@@ -68,6 +68,18 @@ bun tauri build
 
 The output will be in `src-tauri/target/release/bundle/`.
 
+## Troubleshooting
+
+### "App is damaged and can't be opened" (macOS)
+Since this app is not signed with an Apple Developer Certificate (to keep it free and open-source), macOS Gatekeeper may block it. To fix this:
+
+1. Open Terminal.
+2. Run the following command:
+   ```bash
+   xattr -cr /Applications/NuggetVPN.app
+   ```
+   *(Replace `/Applications/NuggetVPN.app` with the actual path if you installed it elsewhere)*
+
 ## Project Structure
 
 - **`src/`**: SvelteKit frontend application.
