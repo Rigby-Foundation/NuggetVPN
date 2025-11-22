@@ -424,8 +424,15 @@ pub fn run() {
 
             #[cfg(target_os = "linux")]
             {
-                eprintln!("На Linux необходимо запускать приложение через sudo!");
-                std::process::exit(1);
+                match Command::new("pkexec").arg(safe_path).spawn() {
+                    Ok(_) => {
+                        std::process::exit(0);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to request elevation: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
         }
     }
@@ -439,6 +446,8 @@ pub fn run() {
                 profiles: Mutex::new(loaded),
                 child_process: Mutex::new(None),
             });
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
