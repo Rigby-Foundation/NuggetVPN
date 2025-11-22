@@ -1,0 +1,108 @@
+name: Test Build
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - 'v*'
+  pull_request:
+
+jobs:
+  test-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-13' # Intel
+            args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+            singbox_arch: 'amd64'
+            singbox_os: 'darwin'
+            ext: 'tar.gz'
+          - platform: 'macos-14' # Apple Silicon
+            args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+            singbox_arch: 'arm64'
+            singbox_os: 'darwin'
+            ext: 'tar.gz'
+          - platform: 'ubuntu-22.04' # Linux
+            args: ''
+            target: 'x86_64-unknown-linux-gnu'
+            singbox_arch: 'amd64'
+            singbox_os: 'linux'
+            ext: 'tar.gz'
+          - platform: 'windows-latest' # Windows
+            args: ''
+            target: 'x86_64-pc-windows-msvc'
+            singbox_arch: 'amd64'
+            singbox_os: 'windows'
+            ext: 'zip'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Setup sing-box sidecar
+        shell: bash
+        run: |
+          mkdir -p src-tauri/bin
+          VERSION="1.9.0"
+          OS="${{ matrix.singbox_os }}"
+          ARCH="${{ matrix.singbox_arch }}"
+          TARGET="${{ matrix.target }}"
+          EXT="${{ matrix.ext }}"
+          
+          URL="https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box-${VERSION}-${OS}-${ARCH}.${EXT}"
+          
+          echo "Downloading sing-box from $URL"
+          curl -L -o "sing-box.${EXT}" "$URL"
+          
+          if [ "$EXT" = "zip" ]; then
+            unzip "sing-box.${EXT}"
+          else
+            tar -xzf "sing-box.${EXT}"
+          fi
+          
+          # Extract binary and rename to sidecar format
+          DIR_NAME="sing-box-${VERSION}-${OS}-${ARCH}"
+          
+          if [ "$OS" = "windows" ]; then
+            mv "$DIR_NAME/sing-box.exe" "src-tauri/bin/sing-box-${TARGET}.exe"
+          else
+            mv "$DIR_NAME/sing-box" "src-tauri/bin/sing-box-${TARGET}"
+            chmod +x "src-tauri/bin/sing-box-${TARGET}"
+          fi
+          
+          echo "Sidecar binary prepared:"
+          ls -l src-tauri/bin/
+
+      - name: Build (Test)
+        run: bun tauri build ${{ matrix.args }}

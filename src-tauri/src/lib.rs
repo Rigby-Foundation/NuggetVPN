@@ -404,7 +404,7 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             let script = format!(
-                "do shell script \"\\\"{}\\\"\" with administrator privileges",
+                "do shell script \"\\\"{}\\\" &> /dev/null &\" with administrator privileges",
                 safe_path
             );
 
