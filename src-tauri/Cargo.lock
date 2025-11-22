@@ -3204,7 +3204,7 @@ dependencies = [
 
 [[package]]
 name = "rigbyhide"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.21.7",
  "nix 0.27.1",
