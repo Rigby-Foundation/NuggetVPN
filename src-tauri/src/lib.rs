@@ -403,21 +403,30 @@ pub fn run() {
             let safe_path = exe_path_str.replace("\"", "\\\"");
 
             #[cfg(target_os = "macos")]
-            let script = format!(
-                "do shell script \"\\\"{}\\\" &> /dev/null &\" with administrator privileges",
-                safe_path
-            );
-
-            #[cfg(target_os = "macos")]
             {
-                match Command::new("osascript").arg("-e").arg(script).spawn() {
+                match Command::new("open")
+                    .arg("-a")
+                    .arg(&safe_path)
+                    .arg("--new")
+                    .spawn()
+                {
                     Ok(_) => {
                         std::process::exit(0);
                     }
-                    Err(e) => {
-                        eprintln!("Failed to request elevation: {}", e);
-
-                        std::process::exit(1);
+                    Err(_) => {
+                        let script = format!(
+                            "do shell script \"\\\"{}\\\" &> /dev/null &\" with administrator privileges",
+                            safe_path
+                        );
+                        match Command::new("osascript").arg("-e").arg(script).spawn() {
+                            Ok(_) => {
+                                std::process::exit(0);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to request elevation: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
                     }
                 }
             }
