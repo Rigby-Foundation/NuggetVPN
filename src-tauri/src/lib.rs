@@ -380,21 +380,21 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         },
         "dns": {
             "servers": [
-                { "tag": "google", "address": "8.8.8.8", "detour": "proxy" },
+                { "tag": "cloudflare", "address": "1.1.1.1", "detour": "proxy" },
                 { "tag": "local", "address": "local", "detour": "direct" }
             ],
             "rules": [
-                { "outbound": "any", "server": "google" }
+                { "outbound": "any", "server": "cloudflare" }
             ]
         },
         "inbounds": [{
             "type": "tun",
             "tag": "tun-in",
             "address": ["172.19.0.1/30"],
-            "mtu": 1280,
+            "mtu": 9000,
             "auto_route": true,
             "strict_route": true,
-            "stack": "system",
+            "stack": "gvisor",
             "sniff": true
         }],
         "outbounds": [
