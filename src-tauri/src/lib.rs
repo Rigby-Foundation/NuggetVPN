@@ -430,6 +430,15 @@ fn get_singbox_path() -> String {
     {
         let target = "x86_64-pc-windows-msvc";
         let path = exe_dir.join(format!("sing-box-{}.exe", target));
+        if path.exists() {
+            return path.to_str().unwrap().to_string();
+        }
+
+        let simple_path = exe_dir.join("sing-box.exe");
+        if simple_path.exists() {
+            return simple_path.to_str().unwrap().to_string();
+        }
+
         return path.to_str().unwrap().to_string();
     }
 }
