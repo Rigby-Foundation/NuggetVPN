@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p src-tauri/bin
-          VERSION="1.9.0"
+          VERSION="1.12.12"
           OS="${{ matrix.singbox_os }}"
           ARCH="${{ matrix.singbox_arch }}"
           TARGET="${{ matrix.target }}"
