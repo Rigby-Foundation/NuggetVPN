@@ -294,18 +294,8 @@ fn get_singbox_path() -> String {
     let current_exe = std::env::current_exe().unwrap();
     let exe_dir = current_exe.parent().unwrap();
 
-    // In development or production, the sidecar is expected to be in the same directory
-    // or a known relative path. Tauri bundles it.
-    // However, since we are not using Tauri's sidecar API anymore, we need to find it manually.
-    // When bundled, it's usually next to the executable or in Resources/bin on macOS.
-
     #[cfg(target_os = "macos")]
     {
-        // In .app bundle: Contents/MacOS/nuggetvpn -> Contents/MacOS/sing-box-x86_64-apple-darwin
-        // Or sometimes Tauri puts it in Resources.
-        // Let's try next to executable first (Tauri 2 default for sidecars is externalBin)
-
-        // Construct the target triple suffix
         let target = if cfg!(target_arch = "x86_64") {
             "x86_64-apple-darwin"
         } else {
@@ -317,7 +307,11 @@ fn get_singbox_path() -> String {
             return path.to_str().unwrap().to_string();
         }
 
-        // Try Resources/bin (typical macOS bundle structure)
+        let simple_path = exe_dir.join("sing-box");
+        if simple_path.exists() {
+            return simple_path.to_str().unwrap().to_string();
+        }
+
         let resources_path = exe_dir
             .parent()
             .unwrap()
@@ -328,7 +322,16 @@ fn get_singbox_path() -> String {
             return resources_path.to_str().unwrap().to_string();
         }
 
-        // Fallback for dev environment
+        let resources_simple_path = exe_dir
+            .parent()
+            .unwrap()
+            .join("Resources")
+            .join("bin")
+            .join("sing-box");
+        if resources_simple_path.exists() {
+            return resources_simple_path.to_str().unwrap().to_string();
+        }
+
         let dev_path = exe_dir.join(format!("sing-box-{}", target));
         return dev_path.to_str().unwrap().to_string();
     }
@@ -361,9 +364,9 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
     let outbound_config = parse_outbound(&current_profile.config_link)?;
 
     let log_path = get_log_path(&app);
-    // Clear log file
+
     let _ = File::create(&log_path);
-    let log_path_str = log_path.to_str().unwrap().replace("\\", "/"); // Fix for Windows JSON
+    let log_path_str = log_path.to_str().unwrap().replace("\\", "/");
 
     let final_config = json!({
         "log": {
@@ -430,8 +433,6 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     #[cfg(target_os = "linux")]
     {
-        // pkexec doesn't easily support redirection in the command string without a shell wrapper
-        // We'll wrap in sh -c
         let cmd = format!(
             "\"{}\" run -c \"{}\" >> \"{}\" 2>&1",
             singbox_path, config_path_str, log_path_shell
@@ -446,10 +447,6 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     #[cfg(target_os = "windows")]
     {
-        // PowerShell Start-Process doesn't support redirection easily.
-        // We rely on sing-box internal logging for Windows for now,
-        // or we could wrap in cmd /c but that gets messy with quoting.
-        // Let's trust sing-box "log": {"output": ...} works on Windows.
         Command::new("powershell")
             .arg("Start-Process")
             .arg("-FilePath")
@@ -464,13 +461,6 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
     }
 
     *running = true;
-
-    // Start log tailing
-    let log_path_clone = log_path.clone();
-    // We need a way to stop the thread, but for now we rely on file updates.
-    // Actually, we should check state.is_running inside the loop.
-    // But we can't easily pass the mutex into the thread without Arc.
-    // For simplicity in this refactor, we'll just tail.
 
     tauri::async_runtime::spawn(async move {
         let mut file = match File::open(&log_path_clone) {
