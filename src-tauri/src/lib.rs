@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -19,15 +19,47 @@ struct Profile {
     server: String,
     protocol: String,
     config_link: String,
+    total_up: Option<u64>,
+    total_down: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct AppSettings {
+    mtu: u32,
+    dns: String,
+    tls_fragment: bool,
+    tls_fragment_size: String,
+    tls_fragment_sleep: String,
+    tls_mixed_sni_case: bool,
+    tls_padding: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            mtu: 9000,
+            dns: "1.1.1.1".to_string(),
+            tls_fragment: false,
+            tls_fragment_size: "100-200".to_string(),
+            tls_fragment_sleep: "10-20".to_string(),
+            tls_mixed_sni_case: false,
+            tls_padding: false,
+        }
+    }
 }
 
 struct AppState {
     profiles: Mutex<Vec<Profile>>,
+    settings: Mutex<AppSettings>,
     is_running: Mutex<bool>,
 }
 
 fn get_data_path(app: &AppHandle) -> PathBuf {
     app.path().app_data_dir().unwrap().join("profiles.json")
+}
+
+fn get_settings_path(app: &AppHandle) -> PathBuf {
+    app.path().app_data_dir().unwrap().join("settings.json")
 }
 
 fn get_log_path(app: &AppHandle) -> PathBuf {
@@ -36,17 +68,6 @@ fn get_log_path(app: &AppHandle) -> PathBuf {
         let _ = fs::create_dir_all(parent);
     }
     path
-}
-
-fn append_log_to_file(path: &PathBuf, msg: &str) {
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-        let line = if msg.ends_with('\n') {
-            msg.to_string()
-        } else {
-            format!("{}\n", msg)
-        };
-        let _ = file.write_all(line.as_bytes());
-    }
 }
 
 fn load_profiles_from_disk(app: &AppHandle) -> Vec<Profile> {
@@ -65,6 +86,25 @@ fn save_profiles_to_disk(app: &AppHandle, profiles: &Vec<Profile>) {
         let _ = fs::create_dir_all(parent);
     }
     let data = serde_json::to_string_pretty(profiles).unwrap();
+    let _ = fs::write(path, data);
+}
+
+fn load_settings_from_disk(app: &AppHandle) -> AppSettings {
+    let path = get_settings_path(app);
+    if path.exists() {
+        let data = fs::read_to_string(path).unwrap_or_default();
+        serde_json::from_str(&data).unwrap_or_default()
+    } else {
+        AppSettings::default()
+    }
+}
+
+fn save_settings_to_disk(app: &AppHandle, settings: &AppSettings) {
+    let path = get_settings_path(app);
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let data = serde_json::to_string_pretty(settings).unwrap();
     let _ = fs::write(path, data);
 }
 
@@ -112,7 +152,7 @@ fn resolve_host(host: &str) -> String {
     }
 }
 
-fn parse_outbound(link: &str) -> Result<Value, String> {
+fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
     let url = Url::parse(link).map_err(|_| "Invalid URL format")?;
     let protocol = url.scheme();
 
@@ -146,6 +186,22 @@ fn parse_outbound(link: &str) -> Result<Value, String> {
                             "short_id": params.get("sid").unwrap_or(&"".to_string())
                         }
                     });
+
+                    if settings.tls_fragment {
+                        outbound["tls"]["utls"]["tls_fragment"] = json!({
+                            "enabled": true,
+                            "size": settings.tls_fragment_size,
+                            "sleep": settings.tls_fragment_sleep
+                        });
+                    }
+
+                    if settings.tls_mixed_sni_case {
+                        outbound["tls"]["mixed_sni_case"] = json!(true);
+                    }
+
+                    if settings.tls_padding {
+                        outbound["tls"]["padding"] = json!(true);
+                    }
                 } else if security == "tls" {
                     outbound["tls"] = json!({
                         "enabled": true,
@@ -153,6 +209,22 @@ fn parse_outbound(link: &str) -> Result<Value, String> {
                         "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
                         "insecure": true
                     });
+
+                    if settings.tls_fragment {
+                        outbound["tls"]["utls"]["tls_fragment"] = json!({
+                            "enabled": true,
+                            "size": settings.tls_fragment_size,
+                            "sleep": settings.tls_fragment_sleep
+                        });
+                    }
+
+                    if settings.tls_mixed_sni_case {
+                        outbound["tls"]["mixed_sni_case"] = json!(true);
+                    }
+
+                    if settings.tls_padding {
+                        outbound["tls"]["padding"] = json!(true);
+                    }
                 }
             }
             Ok(outbound)
@@ -289,6 +361,8 @@ fn add_profile(
         server: "Auto".to_string(),
         protocol: protocol.to_string(),
         config_link: link,
+        total_up: Some(0),
+        total_down: Some(0),
     });
     save_profiles_to_disk(&app, &profiles);
     Ok(profiles.clone())
@@ -314,6 +388,40 @@ fn open_logs_folder(app: AppHandle) {
             .opener()
             .open_path(parent.to_str().unwrap(), None::<&str>);
     }
+}
+
+#[tauri::command]
+fn get_settings(state: State<AppState>) -> AppSettings {
+    state.settings.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn save_settings(
+    app: AppHandle,
+    state: State<AppState>,
+    settings: AppSettings,
+) -> Result<(), String> {
+    let mut s = state.settings.lock().unwrap();
+    *s = settings;
+    save_settings_to_disk(&app, &s);
+    Ok(())
+}
+
+#[tauri::command]
+fn update_profile_usage(
+    app: AppHandle,
+    state: State<AppState>,
+    id: String,
+    up: u64,
+    down: u64,
+) -> Result<(), String> {
+    let mut profiles = state.profiles.lock().unwrap();
+    if let Some(profile) = profiles.iter_mut().find(|p| p.id == id) {
+        profile.total_up = Some(profile.total_up.unwrap_or(0) + up);
+        profile.total_down = Some(profile.total_down.unwrap_or(0) + down);
+        save_profiles_to_disk(&app, &profiles);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -361,6 +469,8 @@ async fn import_subscription(
             server: "Auto".to_string(),
             protocol: protocol.to_string(),
             config_link: link.to_string(),
+            total_up: Some(0),
+            total_down: Some(0),
         });
         added = true;
     }
@@ -452,13 +562,13 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     let profiles = state.profiles.lock().unwrap();
     let current_profile = profiles.first().ok_or("No profiles found")?;
+    let settings = state.settings.lock().unwrap();
 
-    let outbound_config = parse_outbound(&current_profile.config_link)?;
+    let outbound_config = parse_outbound(&current_profile.config_link, &settings)?;
 
     let log_path = get_log_path(&app);
 
     let _ = File::create(&log_path);
-    let log_path_str = log_path.to_str().unwrap().replace("\\", "/");
 
     let final_config = json!({
         "log": {
@@ -472,18 +582,18 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         },
         "dns": {
             "servers": [
-                { "tag": "cloudflare", "address": "1.1.1.1", "detour": "proxy" },
+                { "tag": "custom", "address": settings.dns, "detour": "proxy" },
                 { "tag": "local", "address": "local", "detour": "direct" }
             ],
             "rules": [
-                { "outbound": "any", "server": "cloudflare" }
+                { "outbound": "any", "server": "custom" }
             ]
         },
         "inbounds": [{
             "type": "tun",
             "tag": "tun-in",
             "address": ["172.19.0.1/30"],
-            "mtu": 9000,
+            "mtu": settings.mtu,
             "auto_route": true,
             "strict_route": true,
             "stack": "gvisor",
@@ -639,8 +749,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let loaded = load_profiles_from_disk(app.handle());
+            let loaded_settings = load_settings_from_disk(app.handle());
             app.manage(AppState {
                 profiles: Mutex::new(loaded),
+                settings: Mutex::new(loaded_settings),
                 is_running: Mutex::new(false),
             });
             #[cfg(target_os = "macos")]
@@ -654,7 +766,10 @@ pub fn run() {
             import_subscription,
             start_vpn,
             stop_vpn,
-            open_logs_folder
+            open_logs_folder,
+            get_settings,
+            save_settings,
+            update_profile_usage
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

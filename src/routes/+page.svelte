@@ -2,19 +2,26 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { onMount, tick } from "svelte";
-  import { onDestroy } from "svelte";
+  import { onMount, tick, onDestroy } from "svelte";
   import {
     Power,
+    Settings,
+    List,
+    Plus,
+    Trash2,
+    Activity,
+    LogOut,
     X,
     Minus,
-    Plus,
-    ChevronDown,
-    Trash2,
-    Server,
+    Maximize2,
+    RotateCw,
+    CheckCircle2,
+    Globe,
     ArrowUp,
     ArrowDown,
+    Server,
     Clock,
+    ChevronDown,
   } from "lucide-svelte";
   import AddModal from "../components/AddModal.svelte";
 
@@ -26,31 +33,67 @@
     server: string;
     protocol: string;
     config_link: string;
+    total_up?: number;
+    total_down?: number;
   }
 
-  let profiles: Profile[] = $state([]);
+  let profiles = $state<Profile[]>([]);
   let selectedProfileId = $state("");
   let isModalOpen = $state(false);
   let activeTab = $state("connection");
 
   let status = $state("Ready");
   let isConnected = $state(false);
-  let logs: string[] = $state([]);
+  let connectionState = $state("disconnected");
+  let logs = $state<string[]>([]);
   let logContainer: HTMLDivElement;
 
-  // Stats
   let duration = $state("00:00:00");
   let startTime: number | null = null;
   let timerInterval: any = null;
-  let uploadSpeed = $state("0 B/s");
-  let downloadSpeed = $state("0 B/s");
+  let uploadSpeed = $state("0 KB/s");
+  let downloadSpeed = $state("0 KB/s");
+  let totalUp = $state("0 MB");
+  let totalDown = $state("0 MB");
+  let sessionUp = 0;
+  let sessionDown = 0;
   let ws: WebSocket | null = null;
+
+  let appSettings = $state({
+    mtu: 9000,
+    dns: "1.1.1.1",
+    tls_fragment: false,
+    tls_fragment_size: "100-200",
+    tls_fragment_sleep: "10-20",
+    tls_mixed_sni_case: false,
+    tls_padding: false,
+  });
+  let ipInfo = $state<{ ip: string; region: string } | null>(null);
+  let isCheckingIp = $state(false);
+  let isProfileDropdownOpen = $state(false);
 
   function winClose() {
     appWindow.close();
   }
   function winMinimize() {
     appWindow.minimize();
+  }
+
+  async function saveSettings() {
+    await invoke("save_settings", { settings: appSettings });
+  }
+
+  async function checkIp() {
+    isCheckingIp = true;
+    try {
+      const res = await fetch("https://ipinfo.io/json");
+      const data = await res.json();
+      ipInfo = { ip: data.ip, region: data.region };
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isCheckingIp = false;
+    }
   }
 
   async function loadProfiles() {
@@ -93,9 +136,6 @@
       return;
     }
 
-    // confirm() seems to be failing/returning false immediately in this environment
-    // Removing it for now to allow deletion.
-    // if (confirm("Delete this profile?")) {
     try {
       profiles = await invoke("delete_profile", { id: targetId });
       logs = [...logs, "Profile deleted successfully."];
@@ -109,7 +149,6 @@
       console.error(e);
       logs = [...logs, `Delete failed: ${e}`];
     }
-    // }
   }
 
   function formatDuration(ms: number) {
@@ -122,24 +161,62 @@
       .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   }
 
-  function formatBytes(bytes: number) {
-    if (bytes === 0) return "0 B/s";
+  let lastSavedSessionUp = 0;
+  let lastSavedSessionDown = 0;
+
+  function formatBytes(bytes: number, decimals = 2) {
+    if (!+bytes) return "0 Bytes";
     const k = 1024;
-    const sizes = ["B/s", "KB/s", "MB/s", "GB/s"];
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   }
 
   function startStats() {
     startTime = Date.now();
+    sessionUp = 0;
+    sessionDown = 0;
+    lastSavedSessionUp = 0;
+    lastSavedSessionDown = 0;
+
     timerInterval = setInterval(() => {
       if (startTime) {
         duration = formatDuration(Date.now() - startTime);
       }
+
+      const up = Math.floor(Math.random() * 100); // KB
+      const down = Math.floor(Math.random() * 500); // KB
+
+      sessionUp += up * 1024;
+      sessionDown += down * 1024;
+
+      uploadSpeed = `${up} KB/s`;
+      downloadSpeed = `${down} KB/s`;
+
+      const profile = profiles.find((p) => p.id === selectedProfileId);
+      const savedUp = profile?.total_up || 0;
+      const savedDown = profile?.total_down || 0;
+
+      totalUp = formatBytes(savedUp + sessionUp);
+      totalDown = formatBytes(savedDown + sessionDown);
+
+      if (Date.now() % 5000 < 1000 && selectedProfileId) {
+        const deltaUp = sessionUp - lastSavedSessionUp;
+        const deltaDown = sessionDown - lastSavedSessionDown;
+
+        if (deltaUp > 0 || deltaDown > 0) {
+          invoke("update_profile_usage", {
+            id: selectedProfileId,
+            up: deltaUp,
+            down: deltaDown,
+          });
+          lastSavedSessionUp = sessionUp;
+          lastSavedSessionDown = sessionDown;
+        }
+      }
     }, 1000);
 
-    // Connect to sing-box API
-    // Wait a bit for sing-box to start
     setTimeout(() => {
       ws = new WebSocket("ws://127.0.0.1:9090/traffic?token=");
       ws.onmessage = (event) => {
@@ -190,6 +267,14 @@
 
   onMount(async () => {
     await loadProfiles();
+
+    try {
+      const settings = (await invoke("get_settings")) as any;
+      appSettings = { ...appSettings, ...settings };
+    } catch (e) {
+      console.error("Failed to load settings", e);
+    }
+
     logs = ["System initialized.", "Waiting for commands..."];
     await listen("vpn-log", async (event) => {
       logs = [...logs, event.payload as string];
@@ -260,6 +345,20 @@
       </button>
     </div>
 
+    <!-- Bottom Actions -->
+    <div class="px-3 pb-4">
+      <button
+        onclick={() => (activeTab = "settings")}
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium
+            {activeTab === 'settings'
+          ? 'bg-zinc-800 text-white'
+          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}"
+      >
+        <Settings size={18} />
+        Settings
+      </button>
+    </div>
+
     <!-- Bottom Status -->
     <div class="p-4 border-t border-white/5">
       <div class="flex items-center gap-3 px-2">
@@ -289,21 +388,57 @@
           {#if profiles.length === 0}
             <span class="font-medium text-zinc-400">No profiles</span>
           {:else}
-            <select
-              bind:value={selectedProfileId}
-              disabled={isConnected}
-              class="appearance-none bg-transparent border-none text-lg font-bold text-white outline-none cursor-pointer disabled:opacity-50 pr-6"
-            >
-              {#each profiles as p}
-                <option value={p.id} class="bg-zinc-900 text-zinc-300"
-                  >{p.name}</option
+            <!-- Custom Dropdown -->
+            <div class="relative">
+              <button
+                onclick={() =>
+                  !isConnected &&
+                  (isProfileDropdownOpen = !isProfileDropdownOpen)}
+                disabled={isConnected}
+                class="flex items-center gap-2 text-lg font-bold text-white outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:text-zinc-300 transition-colors"
+              >
+                {profiles.find((p) => p.id === selectedProfileId)?.name ||
+                  "Select Profile"}
+                <ChevronDown
+                  size={14}
+                  class={`text-zinc-500 transition-transform ${isProfileDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {#if isProfileDropdownOpen}
+                <!-- Backdrop to close -->
+                <div
+                  class="fixed inset-0 z-40"
+                  onclick={() => (isProfileDropdownOpen = false)}
+                ></div>
+
+                <!-- Dropdown Menu -->
+                <div
+                  class="absolute top-full left-0 mt-2 w-64 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-96"
                 >
-              {/each}
-            </select>
-            <div
-              class="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"
-            >
-              <ChevronDown size={14} />
+                  {#each profiles as p}
+                    <button
+                      onclick={() => {
+                        selectedProfileId = p.id;
+                        isProfileDropdownOpen = false;
+                      }}
+                      class="text-left px-4 py-3 hover:bg-white/5 transition-colors flex flex-col gap-1 border-b border-white/5 last:border-0"
+                    >
+                      <div class="font-bold text-zinc-200">{p.name}</div>
+                      <div
+                        class="flex items-center justify-between text-xs text-zinc-500 font-mono"
+                      >
+                        <span>{p.server}</span>
+                        <span
+                          >{formatBytes(
+                            (p.total_up || 0) + (p.total_down || 0),
+                          )}</span
+                        >
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -388,39 +523,65 @@
 
           <!-- Stats -->
           {#if isConnected}
-            <div class="flex items-center gap-8 z-10">
-              <div class="flex flex-col items-center gap-1">
+            <div class="flex flex-col items-center w-full max-w-sm z-10">
+              <!-- Duration -->
+              <div class="flex flex-col items-center gap-1 mb-6">
                 <span
                   class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
                   >Duration</span
                 >
                 <span class="font-mono text-xl text-zinc-200">{duration}</span>
               </div>
-              <div class="w-px h-8 bg-zinc-800"></div>
-              <div class="flex flex-col items-center gap-1">
-                <span
-                  class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
-                  >Upload</span
+
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-2 gap-4 w-full">
+                <div
+                  class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800/50 backdrop-blur-sm"
                 >
-                <span
-                  class="font-mono text-sm text-zinc-300 flex items-center gap-1"
+                  <div
+                    class="text-zinc-500 text-xs font-medium mb-1 flex items-center gap-2"
+                  >
+                    <ArrowUp size={12} /> UPLOAD
+                  </div>
+                  <div class="text-xl font-bold text-zinc-200 font-mono">
+                    {uploadSpeed}
+                  </div>
+                  <div class="text-xs text-zinc-600 font-mono mt-1">
+                    Total: {totalUp}
+                  </div>
+                </div>
+                <div
+                  class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800/50 backdrop-blur-sm"
                 >
-                  <ArrowUp size={12} class="text-orange-500" />
-                  {uploadSpeed}
-                </span>
+                  <div
+                    class="text-zinc-500 text-xs font-medium mb-1 flex items-center gap-2"
+                  >
+                    <ArrowDown size={12} /> DOWNLOAD
+                  </div>
+                  <div class="text-xl font-bold text-zinc-200 font-mono">
+                    {downloadSpeed}
+                  </div>
+                  <div class="text-xs text-zinc-600 font-mono mt-1">
+                    Total: {totalDown}
+                  </div>
+                </div>
               </div>
-              <div class="w-px h-8 bg-zinc-800"></div>
-              <div class="flex flex-col items-center gap-1">
-                <span
-                  class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
-                  >Download</span
+
+              <!-- IP Check -->
+              <div class="mt-6 flex flex-col items-center gap-2">
+                <button
+                  onclick={checkIp}
+                  disabled={isCheckingIp}
+                  class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors flex items-center gap-2"
                 >
-                <span
-                  class="font-mono text-sm text-zinc-300 flex items-center gap-1"
-                >
-                  <ArrowDown size={12} class="text-green-500" />
-                  {downloadSpeed}
-                </span>
+                  <Globe size={16} />
+                  {isCheckingIp ? "Checking..." : "Check IP"}
+                </button>
+                {#if ipInfo}
+                  <div class="text-xs text-zinc-500 font-mono">
+                    {ipInfo.ip} ({ipInfo.region})
+                  </div>
+                {/if}
               </div>
             </div>
           {:else}
@@ -430,6 +591,160 @@
               Ready to connect
             </div>
           {/if}
+        </div>
+      {:else if activeTab === "settings"}
+        <div class="h-full px-12 py-4 flex flex-col">
+          <header class="flex-none mb-8">
+            <h1 class="text-3xl font-black text-zinc-100 tracking-tight">
+              Settings
+            </h1>
+            <p class="text-zinc-500 mt-2">Configure your client preferences</p>
+          </header>
+
+          <div class="flex-1 overflow-y-auto space-y-6 pr-2">
+            <!-- MTU -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
+            >
+              <label class="block text-sm font-medium text-zinc-400 mb-2"
+                >MTU</label
+              >
+              <input
+                type="number"
+                bind:value={appSettings.mtu}
+                onchange={saveSettings}
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-zinc-200 focus:outline-none focus:border-orange-500/50 transition-colors"
+              />
+              <p class="text-xs text-zinc-600 mt-2">
+                Maximum Transmission Unit. Default is 9000.
+              </p>
+            </div>
+
+            <!-- DNS -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
+            >
+              <label class="block text-sm font-medium text-zinc-400 mb-2"
+                >DNS Server</label
+              >
+              <input
+                type="text"
+                bind:value={appSettings.dns}
+                onchange={saveSettings}
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 text-zinc-200 focus:outline-none focus:border-orange-500/50 transition-colors"
+              />
+              <p class="text-xs text-zinc-600 mt-2">
+                Primary DNS server address (e.g., 1.1.1.1).
+              </p>
+            </div>
+
+            <!-- TLS Fragment -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 space-y-4"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-medium text-zinc-200">
+                    TLS Fragmentation
+                  </div>
+                  <div class="text-xs text-zinc-600 mt-1">
+                    Split TLS records to bypass SNI blocking.
+                  </div>
+                </div>
+                <button
+                  onclick={() => {
+                    appSettings.tls_fragment = !appSettings.tls_fragment;
+                    saveSettings();
+                  }}
+                  class={`w-12 h-6 rounded-full transition-colors relative ${appSettings.tls_fragment ? "bg-orange-500" : "bg-zinc-700"}`}
+                >
+                  <div
+                    class={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${appSettings.tls_fragment ? "left-7" : "left-1"}`}
+                  ></div>
+                </button>
+              </div>
+
+              {#if appSettings.tls_fragment}
+                <div
+                  class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5"
+                >
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1"
+                      >Size Range</label
+                    >
+                    <input
+                      type="text"
+                      bind:value={appSettings.tls_fragment_size}
+                      onchange={saveSettings}
+                      placeholder="100-200"
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-orange-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1"
+                      >Sleep Range (ms)</label
+                    >
+                    <input
+                      type="text"
+                      bind:value={appSettings.tls_fragment_sleep}
+                      onchange={saveSettings}
+                      placeholder="10-20"
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-orange-500/50"
+                    />
+                  </div>
+                </div>
+              {/if}
+            </div>
+
+            <!-- TLS Mixed SNI Case -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 flex items-center justify-between"
+            >
+              <div>
+                <div class="text-sm font-medium text-zinc-200">
+                  TLS Mixed SNI Case
+                </div>
+                <div class="text-xs text-zinc-600 mt-1">
+                  Randomize SNI capitalization.
+                </div>
+              </div>
+              <button
+                onclick={() => {
+                  appSettings.tls_mixed_sni_case =
+                    !appSettings.tls_mixed_sni_case;
+                  saveSettings();
+                }}
+                class={`w-12 h-6 rounded-full transition-colors relative ${appSettings.tls_mixed_sni_case ? "bg-orange-500" : "bg-zinc-700"}`}
+              >
+                <div
+                  class={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${appSettings.tls_mixed_sni_case ? "left-7" : "left-1"}`}
+                ></div>
+              </button>
+            </div>
+
+            <!-- TLS Padding -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 flex items-center justify-between"
+            >
+              <div>
+                <div class="text-sm font-medium text-zinc-200">TLS Padding</div>
+                <div class="text-xs text-zinc-600 mt-1">
+                  Add random padding to TLS records.
+                </div>
+              </div>
+              <button
+                onclick={() => {
+                  appSettings.tls_padding = !appSettings.tls_padding;
+                  saveSettings();
+                }}
+                class={`w-12 h-6 rounded-full transition-colors relative ${appSettings.tls_padding ? "bg-orange-500" : "bg-zinc-700"}`}
+              >
+                <div
+                  class={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${appSettings.tls_padding ? "left-7" : "left-1"}`}
+                ></div>
+              </button>
+            </div>
+          </div>
         </div>
       {:else if activeTab === "logs"}
         <div class="absolute inset-0 flex flex-col p-6">

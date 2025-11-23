@@ -1,6 +1,7 @@
 <script lang="ts">
     import { X, Clipboard, Link, type Icon } from "lucide-svelte";
     import { invoke } from "@tauri-apps/api/core";
+    import { fade, scale } from "svelte/transition";
 
     let { isOpen, onClose, onSave } = $props();
 
@@ -41,25 +42,23 @@
 
 {#if isOpen}
     <div
-        class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-        onclick={onClose}
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        transition:fade={{ duration: 200 }}
     >
         <div
-            class="w-full max-w-sm bg-[#120a05] border border-orange-500/20 rounded-2xl shadow-2xl overflow-hidden"
-            onclick={(e) => e.stopPropagation()}
+            class="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            transition:scale={{ duration: 200, start: 0.95 }}
         >
             <div
-                class="bg-white/5 p-4 flex justify-between items-center border-b border-white/5"
+                class="p-6 border-b border-white/5 flex items-center justify-between"
             >
-                <h3 class="text-zinc-100 font-bold tracking-wide">
-                    ADD CONNECTION
-                </h3>
-                <button onclick={onClose}
-                    ><X
-                        size={18}
-                        class="text-zinc-500 hover:text-white"
-                    /></button
+                <h2 class="text-xl font-bold text-white">Add Profile</h2>
+                <button
+                    onclick={onClose}
+                    class="text-zinc-500 hover:text-white transition-colors"
                 >
+                    <X size={20} />
+                </button>
             </div>
 
             <div class="p-6 space-y-4">
