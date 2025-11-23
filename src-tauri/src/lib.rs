@@ -535,14 +535,21 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     #[cfg(target_os = "windows")]
     {
+        // We need to wrap the command in cmd /c to support output redirection (>>)
+        // And we run cmd via PowerShell Start-Process to get UAC (RunAs) and hide the window
+        let cmd_args = format!(
+            "/c \"\"{}\" run -c \"{}\" >> \"{}\" 2>&1\"",
+            singbox_path, config_path_str, log_path_shell
+        );
+
         Command::new("powershell")
             .arg("Start-Process")
-            .arg("-FilePath")
-            .arg(format!("\"{}\"", singbox_path))
+            .arg("cmd")
             .arg("-ArgumentList")
-            .arg(format!("\"run -c \\\"{}\\\"\"", config_path_str))
+            .arg(format!("'{}'", cmd_args)) // Single quote the whole argument string for PowerShell
             .arg("-Verb")
             .arg("RunAs")
+            .arg("-WindowStyle")
             .arg("Hidden")
             .spawn()
             .map_err(|e| format!("Failed to start VPN: {}", e))?;
