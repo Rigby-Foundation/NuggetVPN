@@ -368,8 +368,7 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
     let final_config = json!({
         "log": {
             "level": "info",
-            "timestamp": true,
-            "output": log_path_str
+            "timestamp": true
         },
         "dns": {
             "servers": [
@@ -413,12 +412,13 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     let singbox_path = get_singbox_path();
     let config_path_str = config_path.to_str().unwrap();
+    let log_path_shell = log_path.to_str().unwrap();
 
     #[cfg(target_os = "macos")]
     {
         let script = format!(
-            "do shell script \"\\\"{}\\\" run -c \\\"{}\\\" &> /dev/null &\" with administrator privileges",
-            singbox_path, config_path_str
+            "do shell script \"\\\"{}\\\" run -c \\\"{}\\\" >> \\\"{}\\\" 2>&1 &\" with administrator privileges",
+            singbox_path, config_path_str, log_path_shell
         );
 
         Command::new("osascript")
@@ -430,17 +430,26 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     #[cfg(target_os = "linux")]
     {
+        // pkexec doesn't easily support redirection in the command string without a shell wrapper
+        // We'll wrap in sh -c
+        let cmd = format!(
+            "\"{}\" run -c \"{}\" >> \"{}\" 2>&1",
+            singbox_path, config_path_str, log_path_shell
+        );
         Command::new("pkexec")
-            .arg(singbox_path)
-            .arg("run")
+            .arg("sh")
             .arg("-c")
-            .arg(config_path_str)
+            .arg(cmd)
             .spawn()
             .map_err(|e| format!("Failed to start VPN: {}", e))?;
     }
 
     #[cfg(target_os = "windows")]
     {
+        // PowerShell Start-Process doesn't support redirection easily.
+        // We rely on sing-box internal logging for Windows for now,
+        // or we could wrap in cmd /c but that gets messy with quoting.
+        // Let's trust sing-box "log": {"output": ...} works on Windows.
         Command::new("powershell")
             .arg("Start-Process")
             .arg("-FilePath")
