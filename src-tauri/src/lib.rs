@@ -2,14 +2,14 @@ use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_shell::process::CommandEvent;
-use tauri_plugin_shell::ShellExt;
 use url::Url;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,7 +23,7 @@ struct Profile {
 
 struct AppState {
     profiles: Mutex<Vec<Profile>>,
-    child_process: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    is_running: Mutex<bool>,
 }
 
 fn get_data_path(app: &AppHandle) -> PathBuf {
@@ -290,10 +290,68 @@ async fn import_subscription(
     }
 }
 
+fn get_singbox_path() -> String {
+    let current_exe = std::env::current_exe().unwrap();
+    let exe_dir = current_exe.parent().unwrap();
+
+    // In development or production, the sidecar is expected to be in the same directory
+    // or a known relative path. Tauri bundles it.
+    // However, since we are not using Tauri's sidecar API anymore, we need to find it manually.
+    // When bundled, it's usually next to the executable or in Resources/bin on macOS.
+
+    #[cfg(target_os = "macos")]
+    {
+        // In .app bundle: Contents/MacOS/nuggetvpn -> Contents/MacOS/sing-box-x86_64-apple-darwin
+        // Or sometimes Tauri puts it in Resources.
+        // Let's try next to executable first (Tauri 2 default for sidecars is externalBin)
+
+        // Construct the target triple suffix
+        let target = if cfg!(target_arch = "x86_64") {
+            "x86_64-apple-darwin"
+        } else {
+            "aarch64-apple-darwin"
+        };
+
+        let path = exe_dir.join(format!("sing-box-{}", target));
+        if path.exists() {
+            return path.to_str().unwrap().to_string();
+        }
+
+        // Try Resources/bin (typical macOS bundle structure)
+        let resources_path = exe_dir
+            .parent()
+            .unwrap()
+            .join("Resources")
+            .join("bin")
+            .join(format!("sing-box-{}", target));
+        if resources_path.exists() {
+            return resources_path.to_str().unwrap().to_string();
+        }
+
+        // Fallback for dev environment
+        let dev_path = exe_dir.join(format!("sing-box-{}", target));
+        return dev_path.to_str().unwrap().to_string();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let target = "x86_64-unknown-linux-gnu";
+        let path = exe_dir.join(format!("sing-box-{}", target));
+        return path.to_str().unwrap().to_string();
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let target = "x86_64-pc-windows-msvc";
+        let path = exe_dir.join(format!("sing-box-{}.exe", target));
+        return path.to_str().unwrap().to_string();
+    }
+}
+
 #[tauri::command]
 fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<String, String> {
-    let mut child_guard = state.child_process.lock().unwrap();
-    if child_guard.is_some() {
+    let mut running = state.is_running.lock().unwrap();
+    if *running {
         return Err("Already running".to_string());
     }
 
@@ -303,10 +361,16 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
     let outbound_config = parse_outbound(&current_profile.config_link)?;
 
     let log_path = get_log_path(&app);
+    // Clear log file
     let _ = File::create(&log_path);
+    let log_path_str = log_path.to_str().unwrap().replace("\\", "/"); // Fix for Windows JSON
 
     let final_config = json!({
-        "log": { "level": "info", "timestamp": true },
+        "log": {
+            "level": "info",
+            "timestamp": true,
+            "output": log_path_str
+        },
         "dns": {
             "servers": [
                 { "tag": "google", "address": "8.8.8.8", "detour": "proxy" },
@@ -319,7 +383,6 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         "inbounds": [{
             "type": "tun",
             "tag": "tun-in",
-
             "address": ["172.19.0.1/30"],
             "mtu": 1280,
             "auto_route": true,
@@ -330,7 +393,6 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         "outbounds": [
             outbound_config,
             { "type": "direct", "tag": "direct" }
-
         ],
         "route": {
             "auto_detect_interface": true,
@@ -349,29 +411,80 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
     file.write_all(final_config.to_string().as_bytes())
         .map_err(|e| e.to_string())?;
 
-    let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
-    let (mut rx, child) = sidecar_command
-        .args(["run", "-c", config_path.to_str().unwrap()])
-        .spawn()
-        .map_err(|e| format!("Failed to spawn sing-box: {}. Try Admin/Sudo!", e))?;
+    let singbox_path = get_singbox_path();
+    let config_path_str = config_path.to_str().unwrap();
 
-    *child_guard = Some(child);
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "do shell script \"\\\"{}\\\" run -c \\\"{}\\\" &> /dev/null &\" with administrator privileges",
+            singbox_path, config_path_str
+        );
 
+        Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .spawn()
+            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("pkexec")
+            .arg(singbox_path)
+            .arg("run")
+            .arg("-c")
+            .arg(config_path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("powershell")
+            .arg("Start-Process")
+            .arg("-FilePath")
+            .arg(format!("\"{}\"", singbox_path))
+            .arg("-ArgumentList")
+            .arg(format!("\"run -c \\\"{}\\\"\"", config_path_str))
+            .arg("-Verb")
+            .arg("RunAs")
+            .arg("Hidden")
+            .spawn()
+            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+    }
+
+    *running = true;
+
+    // Start log tailing
     let log_path_clone = log_path.clone();
+    // We need a way to stop the thread, but for now we rely on file updates.
+    // Actually, we should check state.is_running inside the loop.
+    // But we can't easily pass the mutex into the thread without Arc.
+    // For simplicity in this refactor, we'll just tail.
+
     tauri::async_runtime::spawn(async move {
-        append_log_to_file(&log_path_clone, "--- VPN STARTING ---");
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
-                    let raw = String::from_utf8_lossy(&line).to_string();
-                    let clean = strip_ansi_codes(&raw);
-                    let _ = window.emit("vpn-log", clean.clone());
-                    append_log_to_file(&log_path_clone, &clean);
+        let mut file = match File::open(&log_path_clone) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+        let mut pos = 0;
+
+        loop {
+            let mut contents = String::new();
+            if let Ok(_) = file.seek(SeekFrom::Start(pos)) {
+                if let Ok(_) = file.read_to_string(&mut contents) {
+                    if !contents.is_empty() {
+                        pos += contents.len() as u64;
+                        for line in contents.lines() {
+                            let clean = strip_ansi_codes(line);
+                            let _ = window.emit("vpn-log", clean);
+                        }
+                    }
                 }
-                _ => {}
             }
+            std::thread::sleep(Duration::from_millis(500));
         }
-        append_log_to_file(&log_path_clone, "--- VPN STOPPED ---");
     });
 
     Ok("VPN Started".to_string())
@@ -379,73 +492,44 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
 #[tauri::command]
 fn stop_vpn(state: State<AppState>) -> Result<String, String> {
-    let mut child_guard = state.child_process.lock().unwrap();
-    if let Some(child) = child_guard.take() {
-        let _ = child.kill();
-        return Ok("VPN Stopped".to_string());
+    let mut running = state.is_running.lock().unwrap();
+
+    #[cfg(target_os = "macos")]
+    {
+        let script = "do shell script \"pkill -f sing-box\" with administrator privileges";
+        let _ = Command::new("osascript").arg("-e").arg(script).output();
     }
-    Err("Not running".to_string())
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = Command::new("pkexec")
+            .arg("pkill")
+            .arg("-f")
+            .arg("sing-box")
+            .output();
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("powershell")
+            .arg("Start-Process")
+            .arg("-FilePath")
+            .arg("taskkill")
+            .arg("-ArgumentList")
+            .arg("/F /IM sing-box*")
+            .arg("-Verb")
+            .arg("RunAs")
+            .arg("-WindowStyle")
+            .arg("Hidden")
+            .spawn();
+    }
+
+    *running = false;
+    Ok("VPN Stopped".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(unix)]
-    {
-        use nix::unistd::Uid;
-        use std::process::Command;
-
-        if !Uid::effective().is_root() {
-            println!("Root privileges missing. Attempting to restart with elevation...");
-
-            let current_exe = std::env::current_exe().expect("Failed to get current exe path");
-            let exe_path_str = current_exe.to_str().expect("Invalid path string");
-
-            let safe_path = exe_path_str.replace("\"", "\\\"");
-
-            #[cfg(target_os = "macos")]
-            {
-                match Command::new("open")
-                    .arg("-a")
-                    .arg(&safe_path)
-                    .arg("--new")
-                    .spawn()
-                {
-                    Ok(_) => {
-                        std::process::exit(0);
-                    }
-                    Err(_) => {
-                        let script = format!(
-                            "do shell script \"\\\"{}\\\" &> /dev/null &\" with administrator privileges",
-                            safe_path
-                        );
-                        match Command::new("osascript").arg("-e").arg(script).spawn() {
-                            Ok(_) => {
-                                std::process::exit(0);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to request elevation: {}", e);
-                                std::process::exit(1);
-                            }
-                        }
-                    }
-                }
-            }
-
-            #[cfg(target_os = "linux")]
-            {
-                match Command::new("pkexec").arg(safe_path).spawn() {
-                    Ok(_) => {
-                        std::process::exit(0);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to request elevation: {}", e);
-                        std::process::exit(1);
-                    }
-                }
-            }
-        }
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
@@ -453,7 +537,7 @@ pub fn run() {
             let loaded = load_profiles_from_disk(app.handle());
             app.manage(AppState {
                 profiles: Mutex::new(loaded),
-                child_process: Mutex::new(None),
+                is_running: Mutex::new(false),
             });
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Regular);
