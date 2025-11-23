@@ -462,6 +462,7 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
 
     *running = true;
 
+    let log_path_clone = log_path.clone();
     tauri::async_runtime::spawn(async move {
         let mut file = match File::open(&log_path_clone) {
             Ok(f) => f,
