@@ -181,6 +181,77 @@ fn parse_outbound(link: &str) -> Result<Value, String> {
                 "password": parts[1]
             }))
         }
+        "hy2" | "hysteria2" => {
+            let password = url.username();
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            let mut outbound = json!({
+                "type": "hysteria2",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "password": password,
+                "tls": {
+                    "enabled": true,
+                    "server_name": params.get("sni").unwrap_or(&domain.to_string()),
+                    "insecure": params.get("insecure").map(|v| v == "1").unwrap_or(false)
+                }
+            });
+
+            if let Some(obfs) = params.get("obfs") {
+                if obfs != "none" {
+                    outbound["obfs"] = json!({
+                        "type": "salamander",
+                        "password": params.get("obfs-password").unwrap_or(&"".to_string())
+                    });
+                }
+            }
+
+            Ok(outbound)
+        }
+        "wireguard" => {
+            let private_key = url.username();
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            Ok(json!({
+                "type": "wireguard",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "private_key": private_key,
+                "peer_public_key": params.get("public_key").unwrap_or(&"".to_string()),
+                "local_address": [params.get("ip").unwrap_or(&"10.0.0.2/32".to_string())],
+                "mtu": params.get("mtu").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1280)
+            }))
+        }
+        "socks" | "socks5" | "socks4" => {
+            let username = url.username();
+            let password = url.password().unwrap_or("");
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+
+            let resolved_ip = resolve_host(domain);
+
+            let version = if protocol == "socks4" { "4" } else { "5" };
+
+            Ok(json!({
+                "type": "socks",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "version": version,
+                "username": username,
+                "password": password
+            }))
+        }
         _ => Err(format!("Protocol {} not supported", protocol)),
     }
 }
@@ -202,6 +273,12 @@ fn add_profile(
         "vless"
     } else if link.starts_with("ss") {
         "ss"
+    } else if link.starts_with("hy2") || link.starts_with("hysteria2") {
+        "hysteria2"
+    } else if link.starts_with("wireguard") {
+        "wireguard"
+    } else if link.starts_with("socks") {
+        "socks"
     } else {
         "unknown"
     };
@@ -268,6 +345,12 @@ async fn import_subscription(
             "vless"
         } else if link.starts_with("ss") {
             "ss"
+        } else if link.starts_with("hy2") || link.starts_with("hysteria2") {
+            "hysteria2"
+        } else if link.starts_with("wireguard") {
+            "wireguard"
+        } else if link.starts_with("socks") {
+            "socks"
         } else {
             continue;
         };

@@ -31,6 +31,7 @@
   let profiles: Profile[] = $state([]);
   let selectedProfileId = $state("");
   let isModalOpen = $state(false);
+  let activeTab = $state("connection");
 
   let status = $state("Ready");
   let isConnected = $state(false);
@@ -85,13 +86,30 @@
     }
   }
 
-  async function handleDelete() {
-    if (!selectedProfileId) return;
-    if (confirm("Delete this profile?")) {
-      profiles = await invoke("delete_profile", { id: selectedProfileId });
-      if (profiles.length > 0) selectedProfileId = profiles[0].id;
-      else selectedProfileId = "";
+  async function handleDelete(id: string | null = null) {
+    const targetId = id || selectedProfileId;
+
+    if (!targetId) {
+      return;
     }
+
+    // confirm() seems to be failing/returning false immediately in this environment
+    // Removing it for now to allow deletion.
+    // if (confirm("Delete this profile?")) {
+    try {
+      profiles = await invoke("delete_profile", { id: targetId });
+      logs = [...logs, "Profile deleted successfully."];
+
+      // If we deleted the currently selected profile, select the first one or clear selection
+      if (targetId === selectedProfileId) {
+        if (profiles.length > 0) selectedProfileId = profiles[0].id;
+        else selectedProfileId = "";
+      }
+    } catch (e) {
+      console.error(e);
+      logs = [...logs, `Delete failed: ${e}`];
+    }
+    // }
   }
 
   function formatDuration(ms: number) {
@@ -192,177 +210,277 @@
 />
 
 <main
-  class="h-screen w-screen overflow-hidden bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-[#0f0805] to-black text-zinc-100 font-sans select-none flex flex-col"
+  class="h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans select-none flex"
 >
+  <!-- Sidebar -->
   <div
-    data-tauri-drag-region
-    class="h-12 flex items-center justify-between px-4 shrink-0 relative bg-white/0"
+    class="w-64 bg-zinc-900/50 border-r border-white/5 flex flex-col shrink-0"
   >
-    <div class="flex items-center gap-2 z-10 pt-2">
+    <!-- Logo -->
+    <div class="h-16 flex items-center px-6 gap-2" data-tauri-drag-region>
+      <div class="text-orange-500 pointer-events-none">
+        <Power size={24} strokeWidth={2.5} />
+      </div>
+      <div class="font-black tracking-wider text-xl pointer-events-none">
+        NUGGET<span class="font-light text-zinc-400">VPN</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="flex-1 py-6 px-3 space-y-1">
       <button
-        onclick={winClose}
-        class="w-3 h-3 rounded-full bg-[#FF5F56] hover:brightness-75 transition-all group relative"
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium
+        {activeTab === 'connection'
+          ? 'bg-zinc-800 text-white'
+          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}"
+        onclick={() => (activeTab = "connection")}
       >
-        <X
-          class="w-2 h-2 text-black/50 absolute top-0.5 left-0.5 opacity-0 group-hover:opacity-100"
-        />
+        <Power size={18} />
+        Connection
       </button>
       <button
-        onclick={winMinimize}
-        class="w-3 h-3 rounded-full bg-[#FFBD2E] hover:brightness-75 transition-all group relative"
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium
+        {activeTab === 'configuration'
+          ? 'bg-zinc-800 text-white'
+          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}"
+        onclick={() => (activeTab = "configuration")}
       >
-        <Minus
-          class="w-2 h-2 text-black/50 absolute top-0.5 left-0.5 opacity-0 group-hover:opacity-100"
-        />
+        <Server size={18} />
+        Configuration
+      </button>
+      <button
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium
+        {activeTab === 'logs'
+          ? 'bg-zinc-800 text-white'
+          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}"
+        onclick={() => (activeTab = "logs")}
+      >
+        <Clock size={18} />
+        Logs
       </button>
     </div>
 
-    <div
-      class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-xs tracking-widest font-bold"
-    >
-      NUGGETVPN
+    <!-- Bottom Status -->
+    <div class="p-4 border-t border-white/5">
+      <div class="flex items-center gap-3 px-2">
+        <div
+          class="w-2 h-2 rounded-full {isConnected
+            ? 'bg-green-500 animate-pulse'
+            : 'bg-zinc-700'}"
+        ></div>
+        <div class="text-xs font-medium text-zinc-400">{status}</div>
+      </div>
     </div>
   </div>
 
-  <div
-    class="flex-1 flex flex-col items-center justify-center p-6 relative z-0"
-  >
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col bg-[#0f0805]">
+    <!-- Top Bar -->
     <div
-      class="absolute inset-0 flex items-center justify-center pointer-events-none"
+      class="h-16 border-b border-white/5 flex items-center justify-between px-6 shrink-0"
+      data-tauri-drag-region
     >
-      <div
-        class="w-[450px] h-[450px] bg-orange-600/5 rounded-full blur-3xl absolute transition-all duration-1000 {isConnected
-          ? 'opacity-100 scale-110'
-          : 'opacity-20 scale-90'}"
-      ></div>
-    </div>
-
-    <div class="relative w-full max-w-[320px] z-10 flex flex-col gap-6">
-      <div class="text-center space-y-1 mb-2">
-        <div
-          class="text-xs font-bold tracking-[0.2em] text-zinc-500 uppercase flex items-center justify-center gap-2"
+      <div class="flex flex-col">
+        <span
+          class="text-[10px] font-bold tracking-wider text-zinc-500 uppercase"
+          >Current Profile</span
         >
-          {#if isConnected}<span
-              class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"
-            ></span>{/if}
-          Status
-        </div>
-        <div
-          class="text-2xl font-black tracking-tight flex items-center justify-center gap-2 {isConnected
-            ? 'text-orange-400 drop-shadow-glow'
-            : 'text-zinc-300'}"
-        >
-          {status}
-        </div>
-
-        {#if isConnected}
-          <div
-            class="flex items-center justify-center gap-4 mt-2 text-[10px] font-mono text-zinc-400"
-          >
-            <div class="flex items-center gap-1">
-              <Clock size={10} />
-              {duration}
-            </div>
-            <div class="flex items-center gap-1">
-              <ArrowUp size={10} />
-              {uploadSpeed}
-            </div>
-            <div class="flex items-center gap-1">
-              <ArrowDown size={10} />
-              {downloadSpeed}
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <div class="flex justify-center mb-2">
-        <button
-          onclick={toggleVpn}
-          class="group relative w-44 h-44 rounded-full flex items-center justify-center transition-all duration-500 outline-none
-          {isConnected ? 'scale-105' : 'hover:scale-[1.02]'}"
-        >
-          <div
-            class="absolute inset-0 rounded-full bg-zinc-900/40 border border-white/5 shadow-2xl backdrop-blur-sm"
-          ></div>
-
-          <div
-            class="absolute inset-2 rounded-full transition-all duration-700 overflow-hidden
-            {isConnected
-              ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-[0_0_50px_rgba(249,115,22,0.6)]'
-              : 'bg-[#0a0a0a] border border-white/5 shadow-inner'}"
-          >
-            {#if isConnected}
-              <div
-                class="absolute bottom-0 left-0 right-0 h-full bg-black/10 mix-blend-overlay animate-pulse"
-              ></div>
-            {/if}
-          </div>
-
-          <Power
-            size={56}
-            strokeWidth={1.5}
-            class="relative z-10 transition-all duration-500 {isConnected
-              ? 'text-white drop-shadow-md scale-110'
-              : 'text-zinc-600 group-hover:text-orange-400'}"
-          />
-        </button>
-      </div>
-
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-          <div class="relative flex-1 group">
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
-              <Server size={14} />
-            </div>
+        <div class="relative group flex items-center gap-2">
+          {#if profiles.length === 0}
+            <span class="font-medium text-zinc-400">No profiles</span>
+          {:else}
             <select
               bind:value={selectedProfileId}
-              disabled={isConnected || profiles.length === 0}
-              class="w-full appearance-none bg-zinc-900/50 hover:bg-zinc-800 border border-white/5 hover:border-orange-500/20 text-sm text-zinc-200 pl-10 pr-8 py-3 rounded-xl transition-all outline-none disabled:opacity-50 cursor-pointer"
+              disabled={isConnected}
+              class="appearance-none bg-transparent border-none text-lg font-bold text-white outline-none cursor-pointer disabled:opacity-50 pr-6"
             >
-              {#if profiles.length === 0}
-                <option>No profiles</option>
-              {:else}
-                {#each profiles as p}
-                  <option value={p.id}>{p.name} ({p.protocol})</option>
-                {/each}
-              {/if}
+              {#each profiles as p}
+                <option value={p.id} class="bg-zinc-900 text-zinc-300"
+                  >{p.name}</option
+                >
+              {/each}
             </select>
             <div
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none"
+              class="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"
             >
               <ChevronDown size={14} />
             </div>
-          </div>
-
-          {#if profiles.length > 0 && !isConnected}
-            <button
-              onclick={handleDelete}
-              class="p-3 rounded-xl bg-zinc-900/30 border border-white/5 hover:bg-red-900/20 hover:text-red-400 text-zinc-600 transition-colors"
-            >
-              <Trash2 size={16} />
-            </button>
           {/if}
         </div>
+      </div>
 
+      <div class="flex items-center gap-4">
         <button
           onclick={() => (isModalOpen = true)}
           disabled={isConnected}
-          class="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs hover:border-orange-500/50 hover:text-orange-400 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-2 disabled:opacity-0"
+          class="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus size={14} /> Add Connection Profile
+          <Plus size={16} />
         </button>
-      </div>
 
-      <div class="h-16 overflow-hidden relative group/logs mt-2">
-        <div
-          class="h-full overflow-y-auto font-mono text-[9px] text-zinc-600 px-2 custom-scrollbar"
-          bind:this={logContainer}
-        >
-          {#each logs as log}
-            <div class="mb-1">{log}</div>
-          {/each}
+        <div class="h-6 w-px bg-zinc-800 mx-2"></div>
+
+        <div class="flex items-center gap-2">
+          <button
+            onclick={winMinimize}
+            class="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+          >
+            <Minus size={16} />
+          </button>
+          <button
+            onclick={winClose}
+            class="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-colors"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="flex-1 relative overflow-hidden">
+      {#if activeTab === "connection"}
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <!-- Background Glow -->
+          <div
+            class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+          >
+            <div
+              class="w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[100px] absolute transition-all duration-1000 {isConnected
+                ? 'opacity-100 scale-110'
+                : 'opacity-30 scale-90'}"
+            ></div>
+          </div>
+
+          <!-- Connect Button -->
+          <div class="relative z-10 mb-12">
+            <button
+              onclick={toggleVpn}
+              class="group relative w-56 h-56 rounded-full flex items-center justify-center transition-all duration-500 outline-none
+                  {isConnected ? 'scale-105' : 'hover:scale-[1.02]'}"
+            >
+              <!-- Outer Ring -->
+              <div
+                class="absolute inset-0 rounded-full border border-white/5 bg-zinc-900/20 backdrop-blur-sm"
+              ></div>
+
+              <!-- Inner Circle -->
+              <div
+                class="absolute inset-3 rounded-full transition-all duration-700 overflow-hidden flex items-center justify-center
+                    {isConnected
+                  ? 'bg-linear-to-tr from-orange-600 to-amber-500 shadow-[0_0_60px_rgba(249,115,22,0.4)]'
+                  : 'bg-zinc-900 border border-white/5 shadow-inner'}"
+              >
+                {#if isConnected}
+                  <div class="absolute inset-0 bg-black/10 animate-pulse"></div>
+                {/if}
+
+                <Power
+                  size={64}
+                  strokeWidth={1.5}
+                  class="relative z-10 transition-all duration-500 {isConnected
+                    ? 'text-white drop-shadow-md scale-110'
+                    : 'text-zinc-600 group-hover:text-orange-400'}"
+                />
+              </div>
+            </button>
+          </div>
+
+          <!-- Stats -->
+          {#if isConnected}
+            <div class="flex items-center gap-8 z-10">
+              <div class="flex flex-col items-center gap-1">
+                <span
+                  class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
+                  >Duration</span
+                >
+                <span class="font-mono text-xl text-zinc-200">{duration}</span>
+              </div>
+              <div class="w-px h-8 bg-zinc-800"></div>
+              <div class="flex flex-col items-center gap-1">
+                <span
+                  class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
+                  >Upload</span
+                >
+                <span
+                  class="font-mono text-sm text-zinc-300 flex items-center gap-1"
+                >
+                  <ArrowUp size={12} class="text-orange-500" />
+                  {uploadSpeed}
+                </span>
+              </div>
+              <div class="w-px h-8 bg-zinc-800"></div>
+              <div class="flex flex-col items-center gap-1">
+                <span
+                  class="text-xs font-bold text-zinc-500 tracking-wider uppercase"
+                  >Download</span
+                >
+                <span
+                  class="font-mono text-sm text-zinc-300 flex items-center gap-1"
+                >
+                  <ArrowDown size={12} class="text-green-500" />
+                  {downloadSpeed}
+                </span>
+              </div>
+            </div>
+          {:else}
+            <div
+              class="h-[52px] flex items-center justify-center text-zinc-500 text-sm z-10"
+            >
+              Ready to connect
+            </div>
+          {/if}
+        </div>
+      {:else if activeTab === "logs"}
+        <div class="absolute inset-0 flex flex-col p-6">
+          <h2 class="text-lg font-bold mb-4 text-zinc-200">System Logs</h2>
+          <div
+            class="flex-1 overflow-y-auto font-mono text-xs text-zinc-400 bg-zinc-900/50 rounded-xl p-4 border border-white/5 custom-scrollbar"
+            bind:this={logContainer}
+          >
+            {#each logs as log}
+              <div class="mb-1 border-b border-white/5 pb-1 last:border-0">
+                {log}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else if activeTab === "configuration"}
+        <div class="absolute inset-0 flex flex-col p-6">
+          <h2 class="text-lg font-bold mb-4 text-zinc-200">Configuration</h2>
+          <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+            {#each profiles as p}
+              <div
+                class="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex items-center justify-between group hover:border-orange-500/30 transition-colors"
+              >
+                <div>
+                  <div class="font-bold text-zinc-200">{p.name}</div>
+                  <div class="text-xs text-zinc-500 font-mono mt-1">
+                    {p.server} ({p.protocol})
+                  </div>
+                </div>
+                <div
+                  class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <button
+                    onclick={() => handleDelete(p.id)}
+                    class="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-lg text-zinc-500 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            {/each}
+
+            <button
+              onclick={() => (isModalOpen = true)}
+              class="w-full py-4 rounded-xl border border-dashed border-zinc-800 text-zinc-500 hover:border-orange-500/50 hover:text-orange-400 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={16} /> Add New Profile
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 </main>
