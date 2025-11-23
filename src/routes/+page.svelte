@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount, tick } from "svelte";
+  import { onDestroy } from "svelte";
   import {
     Power,
     X,
@@ -10,8 +11,10 @@
     Plus,
     ChevronDown,
     Trash2,
-    ShieldCheck,
     Server,
+    ArrowUp,
+    ArrowDown,
+    Clock,
   } from "lucide-svelte";
   import AddModal from "../components/AddModal.svelte";
 
@@ -33,6 +36,14 @@
   let isConnected = $state(false);
   let logs: string[] = $state([]);
   let logContainer: HTMLDivElement;
+
+  // Stats
+  let duration = $state("00:00:00");
+  let startTime: number | null = null;
+  let timerInterval: any = null;
+  let uploadSpeed = $state("0 B/s");
+  let downloadSpeed = $state("0 B/s");
+  let ws: WebSocket | null = null;
 
   function winClose() {
     appWindow.close();
@@ -83,6 +94,55 @@
     }
   }
 
+  function formatDuration(ms: number) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return "0 B/s";
+    const k = 1024;
+    const sizes = ["B/s", "KB/s", "MB/s", "GB/s"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
+
+  function startStats() {
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+      if (startTime) {
+        duration = formatDuration(Date.now() - startTime);
+      }
+    }, 1000);
+
+    // Connect to sing-box API
+    // Wait a bit for sing-box to start
+    setTimeout(() => {
+      ws = new WebSocket("ws://127.0.0.1:9090/traffic?token=");
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          uploadSpeed = formatBytes(data.up);
+          downloadSpeed = formatBytes(data.down);
+        } catch (e) {}
+      };
+    }, 1000);
+  }
+
+  function stopStats() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (ws) ws.close();
+    duration = "00:00:00";
+    uploadSpeed = "0 B/s";
+    downloadSpeed = "0 B/s";
+    startTime = null;
+  }
+
   async function toggleVpn() {
     if (profiles.length === 0) {
       status = "No Profile!";
@@ -96,11 +156,13 @@
         await invoke("start_vpn");
         isConnected = true;
         status = "CONNECTED";
+        startStats();
       } else {
         status = "Stopping...";
         await invoke("stop_vpn");
         isConnected = false;
         status = "Ready";
+        stopStats();
       }
     } catch (error) {
       status = "Error";
@@ -116,6 +178,10 @@
       await tick();
       if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
     });
+  });
+
+  onDestroy(() => {
+    stopStats();
   });
 </script>
 
@@ -188,6 +254,25 @@
         >
           {status}
         </div>
+
+        {#if isConnected}
+          <div
+            class="flex items-center justify-center gap-4 mt-2 text-[10px] font-mono text-zinc-400"
+          >
+            <div class="flex items-center gap-1">
+              <Clock size={10} />
+              {duration}
+            </div>
+            <div class="flex items-center gap-1">
+              <ArrowUp size={10} />
+              {uploadSpeed}
+            </div>
+            <div class="flex items-center gap-1">
+              <ArrowDown size={10} />
+              {downloadSpeed}
+            </div>
+          </div>
+        {/if}
       </div>
 
       <div class="flex justify-center mb-2">

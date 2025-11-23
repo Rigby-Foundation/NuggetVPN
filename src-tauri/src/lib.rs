@@ -373,6 +373,11 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
             "level": "info",
             "timestamp": true
         },
+        "experimental": {
+            "clash_api": {
+                "external_controller": "127.0.0.1:9090"
+            }
+        },
         "dns": {
             "servers": [
                 { "tag": "google", "address": "8.8.8.8", "detour": "proxy" },
