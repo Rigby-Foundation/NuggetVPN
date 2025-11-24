@@ -277,7 +277,11 @@
 
     logs = ["System initialized.", "Waiting for commands..."];
     await listen("vpn-log", async (event) => {
-      logs = [...logs, event.payload as string];
+      const newLogs = event.payload as string[];
+      logs.push(...newLogs);
+      if (logs.length > 1000) {
+        logs = logs.slice(-1000);
+      }
       await tick();
       if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
     });

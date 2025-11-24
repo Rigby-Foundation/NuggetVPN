@@ -690,9 +690,12 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
                 if let Ok(_) = file.read_to_string(&mut contents) {
                     if !contents.is_empty() {
                         pos += contents.len() as u64;
+                        let mut batch = Vec::new();
                         for line in contents.lines() {
-                            let clean = strip_ansi_codes(line);
-                            let _ = window.emit("vpn-log", clean);
+                            batch.push(strip_ansi_codes(line));
+                        }
+                        if !batch.is_empty() {
+                            let _ = window.emit("vpn-log", batch);
                         }
                     }
                 }
