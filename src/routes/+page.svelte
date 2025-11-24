@@ -24,6 +24,7 @@
     ChevronDown,
   } from "lucide-svelte";
   import AddModal from "../components/AddModal.svelte";
+  import Onboarding from "../components/Onboarding.svelte";
 
   const appWindow = getCurrentWindow();
 
@@ -46,6 +47,7 @@
   let isConnected = $state(false);
   let connectionState = $state("disconnected");
   let logs = $state<string[]>([]);
+  let logLimit = $state(1000);
   let logContainer: HTMLDivElement;
 
   let duration = $state("00:00:00");
@@ -67,10 +69,15 @@
     tls_fragment_sleep: "10-20",
     tls_mixed_sni_case: false,
     tls_padding: false,
+    auth_server: null as string | null,
+    auth_token: null as string | null,
+    skip_auth: false,
+    pending_sync_upload: false,
   });
   let ipInfo = $state<{ ip: string; region: string } | null>(null);
   let isCheckingIp = $state(false);
   let isProfileDropdownOpen = $state(false);
+  let showOnboarding = $state(false);
 
   function winClose() {
     appWindow.close();
@@ -271,6 +278,29 @@
     try {
       const settings = (await invoke("get_settings")) as any;
       appSettings = { ...appSettings, ...settings };
+
+      // Check if we need to show onboarding
+      if (!appSettings.auth_server && !appSettings.skip_auth) {
+        showOnboarding = true;
+      }
+
+      // Check for pending sync upload
+      if (
+        appSettings.pending_sync_upload &&
+        appSettings.auth_server &&
+        appSettings.auth_token
+      ) {
+        try {
+          logs = [...logs, "Syncing profiles to server..."];
+          await invoke("push_profiles_to_server", { settings: appSettings });
+          appSettings.pending_sync_upload = false;
+          await saveSettings();
+          logs = [...logs, "Profiles synced successfully."];
+        } catch (e) {
+          console.error("Sync failed:", e);
+          logs = [...logs, `Sync failed: ${e}`];
+        }
+      }
     } catch (e) {
       console.error("Failed to load settings", e);
     }
@@ -279,8 +309,8 @@
     await listen("vpn-log", async (event) => {
       const newLogs = event.payload as string[];
       logs.push(...newLogs);
-      if (logs.length > 1000) {
-        logs = logs.slice(-1000);
+      if (logs.length > logLimit) {
+        logs = logs.slice(-logLimit);
       }
       await tick();
       if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
@@ -297,6 +327,13 @@
   onClose={() => (isModalOpen = false)}
   onSave={handleAddProfile}
 />
+
+{#if showOnboarding}
+  <Onboarding
+    settings={appSettings}
+    oncomplete={() => (showOnboarding = false)}
+  />
+{/if}
 
 <main
   class="h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans select-none flex"
@@ -606,6 +643,64 @@
           </header>
 
           <div class="flex-1 overflow-y-auto space-y-6 pr-2">
+            <!-- Sync Settings -->
+            <div
+              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
+            >
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <div class="text-sm font-medium text-zinc-200">
+                    Synchronization
+                  </div>
+                  <div class="text-xs text-zinc-600 mt-1">
+                    Sync your profiles across devices.
+                  </div>
+                </div>
+                {#if appSettings.auth_server}
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="text-xs text-green-500 font-mono flex items-center gap-1"
+                    >
+                      <CheckCircle2 size={12} /> Connected
+                    </span>
+                  </div>
+                {/if}
+              </div>
+
+              {#if appSettings.auth_server}
+                <div
+                  class="bg-zinc-950/50 rounded-xl p-4 border border-white/5 mb-4"
+                >
+                  <div
+                    class="text-xs text-zinc-500 uppercase tracking-wider mb-1"
+                  >
+                    Server
+                  </div>
+                  <div class="text-sm text-zinc-300 font-mono truncate">
+                    {appSettings.auth_server}
+                  </div>
+                </div>
+                <button
+                  onclick={() => {
+                    appSettings.auth_server = null;
+                    appSettings.auth_token = null;
+                    appSettings.skip_auth = false; // Reset so they can setup again
+                    saveSettings();
+                  }}
+                  class="w-full py-2 bg-zinc-800 hover:bg-red-500/10 hover:text-red-400 text-zinc-400 rounded-lg text-sm transition-colors"
+                >
+                  Disconnect
+                </button>
+              {:else}
+                <button
+                  onclick={() => (showOnboarding = true)}
+                  class="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <RotateCw size={16} /> Connect Sync Server
+                </button>
+              {/if}
+            </div>
+
             <!-- MTU -->
             <div
               class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
@@ -752,7 +847,20 @@
         </div>
       {:else if activeTab === "logs"}
         <div class="absolute inset-0 flex flex-col p-6">
-          <h2 class="text-lg font-bold mb-4 text-zinc-200">System Logs</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-zinc-200">System Logs</h2>
+            <select
+              bind:value={logLimit}
+              onchange={() => {
+                if (logs.length > logLimit) logs = logs.slice(-logLimit);
+              }}
+              class="bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-orange-500 transition-colors"
+            >
+              <option value={100}>100 lines</option>
+              <option value={500}>500 lines</option>
+              <option value={1000}>1000 lines</option>
+            </select>
+          </div>
           <div
             class="flex-1 overflow-y-auto font-mono text-xs text-zinc-400 bg-zinc-900/50 rounded-xl p-4 border border-white/5 custom-scrollbar"
             bind:this={logContainer}

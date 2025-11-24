@@ -32,6 +32,14 @@ struct AppSettings {
     tls_fragment_sleep: String,
     tls_mixed_sni_case: bool,
     tls_padding: bool,
+    #[serde(default)]
+    pub auth_server: Option<String>,
+    #[serde(default)]
+    pub auth_token: Option<String>,
+    #[serde(default)]
+    pub skip_auth: bool,
+    #[serde(default)]
+    pub pending_sync_upload: bool,
 }
 
 impl Default for AppSettings {
@@ -44,6 +52,10 @@ impl Default for AppSettings {
             tls_fragment_sleep: "10-20".to_string(),
             tls_mixed_sni_case: false,
             tls_padding: false,
+            auth_server: None,
+            auth_token: None,
+            skip_auth: false,
+            pending_sync_upload: false,
         }
     }
 }
@@ -483,6 +495,166 @@ async fn import_subscription(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct AuthResponse {
+    token: Option<String>,
+    message: Option<String>,
+}
+
+#[tauri::command]
+async fn login_user(server: String, username: String, password: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/login", server.trim_end_matches('/'));
+
+    let res = client
+        .post(&url)
+        .json(&json!({
+            "username": username,
+            "password": password
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        let text = res.text().await.unwrap_or_default();
+        return Err(text);
+    }
+
+    let data: AuthResponse = res.json().await.map_err(|e| e.to_string())?;
+
+    match data.token {
+        Some(token) => Ok(token),
+        None => Err("No token received".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn register_user(
+    server: String,
+    username: String,
+    password: String,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/register", server.trim_end_matches('/'));
+
+    let res = client
+        .post(&url)
+        .json(&json!({
+            "username": username,
+            "password": password
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        let text = res.text().await.unwrap_or_default();
+        return Err(text);
+    }
+
+    Ok("Registration successful".to_string())
+}
+
+#[derive(Serialize, Deserialize)]
+struct ServerProfile {
+    id: String,
+    name: String,
+    hash: String,
+    encryption_type: String,
+    updated_at: String,
+}
+
+#[tauri::command]
+async fn push_profiles_to_server(
+    app: tauri::AppHandle,
+    settings: AppSettings,
+) -> Result<String, String> {
+    let server = settings.auth_server.ok_or("No auth server configured")?;
+    let token = settings.auth_token.ok_or("No auth token configured")?;
+
+    let profiles = load_profiles_from_disk(&app);
+    let client = reqwest::Client::new();
+    let url = format!("{}/profiles", server.trim_end_matches('/'));
+
+    for profile in profiles {
+        // Serialize profile to JSON string to use as "hash"
+        let profile_json = serde_json::to_string(&profile).map_err(|e| e.to_string())?;
+
+        let res = client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&json!({
+                "name": profile.name,
+                "hash": profile_json,
+                "encryption_type": "json" // Using "json" as type for now since we are just storing the struct
+            }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !res.status().is_success() {
+            // Log error but continue? Or fail?
+            // For now, let's fail to ensure consistency
+            let text = res.text().await.unwrap_or_default();
+            return Err(format!("Failed to push profile {}: {}", profile.name, text));
+        }
+    }
+
+    Ok("All profiles pushed successfully".to_string())
+}
+
+#[tauri::command]
+async fn pull_profiles_from_server(
+    app: tauri::AppHandle,
+    settings: AppSettings,
+) -> Result<Vec<Profile>, String> {
+    let server = settings.auth_server.ok_or("No auth server configured")?;
+    let token = settings.auth_token.ok_or("No auth token configured")?;
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/profiles", server.trim_end_matches('/'));
+
+    let res = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        let text = res.text().await.unwrap_or_default();
+        return Err(text);
+    }
+
+    let server_profiles: Vec<ServerProfile> = res.json().await.map_err(|e| e.to_string())?;
+    let mut local_profiles: Vec<Profile> = Vec::new();
+
+    for sp in server_profiles {
+        // Try to deserialize the "hash" back into a Profile
+        // If it fails (e.g. legacy format or actual encryption), we might need to handle it
+        // For now, assuming it's the JSON we pushed
+        match serde_json::from_str::<Profile>(&sp.hash) {
+            Ok(mut p) => {
+                // Ensure ID matches or generate new?
+                // The server profile has its own ID, but the embedded profile has one too.
+                // Let's trust the embedded one for now, or maybe update it?
+                // Actually, if we are syncing, we should probably keep the ID consistent.
+                local_profiles.push(p);
+            }
+            Err(e) => {
+                println!("Failed to parse profile {}: {}", sp.name, e);
+            }
+        }
+    }
+
+    if !local_profiles.is_empty() {
+        save_profiles_to_disk(&app, &local_profiles);
+    }
+
+    Ok(local_profiles)
+}
+
 fn get_singbox_path() -> String {
     let current_exe = std::env::current_exe().unwrap();
     let exe_dir = current_exe.parent().unwrap();
@@ -772,7 +944,11 @@ pub fn run() {
             open_logs_folder,
             get_settings,
             save_settings,
-            update_profile_usage
+            update_profile_usage,
+            login_user,
+            register_user,
+            push_profiles_to_server,
+            pull_profiles_from_server
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
