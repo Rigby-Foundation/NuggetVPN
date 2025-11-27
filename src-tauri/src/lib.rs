@@ -705,6 +705,15 @@ fn get_singbox_path() -> String {
     {
         let target = "x86_64-unknown-linux-gnu";
         let path = exe_dir.join(format!("sing-box-{}", target));
+        if path.exists() {
+            return path.to_str().unwrap().to_string();
+        }
+
+        let simple_path = exe_dir.join("sing-box");
+        if simple_path.exists() {
+            return simple_path.to_str().unwrap().to_string();
+        }
+
         return path.to_str().unwrap().to_string();
     }
 

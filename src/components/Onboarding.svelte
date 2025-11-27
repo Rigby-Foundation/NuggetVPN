@@ -4,13 +4,13 @@
 
     let { settings, oncomplete } = $props();
 
-    let step = 0; // 0: Server URL, 1: Auth (Login/Register)
-    let serverUrl = "http://127.0.0.1:3001";
-    let username = "";
-    let password = "";
-    let isRegistering = false;
-    let error = "";
-    let isLoading = false;
+    let step = $state(0); // 0: Server URL, 1: Auth (Login/Register)
+    let serverUrl = $state("http://127.0.0.1:3001");
+    let username = $state("");
+    let password = $state("");
+    let isRegistering = $state(false);
+    let error = $state("");
+    let isLoading = $state(false);
 
     async function handleSkip() {
         settings.skip_auth = true;
