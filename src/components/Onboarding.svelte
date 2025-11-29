@@ -99,7 +99,7 @@
 </script>
 
 <div
-    class="fixed inset-0 z-50 bg-[#0f0805] flex items-center justify-center p-6"
+    class="fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center p-6"
 >
     <div class="w-full max-w-md">
         <!-- Header -->
@@ -123,9 +123,7 @@
             </p>
         </div>
 
-        <div
-            class="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 backdrop-blur-xl"
-        >
+        <div class="bg-zinc-900 border border-white/5 rounded-2xl p-6">
             {#if error}
                 <div
                     class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center"

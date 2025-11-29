@@ -46,7 +46,7 @@
         transition:fade={{ duration: 200 }}
     >
         <div
-            class="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            class="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
             transition:scale={{ duration: 200, start: 0.95 }}
         >
             <div
@@ -71,7 +71,7 @@
                         bind:value={inputLink}
                         rows="3"
                         placeholder="Paste vless://... OR http://mysite.com/sub"
-                        class="w-full bg-zinc-900/50 border border-zinc-700 focus:border-orange-500 text-zinc-100 p-3 rounded-xl outline-none text-xs font-mono resize-none"
+                        class="w-full bg-zinc-950 border border-zinc-700 focus:border-orange-500 text-zinc-100 p-3 rounded-xl outline-none text-xs font-mono resize-none"
                     ></textarea>
                 </div>
 
@@ -85,7 +85,7 @@
                             bind:value={name}
                             type="text"
                             placeholder="My Server"
-                            class="w-full bg-zinc-900/50 border border-zinc-700 text-zinc-100 p-3 rounded-xl outline-none"
+                            class="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 p-3 rounded-xl outline-none"
                         />
                     </div>
                 {/if}

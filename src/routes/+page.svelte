@@ -339,9 +339,7 @@
   class="h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans select-none flex"
 >
   <!-- Sidebar -->
-  <div
-    class="w-64 bg-zinc-900/50 border-r border-white/5 flex flex-col shrink-0"
-  >
+  <div class="w-64 bg-zinc-900 border-r border-white/5 flex flex-col shrink-0">
     <!-- Logo -->
     <div class="h-16 flex items-center px-6 gap-2" data-tauri-drag-region>
       <div class="text-orange-500 pointer-events-none">
@@ -414,7 +412,8 @@
   </div>
 
   <!-- Main Content -->
-  <div class="flex-1 flex flex-col bg-[#0f0805]">
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col bg-zinc-950">
     <!-- Top Bar -->
     <div
       class="h-16 border-b border-white/5 flex items-center justify-between px-6 shrink-0"
@@ -455,7 +454,7 @@
 
                 <!-- Dropdown Menu -->
                 <div
-                  class="absolute top-full left-0 mt-2 w-64 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-96"
+                  class="absolute top-full left-0 mt-2 w-64 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-y-auto flex flex-col max-h-96"
                 >
                   {#each profiles as p}
                     <button
@@ -517,16 +516,10 @@
     <div class="flex-1 relative overflow-hidden">
       {#if activeTab === "connection"}
         <div class="absolute inset-0 flex flex-col items-center justify-center">
-          <!-- Background Glow -->
+          <!-- Background Glow Removed -->
           <div
             class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
-          >
-            <div
-              class="w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[100px] absolute transition-all duration-1000 {isConnected
-                ? 'opacity-100 scale-110'
-                : 'opacity-30 scale-90'}"
-            ></div>
-          </div>
+          ></div>
 
           <!-- Connect Button -->
           <div class="relative z-10 mb-12">
@@ -537,7 +530,7 @@
             >
               <!-- Outer Ring -->
               <div
-                class="absolute inset-0 rounded-full border border-white/5 bg-zinc-900/20 backdrop-blur-sm"
+                class="absolute inset-0 rounded-full border border-white/5 bg-zinc-900"
               ></div>
 
               <!-- Inner Circle -->
@@ -576,9 +569,7 @@
 
               <!-- Stats Grid -->
               <div class="grid grid-cols-2 gap-4 w-full">
-                <div
-                  class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800/50 backdrop-blur-sm"
-                >
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
                   <div
                     class="text-zinc-500 text-xs font-medium mb-1 flex items-center gap-2"
                   >
@@ -591,9 +582,7 @@
                     Total: {totalUp}
                   </div>
                 </div>
-                <div
-                  class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800/50 backdrop-blur-sm"
-                >
+                <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
                   <div
                     class="text-zinc-500 text-xs font-medium mb-1 flex items-center gap-2"
                   >
@@ -644,9 +633,7 @@
 
           <div class="flex-1 overflow-y-auto space-y-6 pr-2">
             <!-- Sync Settings -->
-            <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
-            >
+            <div class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
               <div class="flex items-center justify-between mb-4">
                 <div>
                   <div class="text-sm font-medium text-zinc-200">
@@ -669,7 +656,7 @@
 
               {#if appSettings.auth_server}
                 <div
-                  class="bg-zinc-950/50 rounded-xl p-4 border border-white/5 mb-4"
+                  class="bg-zinc-950 rounded-xl p-4 border border-white/5 mb-4"
                 >
                   <div
                     class="text-xs text-zinc-500 uppercase tracking-wider mb-1"
@@ -702,9 +689,7 @@
             </div>
 
             <!-- MTU -->
-            <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
-            >
+            <div class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
               <label class="block text-sm font-medium text-zinc-400 mb-2"
                 >MTU</label
               >
@@ -720,9 +705,7 @@
             </div>
 
             <!-- DNS -->
-            <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50"
-            >
+            <div class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
               <label class="block text-sm font-medium text-zinc-400 mb-2"
                 >DNS Server</label
               >
@@ -739,7 +722,7 @@
 
             <!-- TLS Fragment -->
             <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 space-y-4"
+              class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800 space-y-4"
             >
               <div class="flex items-center justify-between">
                 <div>
@@ -797,7 +780,7 @@
 
             <!-- TLS Mixed SNI Case -->
             <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 flex items-center justify-between"
+              class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800 flex items-center justify-between"
             >
               <div>
                 <div class="text-sm font-medium text-zinc-200">
@@ -823,7 +806,7 @@
 
             <!-- TLS Padding -->
             <div
-              class="bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800/50 flex items-center justify-between"
+              class="bg-zinc-900 rounded-2xl p-6 border border-zinc-800 flex items-center justify-between"
             >
               <div>
                 <div class="text-sm font-medium text-zinc-200">TLS Padding</div>
