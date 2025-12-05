@@ -1,6 +1,6 @@
 # NuggetVPN
 
-NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](https://tauri.app/) and [Svelte 5](https://svelte.dev/). It utilizes [sing-box](https://sing-box.sagernet.org/) as its core engine to provide robust and secure connectivity.
+NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](https://tauri.app/) and [React 19](https://react.dev/). It utilizes [sing-box](https://sing-box.sagernet.org/) as its core engine to provide robust and secure connectivity.
 
 ## Features
 
@@ -83,7 +83,8 @@ Since this app is not signed with an Apple Developer Certificate (to keep it fre
 ## Project Structure
 
 - **`src/`**: SvelteKit frontend application.
-  - **`routes/`**: App pages and layout.
+  - **`lib/`**: Some shadcn libs.
+  - **`hooks/`**: shadcn/ui hooks.
   - **`components/`**: Reusable UI components.
 - **`src-tauri/`**: Rust backend and Tauri configuration.
   - **`src/lib.rs`**: Main application logic, commands, and VPN management.
