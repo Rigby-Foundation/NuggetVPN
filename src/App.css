@@ -1,62 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Unbounded:wght@200..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
-
-/* Stolzl Font Family */
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Thin.woff2') format('woff2'),
-        url('/font/Stolzl-Thin.woff') format('woff');
-    font-weight: 100;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Light.woff2') format('woff2'),
-        url('/font/Stolzl-Light.woff') format('woff');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Regular.woff2') format('woff2'),
-        url('/font/Stolzl-Regular.woff') format('woff');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Book.woff2') format('woff2'),
-        url('/font/Stolzl-Book.woff') format('woff');
-    font-weight: 450;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Medium.woff2') format('woff2'),
-        url('/font/Stolzl-Medium.woff') format('woff');
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Stolzl';
-    src: url('/font/Stolzl-Bold.woff2') format('woff2'),
-        url('/font/Stolzl-Bold.woff') format('woff');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-}
 
 .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -190,38 +136,54 @@
     body {
         @apply bg-background text-foreground min-h-svh relative selection:bg-primary/20 selection:text-primary;
     }
-
-    /* some goofy ahh copy-paste from rigbyhost code */
-    body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        pointer-events: none;
-        background:
-            radial-gradient(circle at 50% 0%, oklch(0.95 0.02 260 / 0.8) 0%, transparent 60%),
-            radial-gradient(circle at 90% 10%, oklch(0.95 0.03 200 / 0.5) 0%, transparent 50%);
-    }
-
-    .dark body::before {
-        background:
-            radial-gradient(circle at 60% -20%, oklch(0.3 0.15 45 / 0.2) 0%, transparent 60%),
-            radial-gradient(circle at 100% 0%, oklch(0.3 0.12 70 / 0.15) 0%, transparent 50%),
-            radial-gradient(circle at 0% 100%, oklch(0.25 0.15 30 / 0.15) 0%, transparent 55%),
-            var(--background);
-    }
-
-    body::after {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-        pointer-events: none;
-        mix-blend-mode: overlay;
-    }
 }
 
 body {
-    font-family: 'Stolzl', sans-serif;
+    font-family: 'Google Sans', 'Unbounded', sans-serif;
+}
+
+.unbounded {
+    font-family: 'Unbounded', sans-serif;
+}
+
+html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: transparent !important;
+    overflow: hidden;  /* ДОБАВЬ ЭТО */
+}
+
+#root {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.window-frame {
+    width: 100%;
+    height: 100%;         /* обязательно */
+    border-radius: 16px;
+    overflow: hidden;
+    background: transparent;
+}
+
+.window-inner {
+    width: 100%;
+    height: 100%;         /* обязательно */
+    background: var(--background);
+}
+
+/* колонка (TopBar + content) */
+.app-col {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* КРИТИЧНО */
+}
+
+/* контейнер для views */
+.app-content {
+    flex: 1;
+    min-height: 0; /* КРИТИЧНО */
+    overflow: hidden; /* НЕ скроллим тут */
 }
