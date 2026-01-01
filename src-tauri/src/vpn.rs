@@ -109,6 +109,12 @@ pub fn start_vpn(
 
     let _ = File::create(&log_path);
 
+    let local_dns_address = if cfg!(target_os = "windows") {
+        format!("udp://{}", settings.dns)
+    } else {
+        "local".to_string()
+    };
+
     let final_config = json!({
         "log": {
             "level": "info",
@@ -123,10 +129,10 @@ pub fn start_vpn(
             "servers": [
                 {
                     "tag": "local",
-                    "address": if cfg!(target_os = "windows") { format!("udp://{}", settings.dns) } else { "local".to_string() },
+                    "address": local_dns_address,
                     "detour": "direct"
                 },
-                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local" }
+                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local", "detour": "proxy" }
             ],
             "rules": [
                 { "outbound": "any", "action": "route", "server": "local" }
@@ -155,7 +161,7 @@ pub fn start_vpn(
             "final": "proxy",
             "rules": [
                 { "protocol": "dns", "action": "hijack-dns" },
-                { "ip_cidr": [format!("{}/32", settings.dns)], "port": [53], "outbound": "direct" },
+                { "ip_cidr": [format!("{}/32", settings.dns)], "outbound": "direct" },
                 { "ip_is_private": true, "outbound": "direct" }
             ]
         }
