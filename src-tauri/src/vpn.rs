@@ -121,8 +121,8 @@ pub fn start_vpn(
         },
         "dns": {
             "servers": [
-                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local" },
-                { "tag": "local", "address": "local" }
+                { "tag": "local", "address": "local", "detour": "direct" },
+                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local" }
             ],
             "rules": [
                 { "outbound": "any", "action": "route", "server": "local" }

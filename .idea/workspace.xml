@@ -11,15 +11,12 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="reafactor and sni spoof">
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="some fix, bump version, change svelte to react everywhere">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CONTRIBUTING.md" beforeDir="false" afterPath="$PROJECT_DIR$/CONTRIBUTING.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/vpn.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/vpn.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/tauri.conf.json" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/tauri.conf.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -129,7 +126,8 @@
       <workItem from="1767228796841" duration="6334000" />
       <workItem from="1767237118078" duration="677000" />
       <workItem from="1767237977711" duration="952000" />
-      <workItem from="1767277013070" duration="1932000" />
+      <workItem from="1767277013070" duration="2425000" />
+      <workItem from="1767283227612" duration="1312000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -219,7 +217,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767278664730</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="some fix, bump version, change svelte to react everywhere">
+      <option name="closed" value="true" />
+      <created>1767279004113</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1767279004113</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -236,7 +242,8 @@
     <MESSAGE value="rollback linux version" />
     <MESSAGE value="some fixes" />
     <MESSAGE value="reafactor and sni spoof" />
-    <option name="LAST_COMMIT_MESSAGE" value="reafactor and sni spoof" />
+    <MESSAGE value="some fix, bump version, change svelte to react everywhere" />
+    <option name="LAST_COMMIT_MESSAGE" value="some fix, bump version, change svelte to react everywhere" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
