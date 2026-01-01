@@ -121,7 +121,11 @@ pub fn start_vpn(
         },
         "dns": {
             "servers": [
-                { "tag": "local", "address": "local", "detour": "direct" },
+                {
+                    "tag": "local",
+                    "address": if cfg!(target_os = "windows") { format!("udp://{}", settings.dns) } else { "local".to_string() },
+                    "detour": "direct"
+                },
                 { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local" }
             ],
             "rules": [
@@ -271,15 +275,8 @@ pub fn stop_vpn(state: State<AppState>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         let _ = Command::new("powershell")
-            .arg("Start-Process")
-            .arg("-FilePath")
-            .arg("taskkill")
-            .arg("-ArgumentList")
-            .arg("/F /IM sing-box*")
-            .arg("-Verb")
-            .arg("RunAs")
-            .arg("-WindowStyle")
-            .arg("Hidden")
+            .arg("-Command")
+            .arg("Start-Process -FilePath 'taskkill' -ArgumentList '/F','/IM','sing-box.exe' -Verb RunAs -WindowStyle Hidden")
             .spawn();
     }
 
