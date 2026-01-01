@@ -28,6 +28,8 @@ const defaultSettings: AppSettings = {
   tls_fragment_sleep: "10-20",
   tls_mixed_sni_case: false,
   tls_padding: false,
+  sni_spoof_enabled: false,
+  sni_spoof_value: "",
   auth_server: null,
   auth_token: null,
   skip_auth: false,

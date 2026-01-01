@@ -31,7 +31,7 @@ Ensure you have the development environment set up as described in the [README.m
    git checkout -b feature/my-awesome-feature
    ```
 2. **Make Changes**:
-   - Frontend code is in `src/`. We use Svelte 5 + TailwindCSS.
+   - Frontend code is in `src/`. We use React 19 + TailwindCSS.
    - Backend code is in `src-tauri/src/`. We use Rust.
 3. **Test**:
    - Run `bun tauri dev` to test the app.
@@ -43,7 +43,7 @@ Ensure you have the development environment set up as described in the [README.m
 
 ## Project Structure
 
-- **`src/`**: The SvelteKit frontend.
+- **`src/`**: The React frontend.
   - `routes/`: File-based routing.
   - `lib/`: Shared utilities (if any).
 - **`src-tauri/`**: The Tauri backend.

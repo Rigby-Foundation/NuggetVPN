@@ -4,7 +4,7 @@ NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](ht
 
 ## Features
 
-- **High Performance**: Built with Rust and Svelte for minimal resource usage.
+- **High Performance**: Built with Rust and React for minimal resource usage.
 - **Protocol Support**:
   - **VLESS**: Supports Reality and TLS security flows.
   - **Shadowsocks**: Standard support for SS protocols.
@@ -82,7 +82,7 @@ Since this app is not signed with an Apple Developer Certificate (to keep it fre
 
 ## Project Structure
 
-- **`src/`**: SvelteKit frontend application.
+- **`src/`**: React frontend application.
   - **`lib/`**: Some shadcn libs.
   - **`hooks/`**: shadcn/ui hooks.
   - **`components/`**: Reusable UI components.
