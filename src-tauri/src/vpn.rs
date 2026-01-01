@@ -155,6 +155,7 @@ pub fn start_vpn(
             "final": "proxy",
             "rules": [
                 { "protocol": "dns", "action": "hijack-dns" },
+                { "ip_cidr": [format!("{}/32", settings.dns)], "port": [53], "outbound": "direct" },
                 { "ip_is_private": true, "outbound": "direct" }
             ]
         }

@@ -11,12 +11,8 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="some fix, bump version, change svelte to react everywhere">
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="fix some issues on windows again">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/src/vpn.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/vpn.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/tauri.conf.json" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/tauri.conf.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -127,7 +123,7 @@
       <workItem from="1767237118078" duration="677000" />
       <workItem from="1767237977711" duration="952000" />
       <workItem from="1767277013070" duration="2425000" />
-      <workItem from="1767283227612" duration="1312000" />
+      <workItem from="1767283227612" duration="1876000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -225,7 +221,23 @@
       <option name="project" value="LOCAL" />
       <updated>1767279004113</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="fix some issues on windows">
+      <option name="closed" value="true" />
+      <created>1767284675276</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1767284675276</updated>
+    </task>
+    <task id="LOCAL-00014" summary="fix some issues on windows again">
+      <option name="closed" value="true" />
+      <created>1767287956513</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1767287956513</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -243,7 +255,9 @@
     <MESSAGE value="some fixes" />
     <MESSAGE value="reafactor and sni spoof" />
     <MESSAGE value="some fix, bump version, change svelte to react everywhere" />
-    <option name="LAST_COMMIT_MESSAGE" value="some fix, bump version, change svelte to react everywhere" />
+    <MESSAGE value="fix some issues on windows" />
+    <MESSAGE value="fix some issues on windows again" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix some issues on windows again" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
