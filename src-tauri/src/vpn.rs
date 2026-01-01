@@ -109,10 +109,21 @@ pub fn start_vpn(
 
     let _ = File::create(&log_path);
 
-    let local_dns_address = if cfg!(target_os = "windows") {
-        format!("udp://{}", settings.dns)
+    let (dns_servers, dns_final) = if cfg!(target_os = "windows") {
+        // Windows: простой UDP DNS без DoH
+        (json!([
+            {
+                "tag": "dns-direct",
+                "address": format!("udp://{}", settings.dns),
+                "detour": "direct"
+            }
+        ]), "dns-direct")
     } else {
-        "local".to_string()
+        // macOS/Linux: DoH через прокси с local резолвером
+        (json!([
+            { "tag": "local", "address": "local", "detour": "direct" },
+            { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local", "detour": "proxy" }
+        ]), "remote")
     };
 
     let final_config = json!({
@@ -126,18 +137,11 @@ pub fn start_vpn(
             }
         },
         "dns": {
-            "servers": [
-                {
-                    "tag": "local",
-                    "address": local_dns_address,
-                    "detour": "direct"
-                },
-                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local", "detour": "proxy" }
-            ],
+            "servers": dns_servers,
             "rules": [
-                { "outbound": "any", "action": "route", "server": "local" }
+                { "outbound": "any", "action": "route", "server": if cfg!(target_os = "windows") { "dns-direct" } else { "local" } }
             ],
-            "final": "remote",
+            "final": dns_final,
             "strategy": "prefer_ipv4"
         },
         "inbounds": [{

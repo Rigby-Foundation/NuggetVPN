@@ -11,7 +11,7 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="stoopid windows" />
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="fuck windows" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -121,7 +121,7 @@
       <workItem from="1767237118078" duration="677000" />
       <workItem from="1767237977711" duration="952000" />
       <workItem from="1767277013070" duration="2425000" />
-      <workItem from="1767283227612" duration="2055000" />
+      <workItem from="1767283227612" duration="2198000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -243,7 +243,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767288823824</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="fuck windows">
+      <option name="closed" value="true" />
+      <created>1767289579586</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1767289579586</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -264,7 +272,8 @@
     <MESSAGE value="fix some issues on windows" />
     <MESSAGE value="fix some issues on windows again" />
     <MESSAGE value="stoopid windows" />
-    <option name="LAST_COMMIT_MESSAGE" value="stoopid windows" />
+    <MESSAGE value="fuck windows" />
+    <option name="LAST_COMMIT_MESSAGE" value="fuck windows" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
