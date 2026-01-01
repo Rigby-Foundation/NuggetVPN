@@ -13,19 +13,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-13' # Intel
+          - platform: 'macos-15-intel' # Intel
             args: '--target x86_64-apple-darwin'
             target: 'x86_64-apple-darwin'
             singbox_arch: 'amd64'
             singbox_os: 'darwin'
             ext: 'tar.gz'
-          - platform: 'macos-14' # Apple Silicon
+          - platform: 'macos-15' # Apple Silicon
             args: '--target aarch64-apple-darwin'
             target: 'aarch64-apple-darwin'
             singbox_arch: 'arm64'
             singbox_os: 'darwin'
             ext: 'tar.gz'
-          - platform: 'ubuntu-22.04' # Linux
+          - platform: 'ubuntu-25.04' # Linux
             args: ''
             target: 'x86_64-unknown-linux-gnu'
             singbox_arch: 'amd64'
