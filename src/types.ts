@@ -16,6 +16,8 @@ export interface AppSettings {
     tls_fragment_sleep: string;
     tls_mixed_sni_case: boolean;
     tls_padding: boolean;
+    sni_spoof_enabled: boolean;
+    sni_spoof_value: string;
     auth_server: string | null;
     auth_token: string | null;
     skip_auth: boolean;

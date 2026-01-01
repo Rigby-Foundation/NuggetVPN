@@ -244,6 +244,42 @@ function SettingsView({
               />
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">SNI Spoof</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Override SNI with a custom domain to bypass filtering.
+                  </div>
+                </div>
+                <Switch
+                  checked={appSettings.sni_spoof_enabled}
+                  onCheckedChange={(checked) =>
+                    onSettingsChange("sni_spoof_enabled", checked)
+                  }
+                />
+              </div>
+
+              {appSettings.sni_spoof_enabled && (
+                <div className="pt-4 border-t">
+                  <Label className="mb-1 block text-xs">Spoof Domain</Label>
+                  <Input
+                    type="text"
+                    value={appSettings.sni_spoof_value}
+                    onChange={(e) =>
+                      onSettingsChange("sni_spoof_value", e.target.value)
+                    }
+                    placeholder="www.google.com"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter a domain that appears in SNI (e.g., www.google.com).
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </ScrollArea>

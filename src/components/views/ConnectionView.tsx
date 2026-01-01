@@ -67,7 +67,7 @@ function ConnectionView({
       </div>
 
       {isConnected && (
-          <div className="flex items-center w-full max-w-[55vw]">
+          <div className="flex items-center w-full max-w-[65vw]">
             <div className="grid grid-cols-4 gap-4 w-full">
               <div className="flex items-center justify-center gap-4">
                 <ArrowUp size={24} className="text-red-500" />

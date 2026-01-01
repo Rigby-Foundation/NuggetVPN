@@ -18,43 +18,43 @@ function ConfigurationView({
   onAdd,
 }: ConfigurationViewProps) {
   return (
-    <div className="absolute inset-0 flex flex-col p-6">
-      <h2 className="text-lg font-bold mb-4">Configuration</h2>
-      <ScrollArea className="overflow-scroll">
-        <div className="space-y-2 pr-4">
-          {profiles.map((p) => (
-            <Card
-              key={p.id}
-              className="flex flex-row justify-between p-4 group hover:border-primary/50 transition-colors"
-            >
-              <div className="flex justify-between w-full items-center">
-                <div>
-                  <div className="font-bold">{p.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono mt-1">
-                    {p.server} ({p.protocol})
+    <div className="absolute inset-0">
+      <ScrollArea className="h-full">
+        <div className="p-6">
+          <h2 className="text-lg font-bold mb-4">Configuration</h2>
+          <div className="space-y-2">
+            {profiles.map((p) => (
+              <Card
+                key={p.id}
+                className="p-4 group hover:border-primary/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="font-bold truncate">{p.name}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-1 truncate">
+                      {p.server} ({p.protocol})
+                    </div>
                   </div>
-                </div>
-                <div className="flex">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => onDelete(p.id)}
-                    className="hover:text-destructive hover:bg-destructive/10"
+                    className="shrink-0 hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 size={16} />
                   </Button>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
 
-          <Button
-            variant="outline"
-            className="w-full py-8 border-dashed"
-            onClick={onAdd}
-          >
-            <Plus size={16} className="mr-2" /> Add New Profile
-          </Button>
+            <Button
+              variant="outline"
+              className="w-full py-8 border-dashed"
+              onClick={onAdd}
+            >
+              <Plus size={16} className="mr-2" /> Add New Profile
+            </Button>
+          </div>
         </div>
       </ScrollArea>
     </div>
