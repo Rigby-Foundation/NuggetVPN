@@ -5,6 +5,7 @@ node_modules
 /package
 /dist
 .env
+nuggetvpn-logs.txt
 .env.*
 !.env.example
 vite.config.js.timestamp-*

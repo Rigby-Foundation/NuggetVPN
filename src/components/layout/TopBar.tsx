@@ -33,11 +33,11 @@ function TopBar({
       className="h-16 border-b flex items-center justify-between px-6 shrink-0"
       data-tauri-drag-region
     >
-      <div className="flex flex-col">
+      <div className="flex flex-col min-w-0 flex-1 mr-4">
         <span className="text-[10px] font-bold text-muted-foreground">
           Current Profile
         </span>
-        <div className="relative group flex items-center gap-2">
+        <div className="relative group flex items-center gap-2 min-w-0">
           {profiles.length === 0 ? (
             <span className="font-medium text-muted-foreground">No profiles</span>
           ) : (
@@ -46,10 +46,10 @@ function TopBar({
                 <Button
                   variant="ghost"
                   disabled={isConnected}
-                  className="p-0! h-auto font-bold text-lg"
+                  className="p-0! h-auto font-bold text-lg max-w-full"
                 >
-                  {selectedProfile?.name || "Select Profile"}
-                  <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                  <span className="truncate">{selectedProfile?.name || "Select Profile"}</span>
+                  <ChevronDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64 max-h-96 overflow-y-auto">
@@ -59,10 +59,10 @@ function TopBar({
                     onClick={() => onProfileSelect(p.id)}
                     className="flex flex-col items-start gap-1 p-3 cursor-pointer"
                   >
-                    <div className="font-bold">{p.name}</div>
+                    <div className="font-bold truncate w-full">{p.name}</div>
                     <div className="flex w-full items-center justify-between text-xs text-muted-foreground font-mono">
-                      <span>{p.server}</span>
-                      <span>
+                      <span className="truncate">{p.server}</span>
+                      <span className="shrink-0 ml-2">
                         {formatBytes((p.total_up || 0) + (p.total_down || 0))}
                       </span>
                     </div>
@@ -74,7 +74,7 @@ function TopBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 shrink-0">
         <Button
           size="icon"
           variant="secondary"

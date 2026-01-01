@@ -183,9 +183,15 @@ pub async fn import_subscription(
 
     for line in decoded_string.lines() {
         let link = line.trim();
-        if link.is_empty() {
+        if link.is_empty() || link.starts_with('#') {
             continue;
         }
+        
+        // Skip Hiddify info/fake profiles (contain .time domain or fake_ip)
+        if link.contains(".time:") || link.contains("fake_ip") {
+            continue;
+        }
+        
         let protocol = detect_protocol(link);
         if protocol == "unknown" {
             continue;

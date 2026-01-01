@@ -1,7 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::net::ToSocketAddrs;
 use url::Url;
 
 use crate::models::AppSettings;
@@ -49,19 +48,8 @@ pub fn extract_name_from_link(link: &str) -> String {
 }
 
 fn resolve_host(host: &str) -> String {
-    if host.parse::<std::net::IpAddr>().is_ok() {
-        return host.to_string();
-    }
-
-    match (host, 443).to_socket_addrs() {
-        Ok(mut addrs) => {
-            if let Some(addr) = addrs.find(|a| a.is_ipv4()) {
-                return addr.ip().to_string();
-            }
-            host.to_string()
-        }
-        Err(_) => host.to_string(),
-    }
+    // Let sing-box resolve the domain itself using configured DNS
+    host.to_string()
 }
 
 fn apply_tls_settings(tls: &mut Value, settings: &AppSettings) {

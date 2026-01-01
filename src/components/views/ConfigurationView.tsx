@@ -18,7 +18,7 @@ function ConfigurationView({
   onAdd,
 }: ConfigurationViewProps) {
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 overflow-hidden">
       <ScrollArea className="h-full">
         <div className="p-6">
           <h2 className="text-lg font-bold mb-4">Configuration</h2>
@@ -26,10 +26,10 @@ function ConfigurationView({
             {profiles.map((p) => (
               <Card
                 key={p.id}
-                className="p-4 group hover:border-primary/50 transition-colors"
+                className="p-4 group hover:border-primary/50 transition-colors overflow-hidden"
               >
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className="flex-1 min-w-0">
                     <div className="font-bold truncate">{p.name}</div>
                     <div className="text-xs text-muted-foreground font-mono mt-1 truncate">
                       {p.server} ({p.protocol})

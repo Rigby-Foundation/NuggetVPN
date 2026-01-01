@@ -11,20 +11,14 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="why windows doesnt work">
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="add error catching and fix scroll in logs">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/assets/index-CiKq2AfM.js" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/assets/index-s5OQurSj.css" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/dist/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/capabilities/default.json" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/capabilities/default.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src-tauri/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/views/LogsView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/LogsView.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tsconfig.tsbuildinfo" beforeDir="false" afterPath="$PROJECT_DIR$/tsconfig.tsbuildinfo" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/auth.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/parser.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,6 +77,11 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
+  </component>
   <component name="RunManager" selected="Cargo.Run nuggetvpn">
     <configuration name="Run nuggetvpn" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="buildProfileId" value="dev" />
@@ -135,7 +134,7 @@
       <workItem from="1767237118078" duration="677000" />
       <workItem from="1767237977711" duration="952000" />
       <workItem from="1767277013070" duration="2425000" />
-      <workItem from="1767283227612" duration="2985000" />
+      <workItem from="1767283227612" duration="4435000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -273,7 +272,31 @@
       <option name="project" value="LOCAL" />
       <updated>1767292904119</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="add log download button">
+      <option name="closed" value="true" />
+      <created>1767294112958</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1767294112958</updated>
+    </task>
+    <task id="LOCAL-00019" summary="add error catching and fix scroll in logs">
+      <option name="closed" value="true" />
+      <created>1767294931569</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1767294931569</updated>
+    </task>
+    <task id="LOCAL-00020" summary="add error catching and fix scroll in logs">
+      <option name="closed" value="true" />
+      <created>1767295692283</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1767295692283</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -296,7 +319,9 @@
     <MESSAGE value="stoopid windows" />
     <MESSAGE value="fuck windows" />
     <MESSAGE value="why windows doesnt work" />
-    <option name="LAST_COMMIT_MESSAGE" value="why windows doesnt work" />
+    <MESSAGE value="add log download button" />
+    <MESSAGE value="add error catching and fix scroll in logs" />
+    <option name="LAST_COMMIT_MESSAGE" value="add error catching and fix scroll in logs" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
