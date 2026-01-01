@@ -11,7 +11,7 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="some fixes" />
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="bump" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -126,7 +126,7 @@
       <workItem from="1767237118078" duration="677000" />
       <workItem from="1767237977711" duration="952000" />
       <workItem from="1767277013070" duration="2425000" />
-      <workItem from="1767283227612" duration="4512000" />
+      <workItem from="1767283227612" duration="4848000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -296,7 +296,23 @@
       <option name="project" value="LOCAL" />
       <updated>1767296939451</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="final fixes">
+      <option name="closed" value="true" />
+      <created>1767297866011</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1767297866011</updated>
+    </task>
+    <task id="LOCAL-00023" summary="bump">
+      <option name="closed" value="true" />
+      <created>1767297980497</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1767297980497</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -321,7 +337,9 @@
     <MESSAGE value="add log download button" />
     <MESSAGE value="add error catching and fix scroll in logs" />
     <MESSAGE value="some fixes" />
-    <option name="LAST_COMMIT_MESSAGE" value="some fixes" />
+    <MESSAGE value="final fixes" />
+    <MESSAGE value="bump" />
+    <option name="LAST_COMMIT_MESSAGE" value="bump" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
