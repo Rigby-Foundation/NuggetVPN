@@ -139,10 +139,24 @@ fn strip_ansi_codes(s: &str) -> String {
 
 fn extract_name_from_link(link: &str) -> String {
     if let Ok(parsed) = Url::parse(link) {
-        if let Some(fragment) = parsed.fragment() {
-            return urlencoding::decode(fragment)
-                .unwrap_or_default()
-                .to_string();
+        let protocol = match parsed.scheme() {
+            "vless" => "VLESS",
+            "vmess" => "VMess",
+            "trojan" => "Trojan",
+            "ss" => "Shadowsocks",
+            "ssr" => "ShadowsocksR",
+            "hy" | "hysteria" => "Hysteria",
+            "hy2" | "hysteria2" => "Hysteria2",
+            "tuic" => "TUIC",
+            "wg" | "wireguard" => "WireGuard",
+            "socks" | "socks4" | "socks5" => "SOCKS",
+            "http" | "https" => "HTTP",
+            "ssh" => "SSH",
+            other => other,
+        };
+        
+        if let Some(host) = parsed.host_str() {
+            return format!("{} ({})", host, protocol);
         }
     }
     "Imported Profile".to_string()
@@ -1119,11 +1133,11 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         },
         "dns": {
             "servers": [
-                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "detour": "proxy" },
-                { "tag": "local", "address": "local", "detour": "direct" }
+                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local" },
+                { "tag": "local", "address": "local" }
             ],
             "rules": [
-                { "outbound": "any", "server": "local" }
+                { "outbound": "any", "action": "route", "server": "local" }
             ],
             "final": "remote",
             "strategy": "prefer_ipv4"
@@ -1142,14 +1156,13 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         "outbounds": [
             outbound_config,
             { "type": "direct", "tag": "direct" },
-            { "type": "dns", "tag": "dns-out" },
             { "type": "block", "tag": "block" }
         ],
         "route": {
             "auto_detect_interface": true,
             "final": "proxy",
             "rules": [
-                { "protocol": "dns", "outbound": "dns-out" },
+                { "protocol": "dns", "action": "hijack-dns" },
                 { "ip_is_private": true, "outbound": "direct" }
             ]
         }

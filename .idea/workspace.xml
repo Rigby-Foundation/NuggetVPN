@@ -11,11 +11,7 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="fix issues with sing-box">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/release.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/release.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.github/workflows/test.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/test.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -122,7 +118,7 @@
       <updated>1767102746137</updated>
       <workItem from="1767102747377" duration="7103000" />
       <workItem from="1767228796841" duration="6334000" />
-      <workItem from="1767237118078" duration="516000" />
+      <workItem from="1767237118078" duration="677000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -188,7 +184,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767237519911</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="rollback linux version">
+      <option name="closed" value="true" />
+      <created>1767237646156</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1767237646156</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -202,7 +206,8 @@
     <MESSAGE value="fucking xray" />
     <MESSAGE value="rework design" />
     <MESSAGE value="fix issues with sing-box" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix issues with sing-box" />
+    <MESSAGE value="rollback linux version" />
+    <option name="LAST_COMMIT_MESSAGE" value="rollback linux version" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
