@@ -164,6 +164,71 @@ fn resolve_host(host: &str) -> String {
     }
 }
 
+fn apply_tls_settings(tls: &mut Value, settings: &AppSettings) {
+    if settings.tls_fragment {
+        tls["utls"]["tls_fragment"] = json!({
+            "enabled": true,
+            "size": settings.tls_fragment_size,
+            "sleep": settings.tls_fragment_sleep
+        });
+    }
+    if settings.tls_mixed_sni_case {
+        tls["mixed_sni_case"] = json!(true);
+    }
+    if settings.tls_padding {
+        tls["padding"] = json!(true);
+    }
+}
+
+fn add_transport(outbound: &mut Value, params: &std::collections::HashMap<String, String>, domain: &str) {
+    let transport_type = params.get("type").map(|s| s.as_str()).unwrap_or("tcp");
+    
+    match transport_type {
+        "ws" => {
+            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
+            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
+            outbound["transport"] = json!({
+                "type": "ws",
+                "path": path,
+                "headers": { "Host": host },
+                "max_early_data": 2048,
+                "early_data_header_name": "Sec-WebSocket-Protocol"
+            });
+        }
+        "grpc" => {
+            let service_name = params.get("serviceName").map(|s| s.as_str()).unwrap_or("");
+            outbound["transport"] = json!({
+                "type": "grpc",
+                "service_name": service_name
+            });
+        }
+        "h2" | "http" => {
+            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
+            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
+            outbound["transport"] = json!({
+                "type": "http",
+                "host": [host],
+                "path": path
+            });
+        }
+        "quic" => {
+            outbound["transport"] = json!({
+                "type": "quic"
+            });
+        }
+        "httpupgrade" => {
+            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
+            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
+            outbound["transport"] = json!({
+                "type": "httpupgrade",
+                "host": host,
+                "path": path
+            });
+        }
+        _ => {}
+    }
+}
+
 fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
     let url = Url::parse(link).map_err(|_| "Invalid URL format")?;
     let protocol = url.scheme();
@@ -176,19 +241,30 @@ fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
             let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
 
             let resolved_ip = resolve_host(domain);
+            let transport_type = params.get("type").map(|s| s.as_str()).unwrap_or("tcp");
+            
+            // flow is only valid for tcp/raw transport without mux
+            let flow = if transport_type == "tcp" || transport_type == "" {
+                params.get("flow").map(|s| s.as_str()).unwrap_or("")
+            } else {
+                ""
+            };
 
             let mut outbound = json!({
                 "type": "vless",
                 "tag": "proxy",
                 "server": resolved_ip,
                 "server_port": port,
-                "uuid": uuid,
-                "flow": params.get("flow").unwrap_or(&"".to_string())
+                "uuid": uuid
             });
+
+            if !flow.is_empty() {
+                outbound["flow"] = json!(flow);
+            }
 
             if let Some(security) = params.get("security") {
                 if security == "reality" {
-                    outbound["tls"] = json!({
+                    let mut tls = json!({
                         "enabled": true,
                         "server_name": params.get("sni").unwrap_or(&domain.to_string()),
                         "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
@@ -198,72 +274,193 @@ fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
                             "short_id": params.get("sid").unwrap_or(&"".to_string())
                         }
                     });
-
-                    if settings.tls_fragment {
-                        outbound["tls"]["utls"]["tls_fragment"] = json!({
-                            "enabled": true,
-                            "size": settings.tls_fragment_size,
-                            "sleep": settings.tls_fragment_sleep
-                        });
-                    }
-
-                    if settings.tls_mixed_sni_case {
-                        outbound["tls"]["mixed_sni_case"] = json!(true);
-                    }
-
-                    if settings.tls_padding {
-                        outbound["tls"]["padding"] = json!(true);
-                    }
+                    apply_tls_settings(&mut tls, settings);
+                    outbound["tls"] = tls;
                 } else if security == "tls" {
-                    outbound["tls"] = json!({
+                    let alpn = params.get("alpn").map(|s| {
+                        s.split(',').map(|v| v.to_string()).collect::<Vec<_>>()
+                    });
+                    let mut tls = json!({
                         "enabled": true,
                         "server_name": params.get("sni").unwrap_or(&domain.to_string()),
                         "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
-                        "insecure": true
+                        "insecure": params.get("allowInsecure").map(|v| v == "1").unwrap_or(false)
                     });
-
-                    if settings.tls_fragment {
-                        outbound["tls"]["utls"]["tls_fragment"] = json!({
-                            "enabled": true,
-                            "size": settings.tls_fragment_size,
-                            "sleep": settings.tls_fragment_sleep
-                        });
+                    if let Some(alpn_list) = alpn {
+                        tls["alpn"] = json!(alpn_list);
                     }
-
-                    if settings.tls_mixed_sni_case {
-                        outbound["tls"]["mixed_sni_case"] = json!(true);
-                    }
-
-                    if settings.tls_padding {
-                        outbound["tls"]["padding"] = json!(true);
-                    }
+                    apply_tls_settings(&mut tls, settings);
+                    outbound["tls"] = tls;
                 }
             }
+
+            add_transport(&mut outbound, &params, domain);
+            Ok(outbound)
+        }
+        "vmess" => {
+            let link_body = link.strip_prefix("vmess://").ok_or("Invalid vmess link")?;
+            let decoded = general_purpose::STANDARD
+                .decode(link_body.trim())
+                .or_else(|_| general_purpose::URL_SAFE.decode(link_body.trim()))
+                .map_err(|_| "Failed to decode vmess link")?;
+            let vmess_config: Value = serde_json::from_slice(&decoded)
+                .map_err(|_| "Failed to parse vmess JSON")?;
+
+            let server = vmess_config["add"].as_str().unwrap_or("");
+            let port = vmess_config["port"].as_u64().unwrap_or(443) as u16;
+            let uuid = vmess_config["id"].as_str().unwrap_or("");
+            let alter_id = vmess_config["aid"].as_u64().unwrap_or(0) as u32;
+            let security = vmess_config["scy"].as_str().unwrap_or("auto");
+            let net = vmess_config["net"].as_str().unwrap_or("tcp");
+            let tls_type = vmess_config["tls"].as_str().unwrap_or("");
+            let sni = vmess_config["sni"].as_str().unwrap_or(server);
+            let host = vmess_config["host"].as_str().unwrap_or(server);
+            let path = vmess_config["path"].as_str().unwrap_or("/");
+
+            let resolved_ip = resolve_host(server);
+
+            let mut outbound = json!({
+                "type": "vmess",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "uuid": uuid,
+                "alter_id": alter_id,
+                "security": security
+            });
+
+            if tls_type == "tls" {
+                let mut tls = json!({
+                    "enabled": true,
+                    "server_name": sni,
+                    "utls": { "enabled": true, "fingerprint": "chrome" },
+                    "insecure": false
+                });
+                apply_tls_settings(&mut tls, settings);
+                outbound["tls"] = tls;
+            }
+
+            match net {
+                "ws" => {
+                    outbound["transport"] = json!({
+                        "type": "ws",
+                        "path": path,
+                        "headers": { "Host": host },
+                        "max_early_data": 2048,
+                        "early_data_header_name": "Sec-WebSocket-Protocol"
+                    });
+                }
+                "grpc" => {
+                    outbound["transport"] = json!({
+                        "type": "grpc",
+                        "service_name": path.trim_start_matches('/')
+                    });
+                }
+                "h2" | "http" => {
+                    outbound["transport"] = json!({
+                        "type": "http",
+                        "host": [host],
+                        "path": path
+                    });
+                }
+                "quic" => {
+                    outbound["transport"] = json!({
+                        "type": "quic"
+                    });
+                }
+                _ => {}
+            }
+
+            Ok(outbound)
+        }
+        "trojan" => {
+            let password = url.username();
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            let mut outbound = json!({
+                "type": "trojan",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "password": password
+            });
+
+            let sni = params.get("sni").unwrap_or(&domain.to_string()).clone();
+            let alpn = params.get("alpn").map(|s| {
+                s.split(',').map(|v| v.to_string()).collect::<Vec<_>>()
+            });
+            let mut tls = json!({
+                "enabled": true,
+                "server_name": sni,
+                "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
+                "insecure": params.get("allowInsecure").map(|v| v == "1").unwrap_or(false)
+            });
+            if let Some(alpn_list) = alpn {
+                tls["alpn"] = json!(alpn_list);
+            }
+            apply_tls_settings(&mut tls, settings);
+            outbound["tls"] = tls;
+
+            add_transport(&mut outbound, &params, domain);
             Ok(outbound)
         }
         "ss" => {
             let user_info = url.username();
+            let host = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            
+            // Try URL-safe decode first, then standard
             let decoded_user = general_purpose::URL_SAFE
                 .decode(user_info)
+                .or_else(|_| general_purpose::STANDARD.decode(user_info))
                 .map(|b| String::from_utf8(b).unwrap_or(user_info.to_string()))
                 .unwrap_or(user_info.to_string());
 
-            let parts: Vec<&str> = decoded_user.split(':').collect();
+            let parts: Vec<&str> = decoded_user.splitn(2, ':').collect();
             if parts.len() < 2 {
                 return Err("Invalid SS format".to_string());
             }
 
-            let domain = url.host_str().unwrap();
-            let resolved_ip = resolve_host(domain);
+            let resolved_ip = resolve_host(host);
 
-            Ok(json!({
+            let mut outbound = json!({
                 "type": "shadowsocks",
                 "tag": "proxy",
                 "server": resolved_ip,
-                "server_port": url.port().unwrap(),
+                "server_port": port,
                 "method": parts[0],
                 "password": parts[1]
-            }))
+            });
+
+            // Check for SIP003 plugin
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+            if let Some(plugin) = params.get("plugin") {
+                if plugin.starts_with("v2ray-plugin") || plugin.starts_with("xray-plugin") {
+                    // Parse plugin opts
+                    let plugin_opts = params.get("plugin-opts").map(|s| s.as_str()).unwrap_or("");
+                    let opts: std::collections::HashMap<_, _> = plugin_opts
+                        .split(';')
+                        .filter_map(|kv| {
+                            let mut parts = kv.splitn(2, '=');
+                            Some((parts.next()?, parts.next().unwrap_or("")))
+                        })
+                        .collect();
+
+                    let mode = opts.get("mode").unwrap_or(&"websocket");
+                    if *mode == "websocket" {
+                        let path = opts.get("path").unwrap_or(&"/");
+                        let ws_host = opts.get("host").unwrap_or(&host);
+                        outbound["plugin"] = json!("v2ray-plugin");
+                        outbound["plugin_opts"] = json!(format!("mode=websocket;host={};path={}", ws_host, path));
+                    }
+                }
+            }
+
+            Ok(outbound)
         }
         "hy2" | "hysteria2" => {
             let password = url.username();
@@ -287,12 +484,84 @@ fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
             });
 
             if let Some(obfs) = params.get("obfs") {
-                if obfs != "none" {
+                if obfs != "none" && !obfs.is_empty() {
                     outbound["obfs"] = json!({
-                        "type": "salamander",
+                        "type": obfs,
                         "password": params.get("obfs-password").unwrap_or(&"".to_string())
                     });
                 }
+            }
+
+            Ok(outbound)
+        }
+        "hysteria" | "hy" => {
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            let auth_str = params.get("auth").map(|s| s.as_str()).unwrap_or("");
+            let up_mbps = params.get("upmbps").and_then(|v| v.parse::<u32>().ok()).unwrap_or(100);
+            let down_mbps = params.get("downmbps").and_then(|v| v.parse::<u32>().ok()).unwrap_or(100);
+
+            let mut outbound = json!({
+                "type": "hysteria",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "auth_str": auth_str,
+                "up_mbps": up_mbps,
+                "down_mbps": down_mbps,
+                "tls": {
+                    "enabled": true,
+                    "server_name": params.get("peer").or(params.get("sni")).unwrap_or(&domain.to_string()),
+                    "insecure": params.get("insecure").map(|v| v == "1").unwrap_or(false)
+                }
+            });
+
+            if let Some(obfs) = params.get("obfs") {
+                if !obfs.is_empty() {
+                    outbound["obfs"] = json!(obfs);
+                }
+            }
+
+            if let Some(alpn) = params.get("alpn") {
+                outbound["tls"]["alpn"] = json!(alpn.split(',').collect::<Vec<_>>());
+            }
+
+            Ok(outbound)
+        }
+        "tuic" => {
+            let uuid = url.username();
+            let password = url.password().unwrap_or("");
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            let congestion = params.get("congestion_control").map(|s| s.as_str()).unwrap_or("bbr");
+            let udp_relay_mode = params.get("udp_relay_mode").map(|s| s.as_str()).unwrap_or("native");
+
+            let mut outbound = json!({
+                "type": "tuic",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "uuid": uuid,
+                "password": password,
+                "congestion_control": congestion,
+                "udp_relay_mode": udp_relay_mode,
+                "tls": {
+                    "enabled": true,
+                    "server_name": params.get("sni").unwrap_or(&domain.to_string()),
+                    "insecure": params.get("allow_insecure").map(|v| v == "1").unwrap_or(false)
+                }
+            });
+
+            if let Some(alpn) = params.get("alpn") {
+                outbound["tls"]["alpn"] = json!(alpn.split(',').collect::<Vec<_>>());
             }
 
             Ok(outbound)
@@ -305,16 +574,32 @@ fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
 
             let resolved_ip = resolve_host(domain);
 
-            Ok(json!({
+            // Parse local addresses (can be comma-separated for IPv4 and IPv6)
+            let local_addr = params.get("address").or(params.get("ip")).map(|s| {
+                s.split(',').map(|v| v.trim().to_string()).collect::<Vec<_>>()
+            }).unwrap_or_else(|| vec!["10.0.0.2/32".to_string()]);
+
+            let mut outbound = json!({
                 "type": "wireguard",
                 "tag": "proxy",
                 "server": resolved_ip,
                 "server_port": port,
                 "private_key": private_key,
-                "peer_public_key": params.get("public_key").unwrap_or(&"".to_string()),
-                "local_address": [params.get("ip").unwrap_or(&"10.0.0.2/32".to_string())],
+                "peer_public_key": params.get("publickey").or(params.get("public_key")).unwrap_or(&"".to_string()),
+                "local_address": local_addr,
                 "mtu": params.get("mtu").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1280)
-            }))
+            });
+
+            if let Some(reserved) = params.get("reserved") {
+                let reserved_bytes: Vec<u8> = reserved.split(',')
+                    .filter_map(|v| v.trim().parse::<u8>().ok())
+                    .collect();
+                if reserved_bytes.len() == 3 {
+                    outbound["reserved"] = json!(reserved_bytes);
+                }
+            }
+
+            Ok(outbound)
         }
         "socks" | "socks5" | "socks4" => {
             let username = url.username();
@@ -326,17 +611,113 @@ fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
 
             let version = if protocol == "socks4" { "4" } else { "5" };
 
-            Ok(json!({
+            let mut outbound = json!({
                 "type": "socks",
                 "tag": "proxy",
                 "server": resolved_ip,
                 "server_port": port,
-                "version": version,
-                "username": username,
-                "password": password
-            }))
+                "version": version
+            });
+
+            if !username.is_empty() {
+                outbound["username"] = json!(username);
+                outbound["password"] = json!(password);
+            }
+
+            Ok(outbound)
+        }
+        "http" | "https" => {
+            let username = url.username();
+            let password = url.password().unwrap_or("");
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().unwrap_or(if protocol == "https" { 443 } else { 80 });
+
+            let resolved_ip = resolve_host(domain);
+
+            let mut outbound = json!({
+                "type": "http",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port
+            });
+
+            if !username.is_empty() {
+                outbound["username"] = json!(username);
+                outbound["password"] = json!(password);
+            }
+
+            if protocol == "https" {
+                outbound["tls"] = json!({
+                    "enabled": true,
+                    "server_name": domain
+                });
+            }
+
+            Ok(outbound)
+        }
+        "ssh" => {
+            let username = url.username();
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().unwrap_or(22);
+            let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let resolved_ip = resolve_host(domain);
+
+            let mut outbound = json!({
+                "type": "ssh",
+                "tag": "proxy",
+                "server": resolved_ip,
+                "server_port": port,
+                "user": username
+            });
+
+            if let Some(password) = url.password() {
+                outbound["password"] = json!(password);
+            }
+
+            if let Some(pk) = params.get("private_key") {
+                outbound["private_key"] = json!(pk);
+            }
+
+            if let Some(pk_pass) = params.get("private_key_passphrase") {
+                outbound["private_key_passphrase"] = json!(pk_pass);
+            }
+
+            if let Some(host_key) = params.get("host_key") {
+                outbound["host_key"] = json!(host_key.split(',').collect::<Vec<_>>());
+            }
+
+            Ok(outbound)
         }
         _ => Err(format!("Protocol {} not supported", protocol)),
+    }
+}
+
+fn detect_protocol(link: &str) -> &'static str {
+    if link.starts_with("vless://") {
+        "vless"
+    } else if link.starts_with("vmess://") {
+        "vmess"
+    } else if link.starts_with("trojan://") {
+        "trojan"
+    } else if link.starts_with("ss://") {
+        "shadowsocks"
+    } else if link.starts_with("hy2://") || link.starts_with("hysteria2://") {
+        "hysteria2"
+    } else if link.starts_with("hy://") || link.starts_with("hysteria://") {
+        "hysteria"
+    } else if link.starts_with("tuic://") {
+        "tuic"
+    } else if link.starts_with("wireguard://") {
+        "wireguard"
+    } else if link.starts_with("socks://") || link.starts_with("socks5://") || link.starts_with("socks4://") {
+        "socks"
+    } else if link.starts_with("http://") || link.starts_with("https://") {
+        "http"
+    } else if link.starts_with("ssh://") {
+        "ssh"
+    } else {
+        "unknown"
     }
 }
 
@@ -353,19 +734,7 @@ fn add_profile(
     link: String,
 ) -> Result<Vec<Profile>, String> {
     let mut profiles = state.profiles.lock().unwrap();
-    let protocol = if link.starts_with("vless") {
-        "vless"
-    } else if link.starts_with("ss") {
-        "ss"
-    } else if link.starts_with("hy2") || link.starts_with("hysteria2") {
-        "hysteria2"
-    } else if link.starts_with("wireguard") {
-        "wireguard"
-    } else if link.starts_with("socks") {
-        "socks"
-    } else {
-        "unknown"
-    };
+    let protocol = detect_protocol(&link);
 
     profiles.push(Profile {
         id: uuid::Uuid::new_v4().to_string(),
@@ -461,19 +830,10 @@ async fn import_subscription(
         if link.is_empty() {
             continue;
         }
-        let protocol = if link.starts_with("vless") {
-            "vless"
-        } else if link.starts_with("ss") {
-            "ss"
-        } else if link.starts_with("hy2") || link.starts_with("hysteria2") {
-            "hysteria2"
-        } else if link.starts_with("wireguard") {
-            "wireguard"
-        } else if link.starts_with("socks") {
-            "socks"
-        } else {
+        let protocol = detect_protocol(link);
+        if protocol == "unknown" {
             continue;
-        };
+        }
 
         profiles.push(Profile {
             id: uuid::Uuid::new_v4().to_string(),
@@ -635,11 +995,7 @@ async fn pull_profiles_from_server(
         // If it fails (e.g. legacy format or actual encryption), we might need to handle it
         // For now, assuming it's the JSON we pushed
         match serde_json::from_str::<Profile>(&sp.hash) {
-            Ok(mut p) => {
-                // Ensure ID matches or generate new?
-                // The server profile has its own ID, but the embedded profile has one too.
-                // Let's trust the embedded one for now, or maybe update it?
-                // Actually, if we are syncing, we should probably keep the ID consistent.
+            Ok(p) => {
                 local_profiles.push(p);
             }
             Err(e) => {
@@ -763,32 +1119,38 @@ fn start_vpn(app: AppHandle, window: Window, state: State<AppState>) -> Result<S
         },
         "dns": {
             "servers": [
-                { "tag": "custom", "address": settings.dns, "detour": "proxy" },
+                { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "detour": "proxy" },
                 { "tag": "local", "address": "local", "detour": "direct" }
             ],
             "rules": [
-                { "outbound": "any", "server": "custom" }
-            ]
+                { "outbound": "any", "server": "local" }
+            ],
+            "final": "remote",
+            "strategy": "prefer_ipv4"
         },
         "inbounds": [{
             "type": "tun",
             "tag": "tun-in",
-            "address": ["172.19.0.1/30"],
+            "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
             "mtu": settings.mtu,
             "auto_route": true,
             "strict_route": true,
-            "stack": "gvisor",
-            "sniff": true
+            "stack": "mixed",
+            "sniff": true,
+            "sniff_override_destination": true
         }],
         "outbounds": [
             outbound_config,
-            { "type": "direct", "tag": "direct" }
+            { "type": "direct", "tag": "direct" },
+            { "type": "dns", "tag": "dns-out" },
+            { "type": "block", "tag": "block" }
         ],
         "route": {
             "auto_detect_interface": true,
+            "final": "proxy",
             "rules": [
-                { "protocol": "dns", "action": "hijack-dns" },
-                { "inbound": "tun-in", "outbound": "proxy" }
+                { "protocol": "dns", "outbound": "dns-out" },
+                { "ip_is_private": true, "outbound": "direct" }
             ]
         }
     });
