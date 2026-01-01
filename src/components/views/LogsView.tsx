@@ -1,7 +1,6 @@
-import { RefObject } from "react";
+import { RefObject, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -26,6 +25,14 @@ function LogsView({
   onDumpLogs,
   logEndRef,
 }: LogsViewProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
+
   return (
     <div className="absolute inset-0 flex flex-col p-6">
       <div className="flex items-center justify-between mb-4">
@@ -47,7 +54,10 @@ function LogsView({
           </Select>
         </div>
       </div>
-      <ScrollArea className="flex-1 rounded-lg border p-4">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 rounded-lg border p-4 overflow-y-auto"
+      >
         <div className="font-mono text-xs text-muted-foreground">
           {logs.map((log, index) => (
             <div
@@ -59,7 +69,7 @@ function LogsView({
           ))}
           <div ref={logEndRef} />
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

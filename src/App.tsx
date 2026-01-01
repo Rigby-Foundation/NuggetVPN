@@ -301,12 +301,18 @@ function App() {
   }, [logs]);
 
   const handleDumpLogs = async () => {
-    const path = await save({
-      defaultPath: "nuggetvpn-logs.txt",
-      filters: [{ name: "Text", extensions: ["txt"] }],
-    });
-    if (path) {
-      await writeTextFile(path, logs.join("\n"));
+    try {
+      const path = await save({
+        defaultPath: "nuggetvpn-logs.txt",
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+      if (path) {
+        const content = logs.join("\n");
+        await writeTextFile(path, content);
+        setLogs((prev) => [...prev, `Logs exported to ${path}`]);
+      }
+    } catch (e) {
+      setLogs((prev) => [...prev, `Export failed: ${e}`]);
     }
   };
 
