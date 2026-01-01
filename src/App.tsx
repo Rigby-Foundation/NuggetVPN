@@ -2,6 +2,8 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 
 import AddModal from "@/components/AddModal";
 import Onboarding from "@/components/Onboarding";
@@ -294,9 +296,19 @@ function App() {
 
   useEffect(() => {
     if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+      logContainerRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs]);
+
+  const handleDumpLogs = async () => {
+    const path = await save({
+      defaultPath: "nuggetvpn-logs.txt",
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+    if (path) {
+      await writeTextFile(path, logs.join("\n"));
+    }
+  };
 
   const handleSettingsChange = <K extends keyof AppSettings>(
     key: K,
@@ -400,6 +412,7 @@ function App() {
                   logs={logs}
                   logLimit={logLimit}
                   onLogLimitChange={handleLogLimitChange}
+                  onDumpLogs={handleDumpLogs}
                   logEndRef={logContainerRef}
                 />
               )}

@@ -15,6 +15,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             let loaded = load_profiles_from_disk(app.handle());
             let loaded_settings = load_settings_from_disk(app.handle());
