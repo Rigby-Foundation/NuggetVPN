@@ -59,6 +59,7 @@ function App() {
 
   const startTimeRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ipCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const sessionUpRef = useRef(0);
   const sessionDownRef = useRef(0);
@@ -77,7 +78,7 @@ function App() {
     await invoke("save_settings", { settings });
   }, []);
 
-  const checkIp = async () => {
+  const checkIp = useCallback(async () => {
     setIsCheckingIp(true);
     try {
       const res = await fetch("https://ipinfo.io/json");
@@ -88,7 +89,24 @@ function App() {
     } finally {
       setIsCheckingIp(false);
     }
-  };
+  }, []);
+
+  const startIpCheck = useCallback(() => {
+    if (ipCheckIntervalRef.current) {
+      clearInterval(ipCheckIntervalRef.current);
+    }
+    // Check IP every 5 minutes
+    ipCheckIntervalRef.current = setInterval(() => {
+      checkIp();
+    }, 5 * 60 * 1000);
+  }, [checkIp]);
+
+  const stopIpCheck = useCallback(() => {
+    if (ipCheckIntervalRef.current) {
+      clearInterval(ipCheckIntervalRef.current);
+      ipCheckIntervalRef.current = null;
+    }
+  }, []);
 
   const loadProfiles = useCallback(async () => {
     try {
@@ -226,7 +244,11 @@ function App() {
         await invoke("start_vpn");
         setIsConnected(true);
         setStatus("CONNECTED");
-        await checkIp();
+        // Wait a bit for connection to establish, then check IP
+        setTimeout(async () => {
+          await checkIp();
+          startIpCheck();
+        }, 3000);
         startStats();
       } else {
         setStatus("Stopping...");
@@ -234,6 +256,8 @@ function App() {
         setIsConnected(false);
         setStatus("Ready");
         stopStats();
+        stopIpCheck();
+        setIpInfo(null);
       }
     } catch (error) {
       setStatus("Error");
