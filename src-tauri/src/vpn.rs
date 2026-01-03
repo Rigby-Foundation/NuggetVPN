@@ -110,7 +110,6 @@ pub fn start_vpn(
     let _ = File::create(&log_path);
 
     let (dns_servers, dns_final) = if cfg!(target_os = "windows") {
-        // Windows: простой UDP DNS без DoH
         (json!([
             {
                 "tag": "dns-direct",
@@ -119,14 +118,13 @@ pub fn start_vpn(
             }
         ]), "dns-direct")
     } else {
-        // macOS/Linux: DoH через прокси с local резолвером
         (json!([
             { "tag": "local", "address": "local", "detour": "direct" },
             { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local", "detour": "proxy" }
         ]), "remote")
     };
 
-    let final_config = json!({
+    let mut final_config = json!({
         "log": {
             "level": "info",
             "timestamp": true
@@ -162,7 +160,7 @@ pub fn start_vpn(
         ],
         "route": {
             "auto_detect_interface": true,
-            "final": "proxy",
+            "final": if settings.routing_mode == "selected" { "direct" } else { "proxy" },
             "rules": [
                 { "protocol": "dns", "action": "hijack-dns" },
                 { "ip_cidr": [format!("{}/32", settings.dns)], "outbound": "direct" },
@@ -170,6 +168,26 @@ pub fn start_vpn(
             ]
         }
     });
+
+    if settings.routing_mode == "selected" {
+        if let Some(rules) = final_config["route"]["rules"].as_array_mut() {
+            if !settings.routing_apps.is_empty() {
+                rules.insert(0, json!({
+                    "process_name": settings.routing_apps,
+                    "outbound": "proxy"
+                }));
+            }
+             if !settings.routing_domains.is_empty() {
+                rules.insert(0, json!({
+                    "domain_suffix": settings.routing_domains,
+                    "outbound": "proxy"
+                }));
+            }
+            if !settings.routing_apps.is_empty() || !settings.routing_domains.is_empty() {
+                final_config["route"]["final"] = json!("direct");
+            }
+        }
+    }
 
     let config_path = app.path().app_cache_dir().unwrap().join("config.json");
     if let Some(parent) = config_path.parent() {

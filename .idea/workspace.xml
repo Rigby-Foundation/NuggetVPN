@@ -11,7 +11,17 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="bump" />
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="smth new in design and split tunneling">
+      <change afterPath="$PROJECT_DIR$/src/components/layout/WindowControls.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/models.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/models.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/vpn.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/vpn.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/types.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -127,6 +137,8 @@
       <workItem from="1767237977711" duration="952000" />
       <workItem from="1767277013070" duration="2425000" />
       <workItem from="1767283227612" duration="4848000" />
+      <workItem from="1767370628535" duration="8000" />
+      <workItem from="1767478108313" duration="5367000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -339,7 +351,8 @@
     <MESSAGE value="some fixes" />
     <MESSAGE value="final fixes" />
     <MESSAGE value="bump" />
-    <option name="LAST_COMMIT_MESSAGE" value="bump" />
+    <MESSAGE value="smth new in design and split tunneling" />
+    <option name="LAST_COMMIT_MESSAGE" value="smth new in design and split tunneling" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

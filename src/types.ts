@@ -22,6 +22,9 @@ export interface AppSettings {
     auth_token: string | null;
     skip_auth: boolean;
     pending_sync_upload: boolean;
+    routing_mode: "all" | "selected";
+    routing_apps: string[];
+    routing_domains: string[];
 }
 
 export interface IpInfo {

@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
   activeTab: string;
@@ -19,6 +20,7 @@ interface AppSidebarProps {
   isConnected: boolean;
   onClose: () => void;
   onMinimize: () => void;
+  platform?: string;
 }
 
 function AppSidebar({
@@ -28,33 +30,40 @@ function AppSidebar({
   isConnected,
   onClose,
   onMinimize,
+  platform,
 }: AppSidebarProps) {
   return (
     <Sidebar variant="inset" className="select-none">
       <SidebarHeader
-        className="h-16 flex-row items-center justify-between px-4"
+        className={cn(
+          "flex-row items-center justify-between px-4",
+          platform === "macos" ? "h-12" : "h-8"
+        )}
         data-tauri-drag-region
       >
         <div className="flex items-center gap-2">
-          <div className="unbounded text-xl pointer-events-none">
-            Nugget
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="w-3 h-3 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57]/80 transition-colors"
-            aria-label="Close"
-          />
-          <button
-            onClick={onMinimize}
-            className="w-3 h-3 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E]/80 transition-colors"
-            aria-label="Minimize"
-          />
-          <button
-            className="w-3 h-3 rounded-full bg-[#28C840] hover:bg-[#28C840]/80 transition-colors"
-            aria-label="Maximize"
-          />
+          {platform === "macos" ? (
+            <>
+              <button
+                onClick={onClose}
+                className="w-3 h-3 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57]/80 transition-colors"
+                aria-label="Close"
+              />
+              <button
+                onClick={onMinimize}
+                className="w-3 h-3 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E]/80 transition-colors"
+                aria-label="Minimize"
+              />
+              <button
+                className="w-3 h-3 rounded-full bg-[#28C840] hover:bg-[#28C840]/80 transition-colors"
+                aria-label="Maximize"
+              />
+            </>
+          ) : (
+            <div className="flex items-center h-full">
+              <span className="text-xl unbounded tracking-tight">Nugget</span>
+            </div>
+          )}
         </div>
       </SidebarHeader>
 
@@ -109,9 +118,10 @@ function AppSidebar({
         <div className="p-2 border-t border-sidebar-border">
           <div className="flex items-center gap-3 px-2">
             <div
-              className={`w-2 h-2 rounded-full ${
+              className={cn(
+                "w-2 h-2 rounded-full",
                 isConnected ? "bg-green-500 animate-pulse" : "bg-muted-foreground"
-              }`}
+              )}
             />
             <div className="text-xs font-medium text-muted-foreground">
               {status}

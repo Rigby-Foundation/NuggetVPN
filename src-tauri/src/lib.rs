@@ -10,6 +10,11 @@ use tauri::Manager;
 use models::AppState;
 use storage::{load_profiles_from_disk, load_settings_from_disk};
 
+#[tauri::command]
+fn get_current_platform() -> &'static str {
+    std::env::consts::OS
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -43,7 +48,8 @@ pub fn run() {
             auth::push_profiles_to_server,
             auth::pull_profiles_from_server,
             vpn::start_vpn,
-            vpn::stop_vpn
+            vpn::stop_vpn,
+            get_current_platform,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

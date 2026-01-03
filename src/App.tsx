@@ -9,6 +9,7 @@ import AddModal from "@/components/AddModal";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
 import TopBar from "@/components/layout/TopBar";
+import { WindowControls } from "@/components/layout/WindowControls";
 import ConnectionView from "@/components/views/ConnectionView";
 import ConfigurationView from "@/components/views/ConfigurationView";
 import LogsView from "@/components/views/LogsView";
@@ -16,6 +17,7 @@ import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { formatBytes, formatDuration } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { AppSettings, IpInfo, Profile } from "@/types";
 
 import "./App.css";
@@ -36,6 +38,9 @@ const defaultSettings: AppSettings = {
   auth_token: null,
   skip_auth: false,
   pending_sync_upload: false,
+  routing_mode: "all",
+  routing_apps: [],
+  routing_domains: [],
 };
 
 function App() {
@@ -70,9 +75,11 @@ function App() {
   const [ipInfo, setIpInfo] = useState<IpInfo | null>(null);
   const [isCheckingIp, setIsCheckingIp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [platform, setPlatform] = useState("macos");
 
   const winClose = () => appWindow.close();
   const winMinimize = () => appWindow.minimize();
+  const winMaximize = () => appWindow.toggleMaximize();
 
   const saveSettings = useCallback(async (settings: AppSettings) => {
     await invoke("save_settings", { settings });
@@ -244,7 +251,6 @@ function App() {
         await invoke("start_vpn");
         setIsConnected(true);
         setStatus("CONNECTED");
-        // Wait a bit for connection to establish, then check IP
         setTimeout(async () => {
           await checkIp();
           startIpCheck();
@@ -270,6 +276,9 @@ function App() {
       await loadProfiles();
 
       try {
+        const platformName = await invoke<string>("get_current_platform");
+        setPlatform(platformName);
+
         const settings = (await invoke("get_settings")) as AppSettings;
         setAppSettings({ ...defaultSettings, ...settings });
 
@@ -377,7 +386,7 @@ function App() {
   };
 
   return (
-      <main className="h-full overflow-hidden">
+    <main className="h-full overflow-hidden">
       <AddModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -399,9 +408,31 @@ function App() {
           isConnected={isConnected}
           onClose={winClose}
           onMinimize={winMinimize}
+          platform={platform}
         />
-        <SidebarInset>
-          <div className="flex-1 flex flex-col py-4 px-2">
+        <SidebarInset
+          className={cn(
+            "overflow-hidden flex flex-col",
+            platform !== "macos" && "bg-transparent! m-0! p-0! shadow-none! rounded-none!"
+          )}
+        >
+          {platform !== "macos" && (
+            <div className="bg-inset z-50">
+              <WindowControls
+                onClose={winClose}
+                onMinimize={winMinimize}
+                onMaximize={winMaximize}
+              />
+            </div>
+          )}
+          <div
+            className={cn(
+              "flex-1 flex flex-col overflow-hidden",
+              platform !== "macos"
+                ? "bg-background m-2 mt-0 border rounded-xl shadow-sm"
+                : "px-2 pb-4 pt-2"
+            )}
+          >
             <TopBar
               profiles={profiles}
               selectedProfileId={selectedProfileId}

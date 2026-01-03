@@ -33,6 +33,12 @@ pub struct AppSettings {
     pub skip_auth: bool,
     #[serde(default)]
     pub pending_sync_upload: bool,
+    #[serde(default)]
+    pub routing_mode: String,
+    #[serde(default)]
+    pub routing_apps: Vec<String>,
+    #[serde(default)]
+    pub routing_domains: Vec<String>,
 }
 
 impl Default for AppSettings {
@@ -51,6 +57,9 @@ impl Default for AppSettings {
             auth_token: None,
             skip_auth: false,
             pending_sync_upload: false,
+            routing_mode: "all".to_string(),
+            routing_apps: Vec::new(),
+            routing_domains: Vec::new(),
         }
     }
 }
