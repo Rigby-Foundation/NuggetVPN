@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Loader2 } from "lucide-react";
 
 import {
@@ -17,30 +16,37 @@ import { Label } from "@/components/ui/label";
 interface AddModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string | null, link: string | null, isReload?: boolean) => void;
+  onSaveProfile: (name: string, link: string) => Promise<void>;
+  onImportSubscription: (url: string) => Promise<void>;
 }
 
-function AddModal({ isOpen, onClose, onSave }: AddModalProps) {
+function AddModal({
+  isOpen,
+  onClose,
+  onSaveProfile,
+  onImportSubscription,
+}: AddModalProps) {
   const [name, setName] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleProcess = async () => {
-    if (!inputLink) return;
+    const link = inputLink.trim();
+    if (!link) return;
     setIsLoading(true);
     setErrorMsg("");
 
     try {
-      if (inputLink.startsWith("http://") || inputLink.startsWith("https://")) {
-        await invoke("import_subscription", { url: inputLink });
-        onSave(null, null, true);
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        await onImportSubscription(link);
         handleClose();
-      } else {
-        const finalName = name || "New Profile";
-        onSave(finalName, inputLink, false);
-        handleClose();
+        return;
       }
+
+      const finalName = name || "New Profile";
+      await onSaveProfile(finalName, link);
+      handleClose();
     } catch (e) {
       setErrorMsg("Error: " + e);
     } finally {
@@ -59,7 +65,7 @@ function AddModal({ isOpen, onClose, onSave }: AddModalProps) {
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Profile</DialogTitle>
+          <DialogTitle>Add Profile / Subscription</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
@@ -69,13 +75,13 @@ function AddModal({ isOpen, onClose, onSave }: AddModalProps) {
               id="config-link"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
-              placeholder="Paste vless://... OR http://mysite.com/sub"
+              placeholder="Paste vless://... OR https://example.com/sub"
               className="font-mono text-xs resize-none"
               rows={3}
             />
           </div>
 
-          {!inputLink.startsWith("http") && (
+          {!inputLink.trim().startsWith("http") && (
             <div className="grid gap-2">
               <Label htmlFor="profile-name">Profile Name (Optional)</Label>
               <Input
@@ -102,7 +108,7 @@ function AddModal({ isOpen, onClose, onSave }: AddModalProps) {
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLoading
               ? "Processing..."
-              : inputLink.startsWith("http")
+              : inputLink.trim().startsWith("http")
               ? "Import Sub"
               : "Add Profile"}
           </Button>

@@ -1,8 +1,5 @@
 import { ChevronDown, Plus } from "lucide-react";
 
-import { formatBytes } from "@/lib/format";
-import { Profile } from "@/types";
-
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,21 +9,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface TopBarProps {
-  profiles: Profile[];
-  selectedProfileId: string;
+  sources: { domain: string; count: number }[];
+  selectedSourceDomain: string;
   isConnected: boolean;
-  onProfileSelect: (id: string) => void;
+  onSourceSelect: (domain: string) => void;
   onAddProfile: () => void;
 }
 
 function TopBar({
-  profiles,
-  selectedProfileId,
+  sources,
+  selectedSourceDomain,
   isConnected,
-  onProfileSelect,
+  onSourceSelect,
   onAddProfile,
 }: TopBarProps) {
-  const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const domainLabel = (domain: string) => (domain === "local" ? "Local" : domain);
+  const displayName = sources.length
+    ? domainLabel(selectedSourceDomain || "local")
+    : "Select Configuration";
 
   return (
     <div
@@ -35,11 +35,13 @@ function TopBar({
     >
       <div className="flex flex-col min-w-0 flex-1 mr-4">
         <span className="text-[10px] font-bold text-muted-foreground">
-          Current Profile
+          Current Configuration
         </span>
         <div className="relative group flex items-center gap-2 min-w-0">
-          {profiles.length === 0 ? (
-            <span className="font-medium text-muted-foreground">No profiles</span>
+          {sources.length === 0 ? (
+            <span className="font-medium text-muted-foreground">
+              No configurations
+            </span>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -48,24 +50,21 @@ function TopBar({
                   disabled={isConnected}
                   className="p-0! h-auto font-bold text-lg max-w-full"
                 >
-                  <span className="truncate">{selectedProfile?.name || "Select Profile"}</span>
+                  <span className="truncate">{displayName}</span>
                   <ChevronDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64 max-h-96 overflow-y-auto">
-                {profiles.map((p) => (
+                {sources.map((source) => (
                   <DropdownMenuItem
-                    key={p.id}
-                    onClick={() => onProfileSelect(p.id)}
-                    className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                    key={source.domain}
+                    onClick={() => onSourceSelect(source.domain)}
+                    className="flex items-center justify-between text-xs font-medium"
                   >
-                    <div className="font-bold truncate w-full">{p.name}</div>
-                    <div className="flex w-full items-center justify-between text-xs text-muted-foreground font-mono">
-                      <span className="truncate">{p.server}</span>
-                      <span className="shrink-0 ml-2">
-                        {formatBytes((p.total_up || 0) + (p.total_down || 0))}
-                      </span>
-                    </div>
+                    <span className="truncate">{domainLabel(source.domain)}</span>
+                    <span className="text-muted-foreground font-mono">
+                      {source.count}
+                    </span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

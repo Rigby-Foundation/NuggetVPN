@@ -2,6 +2,7 @@ use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
+use url::Url;
 
 use crate::models::{AppSettings, AppState, Profile};
 use crate::parser::{detect_protocol, extract_name_from_link};
@@ -167,6 +168,12 @@ pub async fn import_subscription(
     state: State<'_, AppState>,
     url: String,
 ) -> Result<Vec<Profile>, String> {
+    let parsed_url = Url::parse(&url).map_err(|_| "Invalid subscription URL")?;
+    let source_domain = parsed_url
+        .host_str()
+        .ok_or("Subscription URL missing host")?
+        .to_string();
+
     let client = reqwest::Client::new();
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let text = resp.text().await.map_err(|e| e.to_string())?;
@@ -203,6 +210,7 @@ pub async fn import_subscription(
             server: "Auto".to_string(),
             protocol: protocol.to_string(),
             config_link: link.to_string(),
+            source_domain: source_domain.clone(),
             total_up: Some(0),
             total_down: Some(0),
         });

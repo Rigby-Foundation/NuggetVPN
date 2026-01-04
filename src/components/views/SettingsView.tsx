@@ -2,6 +2,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import * as React from "react";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Laptop,
   Moon,
   Plus,
@@ -10,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { AppSettings } from "@/types";
+import { AppSettings, Profile } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,6 +39,8 @@ interface SettingsViewProps {
   theme: string | undefined;
   setTheme: (value: string) => void;
   appSettings: AppSettings;
+  profiles: Profile[];
+  selectedProfileId: string;
   onSettingsChange: SettingsChangeHandler;
   onConnectSync: () => void;
   onDisconnectSync: () => void;
@@ -46,11 +50,18 @@ function SettingsView({
   theme,
   setTheme,
   appSettings,
+  profiles,
+  selectedProfileId,
   onSettingsChange,
   onConnectSync,
   onDisconnectSync,
 }: SettingsViewProps) {
   const [newDomain, setNewDomain] = React.useState("");
+  const [newChainId, setNewChainId] = React.useState("");
+  const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const availableChainProfiles = profiles.filter(
+    (p) => p.id !== selectedProfileId && !appSettings.proxy_chain.includes(p.id)
+  );
 
   const handleAddApp = async () => {
     try {
@@ -99,6 +110,21 @@ function SettingsView({
       onSettingsChange("routing_domains", [...appSettings.routing_domains, domain]);
       setNewDomain("");
     }
+  };
+
+  const handleAddChainProxy = () => {
+    if (!newChainId) return;
+    if (appSettings.proxy_chain.includes(newChainId)) return;
+    onSettingsChange("proxy_chain", [...appSettings.proxy_chain, newChainId]);
+    setNewChainId("");
+  };
+
+  const handleMoveChainProxy = (index: number, direction: number) => {
+    const next = [...appSettings.proxy_chain];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    onSettingsChange("proxy_chain", next);
   };
 
   return (
@@ -240,6 +266,132 @@ function SettingsView({
                     <p className="text-xs text-muted-foreground mt-2">
                       Primary DNS server address (e.g., 1.1.1.1).
                     </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium">Proxy Chain</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Route the selected profile through additional proxies.
+                        </div>
+                      </div>
+                      <Switch
+                        checked={appSettings.proxy_chain_enabled}
+                        onCheckedChange={(checked) =>
+                          onSettingsChange("proxy_chain_enabled", checked)
+                        }
+                      />
+                    </div>
+
+                    {appSettings.proxy_chain_enabled && (
+                      <div className="space-y-3 pt-4 border-t">
+                        <div className="text-xs text-muted-foreground">
+                          Exit profile:{" "}
+                          <span className="text-foreground font-medium">
+                            {selectedProfile?.name || "None selected"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Order is from first hop (closest to you) to last hop before the exit.
+                        </p>
+
+                        <div className="flex gap-2">
+                          <Select
+                            value={newChainId || undefined}
+                            onValueChange={setNewChainId}
+                            disabled={availableChainProfiles.length === 0}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue
+                                placeholder={
+                                  availableChainProfiles.length === 0
+                                    ? "No profiles available"
+                                    : "Select profile to add"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableChainProfiles.map((profile) => (
+                                <SelectItem key={profile.id} value={profile.id}>
+                                  {profile.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            className="text-xs gap-1 shrink-0"
+                            onClick={handleAddChainProxy}
+                            disabled={!newChainId}
+                          >
+                            <Plus size={12} /> Add
+                          </Button>
+                        </div>
+
+                        {appSettings.proxy_chain.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            No proxies in the chain.
+                          </p>
+                        ) : (
+                          <div className="border rounded-md divide-y max-h-[220px] overflow-y-auto">
+                            {appSettings.proxy_chain.map((id, index) => {
+                              const profile = profiles.find((p) => p.id === id);
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex items-center justify-between p-2 text-sm"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs text-muted-foreground">
+                                      Hop {index + 1}
+                                    </div>
+                                    <div className="truncate">
+                                      {profile?.name || "Unknown profile"}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground"
+                                      onClick={() => handleMoveChainProxy(index, -1)}
+                                      disabled={index === 0}
+                                    >
+                                      <ChevronUp size={14} />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground"
+                                      onClick={() => handleMoveChainProxy(index, 1)}
+                                      disabled={index === appSettings.proxy_chain.length - 1}
+                                    >
+                                      <ChevronDown size={14} />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        onSettingsChange(
+                                          "proxy_chain",
+                                          appSettings.proxy_chain.filter((p) => p !== id)
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={14} />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

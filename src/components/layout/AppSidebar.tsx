@@ -1,4 +1,4 @@
-import { Clock, Power, Server, Settings } from "lucide-react";
+import { Clock, Globe, Power, Server, Settings } from "lucide-react";
 
 import {
   Sidebar,
@@ -87,6 +87,15 @@ function AppSidebar({
                 >
                   <Server size={18} />
                   <span>Configuration</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === "proxies"}
+                  onClick={() => onTabChange("proxies")}
+                >
+                  <Globe size={18} />
+                  <span>Proxies</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

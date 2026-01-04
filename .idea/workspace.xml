@@ -12,13 +12,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="smth new in design and split tunneling">
-      <change afterPath="$PROJECT_DIR$/src/components/layout/WindowControls.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/auth.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/auth.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/commands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/commands.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/src/models.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/models.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src-tauri/src/vpn.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/vpn.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/AddModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/AddModal.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/TopBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/TopBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/views/ConfigurationView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/ConfigurationView.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/types.ts" afterDir="false" />
     </list>
@@ -138,7 +144,8 @@
       <workItem from="1767277013070" duration="2425000" />
       <workItem from="1767283227612" duration="4848000" />
       <workItem from="1767370628535" duration="8000" />
-      <workItem from="1767478108313" duration="5367000" />
+      <workItem from="1767478108313" duration="5389000" />
+      <workItem from="1767546834867" duration="6416000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -324,7 +331,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767297980497</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="smth new in design and split tunneling">
+      <option name="closed" value="true" />
+      <created>1767483499534</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1767483499534</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

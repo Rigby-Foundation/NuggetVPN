@@ -8,6 +8,8 @@ pub struct Profile {
     pub server: String,
     pub protocol: String,
     pub config_link: String,
+    #[serde(default)]
+    pub source_domain: String,
     pub total_up: Option<u64>,
     pub total_down: Option<u64>,
 }
@@ -39,6 +41,10 @@ pub struct AppSettings {
     pub routing_apps: Vec<String>,
     #[serde(default)]
     pub routing_domains: Vec<String>,
+    #[serde(default)]
+    pub proxy_chain_enabled: bool,
+    #[serde(default)]
+    pub proxy_chain: Vec<String>,
 }
 
 impl Default for AppSettings {
@@ -60,6 +66,8 @@ impl Default for AppSettings {
             routing_mode: "all".to_string(),
             routing_apps: Vec::new(),
             routing_domains: Vec::new(),
+            proxy_chain_enabled: false,
+            proxy_chain: Vec::new(),
         }
     }
 }

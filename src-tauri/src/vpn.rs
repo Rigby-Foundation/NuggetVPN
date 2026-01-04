@@ -1,4 +1,5 @@
 use serde_json::json;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::Command;
@@ -93,6 +94,7 @@ pub fn start_vpn(
     app: AppHandle,
     window: Window,
     state: State<AppState>,
+    profile_id: Option<String>,
 ) -> Result<String, String> {
     let mut running = state.is_running.lock().unwrap();
     if *running {
@@ -100,10 +102,52 @@ pub fn start_vpn(
     }
 
     let profiles = state.profiles.lock().unwrap();
-    let current_profile = profiles.first().ok_or("No profiles found")?;
+    let selected_id = profile_id.as_deref().filter(|id| !id.is_empty());
+    let current_profile = selected_id
+        .and_then(|id| profiles.iter().find(|p| p.id == id))
+        .or_else(|| profiles.first())
+        .ok_or("No profiles found")?;
     let settings = state.settings.lock().unwrap();
 
-    let outbound_config = parse_outbound(&current_profile.config_link, &settings)?;
+    let mut chain_profiles = Vec::new();
+    if settings.proxy_chain_enabled {
+        let mut seen = HashSet::new();
+        for chain_id in &settings.proxy_chain {
+            if chain_id == &current_profile.id {
+                continue;
+            }
+            if !seen.insert(chain_id.clone()) {
+                continue;
+            }
+            if let Some(profile) = profiles.iter().find(|p| p.id == *chain_id) {
+                chain_profiles.push(profile);
+            }
+        }
+    }
+
+    let mut exit_outbound = parse_outbound(&current_profile.config_link, &settings)?;
+    exit_outbound["tag"] = json!("proxy");
+
+    let mut chain_outbounds = Vec::new();
+    for (index, profile) in chain_profiles.iter().enumerate() {
+        let mut outbound = parse_outbound(&profile.config_link, &settings)?;
+        let tag = format!("proxy-chain-{}", index + 1);
+        outbound["tag"] = json!(tag);
+        if index > 0 {
+            outbound["detour"] = json!(format!("proxy-chain-{}", index));
+        }
+        chain_outbounds.push(outbound);
+    }
+
+    if !chain_outbounds.is_empty() {
+        exit_outbound["detour"] = json!(format!("proxy-chain-{}", chain_outbounds.len()));
+    }
+
+    let mut outbounds = Vec::new();
+    outbounds.push(exit_outbound);
+    outbounds.extend(chain_outbounds);
+    outbounds.push(json!({ "type": "direct", "tag": "direct" }));
+    outbounds.push(json!({ "type": "block", "tag": "block" }));
 
     let log_path = get_log_path(&app);
 
@@ -153,11 +197,7 @@ pub fn start_vpn(
             "sniff": true,
             "sniff_override_destination": true
         }],
-        "outbounds": [
-            outbound_config,
-            { "type": "direct", "tag": "direct" },
-            { "type": "block", "tag": "block" }
-        ],
+        "outbounds": outbounds,
         "route": {
             "auto_detect_interface": true,
             "final": if settings.routing_mode == "selected" { "direct" } else { "proxy" },

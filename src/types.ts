@@ -4,6 +4,7 @@ export interface Profile {
     server: string;
     protocol: string;
     config_link: string;
+    source_domain?: string;
     total_up?: number;
     total_down?: number;
 }
@@ -25,9 +26,16 @@ export interface AppSettings {
     routing_mode: "all" | "selected";
     routing_apps: string[];
     routing_domains: string[];
+    proxy_chain_enabled: boolean;
+    proxy_chain: string[];
 }
 
 export interface IpInfo {
     ip: string;
     region: string;
+}
+
+export interface ProfilePing {
+    id: string;
+    ping_ms: number | null;
 }
