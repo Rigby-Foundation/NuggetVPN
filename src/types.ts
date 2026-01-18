@@ -28,6 +28,7 @@ export interface AppSettings {
     routing_domains: string[];
     proxy_chain_enabled: boolean;
     proxy_chain: string[];
+    proxy_chain_exit: string;
 }
 
 export interface IpInfo {

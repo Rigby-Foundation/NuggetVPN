@@ -392,16 +392,30 @@ function App() {
       if (!isConnected) {
         setStatus("Connecting...");
         let profileIdToUse = selectedProfileId;
+        const chainActive =
+          appSettings.proxy_chain_enabled && appSettings.proxy_chain.length > 0;
+        const chainExclusions = chainActive
+          ? new Set(appSettings.proxy_chain)
+          : null;
+        if (chainExclusions?.has(profileIdToUse)) {
+          profileIdToUse = "";
+        }
+        const hasForcedExit = chainActive && profileIdToUse !== "";
 
-        if (selectedProxyMode === "auto") {
+        if (selectedProxyMode === "auto" && !hasForcedExit) {
           const pings = await refreshPings(selectedConfigDomain);
           const domain = selectedConfigDomain.trim() || "local";
           const candidates = profiles.filter(
             (profile) => resolveProfileDomain(profile) === domain
           );
+          const eligibleCandidates = chainExclusions
+            ? candidates.filter((profile) => !chainExclusions.has(profile.id))
+            : candidates;
+          const effectiveCandidates =
+            eligibleCandidates.length > 0 ? eligibleCandidates : candidates;
           let bestProfile: Profile | null = null;
           let bestPing = Number.POSITIVE_INFINITY;
-          candidates.forEach((profile) => {
+          effectiveCandidates.forEach((profile) => {
             const ping = pings[profile.id];
             if (ping === null || ping === undefined) return;
             if (ping < bestPing) {
@@ -409,9 +423,12 @@ function App() {
               bestProfile = profile;
             }
           });
-          profileIdToUse = (bestProfile || candidates[0])?.id || "";
+          profileIdToUse = (bestProfile || effectiveCandidates[0])?.id || "";
         } else if (!profileIdToUse) {
-          profileIdToUse = profiles[0]?.id || "";
+          const fallbackProfile = chainExclusions
+            ? profiles.find((profile) => !chainExclusions.has(profile.id))
+            : profiles[0];
+          profileIdToUse = fallbackProfile?.id || "";
         }
 
         if (!profileIdToUse) {
@@ -564,6 +581,14 @@ function App() {
   const handleSelectProxy = (id: string) => {
     const profile = profiles.find((item) => item.id === id);
     if (!profile) return;
+    if (appSettings.proxy_chain_enabled && appSettings.proxy_chain.includes(id)) {
+      const newSettings = {
+        ...appSettings,
+        proxy_chain: appSettings.proxy_chain.filter((entry) => entry !== id),
+      };
+      setAppSettings(newSettings);
+      saveSettings(newSettings);
+    }
     setSelectedProfileId(id);
     setSelectedProxyMode("manual");
     setSelectedConfigDomain(resolveProfileDomain(profile));

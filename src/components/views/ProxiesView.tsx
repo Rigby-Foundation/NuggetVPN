@@ -100,7 +100,7 @@ function ProxiesView({
               Import a subscription or add a profile to populate this list.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
               {domainProfiles.map((profile) => {
                 const ping = profilePings[profile.id];
                 const isSelected =
@@ -112,7 +112,7 @@ function ProxiesView({
                   <Card
                     key={profile.id}
                     className={cn(
-                      "cursor-pointer transition-colors",
+                      "cursor-pointer transition-colors !py-3",
                       isSelected && "border-primary/60 bg-primary/5"
                     )}
                     onClick={() => onSelectProxy(profile.id)}
