@@ -8,6 +8,43 @@
     <title>NuggetVPN</title>
     <meta name="description"
         content="Modern, lightweight, and fast VPN client built with Tauri v2 and React. Open Source and privacy-focused." />
+    <style>
+        :root {
+            --window-radius: 16px;
+        }
+
+        html, body, #root {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: transparent !important;
+            overflow: hidden;
+            border-radius: var(--window-radius);
+            view-transition-name: none;
+        }
+
+        #root {
+            border-radius: var(--window-radius);
+            overflow: hidden;
+        }
+
+        .window-frame {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--window-radius);
+            overflow: hidden;
+            background: transparent;
+        }
+
+    </style>
+    <script>
+        (function () {
+            var ua = navigator.userAgent || "";
+            if (ua.indexOf("Windows") !== -1) {
+                document.documentElement.style.setProperty("--window-radius", "8px");
+            }
+        })();
+    </script>
 </head>
 
 <body>

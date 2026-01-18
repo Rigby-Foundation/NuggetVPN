@@ -6,15 +6,19 @@ import {
   useRef,
   useState,
 } from "react";
+// @ts-expect-error - React experimental ViewTransition type not in stable defs.
+import { ViewTransition } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import toast, { Toaster } from "react-hot-toast";
 
 import AddModal from "@/components/AddModal";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
+import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import TopBar from "@/components/layout/TopBar";
 import { WindowControls } from "@/components/layout/WindowControls";
 import ConnectionView from "@/components/views/ConnectionView";
@@ -26,7 +30,8 @@ import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AppSettings, IpInfo, Profile, ProfilePing } from "@/types";
+import { AppSettings, ConfigSource, IpInfo, Profile, ProfilePing } from "@/types";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import "./App.css";
 
@@ -51,6 +56,7 @@ const defaultSettings: AppSettings = {
   routing_domains: [],
   proxy_chain_enabled: false,
   proxy_chain: [],
+  proxy_chain_exit: "",
 };
 
 const resolveProfileDomain = (profile: Profile) =>
@@ -58,6 +64,7 @@ const resolveProfileDomain = (profile: Profile) =>
 
 function App() {
   const { theme, setTheme } = useTheme();
+  const isMobile = useIsMobile();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,7 +77,7 @@ function App() {
     {}
   );
 
-  const [status, setStatus] = useState("Ready");
+  const [, setStatus] = useState("Ready");
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [logLimit, setLogLimit] = useState("1000");
@@ -104,21 +111,45 @@ function App() {
   const winMinimize = () => appWindow.minimize();
   const winMaximize = () => appWindow.toggleMaximize();
 
-  const sources = useMemo(() => {
-    const map = new Map<string, number>();
+  const sources = useMemo<ConfigSource[]>(() => {
+    const subscriptionCounts = new Map<string, number>();
+    const localProfiles: Profile[] = [];
+
     profiles.forEach((profile) => {
       const domain = resolveProfileDomain(profile);
-      map.set(domain, (map.get(domain) ?? 0) + 1);
+      if (domain === "local") {
+        localProfiles.push(profile);
+        return;
+      }
+      subscriptionCounts.set(domain, (subscriptionCounts.get(domain) ?? 0) + 1);
     });
-    const entries = Array.from(map.entries()).map(([domain, count]) => ({
-      domain,
-      count,
-    }));
-    return entries.sort((a, b) => {
-      if (a.domain === "local") return -1;
-      if (b.domain === "local") return 1;
-      return a.domain.localeCompare(b.domain);
-    });
+
+    const localEntries: ConfigSource[] = localProfiles
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((profile) => ({
+        kind: "profile" as const,
+        key: `profile:${profile.id}`,
+        domain: "local" as const,
+        label: profile.name,
+        detail: profile.protocol,
+        profileId: profile.id,
+      }));
+
+    const subscriptionEntries: ConfigSource[] = Array.from(
+      subscriptionCounts.entries()
+    )
+      .map(([domain, count]) => ({
+        kind: "subscription" as const,
+        key: `subscription:${domain}`,
+        domain,
+        label: domain,
+        detail: `${count} ${count === 1 ? "proxy" : "proxies"}`,
+        count,
+      }))
+      .sort((a, b) => a.domain.localeCompare(b.domain));
+
+    return [...localEntries, ...subscriptionEntries];
   }, [profiles]);
 
   const saveSettings = useCallback(async (settings: AppSettings) => {
@@ -192,10 +223,28 @@ function App() {
       }
 
       const currentProfileId = selectedProfileIdRef.current;
-      const selectedProfileExists = loaded.some(
+      const currentProfile = loaded.find(
         (profile) => profile.id === currentProfileId
       );
-      if (!selectedProfileExists && selectedProxyModeRef.current === "manual") {
+      const currentMatchesDomain =
+        currentProfile &&
+        resolveProfileDomain(currentProfile) === nextDomain;
+
+      if (nextDomain === "local") {
+        const localProfiles = loaded.filter(
+          (profile) => resolveProfileDomain(profile) === "local"
+        );
+        if (localProfiles.length > 0) {
+          if (!localProfiles.some((profile) => profile.id === currentProfileId)) {
+            setSelectedProfileId(localProfiles[0].id);
+          }
+          if (selectedProxyModeRef.current !== "manual") {
+            setSelectedProxyMode("manual");
+          }
+        } else {
+          setSelectedProfileId("");
+        }
+      } else if (selectedProxyModeRef.current === "manual" && !currentMatchesDomain) {
         const fallbackProfile =
           loaded.find(
             (profile) => resolveProfileDomain(profile) === nextDomain
@@ -282,28 +331,87 @@ function App() {
     [loadProfiles]
   );
 
-  const handleDeleteSource = async (domain: string) => {
+  const handleDeleteSource = async (source: ConfigSource) => {
+    const normalizedDomain =
+      source.kind === "subscription"
+        ? source.domain.trim() || "local"
+        : "local";
+    const targetIds =
+      source.kind === "profile"
+        ? [source.profileId]
+        : profiles
+            .filter((profile) => resolveProfileDomain(profile) === normalizedDomain)
+            .map((profile) => profile.id);
+    if (targetIds.length === 0) {
+      return;
+    }
     try {
-      const updated = await invoke<Profile[]>("delete_profiles_by_source", {
-        source_domain: domain,
+      const updated = await invoke<Profile[]>("delete_profiles_by_ids", {
+        ids: targetIds,
       });
       setProfiles(updated);
-      setLogs((prev) => [...prev, `Configuration '${domain}' deleted.`]);
+      setLogs((prev) => [
+        ...prev,
+        source.kind === "profile"
+          ? `Profile '${source.label}' deleted.`
+          : `Configuration '${normalizedDomain}' deleted.`,
+      ]);
 
-      if (!updated.some((profile) => profile.id === selectedProfileId)) {
-        setSelectedProfileId("");
-        setSelectedProxyMode("auto");
+      const remainingIds = new Set(updated.map((profile) => profile.id));
+      if (appSettings.proxy_chain.length > 0) {
+        const nextChain = appSettings.proxy_chain.filter((id) =>
+          remainingIds.has(id)
+        );
+        if (nextChain.length !== appSettings.proxy_chain.length) {
+          const nextSettings = { ...appSettings, proxy_chain: nextChain };
+          setAppSettings(nextSettings);
+          try {
+            await saveSettings(nextSettings);
+          } catch (e) {
+            console.error("Failed to save settings after delete", e);
+          }
+        }
       }
 
-      if (selectedConfigDomain === domain) {
-        const remainingDomains = Array.from(
-          new Set(updated.map((profile) => resolveProfileDomain(profile)))
-        ).sort((a, b) => {
-          if (a === "local") return -1;
-          if (b === "local") return 1;
-          return a.localeCompare(b);
-        });
-        setSelectedConfigDomain(remainingDomains[0] || "local");
+      const remainingDomains = Array.from(
+        new Set(updated.map((profile) => resolveProfileDomain(profile)))
+      ).sort((a, b) => {
+        if (a === "local") return -1;
+        if (b === "local") return 1;
+        return a.localeCompare(b);
+      });
+      const currentDomain = selectedConfigDomain;
+      const nextDomain = remainingDomains.includes(currentDomain)
+        ? currentDomain
+        : remainingDomains[0] || "local";
+      if (currentDomain !== nextDomain) {
+        setSelectedConfigDomain(nextDomain);
+      }
+
+      const currentProfile = updated.find(
+        (profile) => profile.id === selectedProfileId
+      );
+      const currentMatchesDomain =
+        currentProfile && resolveProfileDomain(currentProfile) === nextDomain;
+
+      if (nextDomain === "local") {
+        const localProfiles = updated.filter(
+          (profile) => resolveProfileDomain(profile) === "local"
+        );
+        if (localProfiles.length > 0) {
+          if (
+            !localProfiles.some((profile) => profile.id === selectedProfileId)
+          ) {
+            setSelectedProfileId(localProfiles[0].id);
+          }
+          setSelectedProxyMode("manual");
+        } else {
+          setSelectedProfileId("");
+          setSelectedProxyMode("auto");
+        }
+      } else if (!currentMatchesDomain) {
+        setSelectedProfileId("");
+        setSelectedProxyMode("auto");
       }
     } catch (e) {
       console.error(e);
@@ -385,6 +493,9 @@ function App() {
   const toggleVpn = async () => {
     if (profiles.length === 0) {
       setStatus("No Profile!");
+      toast.error("No profiles found. Add a profile or import a subscription.", {
+        id: "no-profiles",
+      });
       return;
     }
 
@@ -433,6 +544,9 @@ function App() {
 
         if (!profileIdToUse) {
           setStatus("No Proxy!");
+          toast.error("No proxy available for this configuration.", {
+            id: "no-proxy",
+          });
           return;
         }
 
@@ -457,6 +571,10 @@ function App() {
       }
     } catch (error) {
       setStatus("Error");
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message ? `Connection failed: ${message}` : "Connection failed.", {
+        id: "connect-error",
+      });
       console.error(error);
     }
   };
@@ -470,7 +588,25 @@ function App() {
         setPlatform(platformName);
 
         const settings = (await invoke("get_settings")) as AppSettings;
-        setAppSettings({ ...defaultSettings, ...settings });
+        const storedMode = settings.routing_mode as string;
+        const normalizedMode =
+          storedMode === "selected"
+            ? "apps_domains"
+            : storedMode === "all" ||
+              storedMode === "apps" ||
+              storedMode === "domains" ||
+              storedMode === "apps_domains"
+            ? storedMode
+            : "all";
+        const mergedSettings = {
+          ...defaultSettings,
+          ...settings,
+          routing_mode: normalizedMode as AppSettings["routing_mode"],
+        };
+        setAppSettings(mergedSettings);
+        if (normalizedMode !== storedMode) {
+          await saveSettings(mergedSettings);
+        }
 
         if (!settings.auth_server && !settings.skip_auth) {
           setShowOnboarding(true);
@@ -600,8 +736,22 @@ function App() {
     setSelectedConfigDomain(domain || "local");
   };
 
-  const applyConfigSelection = (domain: string, focusProxies: boolean) => {
-    const normalized = domain.trim() || "local";
+  const applyConfigSelection = (source: ConfigSource, focusProxies: boolean) => {
+    if (source.kind === "profile") {
+      const profile = profiles.find((item) => item.id === source.profileId);
+      if (!profile) {
+        return;
+      }
+      setSelectedConfigDomain(resolveProfileDomain(profile));
+      setSelectedProxyMode("manual");
+      setSelectedProfileId(profile.id);
+      if (focusProxies) {
+        setActiveTab("proxies");
+      }
+      return;
+    }
+
+    const normalized = source.domain.trim() || "local";
     setSelectedConfigDomain(normalized);
     const currentProfile = profiles.find(
       (profile) => profile.id === selectedProfileId
@@ -615,12 +765,12 @@ function App() {
     }
   };
 
-  const handleSelectConfig = (domain: string) => {
-    applyConfigSelection(domain, true);
+  const handleSelectConfig = (source: ConfigSource) => {
+    applyConfigSelection(source, true);
   };
 
-  const handleSelectConfigFromTopBar = (domain: string) => {
-    applyConfigSelection(domain, false);
+  const handleSelectConfigFromTopBar = (source: ConfigSource) => {
+    applyConfigSelection(source, false);
   };
 
   const changeTab = (tab: string) => {
@@ -631,6 +781,17 @@ function App() {
 
   return (
     <main className="h-full overflow-hidden">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: "shadow-lg",
+          style: {
+            background: "var(--background)",
+            color: "var(--foreground)",
+            border: "1px solid var(--border)",
+          },
+        }}
+      />
       <AddModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -649,10 +810,9 @@ function App() {
         <AppSidebar
           activeTab={activeTab}
           onTabChange={changeTab}
-          status={status}
-          isConnected={isConnected}
           onClose={winClose}
           onMinimize={winMinimize}
+          onMaximize={winMaximize}
           platform={platform}
         />
         <SidebarInset
@@ -674,79 +834,95 @@ function App() {
             className={cn(
               "flex-1 flex flex-col overflow-hidden",
               platform !== "macos"
-                ? "bg-background m-2 mt-0 border rounded-xl shadow-sm"
-                : "px-2 pb-4 pt-2"
+                ? "bg-background m-2 mt-0 border rounded-[var(--window-radius)] shadow-sm"
+                : cn("px-2 pb-4 pt-2")
             )}
           >
+            {platform === "macos" && isMobile && (
+              <div
+                className="h-8 px-4 flex items-center shrink-0"
+                data-tauri-drag-region
+              >
+                <MacWindowControls
+                  onClose={winClose}
+                  onMinimize={winMinimize}
+                  onMaximize={winMaximize}
+                />
+              </div>
+            )}
             <TopBar
               sources={sources}
               selectedSourceDomain={selectedConfigDomain}
+              selectedProfileId={selectedProfileId}
               isConnected={isConnected}
               onSourceSelect={handleSelectConfigFromTopBar}
               onAddProfile={() => setIsModalOpen(true)}
             />
 
-            <div className="flex-1 relative overflow-hidden">
-              {activeTab === "connection" && (
-                <ConnectionView
-                  isConnected={isConnected}
-                  toggleVpn={toggleVpn}
-                  duration={duration}
-                  uploadSpeed={uploadSpeed}
-                  downloadSpeed={downloadSpeed}
-                  totalUp={totalUp}
-                  totalDown={totalDown}
-                  checkIp={checkIp}
-                  isCheckingIp={isCheckingIp}
-                  ipInfo={ipInfo}
-                />
-              )}
+            <ViewTransition name="app-content">
+              <div className="flex-1 relative overflow-hidden">
+                {activeTab === "connection" && (
+                  <ConnectionView
+                    isConnected={isConnected}
+                    toggleVpn={toggleVpn}
+                    duration={duration}
+                    uploadSpeed={uploadSpeed}
+                    downloadSpeed={downloadSpeed}
+                    totalUp={totalUp}
+                    totalDown={totalDown}
+                    checkIp={checkIp}
+                    isCheckingIp={isCheckingIp}
+                    ipInfo={ipInfo}
+                  />
+                )}
 
-              {activeTab === "settings" && (
-                <SettingsView
-                  theme={theme}
-                  setTheme={setTheme}
-                  appSettings={appSettings}
-                  profiles={profiles}
-                  selectedProfileId={selectedProfileId}
-                  onSettingsChange={handleSettingsChange}
-                  onConnectSync={handleConnectSync}
-                  onDisconnectSync={handleDisconnectSync}
-                />
-              )}
+                {activeTab === "settings" && (
+                  <SettingsView
+                    theme={theme}
+                    setTheme={setTheme}
+                    appSettings={appSettings}
+                    profiles={profiles}
+                    selectedProfileId={selectedProfileId}
+                    onSettingsChange={handleSettingsChange}
+                    onConnectSync={handleConnectSync}
+                    onDisconnectSync={handleDisconnectSync}
+                  />
+                )}
 
-              {activeTab === "logs" && (
-                <LogsView
-                  logs={logs}
-                  logLimit={logLimit}
-                  onLogLimitChange={handleLogLimitChange}
-                  onDumpLogs={handleDumpLogs}
-                  logEndRef={logContainerRef}
-                />
-              )}
+                {activeTab === "logs" && (
+                  <LogsView
+                    logs={logs}
+                    logLimit={logLimit}
+                    onLogLimitChange={handleLogLimitChange}
+                    onDumpLogs={handleDumpLogs}
+                    logEndRef={logContainerRef}
+                  />
+                )}
 
-              {activeTab === "proxies" && (
-                <ProxiesView
-                  profiles={profiles}
-                  profilePings={profilePings}
-                  selectedSourceDomain={selectedConfigDomain}
-                  selectedProxyMode={selectedProxyMode}
-                  selectedProfileId={selectedProfileId}
-                  onSelectProxy={handleSelectProxy}
-                  onSelectAuto={() => handleSelectAuto(selectedConfigDomain)}
-                />
-              )}
+                {activeTab === "proxies" && (
+                  <ProxiesView
+                    profiles={profiles}
+                    profilePings={profilePings}
+                    selectedSourceDomain={selectedConfigDomain}
+                    selectedProxyMode={selectedProxyMode}
+                    selectedProfileId={selectedProfileId}
+                    onSelectProxy={handleSelectProxy}
+                    onSelectAuto={() => handleSelectAuto(selectedConfigDomain)}
+                  />
+                )}
 
-              {activeTab === "configuration" && (
-                <ConfigurationView
-                  sources={sources}
-                  selectedSource={selectedConfigDomain}
-                  onSelectSource={handleSelectConfig}
-                  onDeleteSource={handleDeleteSource}
-                  onAdd={() => setIsModalOpen(true)}
-                />
-              )}
-            </div>
+                {activeTab === "configuration" && (
+                  <ConfigurationView
+                    sources={sources}
+                    selectedSource={selectedConfigDomain}
+                    selectedProfileId={selectedProfileId}
+                    onSelectSource={handleSelectConfig}
+                    onDeleteSource={handleDeleteSource}
+                    onAdd={() => setIsModalOpen(true)}
+                  />
+                )}
+              </div>
+            </ViewTransition>
           </div>
         </SidebarInset>
       </SidebarProvider>

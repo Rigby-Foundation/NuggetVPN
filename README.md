@@ -8,6 +8,7 @@ NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](ht
 - **Protocol Support**:
   - **VLESS**: Supports Reality and TLS security flows.
   - **Shadowsocks**: Standard support for SS protocols.
+  - **And others!**: We support all protocols that are implemented in sing-box
 - **Profile Management**:
   - Import profiles via URL (Subscription).
   - Manually add profiles via `vless://` or `ss://` links.
@@ -17,6 +18,8 @@ NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](ht
   - Automatic TUN interface creation.
   - DNS hijacking prevention.
   - Self-elevation (macOS) for necessary privileges.
+- **Split Tunneling**: You can set what domains or apps to proxy.
+- **Custom sing-box configs**: You can set your own sing-box config.
 
 ## Prerequisites
 

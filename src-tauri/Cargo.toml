@@ -1,6 +1,6 @@
 [package]
 name = "nuggetvpn"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 description = "Modern, lightweight VPN client built with Tauri v2 and React"
 authors = ["Rigby Foundation"]
 edition = "2021"

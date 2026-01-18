@@ -4,24 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { ConfigSource } from "@/types";
 
 interface ConfigurationViewProps {
-  sources: { domain: string; count: number }[];
+  sources: ConfigSource[];
   selectedSource: string;
-  onSelectSource: (domain: string) => void;
-  onDeleteSource: (domain: string) => void;
+  selectedProfileId: string;
+  onSelectSource: (source: ConfigSource) => void;
+  onDeleteSource: (source: ConfigSource) => void;
   onAdd: () => void;
 }
 
 function ConfigurationView({
   sources,
   selectedSource,
+  selectedProfileId,
   onSelectSource,
   onDeleteSource,
   onAdd,
 }: ConfigurationViewProps) {
-  const domainLabel = (domain: string) =>
-    domain === "local" ? "Local" : domain;
+  const isSelected = (source: ConfigSource) =>
+    source.kind === "subscription"
+      ? selectedSource === source.domain
+      : selectedSource === "local" && selectedProfileId === source.profileId;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -37,20 +42,20 @@ function ConfigurationView({
 
             {sources.map((source) => (
               <Card
-                key={source.domain}
+                key={source.key}
                 className={cn(
                   "p-4 group hover:border-primary/50 transition-colors overflow-hidden cursor-pointer",
-                  selectedSource === source.domain && "border-primary/60 bg-primary/5"
+                  isSelected(source) && "border-primary/60 bg-primary/5"
                 )}
-                onClick={() => onSelectSource(source.domain)}
+                onClick={() => onSelectSource(source)}
               >
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-bold truncate">
-                      {domainLabel(source.domain)}
+                      {source.label}
                     </div>
                     <div className="text-xs text-muted-foreground font-mono mt-1 truncate">
-                      {source.count} proxies
+                      {source.detail}
                     </div>
                   </div>
                   <Button
@@ -58,7 +63,7 @@ function ConfigurationView({
                     size="icon"
                     onClick={(event) => {
                       event.stopPropagation();
-                      onDeleteSource(source.domain);
+                      onDeleteSource(source);
                     }}
                     className="shrink-0 hover:text-destructive hover:bg-destructive/10"
                   >

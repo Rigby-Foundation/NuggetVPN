@@ -45,6 +45,8 @@ pub struct AppSettings {
     pub proxy_chain_enabled: bool,
     #[serde(default)]
     pub proxy_chain: Vec<String>,
+    #[serde(default)]
+    pub proxy_chain_exit: String,
 }
 
 impl Default for AppSettings {
@@ -68,6 +70,7 @@ impl Default for AppSettings {
             routing_domains: Vec::new(),
             proxy_chain_enabled: false,
             proxy_chain: Vec::new(),
+            proxy_chain_exit: String::new(),
         }
     }
 }

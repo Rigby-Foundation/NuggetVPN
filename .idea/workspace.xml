@@ -11,10 +11,32 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="type shi">
+    <list default="true" id="b8e3b258-7ca1-43e8-adb0-9ec382422f0f" name="Changes" comment="some shi">
+      <change beforePath="$PROJECT_DIR$/.idea/NuggetVPN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/NuggetVPN.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CONTRIBUTING.md" beforeDir="false" afterPath="$PROJECT_DIR$/CONTRIBUTING.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bun.lock" beforeDir="false" afterPath="$PROJECT_DIR$/bun.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/commands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/commands.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/models.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/models.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/parser.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src-tauri/src/vpn.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src-tauri/src/vpn.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/App.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/AddModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/AddModal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/AppSidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/TopBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/TopBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/tabs.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/tabs.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/views/ConfigurationView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/ConfigurationView.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/components/views/ProxiesView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/ProxiesView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/views/SettingsView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/types.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -42,7 +64,7 @@
     <option name="directoryName" value="GudQ3mii" />
   </component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="ProjectErrors" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
@@ -69,7 +91,7 @@
     &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
     &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
     &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;language.rust.cargo.check&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;ts.external.directory.path&quot;: &quot;/Users/turborigby/NuggetVPN/node_modules/typescript/lib&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
@@ -137,6 +159,10 @@
       <workItem from="1767546834867" duration="6636000" />
       <workItem from="1767745718869" duration="204000" />
       <workItem from="1767745937697" duration="5642000" />
+      <workItem from="1768758716558" duration="3601000" />
+      <workItem from="1768766976028" duration="50000" />
+      <workItem from="1768767037580" duration="15000" />
+      <workItem from="1768767074214" duration="6169000" />
     </task>
     <task id="LOCAL-00001" summary="move to xray">
       <option name="closed" value="true" />
@@ -338,7 +364,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767554865371</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="some shi">
+      <option name="closed" value="true" />
+      <created>1768758739809</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1768758739809</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -367,7 +401,8 @@
     <MESSAGE value="bump" />
     <MESSAGE value="smth new in design and split tunneling" />
     <MESSAGE value="type shi" />
-    <option name="LAST_COMMIT_MESSAGE" value="type shi" />
+    <MESSAGE value="some shi" />
+    <option name="LAST_COMMIT_MESSAGE" value="some shi" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

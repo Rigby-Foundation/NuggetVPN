@@ -146,44 +146,21 @@ body {
     font-family: 'Unbounded', sans-serif;
 }
 
-html, body, #root {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    background: transparent !important;
-    overflow: hidden;  /* ДОБАВЬ ЭТО */
-}
-
-#root {
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-.window-frame {
-    width: 100%;
-    height: 100%;         /* обязательно */
-    border-radius: 16px;
-    overflow: hidden;
-    background: transparent;
-}
-
 .window-inner {
     width: 100%;
-    height: 100%;         /* обязательно */
+    height: 100%;
     background: var(--background);
 }
 
-/* колонка (TopBar + content) */
 .app-col {
     height: 100%;
     display: flex;
     flex-direction: column;
-    min-height: 0; /* КРИТИЧНО */
+    min-height: 0;
 }
 
-/* контейнер для views */
 .app-content {
     flex: 1;
-    min-height: 0; /* КРИТИЧНО */
-    overflow: hidden; /* НЕ скроллим тут */
+    min-height: 0;
+    overflow: hidden;
 }

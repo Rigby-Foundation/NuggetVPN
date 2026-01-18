@@ -59,9 +59,18 @@ function SettingsView({
   const [newDomain, setNewDomain] = React.useState("");
   const [newChainId, setNewChainId] = React.useState("");
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const normalizedRoutingMode =
+    appSettings.routing_mode === "selected" ? "apps_domains" : appSettings.routing_mode;
   const availableChainProfiles = profiles.filter(
     (p) => p.id !== selectedProfileId && !appSettings.proxy_chain.includes(p.id)
   );
+
+  const formatAppLabel = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+    const parts = trimmed.split(/[/\\]/);
+    return parts[parts.length - 1] || trimmed;
+  };
 
   const handleAddApp = async () => {
     try {
@@ -77,16 +86,9 @@ function SettingsView({
 
       if (selected) {
         const paths = Array.isArray(selected) ? selected : [selected];
-
-        const fileNames = paths.map((p) => {
-          const parts = p.split(/[/\\]/);
-          return parts[parts.length - 1];
-        });
-
-        // Filter valid filenames and distinct
-        const newApps = [...appSettings.routing_apps, ...fileNames];
-
-        const uniqueApps = Array.from(new Set(newApps)).filter(Boolean);
+        const cleaned = paths.map((p) => p.trim()).filter(Boolean);
+        const newApps = [...appSettings.routing_apps, ...cleaned];
+        const uniqueApps = Array.from(new Set(newApps));
         onSettingsChange("routing_apps", uniqueApps);
       }
     } catch (e) {
@@ -532,27 +534,36 @@ function SettingsView({
                   </div>
 
                   <Tabs
-                    defaultValue={appSettings.routing_mode}
+                    value={normalizedRoutingMode}
                     onValueChange={(val) =>
-                      onSettingsChange("routing_mode", val as "all" | "selected")
+                      onSettingsChange("routing_mode", val as AppSettings["routing_mode"])
                     }
                     className="w-full"
                   >
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
                       <TabsTrigger value="all">All Apps</TabsTrigger>
-                      <TabsTrigger value="selected">Selected Apps</TabsTrigger>
+                      <TabsTrigger value="apps">Selected Apps</TabsTrigger>
+                      <TabsTrigger value="domains">Selected Domains</TabsTrigger>
+                      <TabsTrigger value="apps_domains">
+                        Selected Apps & Domains
+                      </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="all">
+
+                    <TabsContent value="all" className="pt-2">
                       <div className="text-center py-4 border-2 border-dashed rounded-lg mt-2">
                         <p className="text-sm text-muted-foreground">
                           All applications will be routed through the VPN.
                         </p>
                       </div>
                     </TabsContent>
-                    <TabsContent value="selected">
-                      <div className="space-y-3 pt-2">
+
+                    <TabsContent value="apps" className="pt-2 space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Only the apps below use the VPN. All other traffic goes direct.
+                      </p>
+                      <div className="space-y-3 rounded-md border p-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs">Tunneled Applications</Label>
+                          <Label className="text-xs">Applications</Label>
                           <Button
                             variant="outline"
                             size="sm"
@@ -564,12 +575,12 @@ function SettingsView({
                         </div>
 
                         {appSettings.routing_apps.length === 0 ? (
-                          <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                          <div className="text-center py-6 border-2 border-dashed rounded-lg">
                             <p className="text-sm text-muted-foreground">
                               No applications added.
                             </p>
                             <p className="text-xs text-muted-foreground/60 mt-1">
-                              VPN traffic will be blocked for all apps.
+                              VPN will not be used by any apps.
                             </p>
                           </div>
                         ) : (
@@ -579,7 +590,9 @@ function SettingsView({
                                 key={app}
                                 className="flex items-center justify-between p-2 text-sm"
                               >
-                                <span className="font-mono truncate mr-2">{app}</span>
+                                <span className="font-mono truncate mr-2">
+                                  {formatAppLabel(app)}
+                                </span>
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -598,9 +611,15 @@ function SettingsView({
                           </div>
                         )}
                       </div>
+                    </TabsContent>
 
-                      <div className="space-y-3 pt-4 border-t">
-                        <Label className="text-xs">Tunneled Domains</Label>
+                    <TabsContent value="domains" className="pt-2 space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Only the domains below use the VPN. All other traffic goes
+                        direct.
+                      </p>
+                      <div className="space-y-3 rounded-md border p-3">
+                        <Label className="text-xs">Domains</Label>
                         <div className="flex gap-2">
                           <Input
                             placeholder="google.com"
@@ -628,7 +647,9 @@ function SettingsView({
                                 key={domain}
                                 className="flex items-center justify-between p-2 text-sm"
                               >
-                                <span className="font-mono truncate mr-2">{domain}</span>
+                                <span className="font-mono truncate mr-2">
+                                  {domain}
+                                </span>
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -636,7 +657,9 @@ function SettingsView({
                                   onClick={() =>
                                     onSettingsChange(
                                       "routing_domains",
-                                      appSettings.routing_domains.filter((d) => d !== domain)
+                                      appSettings.routing_domains.filter(
+                                        (d) => d !== domain
+                                      )
                                     )
                                   }
                                 >
@@ -648,7 +671,122 @@ function SettingsView({
                         )}
                         {appSettings.routing_domains.length === 0 && (
                           <p className="text-xs text-muted-foreground">
-                            No specific domains added.
+                            No domains added.
+                          </p>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="apps_domains" className="pt-2 space-y-4">
+                      <p className="text-xs text-muted-foreground">
+                        Only the apps and domains below use the VPN. All other
+                        traffic goes direct.
+                      </p>
+                      <div className="space-y-3 rounded-md border p-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs">Applications</Label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={handleAddApp}
+                          >
+                            <Plus size={12} /> Add Application
+                          </Button>
+                        </div>
+
+                        {appSettings.routing_apps.length === 0 ? (
+                          <div className="text-center py-6 border-2 border-dashed rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                              No applications added.
+                            </p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">
+                              VPN will not be used by any apps.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="border rounded-md divide-y max-h-[200px] overflow-y-auto">
+                            {appSettings.routing_apps.map((app) => (
+                              <div
+                                key={app}
+                                className="flex items-center justify-between p-2 text-sm"
+                              >
+                                <span className="font-mono truncate mr-2">
+                                  {formatAppLabel(app)}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                  onClick={() =>
+                                    onSettingsChange(
+                                      "routing_apps",
+                                      appSettings.routing_apps.filter((a) => a !== app)
+                                    )
+                                  }
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3 rounded-md border p-3">
+                        <Label className="text-xs">Domains</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="google.com"
+                            className="h-8 text-xs"
+                            value={newDomain}
+                            onChange={(e) => setNewDomain(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleAddDomain();
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1 shrink-0"
+                            onClick={handleAddDomain}
+                          >
+                            <Plus size={12} /> Add
+                          </Button>
+                        </div>
+
+                        {appSettings.routing_domains.length > 0 && (
+                          <div className="border rounded-md divide-y max-h-[150px] overflow-y-auto">
+                            {appSettings.routing_domains.map((domain) => (
+                              <div
+                                key={domain}
+                                className="flex items-center justify-between p-2 text-sm"
+                              >
+                                <span className="font-mono truncate mr-2">
+                                  {domain}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                  onClick={() =>
+                                    onSettingsChange(
+                                      "routing_domains",
+                                      appSettings.routing_domains.filter(
+                                        (d) => d !== domain
+                                      )
+                                    )
+                                  }
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {appSettings.routing_domains.length === 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            No domains added.
                           </p>
                         )}
                       </div>

@@ -38,13 +38,16 @@ function AddModal({
     setErrorMsg("");
 
     try {
-      if (link.startsWith("http://") || link.startsWith("https://")) {
+      const isSubscription = /^https?:\/\//i.test(link);
+      const isJsonConfig = /^\s*\{/.test(link);
+
+      if (isSubscription) {
         await onImportSubscription(link);
         handleClose();
         return;
       }
 
-      const finalName = name || "New Profile";
+      const finalName = name || (isJsonConfig ? "Custom Sing-box" : "New Profile");
       await onSaveProfile(finalName, link);
       handleClose();
     } catch (e) {
@@ -70,12 +73,14 @@ function AddModal({
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="config-link">Config Link OR Subscription URL</Label>
+            <Label htmlFor="config-link">
+              Config Link, Subscription URL, or sing-box JSON
+            </Label>
             <Textarea
               id="config-link"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
-              placeholder="Paste vless://... OR https://example.com/sub"
+              placeholder="Paste vless://... OR https://example.com/sub OR sing-box JSON"
               className="font-mono text-xs resize-none"
               rows={3}
             />

@@ -23,7 +23,7 @@ export interface AppSettings {
     auth_token: string | null;
     skip_auth: boolean;
     pending_sync_upload: boolean;
-    routing_mode: "all" | "selected";
+    routing_mode: "all" | "apps" | "domains" | "apps_domains" | "selected";
     routing_apps: string[];
     routing_domains: string[];
     proxy_chain_enabled: boolean;
@@ -40,3 +40,21 @@ export interface ProfilePing {
     id: string;
     ping_ms: number | null;
 }
+
+export type ConfigSource =
+    | {
+        kind: "subscription";
+        key: string;
+        domain: string;
+        label: string;
+        detail: string;
+        count: number;
+    }
+    | {
+        kind: "profile";
+        key: string;
+        domain: "local";
+        label: string;
+        detail: string;
+        profileId: string;
+    };

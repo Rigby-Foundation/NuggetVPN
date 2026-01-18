@@ -5,6 +5,38 @@ use url::Url;
 
 use crate::models::AppSettings;
 
+#[derive(Debug)]
+pub enum SingBoxConfig {
+    Full(Value),
+    Outbound(Value),
+}
+
+pub fn parse_singbox_config(input: &str) -> Result<Option<SingBoxConfig>, String> {
+    let trimmed = input.trim();
+    if !trimmed.starts_with('{') {
+        return Ok(None);
+    }
+
+    let value: Value =
+        serde_json::from_str(trimmed).map_err(|e| format!("Invalid sing-box JSON: {}", e))?;
+    if !value.is_object() {
+        return Err("sing-box config must be a JSON object".to_string());
+    }
+
+    if value.get("outbounds").is_some()
+        || value.get("inbounds").is_some()
+        || value.get("route").is_some()
+    {
+        return Ok(Some(SingBoxConfig::Full(value)));
+    }
+
+    if value.get("type").is_some() {
+        return Ok(Some(SingBoxConfig::Outbound(value)));
+    }
+
+    Err("Unrecognized sing-box JSON format".to_string())
+}
+
 pub fn strip_ansi_codes(s: &str) -> String {
     let mut result = String::new();
     let mut in_escape = false;
@@ -121,6 +153,15 @@ fn add_transport(outbound: &mut Value, params: &HashMap<String, String>, domain:
 }
 
 pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
+    if let Some(parsed) = parse_singbox_config(link)? {
+        return match parsed {
+            SingBoxConfig::Outbound(outbound) => Ok(outbound),
+            SingBoxConfig::Full(_) => Err(
+                "Full sing-box config cannot be used as a single outbound".to_string(),
+            ),
+        };
+    }
+
     let url = Url::parse(link).map_err(|_| "Invalid URL format")?;
     let protocol = url.scheme();
 
@@ -596,30 +637,34 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
 }
 
 pub fn detect_protocol(link: &str) -> &'static str {
-    if link.starts_with("vless://") {
+    let trimmed = link.trim();
+    if trimmed.starts_with('{') {
+        return "sing-box";
+    }
+    if trimmed.starts_with("vless://") {
         "vless"
-    } else if link.starts_with("vmess://") {
+    } else if trimmed.starts_with("vmess://") {
         "vmess"
-    } else if link.starts_with("trojan://") {
+    } else if trimmed.starts_with("trojan://") {
         "trojan"
-    } else if link.starts_with("ss://") {
+    } else if trimmed.starts_with("ss://") {
         "shadowsocks"
-    } else if link.starts_with("hy2://") || link.starts_with("hysteria2://") {
+    } else if trimmed.starts_with("hy2://") || trimmed.starts_with("hysteria2://") {
         "hysteria2"
-    } else if link.starts_with("hy://") || link.starts_with("hysteria://") {
+    } else if trimmed.starts_with("hy://") || trimmed.starts_with("hysteria://") {
         "hysteria"
-    } else if link.starts_with("tuic://") {
+    } else if trimmed.starts_with("tuic://") {
         "tuic"
-    } else if link.starts_with("wireguard://") {
+    } else if trimmed.starts_with("wireguard://") {
         "wireguard"
-    } else if link.starts_with("socks://")
-        || link.starts_with("socks5://")
-        || link.starts_with("socks4://")
+    } else if trimmed.starts_with("socks://")
+        || trimmed.starts_with("socks5://")
+        || trimmed.starts_with("socks4://")
     {
         "socks"
-    } else if link.starts_with("http://") || link.starts_with("https://") {
+    } else if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
         "http"
-    } else if link.starts_with("ssh://") {
+    } else if trimmed.starts_with("ssh://") {
         "ssh"
     } else {
         "unknown"

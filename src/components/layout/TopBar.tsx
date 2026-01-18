@@ -7,25 +7,40 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfigSource } from "@/types";
 
 interface TopBarProps {
-  sources: { domain: string; count: number }[];
+  sources: ConfigSource[];
   selectedSourceDomain: string;
+  selectedProfileId: string;
   isConnected: boolean;
-  onSourceSelect: (domain: string) => void;
+  onSourceSelect: (source: ConfigSource) => void;
   onAddProfile: () => void;
 }
 
 function TopBar({
   sources,
   selectedSourceDomain,
+  selectedProfileId,
   isConnected,
   onSourceSelect,
   onAddProfile,
 }: TopBarProps) {
-  const domainLabel = (domain: string) => (domain === "local" ? "Local" : domain);
+  const isSelected = (source: ConfigSource) =>
+    source.kind === "subscription"
+      ? source.domain === selectedSourceDomain
+      : selectedSourceDomain === "local" && source.profileId === selectedProfileId;
+
+  const selectedSource =
+    sources.find(isSelected) ||
+    sources.find(
+      (source) =>
+        source.kind === "subscription" &&
+        source.domain === selectedSourceDomain
+    ) ||
+    sources[0];
   const displayName = sources.length
-    ? domainLabel(selectedSourceDomain || "local")
+    ? selectedSource?.label || "Select Configuration"
     : "Select Configuration";
 
   return (
@@ -57,13 +72,15 @@ function TopBar({
               <DropdownMenuContent className="w-64 max-h-96 overflow-y-auto">
                 {sources.map((source) => (
                   <DropdownMenuItem
-                    key={source.domain}
-                    onClick={() => onSourceSelect(source.domain)}
+                    key={source.key}
+                    onClick={() => onSourceSelect(source)}
                     className="flex items-center justify-between text-xs font-medium"
                   >
-                    <span className="truncate">{domainLabel(source.domain)}</span>
+                    <span className="truncate">{source.label}</span>
                     <span className="text-muted-foreground font-mono">
-                      {source.count}
+                      {source.kind === "subscription"
+                        ? source.count
+                        : source.detail}
                     </span>
                   </DropdownMenuItem>
                 ))}

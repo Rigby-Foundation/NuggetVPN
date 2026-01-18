@@ -28,10 +28,13 @@ function ProxiesView({
 }: ProxiesViewProps) {
   const normalizedDomain = selectedSourceDomain.trim() || "local";
   const domainLabel = normalizedDomain === "local" ? "Local" : normalizedDomain;
-  const domainProfiles = profiles.filter((profile) => {
-    const domain = (profile.source_domain || "").trim() || "local";
-    return domain === normalizedDomain;
-  });
+  const isSubscriptionSource = normalizedDomain !== "local";
+  const domainProfiles = isSubscriptionSource
+    ? profiles.filter((profile) => {
+        const domain = (profile.source_domain || "").trim() || "local";
+        return domain === normalizedDomain;
+      })
+    : [];
 
   const bestProxy = domainProfiles.reduce<Profile | null>((best, profile) => {
     const ping = profilePings[profile.id];
@@ -57,47 +60,51 @@ function ProxiesView({
             </p>
           </div>
 
-          <Card
-            className={cn(
-              "cursor-pointer transition-colors",
-              selectedProxyMode === "auto" && "border-primary/60 bg-primary/5"
-            )}
-            onClick={onSelectAuto}
-          >
-            <CardContent className="p-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Zap size={16} className="text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold flex items-center gap-2 min-w-0">
-                    Auto
-                    {selectedProxyMode === "auto" && (
-                      <Badge variant="secondary" className="gap-1">
-                        <Check size={12} /> Selected
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {bestProxy
-                      ? `Best ping: ${bestProxy.name}`
-                      : "Selects the lowest latency proxy to Google."}
-                  </div>
-                </div>
-              </div>
-              {bestProxy && profilePings[bestProxy.id] !== undefined && (
-                <span className="text-xs font-mono text-muted-foreground">
-                  {profilePings[bestProxy.id] === null
-                    ? "n/a"
-                    : `${profilePings[bestProxy.id]} ms`}
-                </span>
+          {isSubscriptionSource && (
+            <Card
+              className={cn(
+                "cursor-pointer transition-colors",
+                selectedProxyMode === "auto" && "border-primary/60 bg-primary/5"
               )}
-            </CardContent>
-          </Card>
+              onClick={onSelectAuto}
+            >
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Zap size={16} className="text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold flex items-center gap-2 min-w-0">
+                      Auto
+                      {selectedProxyMode === "auto" && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Check size={12} /> Selected
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {bestProxy
+                        ? `Best ping: ${bestProxy.name}`
+                        : "Selects the lowest latency proxy server."}
+                    </div>
+                  </div>
+                </div>
+                {bestProxy && profilePings[bestProxy.id] !== undefined && (
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {profilePings[bestProxy.id] === null
+                      ? "n/a"
+                      : `${profilePings[bestProxy.id]} ms`}
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {domainProfiles.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Import a subscription or add a profile to populate this list.
+              {isSubscriptionSource
+                ? "No proxies available for this configuration."
+                : "This configuration does not expose a proxy list."}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2">

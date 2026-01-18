@@ -58,7 +58,7 @@ Ensure you have the development environment set up as described in the [README.m
 - Please provide a clear description of what your PR does.
 - If it fixes a bug, reference the issue number.
 - Ensure your code is formatted and passes basic checks.
-- If you are modifying the Rust backend, please verify that it compiles without warnings.
+- If you are modifying the Rust backend, please verify that it compiles.
 
 ## License
 
