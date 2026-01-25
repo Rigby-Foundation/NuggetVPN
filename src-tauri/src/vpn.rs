@@ -357,7 +357,9 @@ pub fn start_vpn(
                 json!([
                     {
                         "tag": "dns-direct",
-                        "address": format!("udp://{}", settings.dns),
+                        "type": "udp",
+                        "server": settings.dns,
+                        "server_port": 53,
                         "detour": "direct"
                     }
                 ]),
@@ -366,8 +368,16 @@ pub fn start_vpn(
         } else {
             (
                 json!([
-                    { "tag": "local", "address": "local", "detour": "direct" },
-                    { "tag": "remote", "address": format!("https://{}/dns-query", settings.dns), "address_resolver": "local", "detour": "proxy" }
+                    { "tag": "local", "type": "local", "detour": "direct" },
+                    {
+                        "tag": "remote",
+                        "type": "https",
+                        "server": settings.dns,
+                        "server_port": 443,
+                        "path": "/dns-query",
+                        "address_resolver": "local",
+                        "detour": "proxy"
+                    }
                 ]),
                 "remote",
             )
@@ -386,7 +396,7 @@ pub fn start_vpn(
             "dns": {
                 "servers": dns_servers,
                 "rules": [
-                    { "outbound": "any", "action": "route", "server": if cfg!(target_os = "windows") { "dns-direct" } else { "local" } }
+                    { "action": "route", "server": if cfg!(target_os = "windows") { "dns-direct" } else { "local" } }
                 ],
                 "final": dns_final,
                 "strategy": "prefer_ipv4"
@@ -408,8 +418,8 @@ pub fn start_vpn(
                 "final": if split_enabled { "direct" } else { "proxy" },
                 "rules": [
                     { "protocol": "dns", "action": "hijack-dns" },
-                    { "ip_cidr": [format!("{}/32", settings.dns)], "outbound": "direct" },
-                    { "ip_is_private": true, "outbound": "direct" }
+                    { "ip_cidr": [format!("{}/32", settings.dns)], "action": "direct" },
+                    { "ip_is_private": true, "action": "direct" }
                 ]
             }
         });
