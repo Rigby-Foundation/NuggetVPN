@@ -414,6 +414,7 @@ pub fn start_vpn(
             "outbounds": outbounds,
             "route": {
                 "auto_detect_interface": true,
+                "default_domain_resolver": if cfg!(target_os = "windows") { "dns-direct" } else { "local" },
                 "final": if split_enabled { "direct" } else { "proxy" },
                 "rules": [
                     { "protocol": "dns", "action": "hijack-dns" },
