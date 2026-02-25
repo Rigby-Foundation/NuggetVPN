@@ -375,7 +375,6 @@ pub fn start_vpn(
                         "server": settings.dns,
                         "server_port": 443,
                         "path": "/dns-query",
-                        "address_resolver": "local",
                         "detour": "proxy"
                     }
                 ]),
