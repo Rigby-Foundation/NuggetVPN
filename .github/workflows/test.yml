@@ -19,18 +19,31 @@ jobs:
             singbox_arch: 'amd64'
             singbox_os: 'darwin'
             ext: 'tar.gz'
+
           - platform: 'macos-15' # Apple Silicon
             args: '--target aarch64-apple-darwin'
             target: 'aarch64-apple-darwin'
             singbox_arch: 'arm64'
             singbox_os: 'darwin'
             ext: 'tar.gz'
-          - platform: 'ubuntu-22.04' # Linux
-            args: ''
+
+          - platform: 'ubuntu-22.04' # Linux (Debian-style)
+            args: '--bundles deb,appimage'
             target: 'x86_64-unknown-linux-gnu'
             singbox_arch: 'amd64'
             singbox_os: 'linux'
             ext: 'tar.gz'
+            linux_distro: 'ubuntu'
+
+          - platform: 'ubuntu-22.04' # Linux (Fedora container -> rpm)
+            args: '--bundles rpm,appimage'
+            target: 'x86_64-unknown-linux-gnu'
+            singbox_arch: 'amd64'
+            singbox_os: 'linux'
+            ext: 'tar.gz'
+            linux_distro: 'fedora'
+            container_image: 'fedora:latest'
+
           - platform: 'windows-latest' # Windows
             args: ''
             target: 'x86_64-pc-windows-msvc'
@@ -39,8 +52,19 @@ jobs:
             ext: 'zip'
 
     runs-on: ${{ matrix.platform }}
+
+    # Fedora job runs inside a Fedora container (no native runner exists)
+    container: ${{ matrix.container_image }}
+
     steps:
       - uses: actions/checkout@v4
+
+      # Packages/tools needed only for Fedora container because it starts empty-ish
+      - name: Install base tools (Fedora container)
+        if: matrix.linux_distro == 'fedora'
+        run: |
+          dnf -y update
+          dnf -y install git curl wget file unzip tar xz findutils which
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -52,11 +76,12 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install Linux dependencies (Ubuntu)
+        if: matrix.linux_distro == 'ubuntu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
             build-essential \
             curl \
             wget \
@@ -66,6 +91,18 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libsoup-3.0-dev
+
+      - name: Install Linux dependencies (Fedora)
+        if: matrix.linux_distro == 'fedora'
+        run: |
+          dnf -y install \
+            gcc gcc-c++ make \
+            openssl-devel \
+            gtk3-devel \
+            webkit2gtk4.1-devel \
+            libayatana-appindicator3-devel \
+            librsvg2-devel \
+            libsoup3-devel
 
       - name: Install frontend dependencies
         run: bun install
@@ -79,28 +116,27 @@ jobs:
           ARCH="${{ matrix.singbox_arch }}"
           TARGET="${{ matrix.target }}"
           EXT="${{ matrix.ext }}"
-          
+
           URL="https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box-${VERSION}-${OS}-${ARCH}.${EXT}"
-          
+
           echo "Downloading sing-box from $URL"
           curl -L -o "sing-box.${EXT}" "$URL"
-          
+
           if [ "$EXT" = "zip" ]; then
             unzip "sing-box.${EXT}"
           else
             tar -xzf "sing-box.${EXT}"
           fi
-          
-          # Extract binary and rename to sidecar format
+
           DIR_NAME="sing-box-${VERSION}-${OS}-${ARCH}"
-          
+
           if [ "$OS" = "windows" ]; then
             mv "$DIR_NAME/sing-box.exe" "src-tauri/bin/sing-box-${TARGET}.exe"
           else
             mv "$DIR_NAME/sing-box" "src-tauri/bin/sing-box-${TARGET}"
             chmod +x "src-tauri/bin/sing-box-${TARGET}"
           fi
-          
+
           echo "Sidecar binary prepared:"
           ls -l src-tauri/bin/
 
@@ -110,18 +146,20 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nuggetvpn-${{ matrix.platform }}
+          name: nuggetvpn-${{ matrix.platform }}${{ matrix.linux_distro && format('-{0}', matrix.linux_distro) || '' }}
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/*/release/bundle/dmg/*.dmg
             src-tauri/target/*/release/bundle/macos/*.app
             src-tauri/target/*/release/bundle/nsis/*.exe
             src-tauri/target/*/release/bundle/msi/*.msi
             src-tauri/target/*/release/bundle/deb/*.deb
+            src-tauri/target/*/release/bundle/rpm/*.rpm
             src-tauri/target/*/release/bundle/appimage/*.AppImage
           if-no-files-found: warn
