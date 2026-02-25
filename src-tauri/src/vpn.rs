@@ -368,7 +368,7 @@ pub fn start_vpn(
         } else {
             (
                 json!([
-                    { "tag": "local", "type": "local", "detour": "direct" },
+                    { "tag": "local", "type": "local" },
                     {
                         "tag": "remote",
                         "type": "https",
