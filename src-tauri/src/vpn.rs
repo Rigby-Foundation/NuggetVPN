@@ -368,14 +368,13 @@ pub fn start_vpn(
         } else {
             (
                 json!([
-                    { "tag": "local", "type": "local", "detour": "direct" },
+                    { "tag": "local", "type": "local" },
                     {
                         "tag": "remote",
                         "type": "https",
                         "server": settings.dns,
                         "server_port": 443,
                         "path": "/dns-query",
-                        "address_resolver": "local",
                         "detour": "proxy"
                     }
                 ]),
@@ -415,6 +414,7 @@ pub fn start_vpn(
             "outbounds": outbounds,
             "route": {
                 "auto_detect_interface": true,
+                "default_domain_resolver": if cfg!(target_os = "windows") { "dns-direct" } else { "local" },
                 "final": if split_enabled { "direct" } else { "proxy" },
                 "rules": [
                     { "protocol": "dns", "action": "hijack-dns" },
