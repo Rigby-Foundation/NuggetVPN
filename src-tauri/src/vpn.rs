@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -265,6 +265,217 @@ fn ensure_clash_api(config: &mut Value) {
     });
 }
 
+fn migrate_singbox_config(config: &mut Value) {
+    // Remove legacy special outbounds (block, dns) deprecated in sing-box 1.11.0
+    let mut removed_tags: HashMap<String, String> = HashMap::new();
+    let mut direct_tags: HashSet<String> = HashSet::new();
+    if let Some(outbounds) = config.get_mut("outbounds").and_then(|v| v.as_array_mut()) {
+        outbounds.retain(|ob| {
+            let ob_type = ob.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let ob_tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+            if ob_type == "direct" {
+                direct_tags.insert(ob_tag.to_string());
+            }
+            match ob_type {
+                "block" => {
+                    removed_tags.insert(ob_tag.to_string(), "block".to_string());
+                    false
+                }
+                "dns" => {
+                    removed_tags.insert(ob_tag.to_string(), "dns".to_string());
+                    false
+                }
+                _ => true,
+            }
+        });
+    }
+
+    // Convert route rules referencing removed outbounds to action-based rules
+    if !removed_tags.is_empty() {
+        if let Some(rules) = config
+            .get_mut("route")
+            .and_then(|r| r.get_mut("rules"))
+            .and_then(|v| v.as_array_mut())
+        {
+            for rule in rules.iter_mut() {
+                let outbound = match rule.get("outbound").and_then(|v| v.as_str()) {
+                    Some(s) => s.to_string(),
+                    None => continue,
+                };
+                if let Some(removed_type) = removed_tags.get(&outbound) {
+                    if let Some(obj) = rule.as_object_mut() {
+                        obj.remove("outbound");
+                        match removed_type.as_str() {
+                            "block" => { obj.insert("action".to_string(), json!("reject")); }
+                            "dns" => { obj.insert("action".to_string(), json!("hijack-dns")); }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Migrate legacy DNS server format (address field) to new format (type + server)
+    if let Some(servers) = config
+        .get_mut("dns")
+        .and_then(|d| d.get_mut("servers"))
+        .and_then(|v| v.as_array_mut())
+    {
+        for server in servers.iter_mut() {
+            if server.get("type").and_then(|v| v.as_str()).is_some() {
+                continue;
+            }
+            let Some(address) = server.get("address").and_then(|v| v.as_str()).map(String::from) else {
+                continue;
+            };
+            if let Some(obj) = server.as_object_mut() {
+                obj.remove("address");
+                obj.remove("address_resolver");
+                obj.remove("address_strategy");
+                obj.remove("address_fallback_delay");
+
+                if address == "local" {
+                    obj.insert("type".to_string(), json!("local"));
+                } else if let Some(rest) = address.strip_prefix("dhcp://") {
+                    obj.insert("type".to_string(), json!("dhcp"));
+                    if !rest.is_empty() && rest != "auto" {
+                        obj.insert("interface".to_string(), json!(rest));
+                    }
+                } else if address == "fakeip" {
+                    obj.insert("type".to_string(), json!("fakeip"));
+                } else if let Some(rest) = address.strip_prefix("tls://") {
+                    obj.insert("type".to_string(), json!("tls"));
+                    obj.insert("server".to_string(), json!(rest));
+                } else if let Some(rest) = address.strip_prefix("tcp://") {
+                    obj.insert("type".to_string(), json!("tcp"));
+                    obj.insert("server".to_string(), json!(rest));
+                } else if let Some(rest) = address.strip_prefix("https://") {
+                    obj.insert("type".to_string(), json!("https"));
+                    let parts: Vec<&str> = rest.splitn(2, '/').collect();
+                    obj.insert("server".to_string(), json!(parts[0]));
+                } else if let Some(rest) = address.strip_prefix("h3://") {
+                    obj.insert("type".to_string(), json!("h3"));
+                    let parts: Vec<&str> = rest.splitn(2, '/').collect();
+                    obj.insert("server".to_string(), json!(parts[0]));
+                } else if let Some(rest) = address.strip_prefix("quic://") {
+                    obj.insert("type".to_string(), json!("quic"));
+                    obj.insert("server".to_string(), json!(rest));
+                } else {
+                    obj.insert("type".to_string(), json!("udp"));
+                    obj.insert("server".to_string(), json!(address));
+                }
+            }
+        }
+    }
+
+    // Remove detour from DNS servers pointing to direct-type outbounds (deprecated in 1.12.0)
+    if let Some(servers) = config
+        .get_mut("dns")
+        .and_then(|d| d.get_mut("servers"))
+        .and_then(|v| v.as_array_mut())
+    {
+        for server in servers.iter_mut() {
+            if let Some(detour) = server.get("detour").and_then(|v| v.as_str()).map(String::from) {
+                if direct_tags.contains(&detour) {
+                    if let Some(obj) = server.as_object_mut() {
+                        obj.remove("detour");
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove legacy DNS rules with "outbound" field (deprecated in 1.12.0)
+    if let Some(rules) = config
+        .get_mut("dns")
+        .and_then(|d| d.get_mut("rules"))
+        .and_then(|v| v.as_array_mut())
+    {
+        rules.retain(|rule| rule.get("outbound").is_none());
+    }
+
+    // Ensure default_domain_resolver is set in route config (required since 1.12.0)
+    if config.get("route").is_some()
+        && config.get("route").and_then(|r| r.get("default_domain_resolver")).is_none()
+    {
+        if let Some(first_tag) = config
+            .get("dns")
+            .and_then(|d| d.get("servers"))
+            .and_then(|v| v.as_array())
+            .and_then(|servers| servers.first())
+            .and_then(|s| s.get("tag"))
+            .and_then(|v| v.as_str())
+        {
+            let tag = first_tag.to_string();
+            config["route"]["default_domain_resolver"] = json!(tag);
+        }
+    }
+
+    // Fix TUN interface_name for macOS (must use utun prefix, not tun)
+    #[cfg(target_os = "macos")]
+    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+        for inbound in inbounds.iter_mut() {
+            let is_tun = inbound.get("type").and_then(|v| v.as_str()) == Some("tun");
+            if !is_tun {
+                continue;
+            }
+            if let Some(name) = inbound.get("interface_name").and_then(|v| v.as_str()) {
+                if let Some(rest) = name.strip_prefix("tun") {
+                    if !name.starts_with("utun") && rest.chars().next().map_or(true, |c| c.is_ascii_digit()) {
+                        if let Some(obj) = inbound.as_object_mut() {
+                            obj.remove("interface_name");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Migrate legacy inbound sniff/sniff_override_destination to route rule actions
+    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+        let mut sniff_rules: Vec<Value> = Vec::new();
+        for inbound in inbounds.iter_mut() {
+            let has_sniff = inbound.get("sniff").and_then(|v| v.as_bool()).unwrap_or(false);
+            if !has_sniff {
+                continue;
+            }
+            let override_dest = inbound
+                .get("sniff_override_destination")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let tag = inbound.get("tag").and_then(|v| v.as_str()).map(String::from);
+
+            if let Some(obj) = inbound.as_object_mut() {
+                obj.remove("sniff");
+                obj.remove("sniff_override_destination");
+                obj.remove("sniff_timeout");
+            }
+
+            let mut sniff_rule = json!({ "action": "sniff" });
+            if override_dest {
+                sniff_rule["override_destination"] = json!(true);
+            }
+            if let Some(ref t) = tag {
+                sniff_rule["inbound"] = json!(t);
+            }
+            sniff_rules.push(sniff_rule);
+        }
+
+        if !sniff_rules.is_empty() {
+            if let Some(rules) = config
+                .get_mut("route")
+                .and_then(|r| r.get_mut("rules"))
+                .and_then(|v| v.as_array_mut())
+            {
+                for (i, rule) in sniff_rules.into_iter().enumerate() {
+                    rules.insert(i, rule);
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn start_vpn(
     app: AppHandle,
@@ -309,6 +520,7 @@ pub fn start_vpn(
 
     let final_config = if let Some(mut config) = custom_config {
         ensure_clash_api(&mut config);
+        migrate_singbox_config(&mut config);
         config
     } else {
         let mut chain_profiles = Vec::new();
@@ -350,7 +562,6 @@ pub fn start_vpn(
         outbounds.push(exit_outbound);
         outbounds.extend(chain_outbounds);
         outbounds.push(json!({ "type": "direct", "tag": "direct" }));
-        outbounds.push(json!({ "type": "block", "tag": "block" }));
 
         let (dns_servers, dns_final) = if cfg!(target_os = "windows") {
             (
@@ -359,8 +570,7 @@ pub fn start_vpn(
                         "tag": "dns-direct",
                         "type": "udp",
                         "server": settings.dns,
-                        "server_port": 53,
-                        "detour": "direct"
+                        "server_port": 53
                     }
                 ]),
                 "dns-direct",
@@ -407,9 +617,7 @@ pub fn start_vpn(
                 "mtu": settings.mtu,
                 "auto_route": true,
                 "strict_route": true,
-                "stack": stack_mode,
-                "sniff": true,
-                "sniff_override_destination": true
+                "stack": stack_mode
             }],
             "outbounds": outbounds,
             "route": {
@@ -417,6 +625,7 @@ pub fn start_vpn(
                 "default_domain_resolver": if cfg!(target_os = "windows") { "dns-direct" } else { "local" },
                 "final": if split_enabled { "direct" } else { "proxy" },
                 "rules": [
+                    { "action": "sniff", "override_destination": true },
                     { "protocol": "dns", "action": "hijack-dns" },
                     { "ip_cidr": [format!("{}/32", settings.dns)], "action": "direct" },
                     { "ip_is_private": true, "action": "direct" }
