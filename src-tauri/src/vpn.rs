@@ -396,7 +396,9 @@ fn migrate_singbox_config(config: &mut Value) {
     }
 
     // Ensure default_domain_resolver is set in route config (required since 1.12.0)
-    if config.get("route").and_then(|r| r.get("default_domain_resolver")).is_none() {
+    if config.get("route").is_some()
+        && config.get("route").and_then(|r| r.get("default_domain_resolver")).is_none()
+    {
         if let Some(first_tag) = config
             .get("dns")
             .and_then(|d| d.get("servers"))
