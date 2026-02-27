@@ -268,10 +268,14 @@ fn ensure_clash_api(config: &mut Value) {
 fn migrate_singbox_config(config: &mut Value) {
     // Remove legacy special outbounds (block, dns) deprecated in sing-box 1.11.0
     let mut removed_tags: HashMap<String, String> = HashMap::new();
+    let mut direct_tags: HashSet<String> = HashSet::new();
     if let Some(outbounds) = config.get_mut("outbounds").and_then(|v| v.as_array_mut()) {
         outbounds.retain(|ob| {
             let ob_type = ob.get("type").and_then(|v| v.as_str()).unwrap_or("");
             let ob_tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
+            if ob_type == "direct" {
+                direct_tags.insert(ob_tag.to_string());
+            }
             match ob_type {
                 "block" => {
                     removed_tags.insert(ob_tag.to_string(), "block".to_string());
@@ -362,6 +366,47 @@ fn migrate_singbox_config(config: &mut Value) {
                     obj.insert("server".to_string(), json!(address));
                 }
             }
+        }
+    }
+
+    // Remove detour from DNS servers pointing to direct-type outbounds (deprecated in 1.12.0)
+    if let Some(servers) = config
+        .get_mut("dns")
+        .and_then(|d| d.get_mut("servers"))
+        .and_then(|v| v.as_array_mut())
+    {
+        for server in servers.iter_mut() {
+            if let Some(detour) = server.get("detour").and_then(|v| v.as_str()).map(String::from) {
+                if direct_tags.contains(&detour) {
+                    if let Some(obj) = server.as_object_mut() {
+                        obj.remove("detour");
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove legacy DNS rules with "outbound" field (deprecated in 1.12.0)
+    if let Some(rules) = config
+        .get_mut("dns")
+        .and_then(|d| d.get_mut("rules"))
+        .and_then(|v| v.as_array_mut())
+    {
+        rules.retain(|rule| rule.get("outbound").is_none());
+    }
+
+    // Ensure default_domain_resolver is set in route config (required since 1.12.0)
+    if config.get("route").and_then(|r| r.get("default_domain_resolver")).is_none() {
+        if let Some(first_tag) = config
+            .get("dns")
+            .and_then(|d| d.get("servers"))
+            .and_then(|v| v.as_array())
+            .and_then(|servers| servers.first())
+            .and_then(|s| s.get("tag"))
+            .and_then(|v| v.as_str())
+        {
+            let tag = first_tag.to_string();
+            config["route"]["default_domain_resolver"] = json!(tag);
         }
     }
 
@@ -503,8 +548,7 @@ pub fn start_vpn(
                         "tag": "dns-direct",
                         "type": "udp",
                         "server": settings.dns,
-                        "server_port": 53,
-                        "detour": "direct"
+                        "server_port": 53
                     }
                 ]),
                 "dns-direct",
