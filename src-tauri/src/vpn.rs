@@ -412,6 +412,24 @@ fn migrate_singbox_config(config: &mut Value) {
         }
     }
 
+    // Fix TUN interface_name for macOS (must use utun prefix, not tun)
+    #[cfg(target_os = "macos")]
+    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
+        for inbound in inbounds.iter_mut() {
+            let is_tun = inbound.get("type").and_then(|v| v.as_str()) == Some("tun");
+            if !is_tun {
+                continue;
+            }
+            if let Some(name) = inbound.get("interface_name").and_then(|v| v.as_str()) {
+                if name.starts_with("tun") && !name.starts_with("utun") {
+                    if let Some(obj) = inbound.as_object_mut() {
+                        obj.remove("interface_name");
+                    }
+                }
+            }
+        }
+    }
+
     // Migrate legacy inbound sniff/sniff_override_destination to route rule actions
     if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
         let mut sniff_rules: Vec<Value> = Vec::new();
