@@ -421,9 +421,11 @@ fn migrate_singbox_config(config: &mut Value) {
                 continue;
             }
             if let Some(name) = inbound.get("interface_name").and_then(|v| v.as_str()) {
-                if name.starts_with("tun") && !name.starts_with("utun") {
-                    if let Some(obj) = inbound.as_object_mut() {
-                        obj.remove("interface_name");
+                if let Some(rest) = name.strip_prefix("tun") {
+                    if !name.starts_with("utun") && rest.chars().next().map_or(true, |c| c.is_ascii_digit()) {
+                        if let Some(obj) = inbound.as_object_mut() {
+                            obj.remove("interface_name");
+                        }
                     }
                 }
             }
