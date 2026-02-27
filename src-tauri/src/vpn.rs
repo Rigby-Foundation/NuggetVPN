@@ -294,15 +294,17 @@ fn migrate_singbox_config(config: &mut Value) {
             .and_then(|v| v.as_array_mut())
         {
             for rule in rules.iter_mut() {
-                if let Some(outbound) = rule.get("outbound").and_then(|v| v.as_str()).map(String::from) {
-                    if let Some(removed_type) = removed_tags.get(&outbound) {
-                        if let Some(obj) = rule.as_object_mut() {
-                            obj.remove("outbound");
-                            match removed_type.as_str() {
-                                "block" => { obj.insert("action".to_string(), json!("reject")); }
-                                "dns" => { obj.insert("action".to_string(), json!("hijack-dns")); }
-                                _ => {}
-                            }
+                let outbound = match rule.get("outbound").and_then(|v| v.as_str()) {
+                    Some(s) => s.to_string(),
+                    None => continue,
+                };
+                if let Some(removed_type) = removed_tags.get(&outbound) {
+                    if let Some(obj) = rule.as_object_mut() {
+                        obj.remove("outbound");
+                        match removed_type.as_str() {
+                            "block" => { obj.insert("action".to_string(), json!("reject")); }
+                            "dns" => { obj.insert("action".to_string(), json!("hijack-dns")); }
+                            _ => {}
                         }
                     }
                 }
@@ -320,9 +322,8 @@ fn migrate_singbox_config(config: &mut Value) {
             if server.get("type").and_then(|v| v.as_str()).is_some() {
                 continue;
             }
-            let address = match server.get("address").and_then(|v| v.as_str()).map(String::from) {
-                Some(a) => a,
-                None => continue,
+            let Some(address) = server.get("address").and_then(|v| v.as_str()).map(String::from) else {
+                continue;
             };
             if let Some(obj) = server.as_object_mut() {
                 obj.remove("address");
