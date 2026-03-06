@@ -55,6 +55,7 @@ pub fn strip_ansi_codes(s: &str) -> String {
 }
 
 pub fn extract_name_from_link(link: &str) -> String {
+    let link = &link.replace("&amp;", "&");
     if let Ok(parsed) = Url::parse(link) {
         let protocol = match parsed.scheme() {
             "vless" => "VLESS",
@@ -153,6 +154,9 @@ fn add_transport(outbound: &mut Value, params: &HashMap<String, String>, domain:
 }
 
 pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
+    // Replace HTML-encoded ampersands that some subscription providers use
+    let link = &link.replace("&amp;", "&");
+
     if let Some(parsed) = parse_singbox_config(link)? {
         return match parsed {
             SingBoxConfig::Outbound(outbound) => Ok(outbound),
