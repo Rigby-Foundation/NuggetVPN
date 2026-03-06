@@ -198,7 +198,16 @@ pub async fn import_subscription(
         if link.contains(".time:") || link.contains("fake_ip") {
             continue;
         }
-        
+
+        // Skip dummy/separator entries used by subscription providers
+        if link.contains("@127.0.0.1:") || link.contains("00000000-0000-0000-0000-000000000000") {
+            continue;
+        }
+
+        // Replace HTML-encoded ampersands from subscription providers
+        let link = link.replace("&amp;", "&");
+        let link = link.as_str();
+
         let protocol = detect_protocol(link);
         if protocol == "unknown" {
             continue;
