@@ -177,13 +177,20 @@ pub async fn import_subscription(
     let client = reqwest::Client::new();
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let text = resp.text().await.map_err(|e| e.to_string())?;
-    let clean_text = text.trim().replace("\n", "").replace("\r", "");
+    let trimmed = text.trim();
 
-    let decoded_bytes = general_purpose::STANDARD
-        .decode(&clean_text)
-        .or_else(|_| general_purpose::URL_SAFE.decode(&clean_text))
-        .unwrap_or_else(|_| clean_text.as_bytes().to_vec());
-    let decoded_string = String::from_utf8(decoded_bytes).map_err(|_| "Invalid UTF-8")?;
+    // Strip newlines for base64 decoding (base64 can be line-wrapped)
+    let clean_for_b64 = trimmed.replace('\n', "").replace('\r', "");
+
+    // Try base64 decode; if it fails, the content is raw text — keep newlines intact
+    let decoded_string = general_purpose::STANDARD
+        .decode(&clean_for_b64)
+        .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&clean_for_b64))
+        .or_else(|_| general_purpose::URL_SAFE.decode(&clean_for_b64))
+        .or_else(|_| general_purpose::URL_SAFE_NO_PAD.decode(&clean_for_b64))
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_else(|| trimmed.to_string());
 
     let mut profiles = state.profiles.lock().unwrap();
     let mut added = false;
