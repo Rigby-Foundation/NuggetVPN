@@ -4,6 +4,7 @@ use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
 
@@ -763,7 +764,11 @@ pub fn start_vpn(
 
     *running = true;
 
+    let stop_signal = state.vpn_stop_signal.clone();
+    stop_signal.store(false, Ordering::SeqCst);
+
     let log_path_clone = log_path.clone();
+    let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         let mut file = match File::open(&log_path_clone) {
             Ok(f) => f,
@@ -772,6 +777,10 @@ pub fn start_vpn(
         let mut pos = 0;
 
         loop {
+            if stop_signal.load(Ordering::SeqCst) {
+                break;
+            }
+
             let mut contents = String::new();
             if let Ok(_) = file.seek(SeekFrom::Start(pos)) {
                 if let Ok(_) = file.read_to_string(&mut contents) {
@@ -782,12 +791,14 @@ pub fn start_vpn(
                             batch.push(strip_ansi_codes(line));
                         }
                         if !batch.is_empty() {
-                            let _ = window.emit("vpn-log", batch);
+                            if app_handle.emit("vpn-log", batch).is_err() {
+                                break;
+                            }
                         }
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(500));
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     });
 
@@ -796,6 +807,8 @@ pub fn start_vpn(
 
 #[tauri::command]
 pub fn stop_vpn(state: State<AppState>) -> Result<String, String> {
+    state.vpn_stop_signal.store(true, Ordering::SeqCst);
+
     let mut running = state.is_running.lock().unwrap();
 
     #[cfg(target_os = "macos")]

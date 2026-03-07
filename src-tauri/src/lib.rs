@@ -5,7 +5,8 @@ mod parser;
 mod storage;
 mod vpn;
 
-use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use models::AppState;
 use storage::{load_profiles_from_disk, load_settings_from_disk};
@@ -29,6 +30,7 @@ pub fn run() {
                 profiles: Mutex::new(loaded),
                 settings: Mutex::new(loaded_settings),
                 is_running: Mutex::new(false),
+                vpn_stop_signal: Arc::new(AtomicBool::new(false)),
             });
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Regular);
