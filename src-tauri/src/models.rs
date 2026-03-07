@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Profile {
@@ -79,4 +80,5 @@ pub struct AppState {
     pub profiles: Mutex<Vec<Profile>>,
     pub settings: Mutex<AppSettings>,
     pub is_running: Mutex<bool>,
+    pub vpn_stop_signal: Arc<AtomicBool>,
 }
