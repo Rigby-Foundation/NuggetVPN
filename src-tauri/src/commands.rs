@@ -160,11 +160,11 @@ pub fn ping_profiles(
         };
 
         let server = outbound
-            .get("server")
+            .get(&serde_yaml::Value::String("server".to_string()))
             .and_then(|value| value.as_str())
             .map(str::to_string);
         let port = outbound
-            .get("server_port")
+            .get(&serde_yaml::Value::String("port".to_string()))
             .and_then(|value| value.as_u64())
             .and_then(|value| u16::try_from(value).ok());
 
