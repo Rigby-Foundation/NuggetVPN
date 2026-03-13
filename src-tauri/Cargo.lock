@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=bccfc58b180f50a442de00752e27a5838f7f6e26#bccfc58b180f50a442de00752e27a5838f7f6e26"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
 dependencies = [
  "aead",
  "aes",
@@ -8588,7 +8588,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=bccfc58b180f50a442de00752e27a5838f7f6e26#bccfc58b180f50a442de00752e27a5838f7f6e26"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
 dependencies = [
  "async-trait",
  "futures",
@@ -8607,7 +8607,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=bccfc58b180f50a442de00752e27a5838f7f6e26#bccfc58b180f50a442de00752e27a5838f7f6e26"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
 dependencies = [
  "bytes",
  "etherparse",
