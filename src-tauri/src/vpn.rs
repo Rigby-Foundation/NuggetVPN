@@ -304,10 +304,14 @@ pub async fn start_vpn(
 mode: rule
 log-level: info
 external-controller: 127.0.0.1:9090
+ipv6: false
 
 dns:
   enable: true
+  ipv6: false
   listen: 127.0.0.1:53553
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
   default-nameserver:
     - {dns}
   nameserver:
@@ -316,7 +320,8 @@ dns:
 tun:
   enable: true
   device-id: "{tun_device}"
-  gateway: "172.19.0.1/30"
+  gateway: "198.19.0.1/24"
+  gateway-v6: "fd00:fac::1/64"
   route-all: {route_all}
   dns-hijack: true
 

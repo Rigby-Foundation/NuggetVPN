@@ -193,6 +193,11 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::
             } else {
                 ""
             };
+            let client_fingerprint = ["fp", "fingerprint", "client-fingerprint"]
+                .iter()
+                .find_map(|k| params.get(*k))
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty());
 
             let mut proxy = serde_yaml::Mapping::new();
             proxy.insert(ystr("name"), ystr("proxy"));
@@ -203,6 +208,9 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::
 
             if !flow.is_empty() {
                 proxy.insert(ystr("flow"), ystr(flow));
+            }
+            if let Some(fp) = client_fingerprint {
+                proxy.insert(ystr("client-fingerprint"), ystr(fp));
             }
 
             if let Some(security) = params.get("security") {
