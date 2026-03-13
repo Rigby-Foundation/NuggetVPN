@@ -58,3 +58,60 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+pub fn run_core() {
+    let mut config = String::new();
+    let mut cwd = String::new();
+    let mut log_file = String::new();
+
+    let args: Vec<String> = std::env::args().collect();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--config" && i + 1 < args.len() {
+            config = args[i + 1].clone();
+            i += 1;
+        } else if args[i] == "--cwd" && i + 1 < args.len() {
+            cwd = args[i + 1].clone();
+            i += 1;
+        } else if args[i] == "--log" && i + 1 < args.len() {
+            log_file = args[i + 1].clone();
+            i += 1;
+        }
+        i += 1;
+    }
+
+    if config.is_empty() {
+        eprintln!("Missing --config");
+        return;
+    }
+
+    let config_yaml = std::fs::read_to_string(&config).unwrap_or_default();
+
+    let pid = std::process::id();
+    let pid_file = std::path::Path::new(&cwd).join("core.pid");
+    std::fs::write(&pid_file, pid.to_string()).unwrap_or_default();
+
+    let stop_file = std::path::Path::new(&cwd).join("core.stop");
+    let _ = std::fs::remove_file(&stop_file); // Remove if exists from previous run
+
+    let stop_file_clone = stop_file.clone();
+    std::thread::spawn(move || {
+        loop {
+            if stop_file_clone.exists() {
+                clash_lib::shutdown();
+                let _ = std::fs::remove_file(&stop_file_clone);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    });
+
+    let _ = clash_lib::start_scaffold(clash_lib::Options {
+        config: clash_lib::Config::Str(config_yaml),
+        cwd: if cwd.is_empty() { None } else { Some(cwd.clone()) },
+        rt: Some(clash_lib::TokioRuntime::MultiThread),
+        log_file: if log_file.is_empty() { None } else { Some(log_file) },
+    });
+
+    let _ = std::fs::remove_file(&pid_file);
+}

@@ -376,18 +376,63 @@ rules:
     let cwd = app.path().app_cache_dir().unwrap().to_string_lossy().to_string();
     let log_file_path = log_path.to_string_lossy().to_string();
 
-    // Start clash-rs in a background thread (start_scaffold is blocking)
-    let config_yaml_clone = final_config_yaml.clone();
-    let cwd_clone = cwd.clone();
-    let log_file_clone = log_file_path.clone();
-    std::thread::spawn(move || {
-        let _ = clash_lib::start_scaffold(clash_lib::Options {
-            config: clash_lib::Config::Str(config_yaml_clone),
-            cwd: Some(cwd_clone),
-            rt: Some(clash_lib::TokioRuntime::MultiThread),
-            log_file: Some(log_file_clone),
+    #[cfg(target_os = "macos")]
+    {
+        let executable_path = std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .to_string();
+
+        let command = format!(
+            "\"{}\" --run-core --config \"{}\" --cwd \"{}\" --log \"{}\" > /dev/null 2>&1 &",
+            executable_path,
+            config_path.to_string_lossy(),
+            cwd.clone(),
+            log_file_path.clone()
+        );
+
+        let script = format!(
+            "do shell script \"{}\" with administrator privileges",
+            command.replace("\"", "\\\"")
+        );
+
+        let status = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .status()
+            .map_err(|e| e.to_string())?;
+
+        if !status.success() {
+            return Err("Failed to get administrator privileges or start VPN core".to_string());
+        }
+
+        // Wait up to 5 seconds for core.pid to ensure it started
+        let mut attempts = 0;
+        let pid_file = std::path::Path::new(&cwd).join("core.pid");
+        while attempts < 50 {
+            if pid_file.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            attempts += 1;
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Start clash-rs in a background thread for non-macOS (start_scaffold is blocking)
+        let config_yaml_clone = final_config_yaml.clone();
+        let cwd_clone = cwd.clone();
+        let log_file_clone = log_file_path.clone();
+        std::thread::spawn(move || {
+            let _ = clash_lib::start_scaffold(clash_lib::Options {
+                config: clash_lib::Config::Str(config_yaml_clone),
+                cwd: Some(cwd_clone),
+                rt: Some(clash_lib::TokioRuntime::MultiThread),
+                log_file: Some(log_file_clone),
+            });
         });
-    });
+    }
 
     {
         let mut running = state.is_running.lock().unwrap();
@@ -434,11 +479,22 @@ rules:
 }
 
 #[tauri::command]
-pub fn stop_vpn(state: State<AppState>) -> Result<String, String> {
+pub fn stop_vpn(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
     state.vpn_stop_signal.store(true, Ordering::SeqCst);
 
-    // Shutdown clash-rs runtime
-    clash_lib::shutdown();
+    let cwd = app.path().app_cache_dir().unwrap().to_string_lossy().to_string();
+    
+    #[cfg(target_os = "macos")]
+    {
+        let stop_file = std::path::Path::new(&cwd).join("core.stop");
+        std::fs::write(&stop_file, "stop").unwrap_or_default();
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Shutdown clash-rs runtime directly
+        clash_lib::shutdown();
+    }
 
     let mut running = state.is_running.lock().unwrap();
     *running = false;

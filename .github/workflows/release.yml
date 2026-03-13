@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
@@ -12,30 +12,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-15-intel' # Intel
-            args: '--target x86_64-apple-darwin'
-            target: 'x86_64-apple-darwin'
-            singbox_arch: 'amd64'
-            singbox_os: 'darwin'
-            ext: 'tar.gz'
-          - platform: 'macos-15' # Apple Silicon
-            args: '--target aarch64-apple-darwin'
-            target: 'aarch64-apple-darwin'
-            singbox_arch: 'arm64'
-            singbox_os: 'darwin'
-            ext: 'tar.gz'
-          - platform: 'ubuntu-22.04' # Linux
-            args: ''
-            target: 'x86_64-unknown-linux-gnu'
-            singbox_arch: 'amd64'
-            singbox_os: 'linux'
-            ext: 'tar.gz'
-          - platform: 'windows-latest' # Windows
-            args: ''
-            target: 'x86_64-pc-windows-msvc'
-            singbox_arch: 'amd64'
-            singbox_os: 'windows'
-            ext: 'zip'
+          - platform: "macos-15-intel" # Intel
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
+          - platform: "macos-15" # Apple Silicon
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+          - platform: "ubuntu-22.04" # Linux
+            args: ""
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "windows-latest" # Windows
+            args: ""
+            target: "x86_64-pc-windows-msvc"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -69,48 +57,14 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Setup sing-box sidecar
-        shell: bash
-        run: |
-          mkdir -p src-tauri/bin
-          VERSION="1.12.12"
-          OS="${{ matrix.singbox_os }}"
-          ARCH="${{ matrix.singbox_arch }}"
-          TARGET="${{ matrix.target }}"
-          EXT="${{ matrix.ext }}"
-          
-          URL="https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box-${VERSION}-${OS}-${ARCH}.${EXT}"
-          
-          echo "Downloading sing-box from $URL"
-          curl -L -o "sing-box.${EXT}" "$URL"
-          
-          if [ "$EXT" = "zip" ]; then
-            unzip "sing-box.${EXT}"
-          else
-            tar -xzf "sing-box.${EXT}"
-          fi
-          
-          # Extract binary and rename to sidecar format
-          DIR_NAME="sing-box-${VERSION}-${OS}-${ARCH}"
-          
-          if [ "$OS" = "windows" ]; then
-            mv "$DIR_NAME/sing-box.exe" "src-tauri/bin/sing-box-${TARGET}.exe"
-          else
-            mv "$DIR_NAME/sing-box" "src-tauri/bin/sing-box-${TARGET}"
-            chmod +x "src-tauri/bin/sing-box-${TARGET}"
-          fi
-          
-          echo "Sidecar binary prepared:"
-          ls -l src-tauri/bin/
-
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'NuggetVPN ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseName: "NuggetVPN ${{ github.ref_name }}"
+          releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
