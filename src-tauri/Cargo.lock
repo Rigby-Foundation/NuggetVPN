@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Watfaq/clash-rs.git#a6f36f173a25500f57a6df85b0b84ebadb57c91c"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=9bbe90df5d37af771ee7d8ea05d11ecf466439e4#9bbe90df5d37af771ee7d8ea05d11ecf466439e4"
 dependencies = [
  "aead",
  "aes",
@@ -888,6 +888,7 @@ dependencies = [
  "h2 0.4.13",
  "h3 0.0.8",
  "h3-quinn 0.0.10",
+ "hex",
  "hickory-client",
  "hickory-proto",
  "hickory-resolver",
@@ -952,7 +953,7 @@ dependencies = [
  "uuid",
  "watfaq-dns",
  "watfaq-netstack",
- "watfaq-rustls",
+ "watfaq-rustls 0.23.21 (git+https://github.com/Rigby-Foundation/rustls.git?rev=955b356dff1352619d1d2c00955adcde61955db4)",
  "webpki-roots",
  "windows 0.62.2",
  "zstd",
@@ -7828,7 +7829,7 @@ source = "git+https://github.com/Watfaq/tokio-rustls.git?rev=638db32084d7ecf9c26
 dependencies = [
  "rustls-pki-types",
  "tokio",
- "watfaq-rustls",
+ "watfaq-rustls 0.23.21 (git+https://github.com/Watfaq/rustls.git?rev=4cae3aa2e84ea29d8a74b495793773bdb0a72206)",
 ]
 
 [[package]]
@@ -8587,7 +8588,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Watfaq/clash-rs.git#a6f36f173a25500f57a6df85b0b84ebadb57c91c"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=9bbe90df5d37af771ee7d8ea05d11ecf466439e4#9bbe90df5d37af771ee7d8ea05d11ecf466439e4"
 dependencies = [
  "async-trait",
  "futures",
@@ -8606,7 +8607,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Watfaq/clash-rs.git#a6f36f173a25500f57a6df85b0b84ebadb57c91c"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=9bbe90df5d37af771ee7d8ea05d11ecf466439e4#9bbe90df5d37af771ee7d8ea05d11ecf466439e4"
 dependencies = [
  "bytes",
  "etherparse",
@@ -8622,8 +8623,20 @@ name = "watfaq-rustls"
 version = "0.23.21"
 source = "git+https://github.com/Watfaq/rustls.git?rev=4cae3aa2e84ea29d8a74b495793773bdb0a72206#4cae3aa2e84ea29d8a74b495793773bdb0a72206"
 dependencies = [
- "aws-lc-rs",
  "log",
+ "once_cell",
+ "rustls-pki-types",
+ "rustls-webpki 0.102.8",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "watfaq-rustls"
+version = "0.23.21"
+source = "git+https://github.com/Rigby-Foundation/rustls.git?rev=955b356dff1352619d1d2c00955adcde61955db4#955b356dff1352619d1d2c00955adcde61955db4"
+dependencies = [
+ "aws-lc-rs",
  "once_cell",
  "rustls-pki-types",
  "rustls-webpki 0.102.8",
