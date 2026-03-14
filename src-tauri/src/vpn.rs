@@ -253,17 +253,6 @@ pub async fn start_vpn(
 
         // Build rules
         let mut rules: Vec<YValue> = Vec::new();
-        for rule in [
-            "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
-            "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
-            "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-            "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
-            "IP-CIDR,169.254.0.0/16,DIRECT,no-resolve",
-            "IP-CIDR6,fc00::/7,DIRECT,no-resolve",
-            "DST-PORT,8291,DIRECT",
-        ] {
-            rules.push(ystr(rule));
-        }
 
         if split_enabled {
             if include_apps {
