@@ -32,7 +32,7 @@ tempfile = "3.10"
 tauri-plugin-dialog = "2.4.2"
 tauri-plugin-fs = "2.4.4"
 tokio = { version = "1", features = ["full"] }
-clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", rev = "a224cabc6affa8854bd5288e088ef5e89e039cb0", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
+clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", rev = "191aff1c3354c77e3ad53807c0efc909bfbe1a09", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["user"] }

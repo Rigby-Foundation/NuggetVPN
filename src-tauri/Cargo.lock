@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
 dependencies = [
  "aead",
  "aes",
@@ -953,7 +953,7 @@ dependencies = [
  "uuid",
  "watfaq-dns",
  "watfaq-netstack",
- "watfaq-rustls 0.23.21 (git+https://github.com/Rigby-Foundation/rustls.git?rev=d6015cb6d1bd445278adbdb533f4c1925ab66d38)",
+ "watfaq-rustls 0.23.21 (git+https://github.com/Rigby-Foundation/rustls.git?rev=c35db86fc4264d0ad54ca44cafe5995fec513144)",
  "webpki-roots",
  "windows 0.62.2",
  "zstd",
@@ -5458,7 +5458,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools",
  "log",
  "multimap",
@@ -8588,7 +8588,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
 dependencies = [
  "async-trait",
  "futures",
@@ -8607,7 +8607,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=a224cabc6affa8854bd5288e088ef5e89e039cb0#a224cabc6affa8854bd5288e088ef5e89e039cb0"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
 dependencies = [
  "bytes",
  "etherparse",
@@ -8634,7 +8634,7 @@ dependencies = [
 [[package]]
 name = "watfaq-rustls"
 version = "0.23.21"
-source = "git+https://github.com/Rigby-Foundation/rustls.git?rev=d6015cb6d1bd445278adbdb533f4c1925ab66d38#d6015cb6d1bd445278adbdb533f4c1925ab66d38"
+source = "git+https://github.com/Rigby-Foundation/rustls.git?rev=c35db86fc4264d0ad54ca44cafe5995fec513144#c35db86fc4264d0ad54ca44cafe5995fec513144"
 dependencies = [
  "aws-lc-rs",
  "once_cell",
