@@ -216,6 +216,8 @@ pub async fn start_vpn(
         // Build Clash YAML config from parsed proxy link
         let mut exit_proxy = parse_outbound(&current_profile.config_link, &settings)?;
         exit_proxy.insert(ystr("name"), ystr("proxy"));
+        let mut winbox_target = "proxy".to_string();
+        let mut winbox_proxy: Option<serde_yaml::Mapping> = None;
 
         let mut proxies: Vec<YValue> = Vec::new();
         let mut proxy_names: Vec<YValue> = vec![ystr("proxy")];
@@ -248,11 +250,25 @@ pub async fn start_vpn(
             }
         }
 
+        if matches!(exit_proxy.get(&ystr("type")), Some(YValue::String(proxy_type)) if proxy_type == "vless")
+            && matches!(exit_proxy.get(&ystr("flow")), Some(YValue::String(flow)) if flow == "xtls-rprx-vision")
+        {
+            let mut winbox_proxy_map = exit_proxy.clone();
+            winbox_proxy_map.remove(&ystr("flow"));
+            winbox_proxy_map.insert(ystr("name"), ystr("proxy-winbox"));
+            winbox_target = "proxy-winbox".to_string();
+            winbox_proxy = Some(winbox_proxy_map);
+        }
+
         // Insert exit proxy at the beginning
         proxies.insert(0, YValue::Mapping(exit_proxy));
+        if let Some(winbox_proxy_map) = winbox_proxy {
+            proxies.insert(1, YValue::Mapping(winbox_proxy_map));
+        }
 
         // Build rules
         let mut rules: Vec<YValue> = Vec::new();
+        rules.push(ystr(&format!("DST-PORT,8291,{}", winbox_target)));
 
         if split_enabled {
             if include_apps {
