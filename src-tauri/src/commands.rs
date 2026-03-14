@@ -8,7 +8,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::models::{AppSettings, AppState, Profile};
-use crate::parser::{detect_protocol, parse_outbound};
+use crate::parser::{detect_protocol, extract_name_from_link, parse_outbound};
 use crate::storage::{get_log_path, save_profiles_to_disk, save_settings_to_disk};
 
 const PING_TIMEOUT_MS: u64 = 2000;
@@ -54,10 +54,15 @@ pub fn add_profile(
 ) -> Result<Vec<Profile>, String> {
     let mut profiles = state.profiles.lock().unwrap();
     let protocol = detect_protocol(&link);
+    let resolved_name = if name.trim().is_empty() {
+        extract_name_from_link(&link)
+    } else {
+        name
+    };
 
     profiles.push(Profile {
         id: uuid::Uuid::new_v4().to_string(),
-        name,
+        name: resolved_name,
         server: "Auto".to_string(),
         protocol: protocol.to_string(),
         config_link: link,

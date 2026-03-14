@@ -26,15 +26,10 @@ pub fn parse_clash_config(input: &str) -> Result<Option<ClashConfig>, String> {
     {
         // Also try JSON sing-box format for backwards compat during migration
         if trimmed.starts_with('{') {
-            // Attempt to parse as JSON and check if it's a full config or outbound
-            let jval: JValue = serde_json::from_str(trimmed)
-                .map_err(|e| format!("Invalid JSON: {}", e))?;
-            if jval.get("outbounds").is_some()
-                || jval.get("inbounds").is_some()
-                || jval.get("proxies").is_some()
-            {
-                return Err("Full JSON configs are no longer supported. Use Clash YAML format.".to_string());
-            }
+            // Accept JSON payloads and let parse_outbound() convert sing-box
+            // outbounds into a Clash proxy entry.
+            let _jval: JValue =
+                serde_json::from_str(trimmed).map_err(|e| format!("Invalid JSON: {}", e))?;
             return Ok(None);
         }
         return Ok(None);
@@ -56,29 +51,113 @@ pub fn parse_clash_config(input: &str) -> Result<Option<ClashConfig>, String> {
 }
 
 pub fn extract_name_from_link(link: &str) -> String {
-    let link = &link.replace("&amp;", "&");
-    if let Ok(parsed) = Url::parse(link) {
-        let protocol = match parsed.scheme() {
-            "vless" => "VLESS",
-            "vmess" => "VMess",
-            "trojan" => "Trojan",
-            "ss" => "Shadowsocks",
-            "ssr" => "ShadowsocksR",
-            "hy" | "hysteria" => "Hysteria",
-            "hy2" | "hysteria2" => "Hysteria2",
-            "tuic" => "TUIC",
-            "wg" | "wireguard" => "WireGuard",
-            "socks" | "socks4" | "socks5" => "SOCKS",
-            "http" | "https" => "HTTP",
-            "ssh" => "SSH",
-            other => other,
-        };
+    let normalized = link.replace("&amp;", "&");
+    let trimmed = normalized.trim();
 
-        if let Some(host) = parsed.host_str() {
+    if let Some(name) = extract_name_from_singbox_json(trimmed) {
+        return name;
+    }
+
+    if let Some(name) = extract_vmess_name_from_link(trimmed) {
+        return name;
+    }
+
+    if let Ok(parsed) = Url::parse(trimmed) {
+        if let Some(fragment) = parsed
+            .fragment()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            return fragment.to_string();
+        }
+
+        let params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
+        if let Some(name) = preferred_link_name(&params) {
+            return name;
+        }
+
+        let protocol = protocol_display_name(parsed.scheme());
+        if let Some(host) = parsed.host_str().filter(|host| !host.trim().is_empty()) {
             return format!("{} ({})", host, protocol);
         }
     }
     "Imported Profile".to_string()
+}
+
+fn protocol_display_name(protocol: &str) -> &str {
+    match protocol {
+        "vless" => "VLESS",
+        "vmess" => "VMess",
+        "trojan" => "Trojan",
+        "ss" => "Shadowsocks",
+        "ssr" => "ShadowsocksR",
+        "hy" | "hysteria" => "Hysteria",
+        "hy2" | "hysteria2" => "Hysteria2",
+        "tuic" => "TUIC",
+        "wg" | "wireguard" => "WireGuard",
+        "socks" | "socks4" | "socks5" => "SOCKS",
+        "http" | "https" => "HTTP",
+        "ssh" => "SSH",
+        other => other,
+    }
+}
+
+fn preferred_link_name(params: &HashMap<String, String>) -> Option<String> {
+    for key in [
+        "serviceName",
+        "service_name",
+        "service-name",
+        "remarks",
+        "remark",
+        "name",
+        "ps",
+        "tag",
+    ] {
+        if let Some(value) = params
+            .get(key)
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+        {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn extract_vmess_name_from_link(link: &str) -> Option<String> {
+    let payload = link.strip_prefix("vmess://")?.trim();
+    let decoded = general_purpose::STANDARD
+        .decode(payload)
+        .or_else(|_| general_purpose::URL_SAFE.decode(payload))
+        .ok()?;
+    let vmess_config: JValue = serde_json::from_slice(&decoded).ok()?;
+    vmess_config
+        .get("ps")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+fn extract_name_from_singbox_json(input: &str) -> Option<String> {
+    if !input.starts_with('{') {
+        return None;
+    }
+    let json: JValue = serde_json::from_str(input).ok()?;
+    let outbounds = json.get("outbounds")?.as_array()?;
+    outbounds
+        .iter()
+        .find(|outbound| {
+            !matches!(
+                outbound.get("type").and_then(|v| v.as_str()).unwrap_or(""),
+                "direct" | "block" | "dns" | "selector" | "urltest" | "fallback"
+            )
+        })
+        .and_then(|outbound| outbound.get("tag"))
+        .and_then(|tag| tag.as_str())
+        .map(str::trim)
+        .filter(|tag| !tag.is_empty())
+        .map(str::to_string)
 }
 
 fn ystr(s: &str) -> YValue {
@@ -117,7 +196,17 @@ fn add_ws_opts(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>
 }
 
 fn add_grpc_opts(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>) {
-    let service_name = params.get("serviceName").map(|s| s.as_str()).unwrap_or("");
+    let service_name = get_param(
+        params,
+        &[
+            "serviceName",
+            "service_name",
+            "service-name",
+            "grpc-service-name",
+            "service",
+        ],
+    )
+    .unwrap_or("");
     let grpc_opts = ymapping(vec![
         ("grpc-service-name", ystr(service_name)),
     ]);
@@ -160,6 +249,263 @@ fn apply_sni_spoof(proxy: &mut serde_yaml::Mapping, settings: &AppSettings) {
     }
 }
 
+fn get_param<'a>(params: &'a HashMap<String, String>, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| params.get(*key))
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+}
+
+fn add_grpc_opts_from_json(
+    proxy: &mut serde_yaml::Mapping,
+    transport: &serde_json::Map<String, JValue>,
+) {
+    let service_name = transport
+        .get("service_name")
+        .and_then(|v| v.as_str())
+        .or_else(|| transport.get("serviceName").and_then(|v| v.as_str()))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("");
+    proxy.insert(
+        ystr("grpc-opts"),
+        ymapping(vec![("grpc-service-name", ystr(service_name))]),
+    );
+}
+
+fn apply_singbox_transport(
+    proxy: &mut serde_yaml::Mapping,
+    outbound: &JValue,
+    domain: &str,
+) {
+    let Some(transport) = outbound.get("transport").and_then(|v| v.as_object()) else {
+        return;
+    };
+    let transport_type = transport
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("tcp");
+    match transport_type {
+        "ws" => {
+            proxy.insert(ystr("network"), ystr("ws"));
+            let path = transport
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/");
+            let host = transport
+                .get("host")
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    transport
+                        .get("headers")
+                        .and_then(|v| v.as_object())
+                        .and_then(|headers| headers.get("Host"))
+                        .and_then(|v| v.as_str())
+                })
+                .unwrap_or(domain);
+            let mut headers = serde_yaml::Mapping::new();
+            headers.insert(ystr("Host"), ystr(host));
+            proxy.insert(
+                ystr("ws-opts"),
+                ymapping(vec![
+                    ("path", ystr(path)),
+                    ("headers", YValue::Mapping(headers)),
+                ]),
+            );
+        }
+        "grpc" => {
+            proxy.insert(ystr("network"), ystr("grpc"));
+            add_grpc_opts_from_json(proxy, transport);
+        }
+        "http" | "h2" => {
+            proxy.insert(ystr("network"), ystr("h2"));
+            let path = transport
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/");
+            let host = transport
+                .get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or(domain);
+            proxy.insert(
+                ystr("h2-opts"),
+                ymapping(vec![
+                    ("host", YValue::Sequence(vec![ystr(host)])),
+                    ("path", ystr(path)),
+                ]),
+            );
+        }
+        _ => {}
+    }
+}
+
+fn parse_singbox_outbound(
+    input: &str,
+    settings: &AppSettings,
+) -> Result<Option<serde_yaml::Mapping>, String> {
+    let trimmed = input.trim();
+    if !trimmed.starts_with('{') {
+        return Ok(None);
+    }
+    let root: JValue = serde_json::from_str(trimmed)
+        .map_err(|e| format!("Invalid sing-box JSON: {}", e))?;
+    let Some(outbounds) = root.get("outbounds").and_then(|v| v.as_array()) else {
+        return Ok(None);
+    };
+    let outbound = outbounds
+        .iter()
+        .find(|outbound| {
+            !matches!(
+                outbound.get("type").and_then(|v| v.as_str()).unwrap_or(""),
+                "direct" | "block" | "dns" | "selector" | "urltest" | "fallback"
+            )
+        })
+        .ok_or("No supported outbound found in sing-box config".to_string())?;
+
+    let outbound_type = outbound
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("sing-box outbound is missing type".to_string())?;
+    let server = outbound
+        .get("server")
+        .and_then(|v| v.as_str())
+        .ok_or("sing-box outbound is missing server".to_string())?;
+    let port = outbound
+        .get("server_port")
+        .and_then(|v| v.as_u64())
+        .or_else(|| outbound.get("port").and_then(|v| v.as_u64()))
+        .ok_or("sing-box outbound is missing server_port".to_string())?;
+
+    let mut proxy = serde_yaml::Mapping::new();
+    proxy.insert(ystr("name"), ystr("proxy"));
+    proxy.insert(ystr("server"), ystr(server));
+    proxy.insert(ystr("port"), ynum(port));
+
+    match outbound_type {
+        "vless" => {
+            let uuid = outbound
+                .get("uuid")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box vless outbound is missing uuid".to_string())?;
+            proxy.insert(ystr("type"), ystr("vless"));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            if let Some(flow) = outbound
+                .get("flow")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+            {
+                proxy.insert(ystr("flow"), ystr(flow));
+            }
+        }
+        "vmess" => {
+            let uuid = outbound
+                .get("uuid")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box vmess outbound is missing uuid".to_string())?;
+            proxy.insert(ystr("type"), ystr("vmess"));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            proxy.insert(ystr("alterId"), ynum(0));
+            let cipher = outbound
+                .get("security")
+                .and_then(|v| v.as_str())
+                .unwrap_or("auto");
+            proxy.insert(ystr("cipher"), ystr(cipher));
+        }
+        "trojan" => {
+            let password = outbound
+                .get("password")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box trojan outbound is missing password".to_string())?;
+            proxy.insert(ystr("type"), ystr("trojan"));
+            proxy.insert(ystr("password"), ystr(password));
+        }
+        "shadowsocks" => {
+            let method = outbound
+                .get("method")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box shadowsocks outbound is missing method".to_string())?;
+            let password = outbound
+                .get("password")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box shadowsocks outbound is missing password".to_string())?;
+            proxy.insert(ystr("type"), ystr("ss"));
+            proxy.insert(ystr("cipher"), ystr(method));
+            proxy.insert(ystr("password"), ystr(password));
+        }
+        other => {
+            return Err(format!(
+                "sing-box outbound type '{}' is not supported for conversion yet",
+                other
+            ));
+        }
+    }
+
+    if let Some(tls) = outbound.get("tls").and_then(|v| v.as_object()) {
+        if tls.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            proxy.insert(ystr("tls"), ybool(true));
+            let sni = tls
+                .get("server_name")
+                .and_then(|v| v.as_str())
+                .or_else(|| tls.get("sni").and_then(|v| v.as_str()))
+                .unwrap_or(server);
+            proxy.insert(ystr("servername"), ystr(sni));
+            proxy.insert(ystr("sni"), ystr(sni));
+            proxy.insert(
+                ystr("skip-cert-verify"),
+                ybool(tls.get("insecure").and_then(|v| v.as_bool()).unwrap_or(false)),
+            );
+
+            if let Some(alpn) = tls.get("alpn").and_then(|v| v.as_array()) {
+                let alpn_list: Vec<YValue> = alpn
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(ystr)
+                    .collect();
+                if !alpn_list.is_empty() {
+                    proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
+                }
+            }
+
+            if let Some(fp) = tls
+                .get("utls")
+                .and_then(|v| v.as_object())
+                .and_then(|utls| utls.get("fingerprint"))
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+            {
+                proxy.insert(ystr("client-fingerprint"), ystr(fp));
+            }
+
+            if let Some(reality) = tls.get("reality").and_then(|v| v.as_object()) {
+                if reality
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    let mut reality_opts = serde_yaml::Mapping::new();
+                    let public_key = reality
+                        .get("public_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let short_id = reality
+                        .get("short_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    reality_opts.insert(ystr("public-key"), ystr(public_key));
+                    reality_opts.insert(ystr("short-id"), ystr(short_id));
+                    proxy.insert(ystr("reality-opts"), YValue::Mapping(reality_opts));
+                }
+            }
+        }
+    }
+
+    apply_singbox_transport(&mut proxy, outbound, server);
+    apply_sni_spoof(&mut proxy, settings);
+    Ok(Some(proxy))
+}
+
 /// Parse a proxy link into a Clash-format YAML mapping.
 /// Returns a serde_yaml::Mapping suitable for inclusion in the `proxies:` list.
 pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::Mapping, String> {
@@ -175,6 +521,10 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::
                 "Full Clash config cannot be used as a single proxy".to_string(),
             ),
         };
+    }
+
+    if let Some(proxy) = parse_singbox_outbound(link, settings)? {
+        return Ok(proxy);
     }
 
     let url = Url::parse(link).map_err(|_| "Invalid URL format")?;
@@ -608,6 +958,13 @@ pub fn detect_protocol(link: &str) -> &'static str {
     let trimmed = link.trim();
     if trimmed.starts_with("proxies:") || trimmed.starts_with("port:") || trimmed.starts_with("---") {
         return "clash-yaml";
+    }
+    if trimmed.starts_with('{') {
+        if let Ok(json) = serde_json::from_str::<JValue>(trimmed) {
+            if json.get("outbounds").is_some() {
+                return "sing-box";
+            }
+        }
     }
     if trimmed.starts_with("vless://") {
         "vless"
