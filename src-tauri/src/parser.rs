@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use serde_yaml::Value as YValue;
 use serde_json::Value as JValue;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 use crate::models::AppSettings;
@@ -102,6 +102,145 @@ fn protocol_display_name(protocol: &str) -> &str {
     }
 }
 
+fn singbox_outbound_type(outbound: &JValue) -> &str {
+    outbound.get("type").and_then(|v| v.as_str()).unwrap_or("")
+}
+
+fn singbox_outbound_tag<'a>(outbound: &'a JValue) -> Option<&'a str> {
+    outbound
+        .get("tag")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|tag| !tag.is_empty())
+}
+
+fn singbox_is_selector_like(outbound_type: &str) -> bool {
+    matches!(outbound_type, "selector" | "urltest" | "fallback")
+}
+
+fn singbox_is_supported_conversion_type(outbound_type: &str) -> bool {
+    matches!(outbound_type, "vless" | "vmess" | "trojan" | "shadowsocks")
+}
+
+fn singbox_outbound_has_endpoint(outbound: &JValue) -> bool {
+    let has_server = outbound
+        .get("server")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|server| !server.is_empty())
+        .is_some();
+    let has_port = outbound
+        .get("server_port")
+        .and_then(|v| v.as_u64())
+        .or_else(|| outbound.get("port").and_then(|v| v.as_u64()))
+        .is_some();
+    has_server && has_port
+}
+
+fn singbox_find_outbound_by_tag<'a>(outbounds: &'a [JValue], tag: &str) -> Option<&'a JValue> {
+    outbounds
+        .iter()
+        .find(|outbound| singbox_outbound_tag(outbound) == Some(tag))
+}
+
+fn resolve_singbox_leaf_by_tag<'a>(
+    outbounds: &'a [JValue],
+    tag: &str,
+    visited: &mut HashSet<String>,
+) -> Option<&'a JValue> {
+    let normalized_tag = tag.trim();
+    if normalized_tag.is_empty() {
+        return None;
+    }
+    if !visited.insert(normalized_tag.to_string()) {
+        return None;
+    }
+
+    let outbound = singbox_find_outbound_by_tag(outbounds, normalized_tag)?;
+    let outbound_type = singbox_outbound_type(outbound);
+    if singbox_is_selector_like(outbound_type) {
+        if let Some(default_tag) = outbound
+            .get("default")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, default_tag, visited) {
+                return Some(resolved);
+            }
+        }
+
+        if let Some(nested) = outbound.get("outbounds").and_then(|v| v.as_array()) {
+            for nested_tag in nested.iter().filter_map(|v| v.as_str()) {
+                if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, nested_tag, visited)
+                {
+                    return Some(resolved);
+                }
+            }
+        }
+        None
+    } else {
+        Some(outbound)
+    }
+}
+
+fn select_singbox_outbound<'a>(json: &'a JValue) -> Result<&'a JValue, String> {
+    let Some(outbounds) = json.get("outbounds").and_then(|v| v.as_array()) else {
+        return Err("No supported outbound found in sing-box config".to_string());
+    };
+
+    let mut preferred_tags: Vec<String> = Vec::new();
+    if let Some(final_tag) = json
+        .get("route")
+        .and_then(|v| v.as_object())
+        .and_then(|route| route.get("final"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        preferred_tags.push(final_tag.to_string());
+    }
+    preferred_tags.extend(["proxy", "select", "auto"].iter().map(|tag| tag.to_string()));
+
+    for tag in preferred_tags {
+        let mut visited = HashSet::new();
+        if let Some(outbound) = resolve_singbox_leaf_by_tag(outbounds, &tag, &mut visited) {
+            let outbound_type = singbox_outbound_type(outbound);
+            if singbox_is_supported_conversion_type(outbound_type)
+                && singbox_outbound_has_endpoint(outbound)
+            {
+                return Ok(outbound);
+            }
+        }
+    }
+
+    for outbound in outbounds {
+        if !singbox_is_selector_like(singbox_outbound_type(outbound)) {
+            continue;
+        }
+        let Some(tag) = singbox_outbound_tag(outbound) else {
+            continue;
+        };
+        let mut visited = HashSet::new();
+        if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, tag, &mut visited) {
+            let outbound_type = singbox_outbound_type(resolved);
+            if singbox_is_supported_conversion_type(outbound_type)
+                && singbox_outbound_has_endpoint(resolved)
+            {
+                return Ok(resolved);
+            }
+        }
+    }
+
+    outbounds
+        .iter()
+        .find(|outbound| {
+            let outbound_type = singbox_outbound_type(outbound);
+            singbox_is_supported_conversion_type(outbound_type) && singbox_outbound_has_endpoint(outbound)
+        })
+        .ok_or("No supported outbound found in sing-box config".to_string())
+}
+
 fn preferred_link_name(params: &HashMap<String, String>) -> Option<String> {
     for key in [
         "serviceName",
@@ -144,20 +283,8 @@ fn extract_name_from_singbox_json(input: &str) -> Option<String> {
         return None;
     }
     let json: JValue = serde_json::from_str(input).ok()?;
-    let outbounds = json.get("outbounds")?.as_array()?;
-    outbounds
-        .iter()
-        .find(|outbound| {
-            !matches!(
-                outbound.get("type").and_then(|v| v.as_str()).unwrap_or(""),
-                "direct" | "block" | "dns" | "selector" | "urltest" | "fallback"
-            )
-        })
-        .and_then(|outbound| outbound.get("tag"))
-        .and_then(|tag| tag.as_str())
-        .map(str::trim)
-        .filter(|tag| !tag.is_empty())
-        .map(str::to_string)
+    let outbound = select_singbox_outbound(&json).ok()?;
+    singbox_outbound_tag(outbound).map(str::to_string)
 }
 
 fn ystr(s: &str) -> YValue {
@@ -349,18 +476,10 @@ fn parse_singbox_outbound(
     }
     let root: JValue = serde_json::from_str(trimmed)
         .map_err(|e| format!("Invalid sing-box JSON: {}", e))?;
-    let Some(outbounds) = root.get("outbounds").and_then(|v| v.as_array()) else {
+    if root.get("outbounds").and_then(|v| v.as_array()).is_none() {
         return Ok(None);
-    };
-    let outbound = outbounds
-        .iter()
-        .find(|outbound| {
-            !matches!(
-                outbound.get("type").and_then(|v| v.as_str()).unwrap_or(""),
-                "direct" | "block" | "dns" | "selector" | "urltest" | "fallback"
-            )
-        })
-        .ok_or("No supported outbound found in sing-box config".to_string())?;
+    }
+    let outbound = select_singbox_outbound(&root)?;
 
     let outbound_type = outbound
         .get("type")

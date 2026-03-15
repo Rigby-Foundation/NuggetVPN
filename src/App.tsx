@@ -156,18 +156,42 @@ function App() {
     await invoke("save_settings", { settings });
   }, []);
 
+  const fetchIpInfo = useCallback(async (timeoutMs = 8000): Promise<IpInfo | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch("https://ipinfo.io/json", { signal: controller.signal });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      const ip = typeof data?.ip === "string" ? data.ip : "";
+      if (!ip) {
+        return null;
+      }
+      return {
+        ip,
+        region: typeof data?.region === "string" ? data.region : "",
+      };
+    } catch (e) {
+      console.error(e);
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, []);
+
   const checkIp = useCallback(async () => {
     setIsCheckingIp(true);
     try {
-      const res = await fetch("https://ipinfo.io/json");
-      const data = await res.json();
-      setIpInfo({ ip: data.ip, region: data.region });
-    } catch (e) {
-      console.error(e);
+      const info = await fetchIpInfo();
+      if (info) {
+        setIpInfo(info);
+      }
     } finally {
       setIsCheckingIp(false);
     }
-  }, []);
+  }, [fetchIpInfo]);
 
   const startIpCheck = useCallback(() => {
     if (ipCheckIntervalRef.current) {
@@ -503,6 +527,7 @@ function App() {
       if (!isConnected) {
         setStatus("Connecting...");
         let profileIdToUse = selectedProfileId;
+        let candidateOrder: string[] = [];
         const chainActive =
           appSettings.proxy_chain_enabled && appSettings.proxy_chain.length > 0;
         const chainExclusions = chainActive
@@ -524,17 +549,24 @@ function App() {
             : candidates;
           const effectiveCandidates =
             eligibleCandidates.length > 0 ? eligibleCandidates : candidates;
-          let bestProfile: Profile | null = null;
-          let bestPing = Number.POSITIVE_INFINITY;
-          effectiveCandidates.forEach((profile) => {
-            const ping = pings[profile.id];
-            if (ping === null || ping === undefined) return;
-            if (ping < bestPing) {
-              bestPing = ping;
-              bestProfile = profile;
-            }
-          });
-          profileIdToUse = (bestProfile || effectiveCandidates[0])?.id || "";
+          candidateOrder = effectiveCandidates
+            .map((profile) => ({
+              id: profile.id,
+              ping: pings[profile.id],
+            }))
+            .sort((a, b) => {
+              const left =
+                a.ping === null || a.ping === undefined
+                  ? Number.POSITIVE_INFINITY
+                  : a.ping;
+              const right =
+                b.ping === null || b.ping === undefined
+                  ? Number.POSITIVE_INFINITY
+                  : b.ping;
+              return left - right;
+            })
+            .map((candidate) => candidate.id);
+          profileIdToUse = candidateOrder[0] || "";
         } else if (!profileIdToUse) {
           const fallbackProfile = chainExclusions
             ? profiles.find((profile) => !chainExclusions.has(profile.id))
@@ -550,16 +582,77 @@ function App() {
           return;
         }
 
-        await invoke("start_vpn", {
-          profile_id: profileIdToUse,
-        });
+        const autoMode = selectedProxyMode === "auto" && !hasForcedExit;
+        const attemptOrder = autoMode
+          ? candidateOrder.length > 0
+            ? candidateOrder
+            : [profileIdToUse]
+          : [profileIdToUse];
+        const baselineIp = autoMode ? (await fetchIpInfo(5000))?.ip || null : null;
+        const wait = (ms: number) =>
+          new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+        let connectedProfileId = "";
+        let connectedIpInfo: IpInfo | null = null;
+        let lastAutoError = "";
+
+        for (const candidateId of attemptOrder) {
+          try {
+            await invoke("start_vpn", {
+              profile_id: candidateId,
+            });
+          } catch (error) {
+            if (!autoMode) {
+              throw error;
+            }
+            lastAutoError = String(error);
+            continue;
+          }
+
+          if (!autoMode) {
+            connectedProfileId = candidateId;
+            break;
+          }
+
+          await wait(2500);
+          const probe = await fetchIpInfo(7000);
+          const unchangedIp = baselineIp && probe?.ip === baselineIp;
+          if (!probe || unchangedIp) {
+            lastAutoError = !probe
+              ? "IP probe failed"
+              : "IP did not change after connect";
+            try {
+              await invoke("stop_vpn");
+            } catch (stopError) {
+              console.error("Failed to stop VPN during auto fallback", stopError);
+            }
+            continue;
+          }
+
+          connectedProfileId = candidateId;
+          connectedIpInfo = probe;
+          break;
+        }
+
+        if (!connectedProfileId) {
+          throw new Error(
+            `No working profile found in auto mode${lastAutoError ? ` (${lastAutoError})` : ""
+            }. Switch to Manual and choose another node.`
+          );
+        }
+
         setIsConnected(true);
         setStatus("CONNECTED");
-        setTimeout(async () => {
-          await checkIp();
+        if (connectedIpInfo) {
+          setIpInfo(connectedIpInfo);
           startIpCheck();
-        }, 3000);
-        startStats(profileIdToUse);
+        } else {
+          setTimeout(async () => {
+            await checkIp();
+            startIpCheck();
+          }, 3000);
+        }
+        startStats(connectedProfileId);
       } else {
         setStatus("Stopping...");
         await invoke("stop_vpn");
