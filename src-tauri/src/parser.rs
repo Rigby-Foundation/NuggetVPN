@@ -13,6 +13,45 @@ pub enum ClashConfig {
     Proxy(YValue),
 }
 
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn decode_percent_escaped(input: &str) -> Option<String> {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0usize;
+    let mut changed = false;
+
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(hi), Some(lo)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2])) {
+                out.push((hi << 4) | lo);
+                i += 3;
+                changed = true;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+
+    if !changed {
+        return None;
+    }
+
+    String::from_utf8(out).ok()
+}
+
+pub fn decode_profile_name(input: &str) -> String {
+    decode_percent_escaped(input).unwrap_or_else(|| input.to_string())
+}
+
 /// Try to parse input as a Clash YAML config or a single proxy entry.
 pub fn parse_clash_config(input: &str) -> Result<Option<ClashConfig>, String> {
     let trimmed = input.trim();
@@ -55,11 +94,11 @@ pub fn extract_name_from_link(link: &str) -> String {
     let trimmed = normalized.trim();
 
     if let Some(name) = extract_name_from_singbox_json(trimmed) {
-        return name;
+        return decode_profile_name(&name);
     }
 
     if let Some(name) = extract_vmess_name_from_link(trimmed) {
-        return name;
+        return decode_profile_name(&name);
     }
 
     if let Ok(parsed) = Url::parse(trimmed) {
@@ -68,12 +107,12 @@ pub fn extract_name_from_link(link: &str) -> String {
             .map(str::trim)
             .filter(|v| !v.is_empty())
         {
-            return fragment.to_string();
+            return decode_profile_name(fragment);
         }
 
         let params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
         if let Some(name) = preferred_link_name(&params) {
-            return name;
+            return decode_profile_name(&name);
         }
 
         let protocol = protocol_display_name(parsed.scheme());

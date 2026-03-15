@@ -5,11 +5,52 @@ mod parser;
 mod storage;
 mod vpn;
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, WindowEvent,
+};
 use models::AppState;
 use storage::{load_profiles_from_disk, load_settings_from_disk};
+
+const TRAY_SHOW_ID: &str = "tray_show";
+const TRAY_QUIT_ID: &str = "tray_quit";
+
+#[derive(Default)]
+struct ExitState {
+    quitting: AtomicBool,
+}
+
+fn reveal_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn shutdown_vpn_on_exit(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    state.vpn_stop_signal.store(true, Ordering::SeqCst);
+    if let Ok(mut running) = state.is_running.lock() {
+        *running = false;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(cache_dir) = app.path().app_cache_dir() {
+            let stop_file = cache_dir.join("core.stop");
+            let _ = std::fs::write(stop_file, "stop");
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        clash_lib::shutdown();
+    }
+}
 
 #[tauri::command]
 fn get_current_platform() -> &'static str {
@@ -25,15 +66,65 @@ pub fn run() {
         .setup(|app| {
             let loaded = load_profiles_from_disk(app.handle());
             let loaded_settings = load_settings_from_disk(app.handle());
+            app.manage(ExitState::default());
             app.manage(AppState {
                 profiles: Mutex::new(loaded),
                 settings: Mutex::new(loaded_settings),
                 is_running: Mutex::new(false),
                 vpn_stop_signal: Arc::new(AtomicBool::new(false)),
             });
+
+            let show_item = MenuItem::with_id(app, TRAY_SHOW_ID, "Open NuggetVPN", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, TRAY_QUIT_ID, "Exit", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            let mut tray_builder = TrayIconBuilder::new()
+                .menu(&tray_menu)
+                .tooltip("NuggetVPN")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    TRAY_SHOW_ID => reveal_main_window(app),
+                    TRAY_QUIT_ID => {
+                        app.state::<ExitState>().quitting.store(true, Ordering::SeqCst);
+                        shutdown_vpn_on_exit(app);
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        reveal_main_window(tray.app_handle());
+                    }
+                });
+
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+            let _ = tray_builder.build(app)?;
+
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Regular);
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window
+                    .state::<ExitState>()
+                    .quitting
+                    .load(Ordering::SeqCst)
+                {
+                    return;
+                }
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_profiles,
