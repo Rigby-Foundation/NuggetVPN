@@ -1,6 +1,6 @@
 # NuggetVPN
 
-NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](https://tauri.app/) and [React 19](https://react.dev/). It utilizes [sing-box](https://sing-box.sagernet.org/) as its core engine to provide robust and secure connectivity.
+NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](https://tauri.app/) and [React 19](https://react.dev/). It utilizes [Clash-rs](https://github.com/Rigby-Foundation/clash-rs) as its core engine to provide robust and secure connectivity.
 
 ## Features
 
@@ -8,7 +8,7 @@ NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](ht
 - **Protocol Support**:
   - **VLESS**: Supports Reality and TLS security flows.
   - **Shadowsocks**: Standard support for SS protocols.
-  - **And others!**: We support all protocols that are implemented in sing-box
+  - **And others!**: We support all protocols that are implemented in clash-rs
 - **Profile Management**:
   - Import profiles via URL (Subscription).
   - Manually add profiles via `vless://` or `ss://` links.
@@ -19,7 +19,7 @@ NuggetVPN is a modern, lightweight, and fast VPN client built with [Tauri v2](ht
   - DNS hijacking prevention.
   - Self-elevation (macOS) for necessary privileges.
 - **Split Tunneling**: You can set what domains or apps to proxy.
-- **Custom sing-box configs**: You can set your own sing-box config.
+- **Custom sing-box configs**: You can set your own sing-box config that will be converted to clash yaml.
 
 ## Prerequisites
 
@@ -45,17 +45,7 @@ Before you begin, ensure you have the following installed:
    bun install
    ```
 
-3. **Setup Sidecar (Important)**
-   NuggetVPN requires the `sing-box` binary to function. You must place the platform-specific binary in the `src-tauri/bin/` directory.
-   
-   - Download `sing-box` from [GitHub Releases](https://github.com/SagerNet/sing-box/releases).
-   - Rename the binary to `sing-box-<target-triple>` (e.g., `sing-box-aarch64-apple-darwin` for Apple Silicon).
-   - Place it in `src-tauri/bin/`.
-   - Ensure it has execution permissions (`chmod +x`).
-
-   *Note: The `tauri.conf.json` expects the binary name to be just `sing-box` in the configuration, but Tauri's sidecar mechanism requires the target triple suffix on the actual file.*
-
-4. **Run in Development Mode**
+3. **Run in Development Mode**
    ```bash
    bun tauri dev
    ```
@@ -92,7 +82,7 @@ Since this app is not signed with an Apple Developer Certificate (to keep it fre
 - **`src-tauri/`**: Rust backend and Tauri configuration.
   - **`src/lib.rs`**: Main application logic, commands, and VPN management.
   - **`capabilities/`**: Tauri permission configurations.
-  - **`bin/`**: External binaries (sing-box).
+  - **`bin/`**: External binaries (clash-rs).
 
 ## License
 
