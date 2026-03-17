@@ -1,236 +1,802 @@
 use base64::{engine::general_purpose, Engine as _};
-use serde_json::{json, Value};
-use std::collections::HashMap;
+use serde_yaml::Value as YValue;
+use serde_json::Value as JValue;
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 use crate::models::AppSettings;
 
+/// Clash full config provided as YAML string
 #[derive(Debug)]
-pub enum SingBoxConfig {
-    Full(Value),
-    Outbound(Value),
+pub enum ClashConfig {
+    Full(String),
+    Proxy(YValue),
 }
 
-pub fn parse_singbox_config(input: &str) -> Result<Option<SingBoxConfig>, String> {
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn decode_percent_escaped(input: &str) -> Option<String> {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0usize;
+    let mut changed = false;
+
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(hi), Some(lo)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2])) {
+                out.push((hi << 4) | lo);
+                i += 3;
+                changed = true;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+
+    if !changed {
+        return None;
+    }
+
+    String::from_utf8(out).ok()
+}
+
+pub fn decode_profile_name(input: &str) -> String {
+    decode_percent_escaped(input).unwrap_or_else(|| input.to_string())
+}
+
+/// Try to parse input as a Clash YAML config or a single proxy entry.
+pub fn parse_clash_config(input: &str) -> Result<Option<ClashConfig>, String> {
     let trimmed = input.trim();
-    if !trimmed.starts_with('{') {
+
+    // Check for YAML-like content (starts with a mapping key or document marker)
+    if !trimmed.starts_with("proxies:")
+        && !trimmed.starts_with("port:")
+        && !trimmed.starts_with("mixed-port:")
+        && !trimmed.starts_with("---")
+        && !trimmed.starts_with("socks-port:")
+    {
+        // Also try JSON sing-box format for backwards compat during migration
+        if trimmed.starts_with('{') {
+            // Accept JSON payloads and let parse_outbound() convert sing-box
+            // outbounds into a Clash proxy entry.
+            let _jval: JValue =
+                serde_json::from_str(trimmed).map_err(|e| format!("Invalid JSON: {}", e))?;
+            return Ok(None);
+        }
         return Ok(None);
     }
 
-    let value: Value =
-        serde_json::from_str(trimmed).map_err(|e| format!("Invalid sing-box JSON: {}", e))?;
-    if !value.is_object() {
-        return Err("sing-box config must be a JSON object".to_string());
+    // It looks like Clash YAML
+    let val: YValue = serde_yaml::from_str(trimmed)
+        .map_err(|e| format!("Invalid Clash YAML: {}", e))?;
+
+    if val.get("proxies").is_some() || val.get("rules").is_some() || val.get("port").is_some() {
+        return Ok(Some(ClashConfig::Full(trimmed.to_string())));
     }
 
-    if value.get("outbounds").is_some()
-        || value.get("inbounds").is_some()
-        || value.get("route").is_some()
-    {
-        return Ok(Some(SingBoxConfig::Full(value)));
+    if val.get("type").is_some() && val.get("name").is_some() {
+        return Ok(Some(ClashConfig::Proxy(val)));
     }
 
-    if value.get("type").is_some() {
-        return Ok(Some(SingBoxConfig::Outbound(value)));
-    }
-
-    Err("Unrecognized sing-box JSON format".to_string())
-}
-
-pub fn strip_ansi_codes(s: &str) -> String {
-    let mut result = String::new();
-    let mut in_escape = false;
-    for c in s.chars() {
-        if c == '\x1b' {
-            in_escape = true;
-        } else if in_escape {
-            if c == 'm' {
-                in_escape = false;
-            }
-        } else {
-            result.push(c);
-        }
-    }
-    result
+    Err("Unrecognized Clash YAML format".to_string())
 }
 
 pub fn extract_name_from_link(link: &str) -> String {
-    let link = &link.replace("&amp;", "&");
-    if let Ok(parsed) = Url::parse(link) {
-        let protocol = match parsed.scheme() {
-            "vless" => "VLESS",
-            "vmess" => "VMess",
-            "trojan" => "Trojan",
-            "ss" => "Shadowsocks",
-            "ssr" => "ShadowsocksR",
-            "hy" | "hysteria" => "Hysteria",
-            "hy2" | "hysteria2" => "Hysteria2",
-            "tuic" => "TUIC",
-            "wg" | "wireguard" => "WireGuard",
-            "socks" | "socks4" | "socks5" => "SOCKS",
-            "http" | "https" => "HTTP",
-            "ssh" => "SSH",
-            other => other,
-        };
+    let normalized = link.replace("&amp;", "&");
+    let trimmed = normalized.trim();
 
-        if let Some(host) = parsed.host_str() {
+    if let Some(name) = extract_name_from_singbox_json(trimmed) {
+        return decode_profile_name(&name);
+    }
+
+    if let Some(name) = extract_vmess_name_from_link(trimmed) {
+        return decode_profile_name(&name);
+    }
+
+    if let Ok(parsed) = Url::parse(trimmed) {
+        if let Some(fragment) = parsed
+            .fragment()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            return decode_profile_name(fragment);
+        }
+
+        let params: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
+        if let Some(name) = preferred_link_name(&params) {
+            return decode_profile_name(&name);
+        }
+
+        let protocol = protocol_display_name(parsed.scheme());
+        if let Some(host) = parsed.host_str().filter(|host| !host.trim().is_empty()) {
             return format!("{} ({})", host, protocol);
         }
     }
     "Imported Profile".to_string()
 }
 
-fn resolve_host(host: &str) -> String {
-    // Let sing-box resolve the domain itself using configured DNS
-    host.to_string()
-}
-
-fn apply_tls_settings(tls: &mut Value, settings: &AppSettings) {
-    if settings.tls_fragment {
-        tls["utls"]["tls_fragment"] = json!({
-            "enabled": true,
-            "size": settings.tls_fragment_size,
-            "sleep": settings.tls_fragment_sleep
-        });
-    }
-    if settings.tls_mixed_sni_case {
-        tls["mixed_sni_case"] = json!(true);
-    }
-    if settings.tls_padding {
-        tls["padding"] = json!(true);
-    }
-    if settings.sni_spoof_enabled && !settings.sni_spoof_value.is_empty() {
-        tls["server_name"] = json!(settings.sni_spoof_value);
+fn protocol_display_name(protocol: &str) -> &str {
+    match protocol {
+        "vless" => "VLESS",
+        "vmess" => "VMess",
+        "trojan" => "Trojan",
+        "ss" => "Shadowsocks",
+        "ssr" => "ShadowsocksR",
+        "hy" | "hysteria" => "Hysteria",
+        "hy2" | "hysteria2" => "Hysteria2",
+        "tuic" => "TUIC",
+        "rigby" => "Rigby",
+        "wg" | "wireguard" => "WireGuard",
+        "socks" | "socks4" | "socks5" => "SOCKS",
+        "http" | "https" => "HTTP",
+        "ssh" => "SSH",
+        other => other,
     }
 }
 
-fn add_transport(outbound: &mut Value, params: &HashMap<String, String>, domain: &str) {
+fn singbox_outbound_type(outbound: &JValue) -> &str {
+    outbound.get("type").and_then(|v| v.as_str()).unwrap_or("")
+}
+
+fn singbox_outbound_tag<'a>(outbound: &'a JValue) -> Option<&'a str> {
+    outbound
+        .get("tag")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|tag| !tag.is_empty())
+}
+
+fn singbox_is_selector_like(outbound_type: &str) -> bool {
+    matches!(outbound_type, "selector" | "urltest" | "fallback")
+}
+
+fn singbox_is_supported_conversion_type(outbound_type: &str) -> bool {
+    matches!(outbound_type, "vless" | "vmess" | "trojan" | "shadowsocks")
+}
+
+fn singbox_outbound_has_endpoint(outbound: &JValue) -> bool {
+    let has_server = outbound
+        .get("server")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|server| !server.is_empty())
+        .is_some();
+    let has_port = outbound
+        .get("server_port")
+        .and_then(|v| v.as_u64())
+        .or_else(|| outbound.get("port").and_then(|v| v.as_u64()))
+        .is_some();
+    has_server && has_port
+}
+
+fn singbox_find_outbound_by_tag<'a>(outbounds: &'a [JValue], tag: &str) -> Option<&'a JValue> {
+    outbounds
+        .iter()
+        .find(|outbound| singbox_outbound_tag(outbound) == Some(tag))
+}
+
+fn resolve_singbox_leaf_by_tag<'a>(
+    outbounds: &'a [JValue],
+    tag: &str,
+    visited: &mut HashSet<String>,
+) -> Option<&'a JValue> {
+    let normalized_tag = tag.trim();
+    if normalized_tag.is_empty() {
+        return None;
+    }
+    if !visited.insert(normalized_tag.to_string()) {
+        return None;
+    }
+
+    let outbound = singbox_find_outbound_by_tag(outbounds, normalized_tag)?;
+    let outbound_type = singbox_outbound_type(outbound);
+    if singbox_is_selector_like(outbound_type) {
+        if let Some(default_tag) = outbound
+            .get("default")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, default_tag, visited) {
+                return Some(resolved);
+            }
+        }
+
+        if let Some(nested) = outbound.get("outbounds").and_then(|v| v.as_array()) {
+            for nested_tag in nested.iter().filter_map(|v| v.as_str()) {
+                if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, nested_tag, visited)
+                {
+                    return Some(resolved);
+                }
+            }
+        }
+        None
+    } else {
+        Some(outbound)
+    }
+}
+
+fn select_singbox_outbound<'a>(json: &'a JValue) -> Result<&'a JValue, String> {
+    let Some(outbounds) = json.get("outbounds").and_then(|v| v.as_array()) else {
+        return Err("No supported outbound found in sing-box config".to_string());
+    };
+
+    let mut preferred_tags: Vec<String> = Vec::new();
+    if let Some(final_tag) = json
+        .get("route")
+        .and_then(|v| v.as_object())
+        .and_then(|route| route.get("final"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        preferred_tags.push(final_tag.to_string());
+    }
+    preferred_tags.extend(["proxy", "select", "auto"].iter().map(|tag| tag.to_string()));
+
+    for tag in preferred_tags {
+        let mut visited = HashSet::new();
+        if let Some(outbound) = resolve_singbox_leaf_by_tag(outbounds, &tag, &mut visited) {
+            let outbound_type = singbox_outbound_type(outbound);
+            if singbox_is_supported_conversion_type(outbound_type)
+                && singbox_outbound_has_endpoint(outbound)
+            {
+                return Ok(outbound);
+            }
+        }
+    }
+
+    for outbound in outbounds {
+        if !singbox_is_selector_like(singbox_outbound_type(outbound)) {
+            continue;
+        }
+        let Some(tag) = singbox_outbound_tag(outbound) else {
+            continue;
+        };
+        let mut visited = HashSet::new();
+        if let Some(resolved) = resolve_singbox_leaf_by_tag(outbounds, tag, &mut visited) {
+            let outbound_type = singbox_outbound_type(resolved);
+            if singbox_is_supported_conversion_type(outbound_type)
+                && singbox_outbound_has_endpoint(resolved)
+            {
+                return Ok(resolved);
+            }
+        }
+    }
+
+    outbounds
+        .iter()
+        .find(|outbound| {
+            let outbound_type = singbox_outbound_type(outbound);
+            singbox_is_supported_conversion_type(outbound_type) && singbox_outbound_has_endpoint(outbound)
+        })
+        .ok_or("No supported outbound found in sing-box config".to_string())
+}
+
+fn preferred_link_name(params: &HashMap<String, String>) -> Option<String> {
+    for key in [
+        "serviceName",
+        "service_name",
+        "service-name",
+        "remarks",
+        "remark",
+        "name",
+        "ps",
+        "tag",
+    ] {
+        if let Some(value) = params
+            .get(key)
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+        {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn extract_vmess_name_from_link(link: &str) -> Option<String> {
+    let payload = link.strip_prefix("vmess://")?.trim();
+    let decoded = general_purpose::STANDARD
+        .decode(payload)
+        .or_else(|_| general_purpose::URL_SAFE.decode(payload))
+        .ok()?;
+    let vmess_config: JValue = serde_json::from_slice(&decoded).ok()?;
+    vmess_config
+        .get("ps")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+fn extract_name_from_singbox_json(input: &str) -> Option<String> {
+    if !input.starts_with('{') {
+        return None;
+    }
+    let json: JValue = serde_json::from_str(input).ok()?;
+    let outbound = select_singbox_outbound(&json).ok()?;
+    singbox_outbound_tag(outbound).map(str::to_string)
+}
+
+fn ystr(s: &str) -> YValue {
+    YValue::String(s.to_string())
+}
+
+fn ynum(n: u64) -> YValue {
+    YValue::Number(serde_yaml::Number::from(n))
+}
+
+fn ybool(b: bool) -> YValue {
+    YValue::Bool(b)
+}
+
+/// Helper: create a YAML mapping from key-value pairs
+fn ymapping(pairs: Vec<(&str, YValue)>) -> YValue {
+    let mut map = serde_yaml::Mapping::new();
+    for (k, v) in pairs {
+        map.insert(ystr(k), v);
+    }
+    YValue::Mapping(map)
+}
+
+fn add_ws_opts(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>, domain: &str) {
+    let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
+    let host = params.get("host").unwrap_or(&domain.to_string()).clone();
+    let mut headers = serde_yaml::Mapping::new();
+    headers.insert(ystr("Host"), ystr(&host));
+    let ws_opts = ymapping(vec![
+        ("path", ystr(path)),
+        ("headers", YValue::Mapping(headers)),
+        ("max-early-data", ynum(2048)),
+        ("early-data-header-name", ystr("Sec-WebSocket-Protocol")),
+    ]);
+    proxy.insert(ystr("ws-opts"), ws_opts);
+}
+
+fn add_grpc_opts(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>) {
+    let service_name = get_param(
+        params,
+        &[
+            "serviceName",
+            "service_name",
+            "service-name",
+            "grpc-service-name",
+            "service",
+        ],
+    )
+    .unwrap_or("");
+    let grpc_opts = ymapping(vec![
+        ("grpc-service-name", ystr(service_name)),
+    ]);
+    proxy.insert(ystr("grpc-opts"), grpc_opts);
+}
+
+fn add_h2_opts(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>, domain: &str) {
+    let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
+    let host = params.get("host").unwrap_or(&domain.to_string()).clone();
+    let h2_opts = ymapping(vec![
+        ("host", YValue::Sequence(vec![ystr(&host)])),
+        ("path", ystr(path)),
+    ]);
+    proxy.insert(ystr("h2-opts"), h2_opts);
+}
+
+fn set_network_transport(proxy: &mut serde_yaml::Mapping, params: &HashMap<String, String>, domain: &str) {
     let transport_type = params.get("type").map(|s| s.as_str()).unwrap_or("tcp");
-
     match transport_type {
         "ws" => {
-            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
-            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
-            outbound["transport"] = json!({
-                "type": "ws",
-                "path": path,
-                "headers": { "Host": host },
-                "max_early_data": 2048,
-                "early_data_header_name": "Sec-WebSocket-Protocol"
-            });
+            proxy.insert(ystr("network"), ystr("ws"));
+            add_ws_opts(proxy, params, domain);
         }
         "grpc" => {
-            let service_name = params.get("serviceName").map(|s| s.as_str()).unwrap_or("");
-            outbound["transport"] = json!({
-                "type": "grpc",
-                "service_name": service_name
-            });
+            proxy.insert(ystr("network"), ystr("grpc"));
+            add_grpc_opts(proxy, params);
         }
         "h2" | "http" => {
-            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
-            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
-            outbound["transport"] = json!({
-                "type": "http",
-                "host": [host],
-                "path": path
-            });
-        }
-        "quic" => {
-            outbound["transport"] = json!({
-                "type": "quic"
-            });
-        }
-        "httpupgrade" => {
-            let path = params.get("path").map(|s| s.as_str()).unwrap_or("/");
-            let host = params.get("host").unwrap_or(&domain.to_string()).clone();
-            outbound["transport"] = json!({
-                "type": "httpupgrade",
-                "host": host,
-                "path": path
-            });
+            proxy.insert(ystr("network"), ystr("h2"));
+            add_h2_opts(proxy, params, domain);
         }
         _ => {}
     }
 }
 
-pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, String> {
-    // Replace HTML-encoded ampersands that some subscription providers use
+fn apply_sni_spoof(proxy: &mut serde_yaml::Mapping, settings: &AppSettings) {
+    if settings.sni_spoof_enabled && !settings.sni_spoof_value.is_empty() {
+        proxy.insert(ystr("sni"), ystr(&settings.sni_spoof_value));
+        proxy.insert(ystr("servername"), ystr(&settings.sni_spoof_value));
+    }
+}
+
+fn get_param<'a>(params: &'a HashMap<String, String>, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| params.get(*key))
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+}
+
+fn add_grpc_opts_from_json(
+    proxy: &mut serde_yaml::Mapping,
+    transport: &serde_json::Map<String, JValue>,
+) {
+    let service_name = transport
+        .get("service_name")
+        .and_then(|v| v.as_str())
+        .or_else(|| transport.get("serviceName").and_then(|v| v.as_str()))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("");
+    proxy.insert(
+        ystr("grpc-opts"),
+        ymapping(vec![("grpc-service-name", ystr(service_name))]),
+    );
+}
+
+fn apply_singbox_transport(
+    proxy: &mut serde_yaml::Mapping,
+    outbound: &JValue,
+    domain: &str,
+) {
+    let Some(transport) = outbound.get("transport").and_then(|v| v.as_object()) else {
+        return;
+    };
+    let transport_type = transport
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("tcp");
+    match transport_type {
+        "ws" => {
+            proxy.insert(ystr("network"), ystr("ws"));
+            let path = transport
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/");
+            let host = transport
+                .get("host")
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    transport
+                        .get("headers")
+                        .and_then(|v| v.as_object())
+                        .and_then(|headers| headers.get("Host"))
+                        .and_then(|v| v.as_str())
+                })
+                .unwrap_or(domain);
+            let mut headers = serde_yaml::Mapping::new();
+            headers.insert(ystr("Host"), ystr(host));
+            proxy.insert(
+                ystr("ws-opts"),
+                ymapping(vec![
+                    ("path", ystr(path)),
+                    ("headers", YValue::Mapping(headers)),
+                ]),
+            );
+        }
+        "grpc" => {
+            proxy.insert(ystr("network"), ystr("grpc"));
+            add_grpc_opts_from_json(proxy, transport);
+        }
+        "http" | "h2" => {
+            proxy.insert(ystr("network"), ystr("h2"));
+            let path = transport
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/");
+            let host = transport
+                .get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or(domain);
+            proxy.insert(
+                ystr("h2-opts"),
+                ymapping(vec![
+                    ("host", YValue::Sequence(vec![ystr(host)])),
+                    ("path", ystr(path)),
+                ]),
+            );
+        }
+        _ => {}
+    }
+}
+
+fn parse_singbox_outbound(
+    input: &str,
+    settings: &AppSettings,
+) -> Result<Option<serde_yaml::Mapping>, String> {
+    let trimmed = input.trim();
+    if !trimmed.starts_with('{') {
+        return Ok(None);
+    }
+    let root: JValue = serde_json::from_str(trimmed)
+        .map_err(|e| format!("Invalid sing-box JSON: {}", e))?;
+    if root.get("outbounds").and_then(|v| v.as_array()).is_none() {
+        return Ok(None);
+    }
+    let outbound = select_singbox_outbound(&root)?;
+
+    let outbound_type = outbound
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or("sing-box outbound is missing type".to_string())?;
+    let server = outbound
+        .get("server")
+        .and_then(|v| v.as_str())
+        .ok_or("sing-box outbound is missing server".to_string())?;
+    let port = outbound
+        .get("server_port")
+        .and_then(|v| v.as_u64())
+        .or_else(|| outbound.get("port").and_then(|v| v.as_u64()))
+        .ok_or("sing-box outbound is missing server_port".to_string())?;
+
+    let mut proxy = serde_yaml::Mapping::new();
+    proxy.insert(ystr("name"), ystr("proxy"));
+    proxy.insert(ystr("server"), ystr(server));
+    proxy.insert(ystr("port"), ynum(port));
+
+    match outbound_type {
+        "vless" => {
+            let uuid = outbound
+                .get("uuid")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box vless outbound is missing uuid".to_string())?;
+            proxy.insert(ystr("type"), ystr("vless"));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            if let Some(flow) = outbound
+                .get("flow")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+            {
+                proxy.insert(ystr("flow"), ystr(flow));
+            }
+        }
+        "vmess" => {
+            let uuid = outbound
+                .get("uuid")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box vmess outbound is missing uuid".to_string())?;
+            proxy.insert(ystr("type"), ystr("vmess"));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            proxy.insert(ystr("alterId"), ynum(0));
+            let cipher = outbound
+                .get("security")
+                .and_then(|v| v.as_str())
+                .unwrap_or("auto");
+            proxy.insert(ystr("cipher"), ystr(cipher));
+        }
+        "trojan" => {
+            let password = outbound
+                .get("password")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box trojan outbound is missing password".to_string())?;
+            proxy.insert(ystr("type"), ystr("trojan"));
+            proxy.insert(ystr("password"), ystr(password));
+        }
+        "shadowsocks" => {
+            let method = outbound
+                .get("method")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box shadowsocks outbound is missing method".to_string())?;
+            let password = outbound
+                .get("password")
+                .and_then(|v| v.as_str())
+                .ok_or("sing-box shadowsocks outbound is missing password".to_string())?;
+            proxy.insert(ystr("type"), ystr("ss"));
+            proxy.insert(ystr("cipher"), ystr(method));
+            proxy.insert(ystr("password"), ystr(password));
+        }
+        other => {
+            return Err(format!(
+                "sing-box outbound type '{}' is not supported for conversion yet",
+                other
+            ));
+        }
+    }
+
+    if let Some(tls) = outbound.get("tls").and_then(|v| v.as_object()) {
+        if tls.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            proxy.insert(ystr("tls"), ybool(true));
+            let sni = tls
+                .get("server_name")
+                .and_then(|v| v.as_str())
+                .or_else(|| tls.get("sni").and_then(|v| v.as_str()))
+                .unwrap_or(server);
+            proxy.insert(ystr("servername"), ystr(sni));
+            proxy.insert(ystr("sni"), ystr(sni));
+            proxy.insert(
+                ystr("skip-cert-verify"),
+                ybool(tls.get("insecure").and_then(|v| v.as_bool()).unwrap_or(false)),
+            );
+
+            if let Some(alpn) = tls.get("alpn").and_then(|v| v.as_array()) {
+                let alpn_list: Vec<YValue> = alpn
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(ystr)
+                    .collect();
+                if !alpn_list.is_empty() {
+                    proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
+                }
+            }
+
+            if let Some(fp) = tls
+                .get("utls")
+                .and_then(|v| v.as_object())
+                .and_then(|utls| utls.get("fingerprint"))
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+            {
+                proxy.insert(ystr("client-fingerprint"), ystr(fp));
+            }
+
+            if let Some(reality) = tls.get("reality").and_then(|v| v.as_object()) {
+                if reality
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    let mut reality_opts = serde_yaml::Mapping::new();
+                    let public_key = reality
+                        .get("public_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let short_id = reality
+                        .get("short_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    reality_opts.insert(ystr("public-key"), ystr(public_key));
+                    reality_opts.insert(ystr("short-id"), ystr(short_id));
+                    proxy.insert(ystr("reality-opts"), YValue::Mapping(reality_opts));
+                }
+            }
+        }
+    }
+
+    apply_singbox_transport(&mut proxy, outbound, server);
+    apply_sni_spoof(&mut proxy, settings);
+    Ok(Some(proxy))
+}
+
+/// Parse a proxy link into a Clash-format YAML mapping.
+/// Returns a serde_yaml::Mapping suitable for inclusion in the `proxies:` list.
+pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::Mapping, String> {
     let link = &link.replace("&amp;", "&");
 
-    if let Some(parsed) = parse_singbox_config(link)? {
+    // Check if it's already a Clash YAML proxy entry
+    if let Some(parsed) = parse_clash_config(link)? {
         return match parsed {
-            SingBoxConfig::Outbound(outbound) => Ok(outbound),
-            SingBoxConfig::Full(_) => Err(
-                "Full sing-box config cannot be used as a single outbound".to_string(),
+            ClashConfig::Proxy(val) => {
+                val.as_mapping().cloned().ok_or("Expected YAML mapping".to_string())
+            }
+            ClashConfig::Full(_) => Err(
+                "Full Clash config cannot be used as a single proxy".to_string(),
             ),
         };
+    }
+
+    if let Some(proxy) = parse_singbox_outbound(link, settings)? {
+        return Ok(proxy);
     }
 
     let url = Url::parse(link).map_err(|_| "Invalid URL format")?;
     let protocol = url.scheme();
 
     match protocol {
+        "rigby" => {
+            let server_static_pubkey = url.username().trim();
+            if server_static_pubkey.is_empty() {
+                return Err("No rigby server static public key".to_string());
+            }
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let parse_bool = |value: Option<&String>, default: bool| -> Result<bool, String> {
+                let Some(raw) = value else {
+                    return Ok(default);
+                };
+                match raw.trim().to_ascii_lowercase().as_str() {
+                    "" => Ok(default),
+                    "1" | "true" | "yes" | "on" => Ok(true),
+                    "0" | "false" | "no" | "off" => Ok(false),
+                    _ => Err(format!("Invalid boolean value: {}", raw)),
+                }
+            };
+
+            let padding = parse_bool(params.get("padding"), true)?;
+            let mux = parse_bool(params.get("mux"), true)?;
+
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("rigby"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("server-static-pubkey"), ystr(server_static_pubkey));
+            proxy.insert(ystr("padding"), ybool(padding));
+            proxy.insert(ystr("mux"), ybool(mux));
+            proxy.insert(ystr("udp"), ybool(true));
+
+            if let Some(sni) = params
+                .get("sni")
+                .map(String::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                proxy.insert(ystr("sni"), ystr(sni));
+            }
+            if let Some(client_private_key) = get_param(
+                &params,
+                &["sk", "client_private_key", "client-private-key"],
+            ) {
+                proxy.insert(ystr("client-private-key"), ystr(client_private_key));
+            }
+
+            apply_sni_spoof(&mut proxy, settings);
+            Ok(proxy)
+        }
         "vless" => {
             let uuid = url.username();
             let domain = url.host_str().ok_or("No host")?;
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
-
-            let resolved_ip = resolve_host(domain);
             let transport_type = params.get("type").map(|s| s.as_str()).unwrap_or("tcp");
 
-            let flow = if transport_type == "tcp" || transport_type == "" {
+            let flow = if transport_type == "tcp" || transport_type.is_empty() {
                 params.get("flow").map(|s| s.as_str()).unwrap_or("")
             } else {
                 ""
             };
+            let client_fingerprint = ["fp", "fingerprint", "client-fingerprint"]
+                .iter()
+                .find_map(|k| params.get(*k))
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty());
 
-            let mut outbound = json!({
-                "type": "vless",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "uuid": uuid
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("vless"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("uuid"), ystr(uuid));
 
             if !flow.is_empty() {
-                outbound["flow"] = json!(flow);
+                proxy.insert(ystr("flow"), ystr(flow));
+            }
+            if let Some(fp) = client_fingerprint {
+                proxy.insert(ystr("client-fingerprint"), ystr(fp));
             }
 
             if let Some(security) = params.get("security") {
-                if security == "reality" {
-                    let mut tls = json!({
-                        "enabled": true,
-                        "server_name": params.get("sni").unwrap_or(&domain.to_string()),
-                        "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
-                        "reality": {
-                            "enabled": true,
-                            "public_key": params.get("pbk").unwrap_or(&"".to_string()),
-                            "short_id": params.get("sid").unwrap_or(&"".to_string())
-                        }
-                    });
-                    apply_tls_settings(&mut tls, settings);
-                    outbound["tls"] = tls;
-                } else if security == "tls" {
-                    let alpn = params.get("alpn").map(|s| {
-                        s.split(',').map(|v| v.to_string()).collect::<Vec<_>>()
-                    });
-                    let mut tls = json!({
-                        "enabled": true,
-                        "server_name": params.get("sni").unwrap_or(&domain.to_string()),
-                        "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
-                        "insecure": params.get("allowInsecure").map(|v| v == "1").unwrap_or(false)
-                    });
-                    if let Some(alpn_list) = alpn {
-                        tls["alpn"] = json!(alpn_list);
+                if security == "reality" || security == "tls" {
+                    proxy.insert(ystr("tls"), ybool(true));
+                    let sni = params.get("sni").unwrap_or(&domain.to_string()).clone();
+                    proxy.insert(ystr("servername"), ystr(&sni));
+                    let skip = params.get("allowInsecure").map(|v| v == "1").unwrap_or(false);
+                    proxy.insert(ystr("skip-cert-verify"), ybool(skip));
+                    if let Some(alpn_str) = params.get("alpn") {
+                        let alpn_list: Vec<YValue> = alpn_str.split(',').map(|v| ystr(v)).collect();
+                        proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
                     }
-                    apply_tls_settings(&mut tls, settings);
-                    outbound["tls"] = tls;
+                }
+                if security == "reality" {
+                    let mut reality_opts = serde_yaml::Mapping::new();
+                    reality_opts.insert(ystr("public-key"), ystr(params.get("pbk").unwrap_or(&"".to_string())));
+                    reality_opts.insert(ystr("short-id"), ystr(params.get("sid").unwrap_or(&"".to_string())));
+                    proxy.insert(ystr("reality-opts"), YValue::Mapping(reality_opts));
                 }
             }
 
-            add_transport(&mut outbound, &params, domain);
-            Ok(outbound)
+            set_network_transport(&mut proxy, &params, domain);
+            apply_sni_spoof(&mut proxy, settings);
+            Ok(proxy)
         }
         "vmess" => {
             let link_body = link.strip_prefix("vmess://").ok_or("Invalid vmess link")?;
@@ -238,13 +804,13 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
                 .decode(link_body.trim())
                 .or_else(|_| general_purpose::URL_SAFE.decode(link_body.trim()))
                 .map_err(|_| "Failed to decode vmess link")?;
-            let vmess_config: Value =
+            let vmess_config: JValue =
                 serde_json::from_slice(&decoded).map_err(|_| "Failed to parse vmess JSON")?;
 
             let server = vmess_config["add"].as_str().unwrap_or("");
             let port = vmess_config["port"].as_u64().unwrap_or(443) as u16;
             let uuid = vmess_config["id"].as_str().unwrap_or("");
-            let alter_id = vmess_config["aid"].as_u64().unwrap_or(0) as u32;
+            let alter_id = vmess_config["aid"].as_u64().unwrap_or(0) as u16;
             let security = vmess_config["scy"].as_str().unwrap_or("auto");
             let net = vmess_config["net"].as_str().unwrap_or("tcp");
             let tls_type = vmess_config["tls"].as_str().unwrap_or("");
@@ -252,61 +818,54 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let host = vmess_config["host"].as_str().unwrap_or(server);
             let path = vmess_config["path"].as_str().unwrap_or("/");
 
-            let resolved_ip = resolve_host(server);
-
-            let mut outbound = json!({
-                "type": "vmess",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "uuid": uuid,
-                "alter_id": alter_id,
-                "security": security
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("vmess"));
+            proxy.insert(ystr("server"), ystr(server));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            proxy.insert(ystr("alterId"), ynum(alter_id as u64));
+            proxy.insert(ystr("cipher"), ystr(security));
 
             if tls_type == "tls" {
-                let mut tls = json!({
-                    "enabled": true,
-                    "server_name": sni,
-                    "utls": { "enabled": true, "fingerprint": "chrome" },
-                    "insecure": false
-                });
-                apply_tls_settings(&mut tls, settings);
-                outbound["tls"] = tls;
+                proxy.insert(ystr("tls"), ybool(true));
+                proxy.insert(ystr("servername"), ystr(sni));
+                proxy.insert(ystr("skip-cert-verify"), ybool(false));
             }
 
             match net {
                 "ws" => {
-                    outbound["transport"] = json!({
-                        "type": "ws",
-                        "path": path,
-                        "headers": { "Host": host },
-                        "max_early_data": 2048,
-                        "early_data_header_name": "Sec-WebSocket-Protocol"
-                    });
+                    proxy.insert(ystr("network"), ystr("ws"));
+                    let mut headers = serde_yaml::Mapping::new();
+                    headers.insert(ystr("Host"), ystr(host));
+                    let ws_opts = ymapping(vec![
+                        ("path", ystr(path)),
+                        ("headers", YValue::Mapping(headers)),
+                        ("max-early-data", ynum(2048)),
+                        ("early-data-header-name", ystr("Sec-WebSocket-Protocol")),
+                    ]);
+                    proxy.insert(ystr("ws-opts"), ws_opts);
                 }
                 "grpc" => {
-                    outbound["transport"] = json!({
-                        "type": "grpc",
-                        "service_name": path.trim_start_matches('/')
-                    });
+                    proxy.insert(ystr("network"), ystr("grpc"));
+                    let grpc_opts = ymapping(vec![
+                        ("grpc-service-name", ystr(path.trim_start_matches('/'))),
+                    ]);
+                    proxy.insert(ystr("grpc-opts"), grpc_opts);
                 }
                 "h2" | "http" => {
-                    outbound["transport"] = json!({
-                        "type": "http",
-                        "host": [host],
-                        "path": path
-                    });
-                }
-                "quic" => {
-                    outbound["transport"] = json!({
-                        "type": "quic"
-                    });
+                    proxy.insert(ystr("network"), ystr("h2"));
+                    let h2_opts = ymapping(vec![
+                        ("host", YValue::Sequence(vec![ystr(host)])),
+                        ("path", ystr(path)),
+                    ]);
+                    proxy.insert(ystr("h2-opts"), h2_opts);
                 }
                 _ => {}
             }
 
-            Ok(outbound)
+            apply_sni_spoof(&mut proxy, settings);
+            Ok(proxy)
         }
         "trojan" => {
             let password = url.username();
@@ -314,34 +873,26 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
-
-            let mut outbound = json!({
-                "type": "trojan",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "password": password
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("trojan"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("password"), ystr(password));
 
             let sni = params.get("sni").unwrap_or(&domain.to_string()).clone();
-            let alpn = params.get("alpn").map(|s| {
-                s.split(',').map(|v| v.to_string()).collect::<Vec<_>>()
-            });
-            let mut tls = json!({
-                "enabled": true,
-                "server_name": sni,
-                "utls": { "enabled": true, "fingerprint": params.get("fp").unwrap_or(&"chrome".to_string()) },
-                "insecure": params.get("allowInsecure").map(|v| v == "1").unwrap_or(false)
-            });
-            if let Some(alpn_list) = alpn {
-                tls["alpn"] = json!(alpn_list);
-            }
-            apply_tls_settings(&mut tls, settings);
-            outbound["tls"] = tls;
+            proxy.insert(ystr("sni"), ystr(&sni));
+            let skip = params.get("allowInsecure").map(|v| v == "1").unwrap_or(false);
+            proxy.insert(ystr("skip-cert-verify"), ybool(skip));
 
-            add_transport(&mut outbound, &params, domain);
-            Ok(outbound)
+            if let Some(alpn_str) = params.get("alpn") {
+                let alpn_list: Vec<YValue> = alpn_str.split(',').map(|v| ystr(v)).collect();
+                proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
+            }
+
+            set_network_transport(&mut proxy, &params, domain);
+            apply_sni_spoof(&mut proxy, settings);
+            Ok(proxy)
         }
         "ss" => {
             let user_info = url.username();
@@ -359,22 +910,19 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
                 return Err("Invalid SS format".to_string());
             }
 
-            let resolved_ip = resolve_host(host);
-
-            let mut outbound = json!({
-                "type": "shadowsocks",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "method": parts[0],
-                "password": parts[1]
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("ss"));
+            proxy.insert(ystr("server"), ystr(host));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("cipher"), ystr(parts[0]));
+            proxy.insert(ystr("password"), ystr(parts[1]));
 
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
             if let Some(plugin) = params.get("plugin") {
                 if plugin.starts_with("v2ray-plugin") || plugin.starts_with("xray-plugin") {
-                    let plugin_opts = params.get("plugin-opts").map(|s| s.as_str()).unwrap_or("");
-                    let opts: HashMap<_, _> = plugin_opts
+                    let plugin_opts_str = params.get("plugin-opts").map(|s| s.as_str()).unwrap_or("");
+                    let opts: HashMap<_, _> = plugin_opts_str
                         .split(';')
                         .filter_map(|kv| {
                             let mut parts = kv.splitn(2, '=');
@@ -384,16 +932,17 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
 
                     let mode = opts.get("mode").unwrap_or(&"websocket");
                     if *mode == "websocket" {
-                        let path = opts.get("path").unwrap_or(&"/");
-                        let ws_host = opts.get("host").unwrap_or(&host);
-                        outbound["plugin"] = json!("v2ray-plugin");
-                        outbound["plugin_opts"] =
-                            json!(format!("mode=websocket;host={};path={}", ws_host, path));
+                        proxy.insert(ystr("plugin"), ystr("v2ray-plugin"));
+                        let mut popts = serde_yaml::Mapping::new();
+                        popts.insert(ystr("mode"), ystr("websocket"));
+                        popts.insert(ystr("host"), ystr(opts.get("host").unwrap_or(&host)));
+                        popts.insert(ystr("path"), ystr(opts.get("path").unwrap_or(&"/")));
+                        proxy.insert(ystr("plugin-opts"), YValue::Mapping(popts));
                     }
                 }
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "hy2" | "hysteria2" => {
             let password = url.username();
@@ -401,75 +950,69 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("hysteria2"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("password"), ystr(password));
 
-            let mut outbound = json!({
-                "type": "hysteria2",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "password": password,
-                "tls": {
-                    "enabled": true,
-                    "server_name": params.get("sni").unwrap_or(&domain.to_string()),
-                    "insecure": params.get("insecure").map(|v| v == "1").unwrap_or(false)
-                }
-            });
+            let sni = params.get("sni").unwrap_or(&domain.to_string()).clone();
+            proxy.insert(ystr("sni"), ystr(&sni));
+            let skip = params.get("insecure").map(|v| v == "1").unwrap_or(false);
+            proxy.insert(ystr("skip-cert-verify"), ybool(skip));
 
             if let Some(obfs) = params.get("obfs") {
                 if obfs != "none" && !obfs.is_empty() {
-                    outbound["obfs"] = json!({
-                        "type": obfs,
-                        "password": params.get("obfs-password").unwrap_or(&"".to_string())
-                    });
+                    proxy.insert(ystr("obfs"), ystr(obfs));
+                    if let Some(obfs_pw) = params.get("obfs-password") {
+                        proxy.insert(ystr("obfs-password"), ystr(obfs_pw));
+                    }
                 }
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "hysteria" | "hy" => {
+            // Hysteria v1 — clash-rs supports hysteria2 natively;
+            // map v1 as hysteria2 with best-effort field mapping
             let domain = url.host_str().ok_or("No host")?;
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
-
             let auth_str = params.get("auth").map(|s| s.as_str()).unwrap_or("");
-            let up_mbps = params
-                .get("upmbps")
-                .and_then(|v| v.parse::<u32>().ok())
-                .unwrap_or(100);
-            let down_mbps = params
-                .get("downmbps")
-                .and_then(|v| v.parse::<u32>().ok())
-                .unwrap_or(100);
+            let up_mbps = params.get("upmbps").and_then(|v| v.parse::<u64>().ok()).unwrap_or(100);
+            let down_mbps = params.get("downmbps").and_then(|v| v.parse::<u64>().ok()).unwrap_or(100);
 
-            let mut outbound = json!({
-                "type": "hysteria",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "auth_str": auth_str,
-                "up_mbps": up_mbps,
-                "down_mbps": down_mbps,
-                "tls": {
-                    "enabled": true,
-                    "server_name": params.get("peer").or(params.get("sni")).unwrap_or(&domain.to_string()),
-                    "insecure": params.get("insecure").map(|v| v == "1").unwrap_or(false)
-                }
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("hysteria2"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("password"), ystr(auth_str));
+            proxy.insert(ystr("up"), ynum(up_mbps));
+            proxy.insert(ystr("down"), ynum(down_mbps));
+
+            let sni = params.get("peer")
+                .or(params.get("sni"))
+                .unwrap_or(&domain.to_string())
+                .clone();
+            proxy.insert(ystr("sni"), ystr(&sni));
+            let skip = params.get("insecure").map(|v| v == "1").unwrap_or(false);
+            proxy.insert(ystr("skip-cert-verify"), ybool(skip));
+
+            if let Some(alpn_str) = params.get("alpn") {
+                let alpn_list: Vec<YValue> = alpn_str.split(',').map(|v| ystr(v)).collect();
+                proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
+            }
 
             if let Some(obfs) = params.get("obfs") {
                 if !obfs.is_empty() {
-                    outbound["obfs"] = json!(obfs);
+                    proxy.insert(ystr("obfs"), ystr(obfs));
                 }
             }
 
-            if let Some(alpn) = params.get("alpn") {
-                outbound["tls"]["alpn"] = json!(alpn.split(',').collect::<Vec<_>>());
-            }
-
-            Ok(outbound)
+            Ok(proxy)
         }
         "tuic" => {
             let uuid = url.username();
@@ -478,38 +1021,30 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
+            let congestion = params.get("congestion_control").map(|s| s.as_str()).unwrap_or("bbr");
+            let udp_relay_mode = params.get("udp_relay_mode").map(|s| s.as_str()).unwrap_or("native");
 
-            let congestion = params
-                .get("congestion_control")
-                .map(|s| s.as_str())
-                .unwrap_or("bbr");
-            let udp_relay_mode = params
-                .get("udp_relay_mode")
-                .map(|s| s.as_str())
-                .unwrap_or("native");
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("tuic"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("uuid"), ystr(uuid));
+            proxy.insert(ystr("password"), ystr(password));
+            proxy.insert(ystr("congestion-controller"), ystr(congestion));
+            proxy.insert(ystr("udp-relay-mode"), ystr(udp_relay_mode));
 
-            let mut outbound = json!({
-                "type": "tuic",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "uuid": uuid,
-                "password": password,
-                "congestion_control": congestion,
-                "udp_relay_mode": udp_relay_mode,
-                "tls": {
-                    "enabled": true,
-                    "server_name": params.get("sni").unwrap_or(&domain.to_string()),
-                    "insecure": params.get("allow_insecure").map(|v| v == "1").unwrap_or(false)
-                }
-            });
+            let sni = params.get("sni").unwrap_or(&domain.to_string()).clone();
+            proxy.insert(ystr("sni"), ystr(&sni));
+            let skip = params.get("allow_insecure").map(|v| v == "1").unwrap_or(false);
+            proxy.insert(ystr("skip-cert-verify"), ybool(skip));
 
-            if let Some(alpn) = params.get("alpn") {
-                outbound["tls"]["alpn"] = json!(alpn.split(',').collect::<Vec<_>>());
+            if let Some(alpn_str) = params.get("alpn") {
+                let alpn_list: Vec<YValue> = alpn_str.split(',').map(|v| ystr(v)).collect();
+                proxy.insert(ystr("alpn"), YValue::Sequence(alpn_list));
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "wireguard" => {
             let private_key = url.username();
@@ -517,36 +1052,39 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let port = url.port().ok_or("No port")?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
-
-            let local_addr = params
-                .get("address")
+            let ip = params.get("address")
                 .or(params.get("ip"))
-                .map(|s| s.split(',').map(|v| v.trim().to_string()).collect::<Vec<_>>())
-                .unwrap_or_else(|| vec!["10.0.0.2/32".to_string()]);
+                .map(|s| {
+                    s.split(',').next().unwrap_or("10.0.0.2/32").trim().to_string()
+                })
+                .unwrap_or_else(|| "10.0.0.2/32".to_string());
 
-            let mut outbound = json!({
-                "type": "wireguard",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "private_key": private_key,
-                "peer_public_key": params.get("publickey").or(params.get("public_key")).unwrap_or(&"".to_string()),
-                "local_address": local_addr,
-                "mtu": params.get("mtu").and_then(|v| v.parse::<u32>().ok()).unwrap_or(1280)
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("wireguard"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("private-key"), ystr(private_key));
+            proxy.insert(ystr("public-key"), ystr(
+                params.get("publickey").or(params.get("public_key")).unwrap_or(&"".to_string())
+            ));
+            proxy.insert(ystr("ip"), ystr(&ip));
+
+            let mtu = params.get("mtu").and_then(|v| v.parse::<u64>().ok()).unwrap_or(1280);
+            proxy.insert(ystr("mtu"), ynum(mtu));
 
             if let Some(reserved) = params.get("reserved") {
-                let reserved_bytes: Vec<u8> = reserved
+                let reserved_bytes: Vec<YValue> = reserved
                     .split(',')
-                    .filter_map(|v| v.trim().parse::<u8>().ok())
+                    .filter_map(|v| v.trim().parse::<u64>().ok())
+                    .map(ynum)
                     .collect();
                 if reserved_bytes.len() == 3 {
-                    outbound["reserved"] = json!(reserved_bytes);
+                    proxy.insert(ystr("reserved"), YValue::Sequence(reserved_bytes));
                 }
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "socks" | "socks5" | "socks4" => {
             let username = url.username();
@@ -554,24 +1092,18 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let domain = url.host_str().ok_or("No host")?;
             let port = url.port().ok_or("No port")?;
 
-            let resolved_ip = resolve_host(domain);
-
-            let version = if protocol == "socks4" { "4" } else { "5" };
-
-            let mut outbound = json!({
-                "type": "socks",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "version": version
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("socks5"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
 
             if !username.is_empty() {
-                outbound["username"] = json!(username);
-                outbound["password"] = json!(password);
+                proxy.insert(ystr("username"), ystr(username));
+                proxy.insert(ystr("password"), ystr(password));
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "http" | "https" => {
             let username = url.username();
@@ -579,28 +1111,23 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let domain = url.host_str().ok_or("No host")?;
             let port = url.port().unwrap_or(if protocol == "https" { 443 } else { 80 });
 
-            let resolved_ip = resolve_host(domain);
-
-            let mut outbound = json!({
-                "type": "http",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("http"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
 
             if !username.is_empty() {
-                outbound["username"] = json!(username);
-                outbound["password"] = json!(password);
+                proxy.insert(ystr("username"), ystr(username));
+                proxy.insert(ystr("password"), ystr(password));
             }
 
             if protocol == "https" {
-                outbound["tls"] = json!({
-                    "enabled": true,
-                    "server_name": domain
-                });
+                proxy.insert(ystr("tls"), ybool(true));
+                proxy.insert(ystr("sni"), ystr(domain));
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         "ssh" => {
             let username = url.username();
@@ -608,33 +1135,31 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
             let port = url.port().unwrap_or(22);
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
 
-            let resolved_ip = resolve_host(domain);
-
-            let mut outbound = json!({
-                "type": "ssh",
-                "tag": "proxy",
-                "server": resolved_ip,
-                "server_port": port,
-                "user": username
-            });
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("ssh"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("username"), ystr(username));
 
             if let Some(password) = url.password() {
-                outbound["password"] = json!(password);
+                proxy.insert(ystr("password"), ystr(password));
             }
 
             if let Some(pk) = params.get("private_key") {
-                outbound["private_key"] = json!(pk);
+                proxy.insert(ystr("private-key"), ystr(pk));
             }
 
             if let Some(pk_pass) = params.get("private_key_passphrase") {
-                outbound["private_key_passphrase"] = json!(pk_pass);
+                proxy.insert(ystr("private-key-passphrase"), ystr(pk_pass));
             }
 
             if let Some(host_key) = params.get("host_key") {
-                outbound["host_key"] = json!(host_key.split(',').collect::<Vec<_>>());
+                let keys: Vec<YValue> = host_key.split(',').map(|v| ystr(v)).collect();
+                proxy.insert(ystr("host-key"), YValue::Sequence(keys));
             }
 
-            Ok(outbound)
+            Ok(proxy)
         }
         _ => Err(format!("Protocol {} not supported", protocol)),
     }
@@ -642,11 +1167,20 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<Value, Strin
 
 pub fn detect_protocol(link: &str) -> &'static str {
     let trimmed = link.trim();
+    if trimmed.starts_with("proxies:") || trimmed.starts_with("port:") || trimmed.starts_with("---") {
+        return "clash-yaml";
+    }
     if trimmed.starts_with('{') {
-        return "sing-box";
+        if let Ok(json) = serde_json::from_str::<JValue>(trimmed) {
+            if json.get("outbounds").is_some() {
+                return "sing-box";
+            }
+        }
     }
     if trimmed.starts_with("vless://") {
         "vless"
+    } else if trimmed.starts_with("rigby://") {
+        "rigby"
     } else if trimmed.starts_with("vmess://") {
         "vmess"
     } else if trimmed.starts_with("trojan://") {

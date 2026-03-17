@@ -1,94 +1,17 @@
-use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet, VecDeque};
+use serde_yaml::Value as YValue;
+use std::collections::{HashSet, VecDeque};
 use std::fs::{self, File};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
 
 use crate::models::AppState;
-use crate::parser::{parse_outbound, parse_singbox_config, strip_ansi_codes, SingBoxConfig};
+use crate::parser::{parse_clash_config, parse_outbound, ClashConfig};
 use crate::storage::get_log_path;
 
-pub fn get_singbox_path() -> String {
-    let current_exe = std::env::current_exe().unwrap();
-    let exe_dir = current_exe.parent().unwrap();
-
-    #[cfg(target_os = "macos")]
-    {
-        let target = if cfg!(target_arch = "x86_64") {
-            "x86_64-apple-darwin"
-        } else {
-            "aarch64-apple-darwin"
-        };
-
-        let path = exe_dir.join(format!("sing-box-{}", target));
-        if path.exists() {
-            return path.to_str().unwrap().to_string();
-        }
-
-        let simple_path = exe_dir.join("sing-box");
-        if simple_path.exists() {
-            return simple_path.to_str().unwrap().to_string();
-        }
-
-        let resources_path = exe_dir
-            .parent()
-            .unwrap()
-            .join("Resources")
-            .join("bin")
-            .join(format!("sing-box-{}", target));
-        if resources_path.exists() {
-            return resources_path.to_str().unwrap().to_string();
-        }
-
-        let resources_simple_path = exe_dir
-            .parent()
-            .unwrap()
-            .join("Resources")
-            .join("bin")
-            .join("sing-box");
-        if resources_simple_path.exists() {
-            return resources_simple_path.to_str().unwrap().to_string();
-        }
-
-        let dev_path = exe_dir.join(format!("sing-box-{}", target));
-        return dev_path.to_str().unwrap().to_string();
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let target = "x86_64-unknown-linux-gnu";
-        let path = exe_dir.join(format!("sing-box-{}", target));
-        if path.exists() {
-            return path.to_str().unwrap().to_string();
-        }
-
-        let simple_path = exe_dir.join("sing-box");
-        if simple_path.exists() {
-            return simple_path.to_str().unwrap().to_string();
-        }
-
-        return path.to_str().unwrap().to_string();
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let target = "x86_64-pc-windows-msvc";
-        let path = exe_dir.join(format!("sing-box-{}.exe", target));
-        if path.exists() {
-            return path.to_str().unwrap().to_string();
-        }
-
-        let simple_path = exe_dir.join("sing-box.exe");
-        if simple_path.exists() {
-            return simple_path.to_str().unwrap().to_string();
-        }
-
-        return path.to_str().unwrap().to_string();
-    }
+fn ystr(s: &str) -> YValue {
+    YValue::String(s.to_string())
 }
 
 fn expand_process_names(apps: &[String]) -> Vec<String> {
@@ -244,258 +167,30 @@ fn extract_process_paths(apps: &[String]) -> Vec<String> {
     paths
 }
 
-fn ensure_clash_api(config: &mut Value) {
-    let controller = json!({
-        "external_controller": "127.0.0.1:9090"
-    });
-
-    if let Some(exp) = config.get_mut("experimental") {
-        if exp.get("clash_api").is_some() {
-            return;
-        }
-        if let Some(obj) = exp.as_object_mut() {
-            obj.insert("clash_api".to_string(), controller);
-            return;
-        }
-    }
-
-    config["experimental"] = json!({
-        "clash_api": {
-            "external_controller": "127.0.0.1:9090"
-        }
-    });
-}
-
-fn migrate_singbox_config(config: &mut Value) {
-    // Remove legacy special outbounds (block, dns) deprecated in sing-box 1.11.0
-    let mut removed_tags: HashMap<String, String> = HashMap::new();
-    let mut direct_tags: HashSet<String> = HashSet::new();
-    if let Some(outbounds) = config.get_mut("outbounds").and_then(|v| v.as_array_mut()) {
-        outbounds.retain(|ob| {
-            let ob_type = ob.get("type").and_then(|v| v.as_str()).unwrap_or("");
-            let ob_tag = ob.get("tag").and_then(|v| v.as_str()).unwrap_or("");
-            if ob_type == "direct" {
-                direct_tags.insert(ob_tag.to_string());
-            }
-            match ob_type {
-                "block" => {
-                    removed_tags.insert(ob_tag.to_string(), "block".to_string());
-                    false
-                }
-                "dns" => {
-                    removed_tags.insert(ob_tag.to_string(), "dns".to_string());
-                    false
-                }
-                _ => true,
-            }
-        });
-    }
-
-    // Convert route rules referencing removed outbounds to action-based rules
-    if !removed_tags.is_empty() {
-        if let Some(rules) = config
-            .get_mut("route")
-            .and_then(|r| r.get_mut("rules"))
-            .and_then(|v| v.as_array_mut())
-        {
-            for rule in rules.iter_mut() {
-                let outbound = match rule.get("outbound").and_then(|v| v.as_str()) {
-                    Some(s) => s.to_string(),
-                    None => continue,
-                };
-                if let Some(removed_type) = removed_tags.get(&outbound) {
-                    if let Some(obj) = rule.as_object_mut() {
-                        obj.remove("outbound");
-                        match removed_type.as_str() {
-                            "block" => { obj.insert("action".to_string(), json!("reject")); }
-                            "dns" => { obj.insert("action".to_string(), json!("hijack-dns")); }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Migrate legacy DNS server format (address field) to new format (type + server)
-    if let Some(servers) = config
-        .get_mut("dns")
-        .and_then(|d| d.get_mut("servers"))
-        .and_then(|v| v.as_array_mut())
-    {
-        for server in servers.iter_mut() {
-            if server.get("type").and_then(|v| v.as_str()).is_some() {
-                continue;
-            }
-            let Some(address) = server.get("address").and_then(|v| v.as_str()).map(String::from) else {
-                continue;
-            };
-            if let Some(obj) = server.as_object_mut() {
-                obj.remove("address");
-                obj.remove("address_resolver");
-                obj.remove("address_strategy");
-                obj.remove("address_fallback_delay");
-
-                if address == "local" {
-                    obj.insert("type".to_string(), json!("local"));
-                } else if let Some(rest) = address.strip_prefix("dhcp://") {
-                    obj.insert("type".to_string(), json!("dhcp"));
-                    if !rest.is_empty() && rest != "auto" {
-                        obj.insert("interface".to_string(), json!(rest));
-                    }
-                } else if address == "fakeip" {
-                    obj.insert("type".to_string(), json!("fakeip"));
-                } else if let Some(rest) = address.strip_prefix("tls://") {
-                    obj.insert("type".to_string(), json!("tls"));
-                    obj.insert("server".to_string(), json!(rest));
-                } else if let Some(rest) = address.strip_prefix("tcp://") {
-                    obj.insert("type".to_string(), json!("tcp"));
-                    obj.insert("server".to_string(), json!(rest));
-                } else if let Some(rest) = address.strip_prefix("https://") {
-                    obj.insert("type".to_string(), json!("https"));
-                    let parts: Vec<&str> = rest.splitn(2, '/').collect();
-                    obj.insert("server".to_string(), json!(parts[0]));
-                } else if let Some(rest) = address.strip_prefix("h3://") {
-                    obj.insert("type".to_string(), json!("h3"));
-                    let parts: Vec<&str> = rest.splitn(2, '/').collect();
-                    obj.insert("server".to_string(), json!(parts[0]));
-                } else if let Some(rest) = address.strip_prefix("quic://") {
-                    obj.insert("type".to_string(), json!("quic"));
-                    obj.insert("server".to_string(), json!(rest));
-                } else {
-                    obj.insert("type".to_string(), json!("udp"));
-                    obj.insert("server".to_string(), json!(address));
-                }
-            }
-        }
-    }
-
-    // Remove detour from DNS servers pointing to direct-type outbounds (deprecated in 1.12.0)
-    if let Some(servers) = config
-        .get_mut("dns")
-        .and_then(|d| d.get_mut("servers"))
-        .and_then(|v| v.as_array_mut())
-    {
-        for server in servers.iter_mut() {
-            if let Some(detour) = server.get("detour").and_then(|v| v.as_str()).map(String::from) {
-                if direct_tags.contains(&detour) {
-                    if let Some(obj) = server.as_object_mut() {
-                        obj.remove("detour");
-                    }
-                }
-            }
-        }
-    }
-
-    // Remove legacy DNS rules with "outbound" field (deprecated in 1.12.0)
-    if let Some(rules) = config
-        .get_mut("dns")
-        .and_then(|d| d.get_mut("rules"))
-        .and_then(|v| v.as_array_mut())
-    {
-        rules.retain(|rule| rule.get("outbound").is_none());
-    }
-
-    // Ensure default_domain_resolver is set in route config (required since 1.12.0)
-    if config.get("route").is_some()
-        && config.get("route").and_then(|r| r.get("default_domain_resolver")).is_none()
-    {
-        if let Some(first_tag) = config
-            .get("dns")
-            .and_then(|d| d.get("servers"))
-            .and_then(|v| v.as_array())
-            .and_then(|servers| servers.first())
-            .and_then(|s| s.get("tag"))
-            .and_then(|v| v.as_str())
-        {
-            let tag = first_tag.to_string();
-            config["route"]["default_domain_resolver"] = json!(tag);
-        }
-    }
-
-    // Fix TUN interface_name for macOS (must use utun prefix, not tun)
-    #[cfg(target_os = "macos")]
-    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
-        for inbound in inbounds.iter_mut() {
-            let is_tun = inbound.get("type").and_then(|v| v.as_str()) == Some("tun");
-            if !is_tun {
-                continue;
-            }
-            if let Some(name) = inbound.get("interface_name").and_then(|v| v.as_str()) {
-                if let Some(rest) = name.strip_prefix("tun") {
-                    if !name.starts_with("utun") && rest.chars().next().map_or(true, |c| c.is_ascii_digit()) {
-                        if let Some(obj) = inbound.as_object_mut() {
-                            obj.remove("interface_name");
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Migrate legacy inbound sniff/sniff_override_destination to route rule actions
-    if let Some(inbounds) = config.get_mut("inbounds").and_then(|v| v.as_array_mut()) {
-        let mut sniff_rules: Vec<Value> = Vec::new();
-        for inbound in inbounds.iter_mut() {
-            let has_sniff = inbound.get("sniff").and_then(|v| v.as_bool()).unwrap_or(false);
-            if !has_sniff {
-                continue;
-            }
-            let override_dest = inbound
-                .get("sniff_override_destination")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let tag = inbound.get("tag").and_then(|v| v.as_str()).map(String::from);
-
-            if let Some(obj) = inbound.as_object_mut() {
-                obj.remove("sniff");
-                obj.remove("sniff_override_destination");
-                obj.remove("sniff_timeout");
-            }
-
-            let mut sniff_rule = json!({ "action": "sniff" });
-            if override_dest {
-                sniff_rule["override_destination"] = json!(true);
-            }
-            if let Some(ref t) = tag {
-                sniff_rule["inbound"] = json!(t);
-            }
-            sniff_rules.push(sniff_rule);
-        }
-
-        if !sniff_rules.is_empty() {
-            if let Some(rules) = config
-                .get_mut("route")
-                .and_then(|r| r.get_mut("rules"))
-                .and_then(|v| v.as_array_mut())
-            {
-                for (i, rule) in sniff_rules.into_iter().enumerate() {
-                    rules.insert(i, rule);
-                }
-            }
-        }
-    }
-}
-
 #[tauri::command]
-pub fn start_vpn(
+pub async fn start_vpn(
     app: AppHandle,
-    window: Window,
-    state: State<AppState>,
+    _window: Window,
+    state: State<'_, AppState>,
     profile_id: Option<String>,
 ) -> Result<String, String> {
-    let mut running = state.is_running.lock().unwrap();
-    if *running {
-        return Err("Already running".to_string());
+    {
+        let running = state.is_running.lock().unwrap();
+        if *running {
+            return Err("Already running".to_string());
+        }
     }
 
-    let profiles = state.profiles.lock().unwrap();
+    let profiles = state.profiles.lock().unwrap().clone();
+    let settings = state.settings.lock().unwrap().clone();
+
     let selected_id = profile_id.as_deref().filter(|id| !id.is_empty());
     let current_profile = selected_id
         .and_then(|id| profiles.iter().find(|p| p.id == id))
         .or_else(|| profiles.first())
-        .ok_or("No profiles found")?;
-    let settings = state.settings.lock().unwrap();
+        .ok_or("No profiles found")?
+        .clone();
+
     let routing_mode = settings.routing_mode.as_str();
     let normalized_routing_mode = if routing_mode == "selected" {
         "apps_domains"
@@ -507,187 +202,175 @@ pub fn start_vpn(
         normalized_routing_mode == "apps_domains" || normalized_routing_mode == "apps";
     let include_domains =
         normalized_routing_mode == "apps_domains" || normalized_routing_mode == "domains";
-    let stack_mode = if include_apps && cfg!(target_os = "macos") {
-        "system"
-    } else {
-        "mixed"
-    };
     let mut split_debug: Option<(String, usize, usize, usize, usize)> = None;
 
-    let custom_config = match parse_singbox_config(&current_profile.config_link)? {
-        Some(SingBoxConfig::Full(config)) => Some(config),
+    // Check for full Clash YAML config
+    let custom_config = match parse_clash_config(&current_profile.config_link)? {
+        Some(ClashConfig::Full(yaml_str)) => Some(yaml_str),
         _ => None,
     };
 
-    let final_config = if let Some(mut config) = custom_config {
-        ensure_clash_api(&mut config);
-        migrate_singbox_config(&mut config);
-        config
+    let final_config_yaml = if let Some(yaml_str) = custom_config {
+        yaml_str
     } else {
-        let mut chain_profiles = Vec::new();
+        // Build Clash YAML config from parsed proxy link
+        let mut exit_proxy = parse_outbound(&current_profile.config_link, &settings)?;
+        exit_proxy.insert(ystr("name"), ystr("proxy"));
+        let mut winbox_target = "proxy".to_string();
+        let mut winbox_proxy: Option<serde_yaml::Mapping> = None;
+
+        let mut proxies: Vec<YValue> = Vec::new();
+        let mut proxy_names: Vec<YValue> = vec![ystr("proxy")];
+
+        // Proxy chain support
         if settings.proxy_chain_enabled {
             let mut seen = HashSet::new();
-            for chain_id in &settings.proxy_chain {
-                if chain_id == &current_profile.id {
-                    continue;
-                }
-                if !seen.insert(chain_id.clone()) {
+            for (index, chain_id) in settings.proxy_chain.iter().enumerate() {
+                if chain_id == &current_profile.id || !seen.insert(chain_id.clone()) {
                     continue;
                 }
                 if let Some(profile) = profiles.iter().find(|p| p.id == *chain_id) {
-                    chain_profiles.push(profile);
+                    let mut chain_proxy = parse_outbound(&profile.config_link, &settings)?;
+                    let tag = format!("chain-{}", index + 1);
+                    chain_proxy.insert(ystr("name"), ystr(&tag));
+                    if index > 0 {
+                        chain_proxy.insert(ystr("dialer-proxy"), ystr(&format!("chain-{}", index)));
+                    }
+                    proxies.push(YValue::Mapping(chain_proxy));
+                    proxy_names.push(ystr(&tag));
                 }
             }
-        }
 
-        let mut exit_outbound = parse_outbound(&current_profile.config_link, &settings)?;
-        exit_outbound["tag"] = json!("proxy");
-
-        let mut chain_outbounds = Vec::new();
-        for (index, profile) in chain_profiles.iter().enumerate() {
-            let mut outbound = parse_outbound(&profile.config_link, &settings)?;
-            let tag = format!("proxy-chain-{}", index + 1);
-            outbound["tag"] = json!(tag);
-            if index > 0 {
-                outbound["detour"] = json!(format!("proxy-chain-{}", index));
+            // Set dialer-proxy on exit proxy to chain through the last chain hop
+            if !proxies.is_empty() {
+                exit_proxy.insert(
+                    ystr("dialer-proxy"),
+                    ystr(&format!("chain-{}", proxies.len())),
+                );
             }
-            chain_outbounds.push(outbound);
         }
 
-        if !chain_outbounds.is_empty() {
-            exit_outbound["detour"] =
-                json!(format!("proxy-chain-{}", chain_outbounds.len()));
+        if matches!(exit_proxy.get(&ystr("type")), Some(YValue::String(proxy_type)) if proxy_type == "vless")
+            && matches!(exit_proxy.get(&ystr("flow")), Some(YValue::String(flow)) if flow == "xtls-rprx-vision")
+        {
+            let mut winbox_proxy_map = exit_proxy.clone();
+            winbox_proxy_map.remove(&ystr("flow"));
+            winbox_proxy_map.insert(ystr("name"), ystr("proxy-winbox"));
+            winbox_target = "proxy-winbox".to_string();
+            winbox_proxy = Some(winbox_proxy_map);
         }
 
-        let mut outbounds = Vec::new();
-        outbounds.push(exit_outbound);
-        outbounds.extend(chain_outbounds);
-        outbounds.push(json!({ "type": "direct", "tag": "direct" }));
+        // Insert exit proxy at the beginning
+        proxies.insert(0, YValue::Mapping(exit_proxy));
+        if let Some(winbox_proxy_map) = winbox_proxy {
+            proxies.insert(1, YValue::Mapping(winbox_proxy_map));
+        }
 
-        let (dns_servers, dns_final) = if cfg!(target_os = "windows") {
-            (
-                json!([
-                    {
-                        "tag": "dns-direct",
-                        "type": "udp",
-                        "server": settings.dns,
-                        "server_port": 53
-                    }
-                ]),
-                "dns-direct",
-            )
-        } else {
-            (
-                json!([
-                    { "tag": "local", "type": "local" },
-                    {
-                        "tag": "remote",
-                        "type": "https",
-                        "server": settings.dns,
-                        "server_port": 443,
-                        "path": "/dns-query",
-                        "detour": "proxy"
-                    }
-                ]),
-                "remote",
-            )
-        };
-
-        let mut config = json!({
-            "log": {
-                "level": "info",
-                "timestamp": true
-            },
-            "experimental": {
-                "clash_api": {
-                    "external_controller": "127.0.0.1:9090"
-                }
-            },
-            "dns": {
-                "servers": dns_servers,
-                "rules": [
-                    { "action": "route", "server": if cfg!(target_os = "windows") { "dns-direct" } else { "local" } }
-                ],
-                "final": dns_final,
-                "strategy": "prefer_ipv4"
-            },
-            "inbounds": [{
-                "type": "tun",
-                "tag": "tun-in",
-                "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
-                "mtu": settings.mtu,
-                "auto_route": true,
-                "strict_route": true,
-                "stack": stack_mode
-            }],
-            "outbounds": outbounds,
-            "route": {
-                "auto_detect_interface": true,
-                "default_domain_resolver": if cfg!(target_os = "windows") { "dns-direct" } else { "local" },
-                "final": if split_enabled { "direct" } else { "proxy" },
-                "rules": [
-                    { "action": "sniff", "override_destination": true },
-                    { "protocol": "dns", "action": "hijack-dns" },
-                    { "ip_cidr": [format!("{}/32", settings.dns)], "action": "direct" },
-                    { "ip_is_private": true, "action": "direct" }
-                ]
-            }
-        });
+        // Build rules
+        let mut rules: Vec<YValue> = Vec::new();
+        rules.push(ystr(&format!("DST-PORT,8291,{}", winbox_target)));
 
         if split_enabled {
-            if let Some(rules) = config["route"]["rules"].as_array_mut() {
-                if include_apps {
-                    let process_paths = extract_process_paths(&settings.routing_apps);
-                    let process_names =
-                        merge_process_names(expand_process_names(&settings.routing_apps), &process_paths);
-                    split_debug = Some((
-                        normalized_routing_mode.to_string(),
-                        settings.routing_apps.len(),
-                        process_names.len(),
-                        process_paths.len(),
-                        settings.routing_domains.len(),
-                    ));
+            if include_apps {
+                let process_paths = extract_process_paths(&settings.routing_apps);
+                let process_names =
+                    merge_process_names(expand_process_names(&settings.routing_apps), &process_paths);
+                split_debug = Some((
+                    normalized_routing_mode.to_string(),
+                    settings.routing_apps.len(),
+                    process_names.len(),
+                    process_paths.len(),
+                    settings.routing_domains.len(),
+                ));
 
-                    if !process_names.is_empty() {
-                        rules.insert(0, json!({
-                            "process_name": process_names,
-                            "outbound": "proxy"
-                        }));
-                    }
-                    if !process_paths.is_empty() {
-                        rules.insert(0, json!({
-                            "process_path": process_paths,
-                            "outbound": "proxy"
-                        }));
-                    }
-                }
-                if include_domains && !settings.routing_domains.is_empty() {
-                    rules.insert(0, json!({
-                        "domain_suffix": settings.routing_domains,
-                        "outbound": "proxy"
-                    }));
-                }
-                if !include_apps && include_domains {
-                    split_debug = Some((
-                        normalized_routing_mode.to_string(),
-                        settings.routing_apps.len(),
-                        0,
-                        0,
-                        settings.routing_domains.len(),
-                    ));
+                for name in &process_names {
+                    rules.push(ystr(&format!("PROCESS-NAME,{},proxy", name)));
                 }
             }
+            if include_domains && !settings.routing_domains.is_empty() {
+                for domain in &settings.routing_domains {
+                    rules.push(ystr(&format!("DOMAIN-SUFFIX,{},proxy", domain)));
+                }
+            }
+            if !include_apps && include_domains {
+                split_debug = Some((
+                    normalized_routing_mode.to_string(),
+                    settings.routing_apps.len(),
+                    0,
+                    0,
+                    settings.routing_domains.len(),
+                ));
+            }
+            // Default to DIRECT in split mode
+            rules.push(ystr("MATCH,DIRECT"));
+        } else {
+            // Route all through proxy
+            rules.push(ystr("MATCH,proxy"));
         }
 
-        config
+        // Build the full Clash config as YAML string
+        let tun_device = if cfg!(target_os = "macos") {
+            "utun1989"
+        } else {
+            "tun0"
+        };
+
+        let config_yaml = format!(
+            r#"mixed-port: 7890
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090
+ipv6: false
+
+dns:
+  enable: true
+  ipv6: false
+  listen: 127.0.0.1:53553
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - {dns}
+  nameserver:
+    - {dns}
+
+tun:
+  enable: true
+  device-id: "{tun_device}"
+  gateway: "198.19.0.1/24"
+  gateway-v6: "fd00:fac::1/64"
+  route-all: {route_all}
+  dns-hijack: true
+
+proxies:
+{proxies_yaml}
+rules:
+{rules_yaml}
+"#,
+            dns = settings.dns,
+            tun_device = tun_device,
+            route_all = !split_enabled,
+            proxies_yaml = proxies.iter()
+                .map(|p| {
+                    let yaml = serde_yaml::to_string(p).unwrap_or_default();
+                    // Indent each proxy as a YAML list item
+                    format!("  - {}", yaml.trim().replace('\n', "\n    "))
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            rules_yaml = rules.iter()
+                .map(|r| format!("  - {}", r.as_str().unwrap_or("")))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+
+        config_yaml
     };
 
     let log_path = get_log_path(&app);
-
     let _ = File::create(&log_path);
 
     if let Some((mode, apps, names, paths, domains)) = split_debug {
-        let _ = window.emit(
+        let _ = app.emit(
             "vpn-log",
             vec![
                 format!(
@@ -702,79 +385,95 @@ pub fn start_vpn(
         );
     }
 
-    let config_path = app.path().app_cache_dir().unwrap().join("config.json");
+    // Save config for debugging
+    let config_path = app.path().app_cache_dir().unwrap().join("config.yaml");
     if let Some(parent) = config_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        let _ = std::fs::create_dir_all(parent);
     }
     let mut file = File::create(&config_path).map_err(|e| e.to_string())?;
-    file.write_all(final_config.to_string().as_bytes())
+    file.write_all(final_config_yaml.as_bytes())
         .map_err(|e| e.to_string())?;
 
-    let singbox_path = get_singbox_path();
-    let config_path_str = config_path.to_str().unwrap();
-    let log_path_shell = log_path.to_str().unwrap();
+    let cwd = app.path().app_cache_dir().unwrap().to_string_lossy().to_string();
+    let log_file_path = log_path.to_string_lossy().to_string();
 
     #[cfg(target_os = "macos")]
     {
+        let executable_path = std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .to_string();
+
+        let command = format!(
+            "\"{}\" --run-core --config \"{}\" --cwd \"{}\" --log \"{}\" > /dev/null 2>&1 &",
+            executable_path,
+            config_path.to_string_lossy(),
+            cwd.clone(),
+            log_file_path.clone()
+        );
+
         let script = format!(
-            "do shell script \"\\\"{}\\\" run -c \\\"{}\\\" >> \\\"{}\\\" 2>&1 &\" with administrator privileges",
-            singbox_path, config_path_str, log_path_shell
+            "do shell script \"{}\" with administrator privileges",
+            command.replace("\"", "\\\"")
         );
 
-        Command::new("osascript")
+        let status = std::process::Command::new("osascript")
             .arg("-e")
-            .arg(script)
-            .spawn()
-            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+            .arg(&script)
+            .status()
+            .map_err(|e| e.to_string())?;
+
+        if !status.success() {
+            return Err("Failed to get administrator privileges or start VPN core".to_string());
+        }
+
+        // Wait up to 5 seconds for core.pid to ensure it started
+        let mut attempts = 0;
+        let pid_file = std::path::Path::new(&cwd).join("core.pid");
+        while attempts < 50 {
+            if pid_file.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            attempts += 1;
+        }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(target_os = "macos"))]
     {
-        let cmd = format!(
-            "\"{}\" run -c \"{}\" >> \"{}\" 2>&1",
-            singbox_path, config_path_str, log_path_shell
-        );
-        Command::new("pkexec")
-            .arg("sh")
-            .arg("-c")
-            .arg(cmd)
-            .spawn()
-            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+        // Start clash-rs in a background thread for non-macOS (start_scaffold is blocking)
+        let config_yaml_clone = final_config_yaml.clone();
+        let cwd_clone = cwd.clone();
+        let log_file_clone = log_file_path.clone();
+        std::thread::spawn(move || {
+            let _ = clash_lib::start_scaffold(clash_lib::Options {
+                config: clash_lib::Config::Str(config_yaml_clone),
+                cwd: Some(cwd_clone),
+                rt: Some(clash_lib::TokioRuntime::MultiThread),
+                log_file: Some(log_file_clone),
+            });
+        });
     }
 
-    #[cfg(target_os = "windows")]
     {
-        let cmd_args = format!(
-            "/c \"\"{}\" run -c \"{}\" >> \"{}\" 2>&1\"",
-            singbox_path, config_path_str, log_path_shell
-        );
-
-        Command::new("powershell")
-            .arg("Start-Process")
-            .arg("cmd")
-            .arg("-ArgumentList")
-            .arg(format!("'{}'", cmd_args))
-            .arg("-Verb")
-            .arg("RunAs")
-            .arg("-WindowStyle")
-            .arg("Hidden")
-            .spawn()
-            .map_err(|e| format!("Failed to start VPN: {}", e))?;
+        let mut running = state.is_running.lock().unwrap();
+        *running = true;
     }
-
-    *running = true;
 
     let stop_signal = state.vpn_stop_signal.clone();
     stop_signal.store(false, Ordering::SeqCst);
 
-    let log_path_clone = log_path.clone();
+    // Tail the log file and forward to frontend
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let mut file = match File::open(&log_path_clone) {
+        use std::io::{Read, Seek, SeekFrom};
+        use tokio::time::Duration;
+
+        let mut file = match File::open(&log_path) {
             Ok(f) => f,
             Err(_) => return,
         };
-        let mut pos = 0;
+        let mut pos = 0u64;
 
         loop {
             if stop_signal.load(Ordering::SeqCst) {
@@ -782,18 +481,13 @@ pub fn start_vpn(
             }
 
             let mut contents = String::new();
-            if let Ok(_) = file.seek(SeekFrom::Start(pos)) {
-                if let Ok(_) = file.read_to_string(&mut contents) {
-                    if !contents.is_empty() {
-                        pos += contents.len() as u64;
-                        let mut batch = Vec::new();
-                        for line in contents.lines() {
-                            batch.push(strip_ansi_codes(line));
-                        }
-                        if !batch.is_empty() {
-                            if app_handle.emit("vpn-log", batch).is_err() {
-                                break;
-                            }
+            if file.seek(SeekFrom::Start(pos)).is_ok() {
+                if file.read_to_string(&mut contents).is_ok() && !contents.is_empty() {
+                    pos += contents.len() as u64;
+                    let batch: Vec<String> = contents.lines().map(|l| l.to_string()).collect();
+                    if !batch.is_empty() {
+                        if app_handle.emit("vpn-log", batch).is_err() {
+                            break;
                         }
                     }
                 }
@@ -806,34 +500,24 @@ pub fn start_vpn(
 }
 
 #[tauri::command]
-pub fn stop_vpn(state: State<AppState>) -> Result<String, String> {
+pub fn stop_vpn(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
     state.vpn_stop_signal.store(true, Ordering::SeqCst);
 
-    let mut running = state.is_running.lock().unwrap();
-
+    let cwd = app.path().app_cache_dir().unwrap().to_string_lossy().to_string();
+    
     #[cfg(target_os = "macos")]
     {
-        let script = "do shell script \"pkill -f sing-box\" with administrator privileges";
-        let _ = Command::new("osascript").arg("-e").arg(script).output();
+        let stop_file = std::path::Path::new(&cwd).join("core.stop");
+        std::fs::write(&stop_file, "stop").unwrap_or_default();
     }
-
-    #[cfg(target_os = "linux")]
+    
+    #[cfg(not(target_os = "macos"))]
     {
-        let _ = Command::new("pkexec")
-            .arg("pkill")
-            .arg("-f")
-            .arg("sing-box")
-            .output();
+        // Shutdown clash-rs runtime directly
+        clash_lib::shutdown();
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let _ = Command::new("powershell")
-            .arg("-Command")
-            .arg("Start-Process -FilePath 'taskkill' -ArgumentList '/F','/IM','sing-box.exe' -Verb RunAs -WindowStyle Hidden")
-            .spawn();
-    }
-
+    let mut running = state.is_running.lock().unwrap();
     *running = false;
     Ok("VPN Stopped".to_string())
 }

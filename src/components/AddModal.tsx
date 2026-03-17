@@ -74,13 +74,13 @@ function AddModal({
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="config-link">
-              Config Link, Subscription URL, or sing-box JSON
+              Config Link, Subscription URL, or Clash YAML
             </Label>
             <Textarea
               id="config-link"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
-              placeholder="Paste vless://... OR https://example.com/sub OR sing-box JSON"
+              placeholder="Paste vless://... OR https://example.com/sub OR Clash YAML"
               className="font-mono text-xs resize-none"
               rows={3}
             />

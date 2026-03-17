@@ -2,9 +2,9 @@ name: Test Build
 on:
   push:
     branches:
-      - '**'
+      - "**"
     tags-ignore:
-      - 'v*'
+      - "v*"
   pull_request:
 
 jobs:
@@ -13,43 +13,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-15-intel' # Intel
-            args: '--target x86_64-apple-darwin'
-            target: 'x86_64-apple-darwin'
-            singbox_arch: 'amd64'
-            singbox_os: 'darwin'
-            ext: 'tar.gz'
+          - platform: "macos-15-intel" # Intel
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
 
-          - platform: 'macos-15' # Apple Silicon
-            args: '--target aarch64-apple-darwin'
-            target: 'aarch64-apple-darwin'
-            singbox_arch: 'arm64'
-            singbox_os: 'darwin'
-            ext: 'tar.gz'
+          - platform: "macos-15" # Apple Silicon
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
 
-          - platform: 'ubuntu-22.04' # Linux (Debian-style)
-            args: '--bundles deb,appimage'
-            target: 'x86_64-unknown-linux-gnu'
-            singbox_arch: 'amd64'
-            singbox_os: 'linux'
-            ext: 'tar.gz'
-            linux_distro: 'ubuntu'
+          - platform: "ubuntu-22.04" # Linux (Debian-style)
+            args: "--bundles deb,appimage"
+            target: "x86_64-unknown-linux-gnu"
+            linux_distro: "ubuntu"
 
-          - platform: 'ubuntu-22.04' # Linux (Fedora container -> rpm)
-            args: '--bundles rpm'          # <-- убрал appimage
-            target: 'x86_64-unknown-linux-gnu'
-            singbox_arch: 'amd64'
-            singbox_os: 'linux'
-            ext: 'tar.gz'
-            linux_distro: 'fedora'
-            container_image: 'fedora:latest'
+          - platform: "ubuntu-22.04" # Linux (Fedora container -> rpm)
+            args: "--bundles rpm" # <-- убрал appimage
+            target: "x86_64-unknown-linux-gnu"
+            linux_distro: "fedora"
+            container_image: "fedora:latest"
 
-          - platform: 'windows-latest' # Windows
-            args: ''
-            target: 'x86_64-pc-windows-msvc'
-            singbox_arch: 'amd64'
-            singbox_os: 'windows'
-            ext: 'zip'
+          - platform: "windows-latest" # Windows
+            args: ""
+            target: "x86_64-pc-windows-msvc"
 
     runs-on: ${{ matrix.platform }}
 
@@ -108,39 +93,6 @@ jobs:
 
       - name: Install frontend dependencies
         run: bun install
-
-      - name: Setup sing-box sidecar
-        shell: bash
-        run: |
-          mkdir -p src-tauri/bin
-          VERSION="1.12.12"
-          OS="${{ matrix.singbox_os }}"
-          ARCH="${{ matrix.singbox_arch }}"
-          TARGET="${{ matrix.target }}"
-          EXT="${{ matrix.ext }}"
-
-          URL="https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box-${VERSION}-${OS}-${ARCH}.${EXT}"
-
-          echo "Downloading sing-box from $URL"
-          curl -L -o "sing-box.${EXT}" "$URL"
-
-          if [ "$EXT" = "zip" ]; then
-            unzip "sing-box.${EXT}"
-          else
-            tar -xzf "sing-box.${EXT}"
-          fi
-
-          DIR_NAME="sing-box-${VERSION}-${OS}-${ARCH}"
-
-          if [ "$OS" = "windows" ]; then
-            mv "$DIR_NAME/sing-box.exe" "src-tauri/bin/sing-box-${TARGET}.exe"
-          else
-            mv "$DIR_NAME/sing-box" "src-tauri/bin/sing-box-${TARGET}"
-            chmod +x "src-tauri/bin/sing-box-${TARGET}"
-          fi
-
-          echo "Sidecar binary prepared:"
-          ls -l src-tauri/bin/
 
       - name: Build (Test)
         run: bun tauri build ${{ matrix.args }}
