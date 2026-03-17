@@ -133,6 +133,7 @@ fn protocol_display_name(protocol: &str) -> &str {
         "hy" | "hysteria" => "Hysteria",
         "hy2" | "hysteria2" => "Hysteria2",
         "tuic" => "TUIC",
+        "rigby" => "Rigby",
         "wg" | "wireguard" => "WireGuard",
         "socks" | "socks4" | "socks5" => "SOCKS",
         "http" | "https" => "HTTP",
@@ -689,6 +690,58 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::
     let protocol = url.scheme();
 
     match protocol {
+        "rigby" => {
+            let server_static_pubkey = url.username().trim();
+            if server_static_pubkey.is_empty() {
+                return Err("No rigby server static public key".to_string());
+            }
+            let domain = url.host_str().ok_or("No host")?;
+            let port = url.port().ok_or("No port")?;
+            let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
+
+            let parse_bool = |value: Option<&String>, default: bool| -> Result<bool, String> {
+                let Some(raw) = value else {
+                    return Ok(default);
+                };
+                match raw.trim().to_ascii_lowercase().as_str() {
+                    "" => Ok(default),
+                    "1" | "true" | "yes" | "on" => Ok(true),
+                    "0" | "false" | "no" | "off" => Ok(false),
+                    _ => Err(format!("Invalid boolean value: {}", raw)),
+                }
+            };
+
+            let padding = parse_bool(params.get("padding"), true)?;
+            let mux = parse_bool(params.get("mux"), true)?;
+
+            let mut proxy = serde_yaml::Mapping::new();
+            proxy.insert(ystr("name"), ystr("proxy"));
+            proxy.insert(ystr("type"), ystr("rigby"));
+            proxy.insert(ystr("server"), ystr(domain));
+            proxy.insert(ystr("port"), ynum(port as u64));
+            proxy.insert(ystr("server-static-pubkey"), ystr(server_static_pubkey));
+            proxy.insert(ystr("padding"), ybool(padding));
+            proxy.insert(ystr("mux"), ybool(mux));
+            proxy.insert(ystr("udp"), ybool(true));
+
+            if let Some(sni) = params
+                .get("sni")
+                .map(String::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                proxy.insert(ystr("sni"), ystr(sni));
+            }
+            if let Some(client_private_key) = get_param(
+                &params,
+                &["sk", "client_private_key", "client-private-key"],
+            ) {
+                proxy.insert(ystr("client-private-key"), ystr(client_private_key));
+            }
+
+            apply_sni_spoof(&mut proxy, settings);
+            Ok(proxy)
+        }
         "vless" => {
             let uuid = url.username();
             let domain = url.host_str().ok_or("No host")?;
@@ -1126,6 +1179,8 @@ pub fn detect_protocol(link: &str) -> &'static str {
     }
     if trimmed.starts_with("vless://") {
         "vless"
+    } else if trimmed.starts_with("rigby://") {
+        "rigby"
     } else if trimmed.starts_with("vmess://") {
         "vmess"
     } else if trimmed.starts_with("trojan://") {
