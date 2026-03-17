@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
 dependencies = [
  "aead",
  "aes",
@@ -928,6 +928,7 @@ dependencies = [
  "sha2 0.10.9",
  "shadowsocks",
  "smoltcp 0.12.0 (git+https://github.com/smoltcp-rs/smoltcp.git?rev=ac32e64)",
+ "snow",
  "sock2proc",
  "socket2 0.6.1",
  "ssh-key",
@@ -1507,9 +1508,9 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "285743a676ccb6b3e116bc14cc69319b957867930ae9c4822f8e0f54509d7243"
+checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
 dependencies = [
  "block-buffer 0.12.0",
  "const-oid 0.10.2",
@@ -1534,7 +1535,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1874,7 +1875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3106,7 +3107,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.1",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3139,7 +3140,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3340,16 +3341,15 @@ dependencies = [
 [[package]]
 name = "internal-russh-forked-ssh-key"
 version = "0.6.16+upstream-0.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe44f2bbd99fcb302e246e2d6bcf51aeda346d02a365f80296a07a8c711b6da6"
 dependencies = [
  "argon2",
  "bcrypt-pbkdf",
- "digest 0.11.1",
+ "digest 0.11.2",
  "ecdsa",
  "ed25519-dalek",
  "hex",
  "hmac",
+ "num-bigint-dig",
  "p256",
  "p384",
  "p521",
@@ -4323,7 +4323,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4372,6 +4372,7 @@ dependencies = [
  "num-iter",
  "num-traits",
  "rand 0.8.5",
+ "serde",
  "smallvec",
  "zeroize",
 ]
@@ -5561,7 +5562,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.1",
+ "socket2 0.5.10",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -5599,9 +5600,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.1",
+ "socket2 0.5.10",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6014,12 +6015,13 @@ dependencies = [
  "const-oid 0.10.2",
  "crypto-bigint 0.7.1",
  "crypto-primes",
- "digest 0.11.1",
+ "digest 0.11.2",
  "pkcs1 0.8.0-rc.4",
  "pkcs8 0.11.0-rc.11",
  "rand_core 0.10.0",
  "sha2 0.11.0-rc.5",
  "signature 3.0.0-rc.10",
+ "spki 0.8.0-rc.4",
  "zeroize",
 ]
 
@@ -6082,10 +6084,12 @@ dependencies = [
  "p521",
  "pageant",
  "pbkdf2",
+ "pkcs1 0.8.0-rc.4",
  "pkcs5",
  "pkcs8 0.10.2",
  "rand 0.8.5",
  "rand_core 0.6.4",
+ "rsa 0.10.0-rc.17",
  "russh-cryptovec",
  "russh-util",
  "sec1",
@@ -6151,7 +6155,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6657,7 +6661,7 @@ checksum = "3b167252f3c126be0d8926639c4c4706950f01445900c4b3db0fd7e89fcb750a"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.11.1",
+ "digest 0.11.2",
 ]
 
 [[package]]
@@ -6679,7 +6683,7 @@ checksum = "7c5f3b1e2dc8aad28310d8410bd4d7e180eca65fca176c52ab00d364475d0024"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.11.1",
+ "digest 0.11.2",
 ]
 
 [[package]]
@@ -6789,7 +6793,7 @@ version = "3.0.0-rc.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f1880df446116126965eeec169136b2e0251dba37c6223bcc819569550edea3"
 dependencies = [
- "digest 0.11.1",
+ "digest 0.11.2",
  "rand_core 0.10.0",
 ]
 
@@ -6859,6 +6863,22 @@ dependencies = [
  "heapless",
  "log",
  "managed",
+]
+
+[[package]]
+name = "snow"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "850948bee068e713b8ab860fe1adc4d109676ab4c3b621fd8147f06b261f2f85"
+dependencies = [
+ "aes-gcm",
+ "blake2",
+ "chacha20poly1305",
+ "curve25519-dalek",
+ "rand_core 0.6.4",
+ "rustc_version",
+ "sha2 0.10.9",
+ "subtle",
 ]
 
 [[package]]
@@ -7565,7 +7585,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8588,7 +8608,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
 dependencies = [
  "async-trait",
  "futures",
@@ -8607,7 +8627,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?rev=191aff1c3354c77e3ad53807c0efc909bfbe1a09#191aff1c3354c77e3ad53807c0efc909bfbe1a09"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
 dependencies = [
  "bytes",
  "etherparse",
@@ -8841,7 +8861,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

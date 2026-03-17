@@ -32,7 +32,10 @@ tempfile = "3.10"
 tauri-plugin-dialog = "2.4.2"
 tauri-plugin-fs = "2.4.4"
 tokio = { version = "1", features = ["full"] }
-clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", rev = "191aff1c3354c77e3ad53807c0efc909bfbe1a09", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
+clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", branch = "master", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
+
+[patch.crates-io]
+internal-russh-forked-ssh-key = { path = "vendor/internal-russh-forked-ssh-key" }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["user"] }
