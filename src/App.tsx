@@ -576,11 +576,18 @@ function App() {
         setStatus("Connecting...");
         let profileIdToUse = selectedProfileId;
         let candidateOrder: string[] = [];
+        const domain = selectedConfigDomain.trim() || "local";
         const chainActive =
           appSettings.proxy_chain_enabled && appSettings.proxy_chain.length > 0;
         const chainExclusions = chainActive
           ? new Set(appSettings.proxy_chain)
           : null;
+        const domainProfiles = profiles.filter(
+          (profile) => resolveProfileDomain(profile) === domain
+        );
+        const eligibleDomainProfiles = chainExclusions
+          ? domainProfiles.filter((profile) => !chainExclusions.has(profile.id))
+          : domainProfiles;
         if (chainExclusions?.has(profileIdToUse)) {
           profileIdToUse = "";
         }
@@ -588,15 +595,10 @@ function App() {
 
         if (selectedProxyMode === "auto" && !hasForcedExit) {
           const pings = await refreshPings(selectedConfigDomain);
-          const domain = selectedConfigDomain.trim() || "local";
-          const candidates = profiles.filter(
-            (profile) => resolveProfileDomain(profile) === domain
-          );
-          const eligibleCandidates = chainExclusions
-            ? candidates.filter((profile) => !chainExclusions.has(profile.id))
-            : candidates;
           const effectiveCandidates =
-            eligibleCandidates.length > 0 ? eligibleCandidates : candidates;
+            eligibleDomainProfiles.length > 0
+              ? eligibleDomainProfiles
+              : domainProfiles;
           candidateOrder = effectiveCandidates
             .map((profile) => ({
               id: profile.id,
@@ -641,9 +643,7 @@ function App() {
             }
           }
         } else if (!profileIdToUse) {
-          const fallbackProfile = chainExclusions
-            ? profiles.find((profile) => !chainExclusions.has(profile.id))
-            : profiles[0];
+          const fallbackProfile = eligibleDomainProfiles[0] || domainProfiles[0];
           profileIdToUse = fallbackProfile?.id || "";
         }
 
@@ -656,7 +656,19 @@ function App() {
         }
 
         const autoMode = selectedProxyMode === "auto" && !hasForcedExit;
-        const attemptOrder = autoMode
+        const subscriptionFallbackMode =
+          selectedProxyMode === "manual" && domain !== "local" && !hasForcedExit;
+        if (subscriptionFallbackMode && candidateOrder.length === 0) {
+          const tailCandidates = (
+            eligibleDomainProfiles.length > 0 ? eligibleDomainProfiles : domainProfiles
+          )
+            .map((profile) => profile.id)
+            .filter((id) => id !== profileIdToUse);
+          candidateOrder = [profileIdToUse, ...tailCandidates];
+        }
+
+        const resilientMode = autoMode || subscriptionFallbackMode;
+        const attemptOrder = resilientMode
           ? candidateOrder.length > 0
             ? candidateOrder
             : [profileIdToUse]
@@ -673,14 +685,14 @@ function App() {
               profile_id: candidateId,
             });
           } catch (error) {
-            if (!autoMode) {
+            if (!resilientMode) {
               throw error;
             }
             lastAutoError = String(error);
             continue;
           }
 
-          if (autoMode) {
+          if (resilientMode) {
             await wait(1800);
             const egressOk = await probeVpnTraffic(4500);
             if (!egressOk) {
