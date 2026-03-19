@@ -80,9 +80,11 @@ pub async fn probe_vpn_egress(timeout_ms: Option<u64>) -> Result<String, String>
         "https://api.ipify.org?format=json",
         "https://ipinfo.io/ip",
         "https://ifconfig.me/ip",
+        "https://www.cloudflare.com/cdn-cgi/trace",
     ];
 
     let mut errors = Vec::new();
+    let mut reachable_without_ip = false;
     for endpoint in endpoints {
         match client.get(endpoint).send().await {
             Ok(response) => {
@@ -95,6 +97,7 @@ pub async fn probe_vpn_egress(timeout_ms: Option<u64>) -> Result<String, String>
                         if let Some(ip) = parse_ip_from_body(&body) {
                             return Ok(ip);
                         }
+                        reachable_without_ip = true;
                         errors.push(format!("{} -> invalid IP payload", endpoint));
                     }
                     Err(e) => {
@@ -108,7 +111,16 @@ pub async fn probe_vpn_egress(timeout_ms: Option<u64>) -> Result<String, String>
         }
     }
 
+    if reachable_without_ip {
+        return Ok("unknown".to_string());
+    }
+
     Err(format!("VPN egress probe failed: {}", errors.join("; ")))
+}
+
+#[tauri::command]
+pub fn is_vpn_running(state: State<AppState>) -> bool {
+    *state.is_running.lock().unwrap()
 }
 
 #[tauri::command]

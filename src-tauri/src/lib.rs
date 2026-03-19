@@ -135,6 +135,7 @@ pub fn run() {
             commands::open_logs_folder,
             commands::ping_profiles,
             commands::probe_vpn_egress,
+            commands::is_vpn_running,
             commands::get_settings,
             commands::save_settings,
             commands::update_profile_usage,

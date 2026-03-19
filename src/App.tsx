@@ -76,6 +76,7 @@ function App() {
   const [profilePings, setProfilePings] = useState<Record<string, number | null>>(
     {}
   );
+  const pingsLoadedRef = useRef<Record<string, boolean>>({});
 
   const [, setStatus] = useState("Ready");
   const [isConnected, setIsConnected] = useState(false);
@@ -189,6 +190,12 @@ function App() {
         if (!trimmedIp) {
           return null;
         }
+        if (trimmedIp === "unknown") {
+          return {
+            ip: "Connected",
+            region: "via VPN",
+          };
+        }
         return {
           ip: trimmedIp,
           region: "via VPN",
@@ -231,6 +238,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const syncRunningState = async () => {
+      try {
+        const running = await invoke<boolean>("is_vpn_running");
+        setIsConnected(running);
+        if (running) {
+          setStatus("CONNECTED");
+        }
+      } catch (_e) {
+        // ignore startup sync errors
+      }
+    };
+    syncRunningState();
+  }, []);
+
+  useEffect(() => {
     selectedConfigDomainRef.current = selectedConfigDomain;
   }, [selectedConfigDomain]);
 
@@ -249,6 +271,7 @@ function App() {
       if (loaded.length === 0) {
         setSelectedProfileId("");
         setSelectedConfigDomain("local");
+        pingsLoadedRef.current = {};
         return;
       }
 
@@ -264,6 +287,7 @@ function App() {
       const nextDomain = domains.includes(currentDomain) ? currentDomain : domains[0];
       if (currentDomain !== nextDomain) {
         setSelectedConfigDomain(nextDomain);
+        pingsLoadedRef.current = {};
       }
 
       const currentProfileId = selectedProfileIdRef.current;
@@ -322,6 +346,7 @@ function App() {
         results.forEach((result) => {
           next[result.id] = result.ping_ms ?? null;
         });
+        pingsLoadedRef.current[targetDomain] = true;
         setProfilePings(next);
         return next;
       } catch (e) {
@@ -330,6 +355,7 @@ function App() {
         domainProfiles.forEach((profile) => {
           fallback[profile.id] = null;
         });
+        pingsLoadedRef.current[targetDomain] = true;
         setProfilePings(fallback);
         return fallback;
       }
@@ -360,6 +386,7 @@ function App() {
           const parsed = new URL(url);
           const domain = parsed.host || "local";
           setSelectedConfigDomain(domain);
+          pingsLoadedRef.current = {};
           setSelectedProxyMode("auto");
           setSelectedProfileId("");
           setActiveTab("proxies");
@@ -613,6 +640,7 @@ function App() {
 
         let connectedProfileId = "";
         let connectedIpInfo: IpInfo | null = null;
+        let connectedButUnknownIp = false;
         let lastAutoError = "";
 
         for (const candidateId of attemptOrder) {
@@ -646,7 +674,11 @@ function App() {
           }
 
           connectedProfileId = candidateId;
-          connectedIpInfo = probe;
+          if (probe.ip === "Connected") {
+            connectedButUnknownIp = true;
+          } else {
+            connectedIpInfo = probe;
+          }
           break;
         }
 
@@ -661,6 +693,12 @@ function App() {
         setStatus("CONNECTED");
         if (connectedIpInfo) {
           setIpInfo(connectedIpInfo);
+          startIpCheck();
+        } else if (connectedButUnknownIp) {
+          setIpInfo({
+            ip: "Connected",
+            region: "via VPN",
+          });
           startIpCheck();
         } else {
           setTimeout(async () => {
@@ -771,10 +809,13 @@ function App() {
     if (activeTab !== "proxies") {
       return;
     }
-    refreshPings();
-    const interval = setInterval(() => refreshPings(), 30000);
+    const domain = selectedConfigDomain.trim() || "local";
+    if (!pingsLoadedRef.current[domain]) {
+      refreshPings(domain);
+    }
+    const interval = setInterval(() => refreshPings(domain), 60000);
     return () => clearInterval(interval);
-  }, [activeTab, refreshPings]);
+  }, [activeTab, refreshPings, selectedConfigDomain]);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -857,6 +898,7 @@ function App() {
         return;
       }
       setSelectedConfigDomain(resolveProfileDomain(profile));
+      pingsLoadedRef.current = {};
       setSelectedProxyMode("manual");
       setSelectedProfileId(profile.id);
       if (focusProxies) {
@@ -867,6 +909,7 @@ function App() {
 
     const normalized = source.domain.trim() || "local";
     setSelectedConfigDomain(normalized);
+    pingsLoadedRef.current = {};
     const currentProfile = profiles.find(
       (profile) => profile.id === selectedProfileId
     );
