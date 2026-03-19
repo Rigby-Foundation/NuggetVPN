@@ -5,6 +5,7 @@ export interface Profile {
     protocol: string;
     config_link: string;
     source_domain?: string;
+    subscription_url?: string;
     total_up?: number;
     total_down?: number;
 }

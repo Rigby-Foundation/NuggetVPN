@@ -280,6 +280,28 @@ function App() {
     }
   }, []);
 
+  const refreshSubscriptionsOnStartup = useCallback(async () => {
+    try {
+      const summary = await invoke<{
+        refreshed: number;
+        failed: number;
+        skipped: number;
+      }>(
+        "refresh_subscriptions_on_startup"
+      );
+      await loadProfiles();
+      if (summary.refreshed > 0 || summary.failed > 0 || summary.skipped > 0) {
+        setLogs((prev) => [
+          ...prev,
+          `Subscriptions startup refresh: refreshed=${summary.refreshed}, failed=${summary.failed}, skipped=${summary.skipped}`,
+        ]);
+      }
+    } catch (e) {
+      console.error("Failed to refresh subscriptions on startup", e);
+      setLogs((prev) => [...prev, `Subscription refresh failed: ${e}`]);
+    }
+  }, [loadProfiles]);
+
   const refreshPings = useCallback(
     async (domain?: string) => {
       const targetDomain = (domain || selectedConfigDomain).trim() || "local";
@@ -588,13 +610,8 @@ function App() {
             ? candidateOrder
             : [profileIdToUse]
           : [profileIdToUse];
-        const baselineIp = autoMode ? (await fetchIpInfo(5000))?.ip || null : null;
-        const wait = (ms: number) =>
-          new Promise<void>((resolve) => setTimeout(resolve, ms));
 
         let connectedProfileId = "";
-        let connectedIpInfo: IpInfo | null = null;
-        let lastAutoError = "";
 
         for (const candidateId of attemptOrder) {
           try {
@@ -605,53 +622,23 @@ function App() {
             if (!autoMode) {
               throw error;
             }
-            lastAutoError = String(error);
-            continue;
-          }
-
-          if (!autoMode) {
-            connectedProfileId = candidateId;
-            break;
-          }
-
-          await wait(2500);
-          const probe = await fetchIpInfo(7000);
-          const unchangedIp = baselineIp && probe?.ip === baselineIp;
-          if (!probe || unchangedIp) {
-            lastAutoError = !probe
-              ? "IP probe failed"
-              : "IP did not change after connect";
-            try {
-              await invoke("stop_vpn");
-            } catch (stopError) {
-              console.error("Failed to stop VPN during auto fallback", stopError);
-            }
             continue;
           }
 
           connectedProfileId = candidateId;
-          connectedIpInfo = probe;
           break;
         }
 
         if (!connectedProfileId) {
-          throw new Error(
-            `No working profile found in auto mode${lastAutoError ? ` (${lastAutoError})` : ""
-            }. Switch to Manual and choose another node.`
-          );
+          throw new Error("No working profile found.");
         }
 
         setIsConnected(true);
         setStatus("CONNECTED");
-        if (connectedIpInfo) {
-          setIpInfo(connectedIpInfo);
+        setTimeout(async () => {
+          await checkIp();
           startIpCheck();
-        } else {
-          setTimeout(async () => {
-            await checkIp();
-            startIpCheck();
-          }, 3000);
-        }
+        }, 3000);
         startStats(connectedProfileId);
       } else {
         setStatus("Stopping...");
@@ -674,7 +661,9 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
+      setLogs(["System initialized.", "Waiting for commands..."]);
       await loadProfiles();
+      await refreshSubscriptionsOnStartup();
 
       try {
         const platformName = await invoke<string>("get_current_platform");
@@ -726,7 +715,6 @@ function App() {
         console.error("Failed to load settings", e);
       }
 
-      setLogs(["System initialized.", "Waiting for commands..."]);
     };
 
     init();
@@ -744,7 +732,7 @@ function App() {
       unlisten.then((fn) => fn());
       stopStats();
     };
-  }, [loadProfiles, saveSettings, stopStats, logLimit]);
+  }, [loadProfiles, refreshSubscriptionsOnStartup, saveSettings, stopStats, logLimit]);
 
   useEffect(() => {
     if (activeTab !== "proxies") {

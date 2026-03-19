@@ -11,6 +11,8 @@ pub struct Profile {
     pub config_link: String,
     #[serde(default)]
     pub source_domain: String,
+    #[serde(default)]
+    pub subscription_url: String,
     pub total_up: Option<u64>,
     pub total_down: Option<u64>,
 }

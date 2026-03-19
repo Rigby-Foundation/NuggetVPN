@@ -138,6 +138,7 @@ pub fn run() {
             commands::save_settings,
             commands::update_profile_usage,
             auth::import_subscription,
+            auth::refresh_subscriptions_on_startup,
             auth::login_user,
             auth::register_user,
             auth::push_profiles_to_server,

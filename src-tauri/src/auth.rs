@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use serde_json::json;
 use tauri::State;
 use url::Url;
@@ -21,6 +22,51 @@ struct ServerProfile {
     hash: String,
     encryption_type: String,
     updated_at: String,
+}
+
+#[derive(Serialize)]
+pub struct SubscriptionRefreshSummary {
+    pub refreshed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+}
+
+fn split_subscription_payload(payload: &str) -> Vec<String> {
+    payload
+        .lines()
+        .filter_map(|line| {
+            let link = line.trim();
+            if link.is_empty() || link.starts_with('#') {
+                return None;
+            }
+            if link.contains(".time:") || link.contains("fake_ip") {
+                return None;
+            }
+            if link.contains("@127.0.0.1:")
+                || link.contains("00000000-0000-0000-0000-000000000000")
+            {
+                return None;
+            }
+            Some(link.replace("&amp;", "&"))
+        })
+        .collect()
+}
+
+fn decode_subscription_body(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let clean_for_b64 = trimmed.replace('\n', "").replace('\r', "");
+    general_purpose::STANDARD
+        .decode(&clean_for_b64)
+        .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&clean_for_b64))
+        .or_else(|_| general_purpose::URL_SAFE.decode(&clean_for_b64))
+        .or_else(|_| general_purpose::URL_SAFE_NO_PAD.decode(&clean_for_b64))
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_else(|| trimmed.to_string())
+}
+
+fn load_subscription_links(raw: &str) -> Vec<String> {
+    split_subscription_payload(&decode_subscription_body(raw))
 }
 
 #[tauri::command]
@@ -177,56 +223,25 @@ pub async fn import_subscription(
     let client = reqwest::Client::new();
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let text = resp.text().await.map_err(|e| e.to_string())?;
-    let trimmed = text.trim();
-
-    // Strip newlines for base64 decoding (base64 can be line-wrapped)
-    let clean_for_b64 = trimmed.replace('\n', "").replace('\r', "");
-
-    // Try base64 decode; if it fails, the content is raw text — keep newlines intact
-    let decoded_string = general_purpose::STANDARD
-        .decode(&clean_for_b64)
-        .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&clean_for_b64))
-        .or_else(|_| general_purpose::URL_SAFE.decode(&clean_for_b64))
-        .or_else(|_| general_purpose::URL_SAFE_NO_PAD.decode(&clean_for_b64))
-        .ok()
-        .and_then(|bytes| String::from_utf8(bytes).ok())
-        .unwrap_or_else(|| trimmed.to_string());
+    let links = load_subscription_links(&text);
 
     let mut profiles = state.profiles.lock().unwrap();
     let mut added = false;
 
-    for line in decoded_string.lines() {
-        let link = line.trim();
-        if link.is_empty() || link.starts_with('#') {
-            continue;
-        }
-        
-        // Skip Hiddify info/fake profiles (contain .time domain or fake_ip)
-        if link.contains(".time:") || link.contains("fake_ip") {
-            continue;
-        }
-
-        // Skip dummy/separator entries used by subscription providers
-        if link.contains("@127.0.0.1:") || link.contains("00000000-0000-0000-0000-000000000000") {
-            continue;
-        }
-
-        // Replace HTML-encoded ampersands from subscription providers
-        let link = link.replace("&amp;", "&");
-        let link = link.as_str();
-
-        let protocol = detect_protocol(link);
+    for link in links {
+        let protocol = detect_protocol(&link);
         if protocol == "unknown" {
             continue;
         }
 
         profiles.push(Profile {
             id: uuid::Uuid::new_v4().to_string(),
-            name: extract_name_from_link(link),
+            name: extract_name_from_link(&link),
             server: "Auto".to_string(),
             protocol: protocol.to_string(),
             config_link: link.to_string(),
             source_domain: source_domain.clone(),
+            subscription_url: url.clone(),
             total_up: Some(0),
             total_down: Some(0),
         });
@@ -239,4 +254,131 @@ pub async fn import_subscription(
     } else {
         Err("No profiles found".to_string())
     }
+}
+
+#[tauri::command]
+pub async fn refresh_subscriptions_on_startup(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SubscriptionRefreshSummary, String> {
+    let snapshot = { state.profiles.lock().unwrap().clone() };
+
+    let mut source_to_url: HashMap<String, String> = HashMap::new();
+    let mut legacy_urls: HashMap<String, String> = HashMap::new();
+    for profile in snapshot {
+        let source = profile.source_domain.trim();
+        if source.is_empty() || source == "local" {
+            continue;
+        }
+        let sub_url = profile.subscription_url.trim();
+        if sub_url.is_empty() {
+            if let Ok(parsed) = Url::parse(&profile.config_link) {
+                if parsed.scheme() == "http" || parsed.scheme() == "https" {
+                    legacy_urls
+                        .entry(source.to_string())
+                        .or_insert_with(|| profile.config_link.trim().to_string());
+                }
+            }
+            continue;
+        }
+        source_to_url
+            .entry(source.to_string())
+            .or_insert_with(|| sub_url.to_string());
+    }
+
+    for (source, sub_url) in legacy_urls {
+        source_to_url.entry(source).or_insert(sub_url);
+    }
+
+    if source_to_url.is_empty() {
+        return Ok(SubscriptionRefreshSummary {
+            refreshed: 0,
+            failed: 0,
+            skipped: 0,
+        });
+    }
+
+    let client = reqwest::Client::new();
+    let mut refreshed = 0usize;
+    let mut failed = 0usize;
+    let mut skipped = 0usize;
+
+    for (source_domain, sub_url) in source_to_url {
+        let parsed_url = match Url::parse(&sub_url) {
+            Ok(url) => url,
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
+        };
+        let host = match parsed_url.host_str() {
+            Some(host) if !host.is_empty() => host,
+            _ => {
+                skipped += 1;
+                continue;
+            }
+        };
+        if host != source_domain {
+            skipped += 1;
+            continue;
+        }
+
+        let body = match client.get(&sub_url).send().await {
+            Ok(response) => match response.text().await {
+                Ok(text) => text,
+                Err(_) => {
+                    failed += 1;
+                    continue;
+                }
+            },
+            Err(_) => {
+                failed += 1;
+                continue;
+            }
+        };
+
+        let links = load_subscription_links(&body);
+        if links.is_empty() {
+            failed += 1;
+            continue;
+        }
+
+        let mut fresh_profiles = Vec::new();
+        for link in links {
+            let protocol = detect_protocol(&link);
+            if protocol == "unknown" {
+                continue;
+            }
+            fresh_profiles.push(Profile {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: extract_name_from_link(&link),
+                server: "Auto".to_string(),
+                protocol: protocol.to_string(),
+                config_link: link,
+                source_domain: source_domain.clone(),
+                subscription_url: sub_url.clone(),
+                total_up: Some(0),
+                total_down: Some(0),
+            });
+        }
+
+        if fresh_profiles.is_empty() {
+            failed += 1;
+            continue;
+        }
+
+        {
+            let mut profiles = state.profiles.lock().unwrap();
+            profiles.retain(|profile| profile.source_domain.trim() != source_domain);
+            profiles.extend(fresh_profiles);
+            save_profiles_to_disk(&app, &profiles);
+        }
+        refreshed += 1;
+    }
+
+    Ok(SubscriptionRefreshSummary {
+        refreshed,
+        failed,
+        skipped,
+    })
 }

@@ -1,9 +1,10 @@
 use serde::Serialize;
 use std::collections::HashSet;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, ToSocketAddrs};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -29,15 +30,68 @@ fn normalize_source_domain(profile: &Profile) -> String {
     }
 }
 
-fn measure_proxy_ping(host: &str, port: u16, timeout: Duration) -> Option<u64> {
-    let start = Instant::now();
-    let addrs = (host, port).to_socket_addrs().ok()?;
+fn resolve_ping_target(host: &str) -> Option<String> {
+    let target = host.trim();
+    if target.is_empty() {
+        return None;
+    }
+
+    if let Ok(ip) = target.parse::<IpAddr>() {
+        return Some(ip.to_string());
+    }
+
+    let addrs = (target, 0).to_socket_addrs().ok()?;
+    let mut fallback_ip: Option<String> = None;
     for addr in addrs {
-        if TcpStream::connect_timeout(&addr, timeout).is_ok() {
-            return Some(start.elapsed().as_millis() as u64);
+        let ip = addr.ip();
+        if ip.is_ipv4() {
+            return Some(ip.to_string());
+        }
+        if fallback_ip.is_none() {
+            fallback_ip = Some(ip.to_string());
         }
     }
-    None
+    fallback_ip
+}
+
+fn measure_proxy_ping(host: &str, timeout_ms: u64) -> Option<u64> {
+    let target = resolve_ping_target(host)?;
+
+    let mut command = Command::new("ping");
+    #[cfg(target_os = "windows")]
+    {
+        command
+            .arg("-n")
+            .arg("1")
+            .arg("-w")
+            .arg(timeout_ms.to_string())
+            .arg(&target);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        command
+            .arg("-c")
+            .arg("1")
+            .arg("-W")
+            .arg(timeout_ms.to_string())
+            .arg(&target);
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let timeout_seconds = std::cmp::max(1, (timeout_ms / 1000) as u64);
+        command
+            .arg("-c")
+            .arg("1")
+            .arg("-W")
+            .arg(timeout_seconds.to_string())
+            .arg(&target);
+    }
+
+    let start = Instant::now();
+    match command.status() {
+        Ok(status) if status.success() => Some(start.elapsed().as_millis() as u64),
+        _ => None,
+    }
 }
 
 #[tauri::command]
@@ -67,6 +121,7 @@ pub fn add_profile(
         protocol: protocol.to_string(),
         config_link: link,
         source_domain: "local".to_string(),
+        subscription_url: String::new(),
         total_up: Some(0),
         total_down: Some(0),
     });
@@ -132,7 +187,6 @@ pub fn ping_profiles(
 ) -> Result<Vec<ProfilePing>, String> {
     let profiles = state.profiles.lock().unwrap().clone();
     let settings = state.settings.lock().unwrap().clone();
-    let timeout = Duration::from_millis(PING_TIMEOUT_MS);
 
     let mut target_domain = source_domain.unwrap_or_default();
     target_domain = target_domain.trim().to_string();
@@ -168,21 +222,14 @@ pub fn ping_profiles(
             .get(&serde_yaml::Value::String("server".to_string()))
             .and_then(|value| value.as_str())
             .map(str::to_string);
-        let port = outbound
-            .get(&serde_yaml::Value::String("port".to_string()))
-            .and_then(|value| value.as_u64())
-            .and_then(|value| u16::try_from(value).ok());
 
-        if let (Some(server), Some(port)) = (server, port) {
-            if server.trim().is_empty() {
-                results.push(ProfilePing {
-                    id: profile.id.clone(),
-                    ping_ms: None,
-                });
+        if let Some(server) = server {
+            if !server.trim().is_empty() {
+                targets.push((profile.id.clone(), server));
                 continue;
             }
-            targets.push((profile.id.clone(), server, port));
-        } else {
+        }
+        {
             results.push(ProfilePing {
                 id: profile.id.clone(),
                 ping_ms: None,
@@ -196,8 +243,8 @@ pub fn ping_profiles(
 
     let workers = std::cmp::min(PING_WORKER_LIMIT, targets.len());
     if workers <= 1 {
-        for (profile_id, server, port) in targets {
-            let ping_ms = measure_proxy_ping(&server, port, timeout);
+        for (profile_id, server) in targets {
+            let ping_ms = measure_proxy_ping(&server, PING_TIMEOUT_MS);
             results.push(ProfilePing {
                 id: profile_id,
                 ping_ms,
@@ -220,11 +267,11 @@ pub fn ping_profiles(
                     locked.pop()
                 };
 
-                let Some((profile_id, server, port)) = task else {
+                let Some((profile_id, server)) = task else {
                     break;
                 };
 
-                let ping_ms = measure_proxy_ping(&server, port, timeout);
+                let ping_ms = measure_proxy_ping(&server, PING_TIMEOUT_MS);
                 if let Ok(mut locked) = collected.lock() {
                     locked.push(ProfilePing {
                         id: profile_id,
