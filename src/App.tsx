@@ -181,17 +181,37 @@ function App() {
     }
   }, []);
 
+  const fetchVpnIpInfo = useCallback(
+    async (timeoutMs = 9000): Promise<IpInfo | null> => {
+      try {
+        const ip = await invoke<string>("probe_vpn_egress", { timeoutMs });
+        const trimmedIp = ip.trim();
+        if (!trimmedIp) {
+          return null;
+        }
+        return {
+          ip: trimmedIp,
+          region: "via VPN",
+        };
+      } catch (e) {
+        console.error("VPN egress probe failed", e);
+        return null;
+      }
+    },
+    []
+  );
+
   const checkIp = useCallback(async () => {
     setIsCheckingIp(true);
     try {
-      const info = await fetchIpInfo();
+      const info = isConnected ? await fetchVpnIpInfo() : await fetchIpInfo();
       if (info) {
         setIpInfo(info);
       }
     } finally {
       setIsCheckingIp(false);
     }
-  }, [fetchIpInfo]);
+  }, [fetchIpInfo, fetchVpnIpInfo, isConnected]);
 
   const startIpCheck = useCallback(() => {
     if (ipCheckIntervalRef.current) {
@@ -588,7 +608,6 @@ function App() {
             ? candidateOrder
             : [profileIdToUse]
           : [profileIdToUse];
-        const baselineIp = autoMode ? (await fetchIpInfo(5000))?.ip || null : null;
         const wait = (ms: number) =>
           new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -609,22 +628,19 @@ function App() {
             continue;
           }
 
-          if (!autoMode) {
-            connectedProfileId = candidateId;
-            break;
-          }
-
           await wait(2500);
-          const probe = await fetchIpInfo(7000);
-          const unchangedIp = baselineIp && probe?.ip === baselineIp;
-          if (!probe || unchangedIp) {
-            lastAutoError = !probe
-              ? "IP probe failed"
-              : "IP did not change after connect";
+          const probe = await fetchVpnIpInfo(9000);
+          if (!probe) {
+            lastAutoError = "VPN egress probe failed";
             try {
               await invoke("stop_vpn");
             } catch (stopError) {
               console.error("Failed to stop VPN during auto fallback", stopError);
+            }
+            if (!autoMode) {
+              throw new Error(
+                "Selected proxy did not pass traffic through VPN. Choose another node or disable proxy chain."
+              );
             }
             continue;
           }
@@ -648,7 +664,12 @@ function App() {
           startIpCheck();
         } else {
           setTimeout(async () => {
-            await checkIp();
+            const vpnInfo = await fetchVpnIpInfo(9000);
+            if (vpnInfo) {
+              setIpInfo(vpnInfo);
+            } else {
+              await checkIp();
+            }
             startIpCheck();
           }, 3000);
         }

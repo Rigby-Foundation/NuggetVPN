@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::collections::HashSet;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -38,6 +38,77 @@ fn measure_proxy_ping(host: &str, port: u16, timeout: Duration) -> Option<u64> {
         }
     }
     None
+}
+
+fn parse_ip_from_body(body: &str) -> Option<String> {
+    let trimmed = body.trim();
+    if let Ok(ip) = trimmed.parse::<IpAddr>() {
+        return Some(ip.to_string());
+    }
+
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if let Some(ip) = json.get("ip").and_then(|value| value.as_str()) {
+            if let Ok(parsed) = ip.trim().parse::<IpAddr>() {
+                return Some(parsed.to_string());
+            }
+        }
+    }
+
+    for token in trimmed.split(|c: char| !(c.is_ascii_hexdigit() || c == '.' || c == ':')) {
+        if token.is_empty() {
+            continue;
+        }
+        if let Ok(ip) = token.parse::<IpAddr>() {
+            return Some(ip.to_string());
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub async fn probe_vpn_egress(timeout_ms: Option<u64>) -> Result<String, String> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(9000).clamp(1000, 20000));
+    let proxy = reqwest::Proxy::all("http://127.0.0.1:7890")
+        .map_err(|e| format!("Failed to configure local proxy: {}", e))?;
+    let client = reqwest::Client::builder()
+        .timeout(timeout)
+        .proxy(proxy)
+        .build()
+        .map_err(|e| format!("Failed to create probe client: {}", e))?;
+
+    let endpoints = [
+        "https://api.ipify.org?format=json",
+        "https://ipinfo.io/ip",
+        "https://ifconfig.me/ip",
+    ];
+
+    let mut errors = Vec::new();
+    for endpoint in endpoints {
+        match client.get(endpoint).send().await {
+            Ok(response) => {
+                if !response.status().is_success() {
+                    errors.push(format!("{} -> HTTP {}", endpoint, response.status()));
+                    continue;
+                }
+                match response.text().await {
+                    Ok(body) => {
+                        if let Some(ip) = parse_ip_from_body(&body) {
+                            return Ok(ip);
+                        }
+                        errors.push(format!("{} -> invalid IP payload", endpoint));
+                    }
+                    Err(e) => {
+                        errors.push(format!("{} -> body error: {}", endpoint, e));
+                    }
+                }
+            }
+            Err(e) => {
+                errors.push(format!("{} -> {}", endpoint, e));
+            }
+        }
+    }
+
+    Err(format!("VPN egress probe failed: {}", errors.join("; ")))
 }
 
 #[tauri::command]
