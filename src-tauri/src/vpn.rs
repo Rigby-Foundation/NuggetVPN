@@ -268,7 +268,6 @@ pub async fn start_vpn(
 
         // Build rules
         let mut rules: Vec<YValue> = Vec::new();
-        rules.push(ystr(&format!("DST-PORT,8291,{}", winbox_target)));
 
         if split_enabled {
             if include_apps {
@@ -301,10 +300,13 @@ pub async fn start_vpn(
                     settings.routing_domains.len(),
                 ));
             }
+            // Keep explicit Winbox routing in split mode only.
+            rules.push(ystr(&format!("DST-PORT,8291,{}", winbox_target)));
             // Default to DIRECT in split mode
             rules.push(ystr("MATCH,DIRECT"));
         } else {
-            // Route all through proxy
+            // Route all through proxy in tunnel mode.
+            // Keep rule count minimal to avoid surprising behavior for unmanaged traffic.
             rules.push(ystr("MATCH,proxy"));
         }
 

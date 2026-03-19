@@ -49,7 +49,19 @@ fn decode_percent_escaped(input: &str) -> Option<String> {
 }
 
 pub fn decode_profile_name(input: &str) -> String {
-    decode_percent_escaped(input).unwrap_or_else(|| input.to_string())
+    // Some providers double-encode names (e.g. %25F0... -> %F0... -> emoji).
+    // Decode in small bounded passes to recover readable Unicode labels.
+    let mut decoded = input.to_string();
+    for _ in 0..4 {
+        let Some(next) = decode_percent_escaped(&decoded) else {
+            break;
+        };
+        if next == decoded {
+            break;
+        }
+        decoded = next;
+    }
+    decoded
 }
 
 /// Try to parse input as a Clash YAML config or a single proxy entry.
