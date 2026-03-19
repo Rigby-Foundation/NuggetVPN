@@ -76,7 +76,6 @@ function App() {
   const [profilePings, setProfilePings] = useState<Record<string, number | null>>(
     {}
   );
-  const pingsLoadedRef = useRef<Record<string, boolean>>({});
 
   const [, setStatus] = useState("Ready");
   const [isConnected, setIsConnected] = useState(false);
@@ -182,43 +181,17 @@ function App() {
     }
   }, []);
 
-  const fetchVpnIpInfo = useCallback(
-    async (timeoutMs = 9000): Promise<IpInfo | null> => {
-      try {
-        const ip = await invoke<string>("probe_vpn_egress", { timeoutMs });
-        const trimmedIp = ip.trim();
-        if (!trimmedIp) {
-          return null;
-        }
-        if (trimmedIp === "unknown") {
-          return {
-            ip: "Connected",
-            region: "via VPN",
-          };
-        }
-        return {
-          ip: trimmedIp,
-          region: "via VPN",
-        };
-      } catch (e) {
-        console.error("VPN egress probe failed", e);
-        return null;
-      }
-    },
-    []
-  );
-
   const checkIp = useCallback(async () => {
     setIsCheckingIp(true);
     try {
-      const info = isConnected ? await fetchVpnIpInfo() : await fetchIpInfo();
+      const info = await fetchIpInfo();
       if (info) {
         setIpInfo(info);
       }
     } finally {
       setIsCheckingIp(false);
     }
-  }, [fetchIpInfo, fetchVpnIpInfo, isConnected]);
+  }, [fetchIpInfo]);
 
   const startIpCheck = useCallback(() => {
     if (ipCheckIntervalRef.current) {
@@ -235,21 +208,6 @@ function App() {
       clearInterval(ipCheckIntervalRef.current);
       ipCheckIntervalRef.current = null;
     }
-  }, []);
-
-  useEffect(() => {
-    const syncRunningState = async () => {
-      try {
-        const running = await invoke<boolean>("is_vpn_running");
-        setIsConnected(running);
-        if (running) {
-          setStatus("CONNECTED");
-        }
-      } catch (_e) {
-        // ignore startup sync errors
-      }
-    };
-    syncRunningState();
   }, []);
 
   useEffect(() => {
@@ -271,7 +229,6 @@ function App() {
       if (loaded.length === 0) {
         setSelectedProfileId("");
         setSelectedConfigDomain("local");
-        pingsLoadedRef.current = {};
         return;
       }
 
@@ -287,7 +244,6 @@ function App() {
       const nextDomain = domains.includes(currentDomain) ? currentDomain : domains[0];
       if (currentDomain !== nextDomain) {
         setSelectedConfigDomain(nextDomain);
-        pingsLoadedRef.current = {};
       }
 
       const currentProfileId = selectedProfileIdRef.current;
@@ -346,7 +302,6 @@ function App() {
         results.forEach((result) => {
           next[result.id] = result.ping_ms ?? null;
         });
-        pingsLoadedRef.current[targetDomain] = true;
         setProfilePings(next);
         return next;
       } catch (e) {
@@ -355,7 +310,6 @@ function App() {
         domainProfiles.forEach((profile) => {
           fallback[profile.id] = null;
         });
-        pingsLoadedRef.current[targetDomain] = true;
         setProfilePings(fallback);
         return fallback;
       }
@@ -386,7 +340,6 @@ function App() {
           const parsed = new URL(url);
           const domain = parsed.host || "local";
           setSelectedConfigDomain(domain);
-          pingsLoadedRef.current = {};
           setSelectedProxyMode("auto");
           setSelectedProfileId("");
           setActiveTab("proxies");
@@ -635,12 +588,12 @@ function App() {
             ? candidateOrder
             : [profileIdToUse]
           : [profileIdToUse];
+        const baselineIp = autoMode ? (await fetchIpInfo(5000))?.ip || null : null;
         const wait = (ms: number) =>
           new Promise<void>((resolve) => setTimeout(resolve, ms));
 
         let connectedProfileId = "";
         let connectedIpInfo: IpInfo | null = null;
-        let connectedButUnknownIp = false;
         let lastAutoError = "";
 
         for (const candidateId of attemptOrder) {
@@ -656,29 +609,28 @@ function App() {
             continue;
           }
 
+          if (!autoMode) {
+            connectedProfileId = candidateId;
+            break;
+          }
+
           await wait(2500);
-          const probe = await fetchVpnIpInfo(9000);
-          if (!probe) {
-            lastAutoError = "VPN egress probe failed";
+          const probe = await fetchIpInfo(7000);
+          const unchangedIp = baselineIp && probe?.ip === baselineIp;
+          if (!probe || unchangedIp) {
+            lastAutoError = !probe
+              ? "IP probe failed"
+              : "IP did not change after connect";
             try {
               await invoke("stop_vpn");
             } catch (stopError) {
               console.error("Failed to stop VPN during auto fallback", stopError);
             }
-            if (!autoMode) {
-              throw new Error(
-                "Selected proxy did not pass traffic through VPN. Choose another node or disable proxy chain."
-              );
-            }
             continue;
           }
 
           connectedProfileId = candidateId;
-          if (probe.ip === "Connected") {
-            connectedButUnknownIp = true;
-          } else {
-            connectedIpInfo = probe;
-          }
+          connectedIpInfo = probe;
           break;
         }
 
@@ -694,20 +646,9 @@ function App() {
         if (connectedIpInfo) {
           setIpInfo(connectedIpInfo);
           startIpCheck();
-        } else if (connectedButUnknownIp) {
-          setIpInfo({
-            ip: "Connected",
-            region: "via VPN",
-          });
-          startIpCheck();
         } else {
           setTimeout(async () => {
-            const vpnInfo = await fetchVpnIpInfo(9000);
-            if (vpnInfo) {
-              setIpInfo(vpnInfo);
-            } else {
-              await checkIp();
-            }
+            await checkIp();
             startIpCheck();
           }, 3000);
         }
@@ -809,13 +750,10 @@ function App() {
     if (activeTab !== "proxies") {
       return;
     }
-    const domain = selectedConfigDomain.trim() || "local";
-    if (!pingsLoadedRef.current[domain]) {
-      refreshPings(domain);
-    }
-    const interval = setInterval(() => refreshPings(domain), 60000);
+    refreshPings();
+    const interval = setInterval(() => refreshPings(), 30000);
     return () => clearInterval(interval);
-  }, [activeTab, refreshPings, selectedConfigDomain]);
+  }, [activeTab, refreshPings]);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -898,7 +836,6 @@ function App() {
         return;
       }
       setSelectedConfigDomain(resolveProfileDomain(profile));
-      pingsLoadedRef.current = {};
       setSelectedProxyMode("manual");
       setSelectedProfileId(profile.id);
       if (focusProxies) {
@@ -909,7 +846,6 @@ function App() {
 
     const normalized = source.domain.trim() || "local";
     setSelectedConfigDomain(normalized);
-    pingsLoadedRef.current = {};
     const currentProfile = profiles.find(
       (profile) => profile.id === selectedProfileId
     );
