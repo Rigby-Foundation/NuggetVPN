@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#86b1f999996cd4f012bffd96e51c7005bcb3968d"
 dependencies = [
  "aead",
  "aes",
@@ -1535,7 +1535,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1875,7 +1875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3107,7 +3107,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "tokio",
  "tower-service",
  "tracing",
@@ -3140,7 +3140,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -3349,7 +3349,6 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hmac",
- "num-bigint-dig",
  "p256",
  "p384",
  "p521",
@@ -4323,7 +4322,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4372,7 +4371,6 @@ dependencies = [
  "num-iter",
  "num-traits",
  "rand 0.8.5",
- "serde",
  "smallvec",
  "zeroize",
 ]
@@ -5459,7 +5457,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools",
  "log",
  "multimap",
@@ -5562,7 +5560,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -5600,9 +5598,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6021,7 +6019,6 @@ dependencies = [
  "rand_core 0.10.0",
  "sha2 0.11.0-rc.5",
  "signature 3.0.0-rc.10",
- "spki 0.8.0-rc.4",
  "zeroize",
 ]
 
@@ -6084,12 +6081,10 @@ dependencies = [
  "p521",
  "pageant",
  "pbkdf2",
- "pkcs1 0.8.0-rc.4",
  "pkcs5",
  "pkcs8 0.10.2",
  "rand 0.8.5",
  "rand_core 0.6.4",
- "rsa 0.10.0-rc.17",
  "russh-cryptovec",
  "russh-util",
  "sec1",
@@ -6155,7 +6150,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7585,7 +7580,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8608,7 +8603,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#86b1f999996cd4f012bffd96e51c7005bcb3968d"
 dependencies = [
  "async-trait",
  "futures",
@@ -8627,7 +8622,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#f541ea4a0761a2ca673637c05b6196bd7a845ee7"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#86b1f999996cd4f012bffd96e51c7005bcb3968d"
 dependencies = [
  "bytes",
  "etherparse",
@@ -8861,7 +8856,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
