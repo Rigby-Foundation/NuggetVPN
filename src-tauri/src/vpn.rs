@@ -217,7 +217,8 @@ pub async fn start_vpn(
         let mut exit_proxy = parse_outbound(&current_profile.config_link, &settings)?;
         exit_proxy.insert(ystr("name"), ystr("proxy"));
         let mut winbox_target = "proxy".to_string();
-        let mut winbox_proxy: Option<serde_yaml::Mapping> = None;
+        let mut speedtest_target = "proxy".to_string();
+        let mut compat_proxy: Option<serde_yaml::Mapping> = None;
 
         let mut proxies: Vec<YValue> = Vec::new();
         let mut proxy_names: Vec<YValue> = vec![ystr("proxy")];
@@ -253,17 +254,18 @@ pub async fn start_vpn(
         if matches!(exit_proxy.get(&ystr("type")), Some(YValue::String(proxy_type)) if proxy_type == "vless")
             && matches!(exit_proxy.get(&ystr("flow")), Some(YValue::String(flow)) if flow == "xtls-rprx-vision")
         {
-            let mut winbox_proxy_map = exit_proxy.clone();
-            winbox_proxy_map.remove(&ystr("flow"));
-            winbox_proxy_map.insert(ystr("name"), ystr("proxy-winbox"));
-            winbox_target = "proxy-winbox".to_string();
-            winbox_proxy = Some(winbox_proxy_map);
+            let mut compat_proxy_map = exit_proxy.clone();
+            compat_proxy_map.remove(&ystr("flow"));
+            compat_proxy_map.insert(ystr("name"), ystr("proxy-compat"));
+            winbox_target = "proxy-compat".to_string();
+            speedtest_target = "proxy-compat".to_string();
+            compat_proxy = Some(compat_proxy_map);
         }
 
         // Insert exit proxy at the beginning
         proxies.insert(0, YValue::Mapping(exit_proxy));
-        if let Some(winbox_proxy_map) = winbox_proxy {
-            proxies.insert(1, YValue::Mapping(winbox_proxy_map));
+        if let Some(compat_proxy_map) = compat_proxy {
+            proxies.insert(1, YValue::Mapping(compat_proxy_map));
         }
 
         // Build rules
@@ -300,11 +302,49 @@ pub async fn start_vpn(
                     settings.routing_domains.len(),
                 ));
             }
+            if speedtest_target != "proxy" {
+                rules.push(ystr(&format!(
+                    "DOMAIN-SUFFIX,speedtest.net,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-SUFFIX,ooklaserver.net,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-KEYWORD,speedtest,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-KEYWORD,ookla,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!("DST-PORT,8080,{}", speedtest_target)));
+            }
             // Keep explicit Winbox routing in split mode only.
             rules.push(ystr(&format!("DST-PORT,8291,{}", winbox_target)));
             // Default to DIRECT in split mode
             rules.push(ystr("MATCH,DIRECT"));
         } else {
+            if speedtest_target != "proxy" {
+                rules.push(ystr(&format!(
+                    "DOMAIN-SUFFIX,speedtest.net,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-SUFFIX,ooklaserver.net,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-KEYWORD,speedtest,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!(
+                    "DOMAIN-KEYWORD,ookla,{}",
+                    speedtest_target
+                )));
+                rules.push(ystr(&format!("DST-PORT,8080,{}", speedtest_target)));
+            }
             // Route all through proxy in tunnel mode.
             // Keep rule count minimal to avoid surprising behavior for unmanaged traffic.
             rules.push(ystr("MATCH,proxy"));
