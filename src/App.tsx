@@ -193,6 +193,35 @@ function App() {
     }
   }, [fetchIpInfo]);
 
+  const probeVpnTraffic = useCallback(async (timeoutMs = 4500) => {
+    const endpoints = [
+      "https://www.gstatic.com/generate_204",
+      "https://cp.cloudflare.com/generate_204",
+      "https://api.ipify.org",
+    ];
+
+    const probe = async (url: string) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        return response.status > 0;
+      } catch (_error) {
+        return false;
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    const results = await Promise.allSettled(endpoints.map((url) => probe(url)));
+    return results.some(
+      (result) => result.status === "fulfilled" && result.value === true
+    );
+  }, []);
+
   const startIpCheck = useCallback(() => {
     if (ipCheckIntervalRef.current) {
       clearInterval(ipCheckIntervalRef.current);
@@ -632,8 +661,11 @@ function App() {
             ? candidateOrder
             : [profileIdToUse]
           : [profileIdToUse];
+        const wait = (ms: number) =>
+          new Promise<void>((resolve) => setTimeout(resolve, ms));
 
         let connectedProfileId = "";
+        let lastAutoError = "";
 
         for (const candidateId of attemptOrder) {
           try {
@@ -644,7 +676,22 @@ function App() {
             if (!autoMode) {
               throw error;
             }
+            lastAutoError = String(error);
             continue;
+          }
+
+          if (autoMode) {
+            await wait(1800);
+            const egressOk = await probeVpnTraffic(4500);
+            if (!egressOk) {
+              lastAutoError = "egress probe failed";
+              try {
+                await invoke("stop_vpn");
+              } catch (stopError) {
+                console.error("Failed to stop VPN during auto fallback", stopError);
+              }
+              continue;
+            }
           }
 
           connectedProfileId = candidateId;
@@ -652,7 +699,9 @@ function App() {
         }
 
         if (!connectedProfileId) {
-          throw new Error("No working profile found.");
+          throw new Error(
+            `No working profile found${lastAutoError ? ` (${lastAutoError})` : ""}.`
+          );
         }
 
         setIsConnected(true);
