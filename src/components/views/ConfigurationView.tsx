@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,8 +10,10 @@ interface ConfigurationViewProps {
   sources: ConfigSource[];
   selectedSource: string;
   selectedProfileId: string;
+  refreshingSourceDomain: string;
   onSelectSource: (source: ConfigSource) => void;
   onDeleteSource: (source: ConfigSource) => void;
+  onRefreshSource: (source: ConfigSource) => void;
   onAdd: () => void;
 }
 
@@ -19,8 +21,10 @@ function ConfigurationView({
   sources,
   selectedSource,
   selectedProfileId,
+  refreshingSourceDomain,
   onSelectSource,
   onDeleteSource,
+  onRefreshSource,
   onAdd,
 }: ConfigurationViewProps) {
   const isSelected = (source: ConfigSource) =>
@@ -40,7 +44,15 @@ function ConfigurationView({
               </div>
             )}
 
-            {sources.map((source) => (
+            {sources.map((source) => {
+              const sourceDomain =
+                source.kind === "subscription"
+                  ? (source.domain || "").trim() || "local"
+                  : "local";
+              const isRefreshingThis =
+                source.kind === "subscription" &&
+                refreshingSourceDomain === sourceDomain;
+              return (
               <Card
                 key={source.key}
                 className={cn(
@@ -63,6 +75,26 @@ function ConfigurationView({
                     size="icon"
                     onClick={(event) => {
                       event.stopPropagation();
+                      onRefreshSource(source);
+                    }}
+                    disabled={isRefreshingThis || source.kind !== "subscription"}
+                    className="shrink-0"
+                    title={
+                      source.kind === "subscription"
+                        ? "Refresh subscription"
+                        : "Only subscriptions can be refreshed"
+                    }
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={cn(isRefreshingThis && "animate-spin")}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(event) => {
+                      event.stopPropagation();
                       onDeleteSource(source);
                     }}
                     className="shrink-0 hover:text-destructive hover:bg-destructive/10"
@@ -71,7 +103,8 @@ function ConfigurationView({
                   </Button>
                 </div>
               </Card>
-            ))}
+              );
+            })}
 
             <Button
               variant="outline"

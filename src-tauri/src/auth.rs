@@ -9,6 +9,8 @@ use crate::models::{AppSettings, AppState, Profile};
 use crate::parser::{detect_protocol, extract_name_from_link};
 use crate::storage::{load_profiles_from_disk, save_profiles_to_disk};
 
+const SUBSCRIPTION_USER_AGENT: &str = "curl/8.7.1 NuggetVPN/1.0";
+
 #[derive(Serialize, Deserialize)]
 struct AuthResponse {
     token: Option<String>,
@@ -67,6 +69,237 @@ fn decode_subscription_body(raw: &str) -> String {
 
 fn load_subscription_links(raw: &str) -> Vec<String> {
     split_subscription_payload(&decode_subscription_body(raw))
+}
+
+fn collect_subscription_sources(snapshot: &[Profile]) -> HashMap<String, String> {
+    let mut source_to_url: HashMap<String, String> = HashMap::new();
+    let mut legacy_urls: HashMap<String, String> = HashMap::new();
+
+    for profile in snapshot {
+        let source = profile.source_domain.trim();
+        if source.is_empty() || source == "local" {
+            continue;
+        }
+
+        let sub_url = profile.subscription_url.trim();
+        if sub_url.is_empty() {
+            if let Ok(parsed) = Url::parse(&profile.config_link) {
+                if parsed.scheme() == "http" || parsed.scheme() == "https" {
+                    legacy_urls
+                        .entry(source.to_string())
+                        .or_insert_with(|| profile.config_link.trim().to_string());
+                }
+            }
+            continue;
+        }
+
+        source_to_url
+            .entry(source.to_string())
+            .or_insert_with(|| sub_url.to_string());
+    }
+
+    for (source, sub_url) in legacy_urls {
+        source_to_url.entry(source).or_insert(sub_url);
+    }
+
+    source_to_url
+}
+
+fn build_subscription_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent(SUBSCRIPTION_USER_AGENT)
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
+
+async fn refresh_subscriptions(
+    app: &tauri::AppHandle,
+    state: &State<'_, AppState>,
+    only_domain: Option<&str>,
+) -> Result<SubscriptionRefreshSummary, String> {
+    let snapshot = { state.profiles.lock().unwrap().clone() };
+    let mut source_to_url = collect_subscription_sources(&snapshot);
+    let strict_mode = only_domain.is_some();
+
+    if let Some(domain) = only_domain {
+        let normalized = domain.trim();
+        if normalized.is_empty() || normalized == "local" {
+            return Err("Invalid subscription domain".to_string());
+        }
+
+        let maybe_url = source_to_url.remove(normalized);
+        source_to_url.clear();
+        if let Some(url) = maybe_url {
+            source_to_url.insert(normalized.to_string(), url);
+        } else {
+            return Err(format!(
+                "Subscription URL not found for domain '{}'. Re-import this subscription once, then refresh will work.",
+                normalized
+            ));
+        }
+    }
+
+    if source_to_url.is_empty() {
+        return Ok(SubscriptionRefreshSummary {
+            refreshed: 0,
+            failed: 0,
+            skipped: 0,
+        });
+    }
+
+    let client = build_subscription_client()?;
+    let mut refreshed = 0usize;
+    let mut failed = 0usize;
+    let mut skipped = 0usize;
+
+    for (source_domain, sub_url) in source_to_url {
+        let parsed_url = match Url::parse(&sub_url) {
+            Ok(url) => url,
+            Err(error) => {
+                if strict_mode {
+                    return Err(format!(
+                        "Saved subscription URL is invalid for '{}': {}",
+                        source_domain, error
+                    ));
+                }
+                skipped += 1;
+                continue;
+            }
+        };
+        let host = match parsed_url.host_str() {
+            Some(host) if !host.is_empty() => host,
+            _ => {
+                if strict_mode {
+                    return Err(format!(
+                        "Saved subscription URL for '{}' has no host",
+                        source_domain
+                    ));
+                }
+                skipped += 1;
+                continue;
+            }
+        };
+        if host != source_domain {
+            if strict_mode {
+                return Err(format!(
+                    "Saved subscription URL host '{}' does not match source '{}'",
+                    host, source_domain
+                ));
+            }
+            skipped += 1;
+            continue;
+        }
+
+        let response = match client.get(&sub_url).send().await {
+            Ok(response) => response,
+            Err(error) => {
+                if strict_mode {
+                    return Err(format!(
+                        "Failed to request subscription '{}': {}",
+                        source_domain, error
+                    ));
+                }
+                failed += 1;
+                continue;
+            }
+        };
+        if !response.status().is_success() {
+            if strict_mode {
+                let status = response.status();
+                let preview = response.text().await.unwrap_or_default();
+                let preview = preview.chars().take(180).collect::<String>();
+                return Err(format!(
+                    "Subscription server '{}' returned {}: {}",
+                    source_domain, status, preview
+                ));
+            }
+            failed += 1;
+            continue;
+        }
+        let body = match response.text().await {
+            Ok(text) => text,
+            Err(error) => {
+                if strict_mode {
+                    return Err(format!(
+                        "Failed to read subscription response for '{}': {}",
+                        source_domain, error
+                    ));
+                }
+                failed += 1;
+                continue;
+            }
+        };
+
+        let links = load_subscription_links(&body);
+        if links.is_empty() {
+            if strict_mode {
+                let preview = body
+                    .lines()
+                    .take(6)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .chars()
+                    .take(220)
+                    .collect::<String>();
+                return Err(format!(
+                    "Subscription '{}' returned no links. Response preview: {}",
+                    source_domain, preview
+                ));
+            }
+            failed += 1;
+            continue;
+        }
+
+        let mut fresh_profiles = Vec::new();
+        for link in links {
+            let protocol = detect_protocol(&link);
+            if protocol == "unknown" {
+                continue;
+            }
+            fresh_profiles.push(Profile {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: extract_name_from_link(&link),
+                server: "Auto".to_string(),
+                protocol: protocol.to_string(),
+                config_link: link,
+                source_domain: source_domain.clone(),
+                subscription_url: sub_url.clone(),
+                total_up: Some(0),
+                total_down: Some(0),
+            });
+        }
+
+        if fresh_profiles.is_empty() {
+            if strict_mode {
+                return Err(format!(
+                    "Subscription '{}' has links, but none are supported",
+                    source_domain
+                ));
+            }
+            failed += 1;
+            continue;
+        }
+
+        {
+            let mut profiles = state.profiles.lock().unwrap();
+            profiles.retain(|profile| profile.source_domain.trim() != source_domain);
+            profiles.extend(fresh_profiles);
+            save_profiles_to_disk(app, &profiles);
+        }
+        refreshed += 1;
+    }
+
+    if strict_mode && refreshed == 0 {
+        return Err("Subscription refresh finished, but no profiles were updated".to_string());
+    }
+
+    Ok(SubscriptionRefreshSummary {
+        refreshed,
+        failed,
+        skipped,
+    })
 }
 
 #[tauri::command]
@@ -220,7 +453,7 @@ pub async fn import_subscription(
         .ok_or("Subscription URL missing host")?
         .to_string();
 
-    let client = reqwest::Client::new();
+    let client = build_subscription_client()?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let text = resp.text().await.map_err(|e| e.to_string())?;
     let links = load_subscription_links(&text);
@@ -261,124 +494,14 @@ pub async fn refresh_subscriptions_on_startup(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SubscriptionRefreshSummary, String> {
-    let snapshot = { state.profiles.lock().unwrap().clone() };
+    refresh_subscriptions(&app, &state, None).await
+}
 
-    let mut source_to_url: HashMap<String, String> = HashMap::new();
-    let mut legacy_urls: HashMap<String, String> = HashMap::new();
-    for profile in snapshot {
-        let source = profile.source_domain.trim();
-        if source.is_empty() || source == "local" {
-            continue;
-        }
-        let sub_url = profile.subscription_url.trim();
-        if sub_url.is_empty() {
-            if let Ok(parsed) = Url::parse(&profile.config_link) {
-                if parsed.scheme() == "http" || parsed.scheme() == "https" {
-                    legacy_urls
-                        .entry(source.to_string())
-                        .or_insert_with(|| profile.config_link.trim().to_string());
-                }
-            }
-            continue;
-        }
-        source_to_url
-            .entry(source.to_string())
-            .or_insert_with(|| sub_url.to_string());
-    }
-
-    for (source, sub_url) in legacy_urls {
-        source_to_url.entry(source).or_insert(sub_url);
-    }
-
-    if source_to_url.is_empty() {
-        return Ok(SubscriptionRefreshSummary {
-            refreshed: 0,
-            failed: 0,
-            skipped: 0,
-        });
-    }
-
-    let client = reqwest::Client::new();
-    let mut refreshed = 0usize;
-    let mut failed = 0usize;
-    let mut skipped = 0usize;
-
-    for (source_domain, sub_url) in source_to_url {
-        let parsed_url = match Url::parse(&sub_url) {
-            Ok(url) => url,
-            Err(_) => {
-                skipped += 1;
-                continue;
-            }
-        };
-        let host = match parsed_url.host_str() {
-            Some(host) if !host.is_empty() => host,
-            _ => {
-                skipped += 1;
-                continue;
-            }
-        };
-        if host != source_domain {
-            skipped += 1;
-            continue;
-        }
-
-        let body = match client.get(&sub_url).send().await {
-            Ok(response) => match response.text().await {
-                Ok(text) => text,
-                Err(_) => {
-                    failed += 1;
-                    continue;
-                }
-            },
-            Err(_) => {
-                failed += 1;
-                continue;
-            }
-        };
-
-        let links = load_subscription_links(&body);
-        if links.is_empty() {
-            failed += 1;
-            continue;
-        }
-
-        let mut fresh_profiles = Vec::new();
-        for link in links {
-            let protocol = detect_protocol(&link);
-            if protocol == "unknown" {
-                continue;
-            }
-            fresh_profiles.push(Profile {
-                id: uuid::Uuid::new_v4().to_string(),
-                name: extract_name_from_link(&link),
-                server: "Auto".to_string(),
-                protocol: protocol.to_string(),
-                config_link: link,
-                source_domain: source_domain.clone(),
-                subscription_url: sub_url.clone(),
-                total_up: Some(0),
-                total_down: Some(0),
-            });
-        }
-
-        if fresh_profiles.is_empty() {
-            failed += 1;
-            continue;
-        }
-
-        {
-            let mut profiles = state.profiles.lock().unwrap();
-            profiles.retain(|profile| profile.source_domain.trim() != source_domain);
-            profiles.extend(fresh_profiles);
-            save_profiles_to_disk(&app, &profiles);
-        }
-        refreshed += 1;
-    }
-
-    Ok(SubscriptionRefreshSummary {
-        refreshed,
-        failed,
-        skipped,
-    })
+#[tauri::command]
+pub async fn refresh_subscription_by_domain(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    source_domain: String,
+) -> Result<SubscriptionRefreshSummary, String> {
+    refresh_subscriptions(&app, &state, Some(&source_domain)).await
 }

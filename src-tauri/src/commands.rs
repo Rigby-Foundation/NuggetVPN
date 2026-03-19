@@ -191,14 +191,11 @@ pub fn open_logs_folder(app: AppHandle) {
     }
 }
 
-#[tauri::command]
-pub fn ping_profiles(
-    state: State<AppState>,
+fn ping_profiles_impl(
+    profiles: Vec<Profile>,
+    settings: AppSettings,
     source_domain: Option<String>,
 ) -> Result<Vec<ProfilePing>, String> {
-    let profiles = state.profiles.lock().unwrap().clone();
-    let settings = state.settings.lock().unwrap().clone();
-
     let mut target_domain = source_domain.unwrap_or_default();
     target_domain = target_domain.trim().to_string();
     if target_domain.is_empty() {
@@ -305,14 +302,25 @@ pub fn ping_profiles(
 }
 
 #[tauri::command]
-pub fn probe_profiles_connectivity(
-    state: State<AppState>,
+pub async fn ping_profiles(
+    state: State<'_, AppState>,
+    source_domain: Option<String>,
+) -> Result<Vec<ProfilePing>, String> {
+    let profiles = state.profiles.lock().unwrap().clone();
+    let settings = state.settings.lock().unwrap().clone();
+
+    tauri::async_runtime::spawn_blocking(move || ping_profiles_impl(profiles, settings, source_domain))
+        .await
+        .map_err(|e| format!("Ping worker join failed: {}", e))?
+}
+
+fn probe_profiles_connectivity_impl(
+    profiles: Vec<Profile>,
+    settings: AppSettings,
     source_domain: Option<String>,
     profile_ids: Option<Vec<String>>,
     timeout_ms: Option<u64>,
 ) -> Result<Vec<ProfilePing>, String> {
-    let profiles = state.profiles.lock().unwrap().clone();
-    let settings = state.settings.lock().unwrap().clone();
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(1200).clamp(200, 10_000));
 
     let mut target_domain = source_domain.unwrap_or_default();
@@ -432,6 +440,23 @@ pub fn probe_profiles_connectivity(
     }
 
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn probe_profiles_connectivity(
+    state: State<'_, AppState>,
+    source_domain: Option<String>,
+    profile_ids: Option<Vec<String>>,
+    timeout_ms: Option<u64>,
+) -> Result<Vec<ProfilePing>, String> {
+    let profiles = state.profiles.lock().unwrap().clone();
+    let settings = state.settings.lock().unwrap().clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        probe_profiles_connectivity_impl(profiles, settings, source_domain, profile_ids, timeout_ms)
+    })
+    .await
+    .map_err(|e| format!("Connectivity probe worker join failed: {}", e))?
 }
 
 #[tauri::command]

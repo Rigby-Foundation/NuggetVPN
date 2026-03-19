@@ -106,6 +106,7 @@ function App() {
   const [isCheckingIp, setIsCheckingIp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [platform, setPlatform] = useState("macos");
+  const [refreshingSourceDomain, setRefreshingSourceDomain] = useState("");
 
   const winClose = () => appWindow.close();
   const winMinimize = () => appWindow.minimize();
@@ -192,35 +193,6 @@ function App() {
       setIsCheckingIp(false);
     }
   }, [fetchIpInfo]);
-
-  const probeVpnTraffic = useCallback(async (timeoutMs = 4500) => {
-    const endpoints = [
-      "https://www.gstatic.com/generate_204",
-      "https://cp.cloudflare.com/generate_204",
-      "https://api.ipify.org",
-    ];
-
-    const probe = async (url: string) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        return response.status > 0;
-      } catch (_error) {
-        return false;
-      } finally {
-        clearTimeout(timeout);
-      }
-    };
-
-    const results = await Promise.allSettled(endpoints.map((url) => probe(url)));
-    return results.some(
-      (result) => result.status === "fulfilled" && result.value === true
-    );
-  }, []);
 
   const startIpCheck = useCallback(() => {
     if (ipCheckIntervalRef.current) {
@@ -328,6 +300,48 @@ function App() {
     }
   }, [loadProfiles]);
 
+  const refreshSubscriptionDomain = useCallback(
+    async (domain: string) => {
+      const normalized = domain.trim();
+      if (!normalized || normalized === "local") {
+        return;
+      }
+
+      setRefreshingSourceDomain(normalized);
+      try {
+        const summary = await invoke<{
+          refreshed: number;
+          failed: number;
+          skipped: number;
+        }>("refresh_subscription_by_domain", {
+          sourceDomain: normalized,
+        });
+        await loadProfiles();
+        setLogs((prev) => [
+          ...prev,
+          `Subscription refreshed (${normalized}): refreshed=${summary.refreshed}, failed=${summary.failed}, skipped=${summary.skipped}`,
+        ]);
+        toast.success(`Subscription refreshed: ${normalized}`, {
+          id: `refresh-${normalized}`,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setLogs((prev) => [
+          ...prev,
+          `Subscription refresh failed (${normalized}): ${message}`,
+        ]);
+        const details =
+          message.length > 220 ? `${message.slice(0, 220)}...` : message;
+        toast.error(`Failed to refresh ${normalized}: ${details}`, {
+          id: `refresh-${normalized}`,
+        });
+      } finally {
+        setRefreshingSourceDomain("");
+      }
+    },
+    [loadProfiles]
+  );
+
   const refreshPings = useCallback(
     async (domain?: string) => {
       const targetDomain = (domain || selectedConfigDomain).trim() || "local";
@@ -341,7 +355,7 @@ function App() {
 
       try {
         const results = await invoke<ProfilePing[]>("ping_profiles", {
-          source_domain: targetDomain,
+          sourceDomain: targetDomain,
         });
         const next: Record<string, number | null> = {};
         domainProfiles.forEach((profile) => {
@@ -491,6 +505,16 @@ function App() {
     }
   };
 
+  const handleRefreshSource = useCallback(
+    async (source: ConfigSource) => {
+      if (source.kind !== "subscription") {
+        return;
+      }
+      await refreshSubscriptionDomain(source.domain);
+    },
+    [refreshSubscriptionDomain]
+  );
+
   const startStats = useCallback((profileId: string) => {
     startTimeRef.current = Date.now();
     sessionUpRef.current = 0;
@@ -624,9 +648,9 @@ function App() {
               const probeResults = await invoke<ProfilePing[]>(
                 "probe_profiles_connectivity",
                 {
-                  source_domain: domain,
-                  profile_ids: candidateOrder.slice(0, probeLimit),
-                  timeout_ms: 1200,
+                  sourceDomain: domain,
+                  profileIds: candidateOrder.slice(0, probeLimit),
+                  timeoutMs: 1200,
                 }
               );
               const reachable = probeResults
@@ -673,8 +697,6 @@ function App() {
             ? candidateOrder
             : [profileIdToUse]
           : [profileIdToUse];
-        const wait = (ms: number) =>
-          new Promise<void>((resolve) => setTimeout(resolve, ms));
 
         let connectedProfileId = "";
         let lastAutoError = "";
@@ -682,7 +704,7 @@ function App() {
         for (const candidateId of attemptOrder) {
           try {
             await invoke("start_vpn", {
-              profile_id: candidateId,
+              profileId: candidateId,
             });
           } catch (error) {
             if (!resilientMode) {
@@ -690,20 +712,6 @@ function App() {
             }
             lastAutoError = String(error);
             continue;
-          }
-
-          if (resilientMode) {
-            await wait(1800);
-            const egressOk = await probeVpnTraffic(4500);
-            if (!egressOk) {
-              lastAutoError = "egress probe failed";
-              try {
-                await invoke("stop_vpn");
-              } catch (stopError) {
-                console.error("Failed to stop VPN during auto fallback", stopError);
-              }
-              continue;
-            }
           }
 
           connectedProfileId = candidateId;
@@ -1070,8 +1078,15 @@ function App() {
                     selectedSourceDomain={selectedConfigDomain}
                     selectedProxyMode={selectedProxyMode}
                     selectedProfileId={selectedProfileId}
+                    isRefreshingSource={
+                      refreshingSourceDomain ===
+                      ((selectedConfigDomain || "").trim() || "local")
+                    }
                     onSelectProxy={handleSelectProxy}
                     onSelectAuto={() => handleSelectAuto(selectedConfigDomain)}
+                    onRefreshSource={() =>
+                      refreshSubscriptionDomain(selectedConfigDomain)
+                    }
                   />
                 )}
 
@@ -1080,8 +1095,10 @@ function App() {
                     sources={sources}
                     selectedSource={selectedConfigDomain}
                     selectedProfileId={selectedProfileId}
+                    refreshingSourceDomain={refreshingSourceDomain}
                     onSelectSource={handleSelectConfig}
                     onDeleteSource={handleDeleteSource}
+                    onRefreshSource={handleRefreshSource}
                     onAdd={() => setIsModalOpen(true)}
                   />
                 )}

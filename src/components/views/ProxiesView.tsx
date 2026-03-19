@@ -1,8 +1,9 @@
-import { Check, Zap } from "lucide-react";
+import { Check, RefreshCw, Zap } from "lucide-react";
 
 import { Profile } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -13,8 +14,10 @@ interface ProxiesViewProps {
   selectedSourceDomain: string;
   selectedProxyMode: "manual" | "auto";
   selectedProfileId: string;
+  isRefreshingSource: boolean;
   onSelectProxy: (id: string) => void;
   onSelectAuto: () => void;
+  onRefreshSource: () => void;
 }
 
 function ProxiesView({
@@ -23,8 +26,10 @@ function ProxiesView({
   selectedSourceDomain,
   selectedProxyMode,
   selectedProfileId,
+  isRefreshingSource,
   onSelectProxy,
   onSelectAuto,
+  onRefreshSource,
 }: ProxiesViewProps) {
   const normalizedDomain = selectedSourceDomain.trim() || "local";
   const domainLabel = normalizedDomain === "local" ? "Local" : normalizedDomain;
@@ -51,13 +56,30 @@ function ProxiesView({
     <div className="absolute inset-0 overflow-hidden">
       <ScrollArea className="h-full">
         <div className="p-6 space-y-4">
-          <div>
-            <h2 className="text-lg font-bold mb-1">Proxies</h2>
-            <p className="text-xs text-muted-foreground">
-              {domainProfiles.length === 0
-                ? "No proxies available for this configuration."
-                : `Showing proxies from ${domainLabel}.`}
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold mb-1">Proxies</h2>
+              <p className="text-xs text-muted-foreground">
+                {domainProfiles.length === 0
+                  ? "No proxies available for this configuration."
+                  : `Showing proxies from ${domainLabel}.`}
+              </p>
+            </div>
+            {isSubscriptionSource && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefreshSource}
+                disabled={isRefreshingSource}
+                className="shrink-0"
+              >
+                <RefreshCw
+                  size={14}
+                  className={cn("mr-2", isRefreshingSource && "animate-spin")}
+                />
+                Refresh
+              </Button>
+            )}
           </div>
 
           {isSubscriptionSource && (

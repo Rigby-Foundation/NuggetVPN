@@ -140,6 +140,7 @@ pub fn run() {
             commands::update_profile_usage,
             auth::import_subscription,
             auth::refresh_subscriptions_on_startup,
+            auth::refresh_subscription_by_domain,
             auth::login_user,
             auth::register_user,
             auth::push_profiles_to_server,
