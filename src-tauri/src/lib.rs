@@ -134,6 +134,7 @@ pub fn run() {
             commands::delete_profiles_by_ids,
             commands::open_logs_folder,
             commands::ping_profiles,
+            commands::probe_profiles_connectivity,
             commands::get_settings,
             commands::save_settings,
             commands::update_profile_usage,

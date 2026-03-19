@@ -1,10 +1,10 @@
 use serde::Serialize;
 use std::collections::HashSet;
-use std::net::{IpAddr, ToSocketAddrs};
+use std::net::{IpAddr, TcpStream, ToSocketAddrs};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -92,6 +92,17 @@ fn measure_proxy_ping(host: &str, timeout_ms: u64) -> Option<u64> {
         Ok(status) if status.success() => Some(start.elapsed().as_millis() as u64),
         _ => None,
     }
+}
+
+fn measure_proxy_tcp(host: &str, port: u16, timeout: Duration) -> Option<u64> {
+    let start = Instant::now();
+    let addrs = (host, port).to_socket_addrs().ok()?;
+    for addr in addrs {
+        if TcpStream::connect_timeout(&addr, timeout).is_ok() {
+            return Some(start.elapsed().as_millis() as u64);
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -272,6 +283,136 @@ pub fn ping_profiles(
                 };
 
                 let ping_ms = measure_proxy_ping(&server, PING_TIMEOUT_MS);
+                if let Ok(mut locked) = collected.lock() {
+                    locked.push(ProfilePing {
+                        id: profile_id,
+                        ping_ms,
+                    });
+                }
+            }));
+        }
+
+        for handle in handles {
+            let _ = handle.join();
+        }
+
+        if let Ok(mut locked) = collected.lock() {
+            results.extend(locked.drain(..));
+        };
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
+pub fn probe_profiles_connectivity(
+    state: State<AppState>,
+    source_domain: Option<String>,
+    profile_ids: Option<Vec<String>>,
+    timeout_ms: Option<u64>,
+) -> Result<Vec<ProfilePing>, String> {
+    let profiles = state.profiles.lock().unwrap().clone();
+    let settings = state.settings.lock().unwrap().clone();
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(1200).clamp(200, 10_000));
+
+    let mut target_domain = source_domain.unwrap_or_default();
+    target_domain = target_domain.trim().to_string();
+    if target_domain.is_empty() {
+        target_domain = "local".to_string();
+    }
+
+    let mut target_profiles: Vec<Profile> = profiles
+        .into_iter()
+        .filter(|profile| normalize_source_domain(profile) == target_domain)
+        .collect();
+
+    if let Some(ids) = profile_ids {
+        if !ids.is_empty() {
+            let id_set: HashSet<String> = ids.into_iter().collect();
+            target_profiles.retain(|profile| id_set.contains(&profile.id));
+        }
+    }
+
+    if target_profiles.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut targets = Vec::new();
+    let mut results = Vec::new();
+
+    for profile in target_profiles.iter() {
+        let outbound = match parse_outbound(&profile.config_link, &settings) {
+            Ok(outbound) => outbound,
+            Err(_) => {
+                results.push(ProfilePing {
+                    id: profile.id.clone(),
+                    ping_ms: None,
+                });
+                continue;
+            }
+        };
+
+        let server = outbound
+            .get(&serde_yaml::Value::String("server".to_string()))
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        let port = outbound
+            .get(&serde_yaml::Value::String("port".to_string()))
+            .and_then(|value| value.as_u64())
+            .and_then(|value| u16::try_from(value).ok());
+
+        if let (Some(server), Some(port)) = (server, port) {
+            if server.trim().is_empty() {
+                results.push(ProfilePing {
+                    id: profile.id.clone(),
+                    ping_ms: None,
+                });
+                continue;
+            }
+            targets.push((profile.id.clone(), server, port));
+        } else {
+            results.push(ProfilePing {
+                id: profile.id.clone(),
+                ping_ms: None,
+            });
+        }
+    }
+
+    if targets.is_empty() {
+        return Ok(results);
+    }
+
+    let workers = std::cmp::min(PING_WORKER_LIMIT, targets.len());
+    if workers <= 1 {
+        for (profile_id, server, port) in targets {
+            let ping_ms = measure_proxy_tcp(&server, port, timeout);
+            results.push(ProfilePing {
+                id: profile_id,
+                ping_ms,
+            });
+        }
+    } else {
+        let tasks = Arc::new(Mutex::new(targets));
+        let collected = Arc::new(Mutex::new(Vec::new()));
+        let mut handles = Vec::with_capacity(workers);
+
+        for _ in 0..workers {
+            let tasks = Arc::clone(&tasks);
+            let collected = Arc::clone(&collected);
+            handles.push(thread::spawn(move || loop {
+                let task = {
+                    let mut locked = match tasks.lock() {
+                        Ok(guard) => guard,
+                        Err(_) => return,
+                    };
+                    locked.pop()
+                };
+
+                let Some((profile_id, server, port)) = task else {
+                    break;
+                };
+
+                let ping_ms = measure_proxy_tcp(&server, port, timeout);
                 if let Ok(mut locked) = collected.lock() {
                     locked.push(ProfilePing {
                         id: profile_id,

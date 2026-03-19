@@ -268,12 +268,9 @@ function App() {
         } else {
           setSelectedProfileId("");
         }
-      } else if (selectedProxyModeRef.current === "manual" && !currentMatchesDomain) {
-        const fallbackProfile =
-          loaded.find(
-            (profile) => resolveProfileDomain(profile) === nextDomain
-          ) || loaded[0];
-        setSelectedProfileId(fallbackProfile?.id || "");
+      } else if (!currentMatchesDomain) {
+        setSelectedProfileId("");
+        setSelectedProxyMode("auto");
       }
     } catch (e) {
       console.error("Failed to load profiles", e);
@@ -589,6 +586,31 @@ function App() {
             })
             .map((candidate) => candidate.id);
           profileIdToUse = candidateOrder[0] || "";
+
+          if (candidateOrder.length > 1) {
+            try {
+              const probeLimit = Math.min(candidateOrder.length, 8);
+              const probeResults = await invoke<ProfilePing[]>(
+                "probe_profiles_connectivity",
+                {
+                  source_domain: domain,
+                  profile_ids: candidateOrder.slice(0, probeLimit),
+                  timeout_ms: 1200,
+                }
+              );
+              const reachable = probeResults
+                .filter((item) => item.ping_ms !== null)
+                .sort((a, b) => (a.ping_ms ?? Infinity) - (b.ping_ms ?? Infinity))
+                .map((item) => item.id);
+              const fallback = candidateOrder.filter(
+                (id) => !reachable.includes(id)
+              );
+              candidateOrder = [...reachable, ...fallback];
+              profileIdToUse = candidateOrder[0] || "";
+            } catch (error) {
+              console.error("Connectivity pre-check failed", error);
+            }
+          }
         } else if (!profileIdToUse) {
           const fallbackProfile = chainExclusions
             ? profiles.find((profile) => !chainExclusions.has(profile.id))
