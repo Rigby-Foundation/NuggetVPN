@@ -751,6 +751,35 @@ pub fn parse_outbound(link: &str, settings: &AppSettings) -> Result<serde_yaml::
                 proxy.insert(ystr("client-private-key"), ystr(client_private_key));
             }
 
+            // Reality steganography fields
+            if let Some(reality_pk) = get_param(
+                &params,
+                &["reality_pk", "reality-pk", "reality_public_key", "reality-public-key"],
+            ) {
+                proxy.insert(ystr("reality-public-key"), ystr(reality_pk));
+            }
+            if let Some(reality_sid) = get_param(
+                &params,
+                &["reality_sid", "reality-sid", "reality_short_id", "reality-short-id"],
+            ) {
+                proxy.insert(ystr("reality-short-id"), ystr(reality_sid));
+            }
+            if let Some(fp) = get_param(
+                &params,
+                &["fp", "fingerprint", "client_fingerprint", "client-fingerprint"],
+            ) {
+                proxy.insert(ystr("client-fingerprint"), ystr(fp));
+            }
+            if let Some(alpn) = get_param(&params, &["alpn"]) {
+                let alpn_list: Vec<&str> = alpn.split(',').map(|s| s.trim()).collect();
+                if !alpn_list.is_empty() {
+                    proxy.insert(
+                        ystr("alpn"), 
+                        YValue::Sequence(alpn_list.into_iter().map(ystr).collect())
+                    );
+                }
+            }
+
             apply_sni_spoof(&mut proxy, settings);
             Ok(proxy)
         }

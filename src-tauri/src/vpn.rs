@@ -324,10 +324,15 @@ dns:
 tun:
   enable: true
   device-id: "{tun_device}"
+  stack: mixed                  # <-- БАГФИКС 1: Чинит потерю UDP (0.0.0.0)
+  auto-route: true              # <-- БАГФИКС 2: Гарантирует правильные маршруты в ОС
+  auto-detect-interface: true   # <-- Помогает при переключении Wi-Fi
   gateway: "198.19.0.1/24"
   gateway-v6: "fd00:fac::1/64"
   route-all: {route_all}
-  dns-hijack: true
+  dns-hijack:                   # <-- БАГФИКС 3: Жесткий перехват DNS для Fake-IP
+    - tcp://any:53
+    - udp://any:53
 
 proxies:
 {proxies_yaml}
