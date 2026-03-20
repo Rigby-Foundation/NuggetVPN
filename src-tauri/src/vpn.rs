@@ -303,23 +303,8 @@ pub async fn start_vpn(
                     settings.routing_domains.len(),
                 ));
             }
+            // Route plain HTTP on port 8080 through proxy-compat (Vision breaks plain HTTP)
             if speedtest_target != "proxy" {
-                rules.push(ystr(&format!(
-                    "DOMAIN-SUFFIX,speedtest.net,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-SUFFIX,ooklaserver.net,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-KEYWORD,speedtest,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-KEYWORD,ookla,{}",
-                    speedtest_target
-                )));
                 rules.push(ystr(&format!("DST-PORT,8080,{}", speedtest_target)));
             }
             // Keep explicit Winbox routing in split mode only.
@@ -327,23 +312,8 @@ pub async fn start_vpn(
             // Default to DIRECT in split mode
             rules.push(ystr("MATCH,DIRECT"));
         } else {
+            // Route plain HTTP on port 8080 through proxy-compat (Vision breaks plain HTTP)
             if speedtest_target != "proxy" {
-                rules.push(ystr(&format!(
-                    "DOMAIN-SUFFIX,speedtest.net,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-SUFFIX,ooklaserver.net,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-KEYWORD,speedtest,{}",
-                    speedtest_target
-                )));
-                rules.push(ystr(&format!(
-                    "DOMAIN-KEYWORD,ookla,{}",
-                    speedtest_target
-                )));
                 rules.push(ystr(&format!("DST-PORT,8080,{}", speedtest_target)));
             }
             // Route all through proxy in tunnel mode.
