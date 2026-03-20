@@ -251,14 +251,13 @@ pub async fn start_vpn(
             }
         }
 
-        // Create compat proxy (without Vision flow) for plain HTTP on port 8080 (e.g., speedtest)
-        // Vision flow requires TLS Application Data and breaks plain HTTP
         if matches!(exit_proxy.get(&ystr("type")), Some(YValue::String(proxy_type)) if proxy_type == "vless")
             && matches!(exit_proxy.get(&ystr("flow")), Some(YValue::String(flow)) if flow == "xtls-rprx-vision")
         {
             let mut compat_proxy_map = exit_proxy.clone();
             compat_proxy_map.remove(&ystr("flow"));
             compat_proxy_map.insert(ystr("name"), ystr("proxy-compat"));
+            winbox_target = "proxy-compat".to_string();
             speedtest_target = "proxy-compat".to_string();
             compat_proxy = Some(compat_proxy_map);
         }
