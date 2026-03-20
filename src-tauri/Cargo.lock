@@ -856,7 +856,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#3a4b3ee393e153f3420094eda7e3490791a5f000"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#10bd3256f87b161996fca44230e500af3fe18881"
 dependencies = [
  "aead",
  "aes",
@@ -8603,7 +8603,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#3a4b3ee393e153f3420094eda7e3490791a5f000"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#10bd3256f87b161996fca44230e500af3fe18881"
 dependencies = [
  "async-trait",
  "futures",
@@ -8622,7 +8622,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#3a4b3ee393e153f3420094eda7e3490791a5f000"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#10bd3256f87b161996fca44230e500af3fe18881"
 dependencies = [
  "bytes",
  "etherparse",

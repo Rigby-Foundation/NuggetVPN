@@ -80,7 +80,7 @@ function App() {
   const [, setStatus] = useState("Ready");
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [logLimit, setLogLimit] = useState("1000");
+  const [logLimit, setLogLimit] = useState("999999");
   const logContainerRef = useRef<HTMLDivElement>(null);
   const selectedConfigDomainRef = useRef(selectedConfigDomain);
   const selectedProfileIdRef = useRef(selectedProfileId);

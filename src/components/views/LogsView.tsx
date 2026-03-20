@@ -50,6 +50,7 @@ function LogsView({
               <SelectItem value="100">100 lines</SelectItem>
               <SelectItem value="500">500 lines</SelectItem>
               <SelectItem value="1000">1000 lines</SelectItem>
+              <SelectItem value="999999">Unlimited</SelectItem>
             </SelectContent>
           </Select>
         </div>
