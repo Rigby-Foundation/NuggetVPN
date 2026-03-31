@@ -32,15 +32,18 @@ tempfile = "3.10"
 tauri-plugin-dialog = "2.4.2"
 tauri-plugin-fs = "2.4.4"
 tokio = { version = "1", features = ["full"] }
-clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", branch = "feat/reality", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
+clash-lib = { git = "https://github.com/Rigby-Foundation/clash-rs.git", package = "clash-lib", branch = "master", features = ["tun", "shadowsocks", "tuic", "ssh", "wireguard"] }
 
 [profile.release]
 opt-level = "s"          # Optimize for size
 codegen-units = 1        # Single codegen unit for better optimization  
-lto = "thin"             # Thin LTO for good optimization
+# lto = "thin"           # Disabled: conflicts with clash-lib embed-bitcode=no
 strip = true             # Strip symbols
 debug = false            # No debug info in release
 panic = "abort"          # Smaller panic handling
+
+[patch."https://github.com/Watfaq/rustls.git"]
+watfaq-rustls = { git = "https://github.com/Rigby-Foundation/rustls.git", branch = "utls-0.23" }
 
 [patch.crates-io]
 internal-russh-forked-ssh-key = { path = "vendor/internal-russh-forked-ssh-key" }

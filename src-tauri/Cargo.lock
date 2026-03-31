@@ -98,6 +98,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arc-swap"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,7 +861,7 @@ dependencies = [
 [[package]]
 name = "clash-lib"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#360014a722a9a5b2fd299408812be431613cd213"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#114980829d7a42e0d0be8eb4c528c8d288cb4c05"
 dependencies = [
  "aead",
  "aes",
@@ -880,6 +889,7 @@ dependencies = [
  "educe",
  "erased-serde",
  "filetime",
+ "flate2",
  "futures",
  "h2 0.4.13",
  "h3 0.0.8",
@@ -928,6 +938,7 @@ dependencies = [
  "sock2proc",
  "socket2 0.6.3",
  "ssh-key",
+ "tar",
  "thiserror 2.0.18",
  "time",
  "tokio",
@@ -950,9 +961,10 @@ dependencies = [
  "uuid",
  "watfaq-dns",
  "watfaq-netstack",
- "watfaq-rustls 0.23.21 (git+https://github.com/Rigby-Foundation/rustls.git?rev=c35db86fc4264d0ad54ca44cafe5995fec513144)",
+ "watfaq-rustls",
  "webpki-roots",
  "windows 0.62.2",
+ "zip",
  "zstd",
 ]
 
@@ -1472,6 +1484,17 @@ checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 dependencies = [
  "powerfmt",
  "serde_core",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -3414,6 +3437,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hmac",
+ "num-bigint-dig",
  "p256",
  "p384",
  "p521",
@@ -4453,6 +4477,7 @@ dependencies = [
  "num-iter",
  "num-traits",
  "rand 0.8.5",
+ "serde",
  "smallvec",
  "zeroize",
 ]
@@ -6043,6 +6068,7 @@ dependencies = [
  "rand_core 0.10.0",
  "sha2 0.11.0-rc.5",
  "signature 3.0.0-rc.10",
+ "spki 0.8.0-rc.4",
  "zeroize",
 ]
 
@@ -6105,10 +6131,12 @@ dependencies = [
  "p521",
  "pageant",
  "pbkdf2",
+ "pkcs1 0.8.0-rc.4",
  "pkcs5",
  "pkcs8 0.10.2",
  "rand 0.8.5",
  "rand_core 0.6.4",
+ "rsa 0.10.0-rc.17",
  "russh-cryptovec",
  "russh-util",
  "sec1",
@@ -7331,6 +7359,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7909,11 +7948,11 @@ dependencies = [
 [[package]]
 name = "tokio-watfaq-rustls"
 version = "0.26.0"
-source = "git+https://github.com/Watfaq/tokio-rustls.git?rev=638db32084d7ecf9c2660847b55d48d1186b4055#638db32084d7ecf9c2660847b55d48d1186b4055"
+source = "git+https://github.com/Watfaq/tokio-rustls.git?rev=cf8961ac1a36e580d0e38bedc8a41ca4a9b301e8#cf8961ac1a36e580d0e38bedc8a41ca4a9b301e8"
 dependencies = [
  "rustls-pki-types",
  "tokio",
- "watfaq-rustls 0.23.21 (git+https://github.com/Watfaq/rustls.git?rev=4cae3aa2e84ea29d8a74b495793773bdb0a72206)",
+ "watfaq-rustls",
 ]
 
 [[package]]
@@ -8719,7 +8758,7 @@ dependencies = [
 [[package]]
 name = "watfaq-dns"
 version = "0.9.5"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#360014a722a9a5b2fd299408812be431613cd213"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#114980829d7a42e0d0be8eb4c528c8d288cb4c05"
 dependencies = [
  "async-trait",
  "futures",
@@ -8738,7 +8777,7 @@ dependencies = [
 [[package]]
 name = "watfaq-netstack"
 version = "0.1.0"
-source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=feat%2Freality#360014a722a9a5b2fd299408812be431613cd213"
+source = "git+https://github.com/Rigby-Foundation/clash-rs.git?branch=master#114980829d7a42e0d0be8eb4c528c8d288cb4c05"
 dependencies = [
  "bytes",
  "etherparse",
@@ -8752,22 +8791,10 @@ dependencies = [
 [[package]]
 name = "watfaq-rustls"
 version = "0.23.21"
-source = "git+https://github.com/Watfaq/rustls.git?rev=4cae3aa2e84ea29d8a74b495793773bdb0a72206#4cae3aa2e84ea29d8a74b495793773bdb0a72206"
-dependencies = [
- "log",
- "once_cell",
- "rustls-pki-types",
- "rustls-webpki 0.102.8",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "watfaq-rustls"
-version = "0.23.21"
-source = "git+https://github.com/Rigby-Foundation/rustls.git?rev=c35db86fc4264d0ad54ca44cafe5995fec513144#c35db86fc4264d0ad54ca44cafe5995fec513144"
+source = "git+https://github.com/Rigby-Foundation/rustls.git?branch=utls-0.23#c35db86fc4264d0ad54ca44cafe5995fec513144"
 dependencies = [
  "aws-lc-rs",
+ "log",
  "once_cell",
  "rustls-pki-types",
  "rustls-webpki 0.102.8",
@@ -9672,6 +9699,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "xattr"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
+dependencies = [
+ "libc",
+ "rustix",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9850,10 +9887,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "zip"
+version = "2.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "crossbeam-utils",
+ "displaydoc",
+ "flate2",
+ "indexmap 2.13.0",
+ "memchr",
+ "thiserror 2.0.18",
+ "zopfli",
+]
+
+[[package]]
 name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[package]]
+name = "zopfli"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05cd8797d63865425ff89b5c4a48804f35ba0ce8d125800027ad6017d2b5249"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
+]
 
 [[package]]
 name = "zstd"

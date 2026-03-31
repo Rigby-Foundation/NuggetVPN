@@ -215,6 +215,8 @@ pub async fn start_vpn(
     } else {
         // Build Clash YAML config from parsed proxy link
         let mut exit_proxy = parse_outbound(&current_profile.config_link, &settings)?;
+        eprintln!("🐛 Parsed proxy type: {:?}", exit_proxy.get(&ystr("type")));
+        eprintln!("🐛 Full parsed proxy config: {:#?}", exit_proxy);
         exit_proxy.insert(ystr("name"), ystr("proxy"));
         let winbox_target = "proxy".to_string();
 
@@ -324,15 +326,9 @@ dns:
 tun:
   enable: true
   device-id: "{tun_device}"
-  stack: mixed                  # <-- БАГФИКС 1: Чинит потерю UDP (0.0.0.0)
-  auto-route: true              # <-- БАГФИКС 2: Гарантирует правильные маршруты в ОС
-  auto-detect-interface: true   # <-- Помогает при переключении Wi-Fi
-  gateway: "198.19.0.1/24"
-  gateway-v6: "fd00:fac::1/64"
+  gateway: "198.18.0.1/24"
   route-all: {route_all}
-  dns-hijack:                   # <-- БАГФИКС 3: Жесткий перехват DNS для Fake-IP
-    - tcp://any:53
-    - udp://any:53
+  dns-hijack: true
 
 proxies:
 {proxies_yaml}
@@ -355,6 +351,9 @@ rules:
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
+
+        eprintln!("🐛 Number of proxies: {}", proxies.len());
+        eprintln!("🐛 Generated YAML config:\n{}", config_yaml);
 
         config_yaml
     };
