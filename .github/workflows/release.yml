@@ -4,67 +4,155 @@ on:
     tags:
       - "v*"
 
+env:
+  WAILS_VERSION: v3.0.0-alpha2.117
+
 jobs:
-  release:
+  macos:
+    name: macOS (universal .dmg)
+    runs-on: macos-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: "macos-15-intel" # Intel
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-          - platform: "macos-15" # Apple Silicon
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          - platform: "ubuntu-22.04" # Linux
-            args: ""
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "windows-latest" # Windows
-            args: ""
-            target: "x86_64-pc-windows-msvc"
-
-    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
         with:
-          targets: ${{ matrix.target }}
+          go-version: "1.24"
+          cache: true
 
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Build universal .dmg
+        run: wails3 task darwin:package:universal:dmg DMG_NAME="NuggetVPN-${{ github.ref_name }}-macos-universal.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: bin/*.dmg
+          if-no-files-found: error
+
+  linux:
+    name: Linux (.deb / .rpm / .AppImage)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libsoup-3.0-dev
+          # libfuse2 is what the produced AppImage needs at runtime.
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libfuse2
 
-      - name: Install frontend dependencies
-        run: bun install
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
-      - name: Build and Release
-        uses: tauri-apps/tauri-action@v0
+      - name: Package
+        run: wails3 task linux:package
+
+      - name: Rename artifacts
+        run: |
+          cd bin
+          for file in *.deb *.rpm *.AppImage; do
+            [ -e "$file" ] || continue
+            extension="${file##*.}"
+            mv "$file" "NuggetVPN-${{ github.ref_name }}-linux-amd64.${extension}"
+          done
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            bin/*.deb
+            bin/*.rpm
+            bin/*.AppImage
+          if-no-files-found: error
+
+  windows:
+    name: Windows (installer)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Package
+        # Produces bin/NuggetVPN.exe plus bin/NuggetVPN-amd64-installer.exe.
+        run: wails3 task windows:package
+
+      - name: Archive
+        shell: bash
+        run: |
+          cd bin
+          7z a "NuggetVPN-${{ github.ref_name }}-windows-amd64.zip" NuggetVPN.exe
+          for installer in *-installer.exe; do
+            [ -e "$installer" ] || continue
+            mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-installer.exe"
+          done
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: |
+            bin/*.zip
+            bin/*-installer.exe
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [macos, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "NuggetVPN ${{ github.ref_name }}"
+          body: "See the assets to download this version and install."
+          draft: true
+          prerelease: false
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.AppImage
+            artifacts/**/*.zip
+            artifacts/**/*-installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "NuggetVPN ${{ github.ref_name }}"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}

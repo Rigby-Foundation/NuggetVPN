@@ -1,3 +1,11 @@
 {
-  "svelte.enable-ts-plugin": true
+  // Without these tags gopls reports false errors: buildtags.go is designed to
+  // fail the build when the sing-box feature tags are missing.
+  "gopls": {
+    "build.buildFlags": [
+      "-tags=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"
+    ]
+  },
+  "go.buildTags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme",
+  "go.testTags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"
 }

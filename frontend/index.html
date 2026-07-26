@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NuggetVPN</title>
+    <meta name="description"
+        content="Modern, lightweight, and fast VPN client built with Wails and React, powered by an embedded sing-box core. Open Source and privacy-focused." />
+    <style>
+        :root {
+            --window-radius: 16px;
+        }
+
+        html, body, #root {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: transparent !important;
+            overflow: hidden;
+            border-radius: var(--window-radius);
+            view-transition-name: none;
+        }
+
+        #root {
+            border-radius: var(--window-radius);
+            overflow: hidden;
+        }
+
+        .window-frame {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--window-radius);
+            overflow: hidden;
+            background: transparent;
+        }
+
+    </style>
+    <script>
+        (function () {
+            var ua = navigator.userAgent || "";
+            if (ua.indexOf("Windows") !== -1) {
+                document.documentElement.style.setProperty("--window-radius", "8px");
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
