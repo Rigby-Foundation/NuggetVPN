@@ -7,20 +7,35 @@ on:
       - "v*"
   pull_request:
 
+# Superseded runs are pointless here: a CGO build of sing-box plus Wails is the
+# expensive part, so cancel the previous one on a new push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # The build tags live in Taskfile.yml and are applied automatically by
 # `wails3 task build`; buildtags.go fails the build if any are missing.
 env:
   SING_BOX_TAGS: with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme
   WAILS_VERSION: v3.0.0-alpha2.117
 
+# Runners are Blacksmith. Note the cache actions below are the upstream ones on
+# purpose: Blacksmith intercepts them and serves from a colocated cache, and its
+# own useblacksmith/* forks are archived.
 jobs:
   test:
-    name: Go tests (${{ matrix.platform }})
+    name: Go tests (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-24.04, windows-latest]
-    runs-on: ${{ matrix.platform }}
+        include:
+          - name: linux
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - name: macos
+            runner: blacksmith-6vcpu-macos-15
+          - name: windows
+            runner: blacksmith-4vcpu-windows-2025
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,18 +69,20 @@ jobs:
 
   build:
     name: Build (${{ matrix.name }})
-    needs: test
+    # Deliberately not gated on `test`: both compile the same dependency tree,
+    # so running them in parallel roughly halves wall-clock time, and a genuine
+    # compile error fails the build job on its own anyway.
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: macos-arm64
-            platform: macos-latest
+            runner: blacksmith-12vcpu-macos-15
           - name: linux-amd64
-            platform: ubuntu-24.04
+            runner: blacksmith-8vcpu-ubuntu-2404
           - name: windows-amd64
-            platform: windows-latest
-    runs-on: ${{ matrix.platform }}
+            runner: blacksmith-8vcpu-windows-2025
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -84,7 +101,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
+      - name: Put Go tool binaries on PATH
+        # setup-go does not add GOPATH/bin, which is where `go install` puts
+        # the wails3 CLI.
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
       - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Build

@@ -7,12 +7,15 @@ on:
 env:
   WAILS_VERSION: v3.0.0-alpha2.117
 
+# Runners are Blacksmith. The cache actions below are the upstream ones on
+# purpose: Blacksmith intercepts them and serves from a colocated cache, and its
+# own useblacksmith/* forks are archived.
 jobs:
   macos:
     name: macOS (universal .dmg)
-    runs-on: macos-latest
-    permissions:
-      contents: write
+    # Apple Silicon; the universal build compiles arm64 and amd64 then lipos
+    # them together, so the extra cores pay for themselves here.
+    runs-on: blacksmith-12vcpu-macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +28,21 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Put Go tool binaries on PATH
+        # setup-go does not add GOPATH/bin, which is where `go install` puts
+        # the wails3 CLI.
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
       - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Build universal .dmg
@@ -39,9 +56,7 @@ jobs:
 
   linux:
     name: Linux (.deb / .rpm / .AppImage)
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +75,21 @@ jobs:
           # libfuse2 is what the produced AppImage needs at runtime.
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libfuse2
 
+      - name: Put Go tool binaries on PATH
+        # setup-go does not add GOPATH/bin, which is where `go install` puts
+        # the wails3 CLI.
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
       - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Package
@@ -87,9 +116,9 @@ jobs:
 
   windows:
     name: Windows (installer)
-    runs-on: windows-latest
-    permissions:
-      contents: write
+    # Blacksmith's Windows runners are in public beta; swap back to
+    # `windows-latest` if this job turns flaky.
+    runs-on: blacksmith-8vcpu-windows-2025
     steps:
       - uses: actions/checkout@v4
 
@@ -102,7 +131,21 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Put Go tool binaries on PATH
+        # setup-go does not add GOPATH/bin, which is where `go install` puts
+        # the wails3 CLI.
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
       - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Package
@@ -131,7 +174,7 @@ jobs:
   publish:
     name: Publish release
     needs: [macos, linux, windows]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
     steps:
