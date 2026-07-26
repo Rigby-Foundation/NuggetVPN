@@ -27,6 +27,15 @@ func freePort(t *testing.T) int {
 func testConfig(t *testing.T) []byte {
 	t.Helper()
 	config := map[string]any{
+		// Supplying a PlatformLogWriter makes sing-box enable its cache file,
+		// which otherwise lands in the package directory as ./cache.db. Pin it
+		// to the test's temp dir so the source tree stays clean.
+		"experimental": map[string]any{
+			"cache_file": map[string]any{
+				"enabled": true,
+				"path":    filepath.Join(t.TempDir(), "cache.db"),
+			},
+		},
 		"log": map[string]any{"level": "warn"},
 		"dns": map[string]any{
 			"servers": []any{map[string]any{"type": "udp", "tag": "d", "server": "1.1.1.1"}},

@@ -33,3 +33,6 @@ frontend/tsconfig.tsbuildinfo
 # NuggetVPN is desktop-only.
 build/ios/
 build/android/
+
+# sing-box cache file, written by the core at runtime
+cache.db
