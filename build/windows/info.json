@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "1.0.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "1.0.0",
+			"CompanyName": "Rigby Foundation",
+			"FileDescription": "Modern, lightweight VPN client with an embedded sing-box core",
+			"LegalCopyright": "(c) 2026, Rigby Foundation",
+			"ProductName": "NuggetVPN",
+			"Comments": "GPL-3.0-only"
+		}
+	}
+}

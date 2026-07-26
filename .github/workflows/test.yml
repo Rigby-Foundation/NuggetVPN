@@ -7,113 +7,123 @@ on:
       - "v*"
   pull_request:
 
+# Superseded runs are pointless here: a CGO build of sing-box plus Wails is the
+# expensive part, so cancel the previous one on a new push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The build tags live in Taskfile.yml and are applied automatically by
+# `wails3 task build`; buildtags.go fails the build if any are missing.
+env:
+  SING_BOX_TAGS: with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme
+  WAILS_VERSION: v3.0.0-alpha2.117
+
+# Runners are Blacksmith. Note the cache actions below are the upstream ones on
+# purpose: Blacksmith intercepts them and serves from a colocated cache, and its
+# own useblacksmith/* forks are archived.
 jobs:
-  test-build:
+  test:
+    name: Go tests (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-15-intel" # Intel
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-
-          - platform: "macos-15" # Apple Silicon
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-
-          - platform: "ubuntu-22.04" # Linux (Debian-style)
-            args: "--bundles deb,appimage"
-            target: "x86_64-unknown-linux-gnu"
-            linux_distro: "ubuntu"
-
-          - platform: "ubuntu-22.04" # Linux (Fedora container -> rpm)
-            args: "--bundles rpm" # <-- убрал appimage
-            target: "x86_64-unknown-linux-gnu"
-            linux_distro: "fedora"
-            container_image: "fedora:latest"
-
-          - platform: "windows-latest" # Windows
-            args: ""
-            target: "x86_64-pc-windows-msvc"
-
-    runs-on: ${{ matrix.platform }}
-
-    # Fedora job runs inside a Fedora container (no native runner exists)
-    container: ${{ matrix.container_image }}
-
+          - name: linux
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - name: macos
+            runner: blacksmith-6vcpu-macos-15
+          - name: windows
+            runner: blacksmith-4vcpu-windows-2025
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
-      # Packages/tools needed only for Fedora container because it starts empty-ish
-      - name: Install base tools (Fedora container)
-        if: matrix.linux_distro == 'fedora'
-        run: |
-          dnf -y update
-          dnf -y install git curl wget file unzip tar xz findutils which
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
         with:
-          targets: ${{ matrix.target }}
+          go-version: "1.24"
+          cache: true
 
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Create placeholder frontend assets
+        # main.go embeds frontend/dist, a build artifact that is not in git, so
+        # Go tooling cannot even load the package without it. The tests never
+        # read the embedded assets; the build job compiles the real frontend.
+        shell: bash
+        run: |
+          mkdir -p frontend/dist
+          echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
+
+      - name: Vet
+        run: go vet -tags "$SING_BOX_TAGS" ./...
+        shell: bash
+
+      - name: Test
+        run: go test -tags "$SING_BOX_TAGS" -count=1 ./...
+        shell: bash
+
+  build:
+    name: Build (${{ matrix.name }})
+    # Deliberately not gated on `test`: both compile the same dependency tree,
+    # so running them in parallel roughly halves wall-clock time, and a genuine
+    # compile error fails the build job on its own anyway.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: blacksmith-12vcpu-macos-15
+          - name: linux-amd64
+            runner: blacksmith-8vcpu-ubuntu-2404
+          - name: windows-amd64
+            runner: blacksmith-8vcpu-windows-2025
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install Linux dependencies (Ubuntu)
-        if: matrix.linux_distro == 'ubuntu'
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libsoup-3.0-dev
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
-      - name: Install Linux dependencies (Fedora)
-        if: matrix.linux_distro == 'fedora'
-        run: |
-          dnf -y install \
-            nodejs npm \
-            gcc gcc-c++ make \
-            openssl-devel \
-            gtk3-devel \
-            webkit2gtk4.1-devel \
-            libayatana-appindicator3-devel \
-            librsvg2-devel \
-            libsoup3-devel \
-            xdg-utils
+      - name: Put Go tool binaries on PATH
+        # setup-go does not add GOPATH/bin, which is where `go install` puts
+        # the wails3 CLI.
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Install frontend dependencies
-        run: bun install
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
 
-      - name: Build (Test)
-        run: bun tauri build ${{ matrix.args }}
+      - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
-      - name: Upload Artifacts
+      - name: Build
+        run: wails3 task build
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuggetvpn-${{ matrix.platform }}${{ matrix.linux_distro && format('-{0}', matrix.linux_distro) || '' }}
-          path: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/rpm/*.rpm
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/*/release/bundle/dmg/*.dmg
-            src-tauri/target/*/release/bundle/macos/*.app
-            src-tauri/target/*/release/bundle/nsis/*.exe
-            src-tauri/target/*/release/bundle/msi/*.msi
-            src-tauri/target/*/release/bundle/deb/*.deb
-            src-tauri/target/*/release/bundle/rpm/*.rpm
-            src-tauri/target/*/release/bundle/appimage/*.AppImage
-          if-no-files-found: warn
+          name: nuggetvpn-${{ matrix.name }}
+          path: bin/*
+          if-no-files-found: error

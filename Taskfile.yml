@@ -1,0 +1,82 @@
+version: '3'
+
+vars:
+  APP_NAME: "NuggetVPN"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "bun"}}'
+  # Matches the strictPort setting in frontend/vite.config.ts.
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 1420}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+  # sing-box gates features behind build tags, and a missing one fails *silently
+  # at runtime*: no Reality (with_utls), no Hysteria2/TUIC (with_quic), no TUN
+  # (with_gvisor). buildtags.go turns that into a compile error, and the default
+  # below means a plain `wails3 build` still picks them up.
+  SING_BOX_TAGS: "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"
+  EXTRA_TAGS: '{{.EXTRA_TAGS | default "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+        vars:
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+        vars:
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  test:
+    summary: Runs the Go test suite with the production build tags
+    deps:
+      - task: ensure:frontend:dist
+    cmds:
+      - go test -tags "{{.SING_BOX_TAGS}}" -count=1 ./...
+
+  vet:
+    summary: Static analysis with the production build tags
+    deps:
+      - task: ensure:frontend:dist
+    cmds:
+      - go vet -tags "{{.SING_BOX_TAGS}}" ./...
+
+  ensure:frontend:dist:
+    # main.go embeds frontend/dist, which is a build artifact and therefore not
+    # in git. Any Go tooling — vet, test, a bare `go build` — fails on a fresh
+    # clone without it. The tests never read the embedded assets, so a
+    # placeholder is enough; real builds overwrite it via `bun run build`.
+    internal: true
+    status:
+      - test -d frontend/dist
+    cmds:
+      - mkdir -p frontend/dist
+      - echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
+
+  tags:
+    summary: Prints the sing-box build tags
+    silent: true
+    cmds:
+      - echo "{{.SING_BOX_TAGS}}"

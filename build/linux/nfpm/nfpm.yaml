@@ -1,0 +1,53 @@
+# Package definition for the .deb / .rpm / Arch packages.
+# Built by `wails3 tool package`, which embeds nfpm — nothing extra to install.
+# Docs: https://nfpm.goreleaser.com
+
+name: "nuggetvpn"
+arch: ${GOARCH}
+platform: "linux"
+version: "1.0.0"
+section: "net"
+priority: "optional"
+maintainer: "Rigby Foundation <noreply@rigbyfoundation.org>"
+description: |
+  Modern, lightweight VPN client with an embedded sing-box core.
+  Supports VLESS (including Reality), VMess, Trojan, Shadowsocks,
+  Hysteria, Hysteria2, TUIC and WireGuard.
+vendor: "Rigby Foundation"
+homepage: "https://github.com/Rigby-Foundation/NuggetVPN"
+license: "GPL-3.0-only"
+release: "1"
+
+contents:
+  - src: "./bin/NuggetVPN"
+    dst: "/usr/bin/NuggetVPN"
+    file_info:
+      mode: 0755
+  - src: "./build/appicon.png"
+    dst: "/usr/share/icons/hicolor/512x512/apps/NuggetVPN.png"
+  - src: "./build/linux/NuggetVPN.desktop"
+    dst: "/usr/share/applications/NuggetVPN.desktop"
+
+# GTK4 + WebKitGTK 6.0 is the Wails v3 default stack (Ubuntu 24.04+ / Debian 13+).
+# polkit is not optional here: the GUI elevates the core service with pkexec to
+# create the TUN interface, and without it the app cannot connect.
+depends:
+  - libgtk-4-1
+  - libwebkitgtk-6.0-4
+  - policykit-1
+
+overrides:
+  rpm:
+    depends:
+      - gtk4
+      - webkitgtk6.0
+      - polkit
+  archlinux:
+    depends:
+      - gtk4
+      - webkitgtk-6.0
+      - polkit
+
+scripts:
+  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
+  postremove: "./build/linux/nfpm/scripts/postremove.sh"
