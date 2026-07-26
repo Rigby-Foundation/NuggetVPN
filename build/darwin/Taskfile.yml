@@ -27,7 +27,9 @@ tasks:
     summary: Builds the application natively on macOS
     internal: true
     deps:
-      - task: common:go:mod:tidy
+      # No go:mod:tidy here: a build must not rewrite go.mod/go.sum, and on
+      # Windows it raced with `bun install` over frontend/node_modules.
+      # Run `make tidy` explicitly when dependencies change.
       - task: common:build:frontend
         vars:
           BUILD_FLAGS:

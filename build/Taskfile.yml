@@ -176,8 +176,18 @@ tasks:
   generate:bindings:
     summary: Generates bindings for the frontend
     run: once
+    # Sequenced after `bun install` on purpose. Binding generation loads Go
+    # packages, which walks the whole module tree including
+    # frontend/node_modules. On Windows that directory cannot be opened while
+    # bun still holds it, and the build dies with "The process cannot access
+    # the file because it is being used by another process". Waiting costs a
+    # few seconds of lost parallelism and removes the race entirely.
+    #
+    # The upstream scaffold depends on go:mod:tidy here; we deliberately do
+    # not. A build must not rewrite go.mod/go.sum — if they are stale the
+    # build should fail loudly. Run `make tidy` when you actually mean it.
     deps:
-      - task: go:mod:tidy
+      - task: install:frontend:deps
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
