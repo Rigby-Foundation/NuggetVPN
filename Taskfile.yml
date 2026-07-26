@@ -51,13 +51,29 @@ tasks:
 
   test:
     summary: Runs the Go test suite with the production build tags
+    deps:
+      - task: ensure:frontend:dist
     cmds:
       - go test -tags "{{.SING_BOX_TAGS}}" -count=1 ./...
 
   vet:
     summary: Static analysis with the production build tags
+    deps:
+      - task: ensure:frontend:dist
     cmds:
       - go vet -tags "{{.SING_BOX_TAGS}}" ./...
+
+  ensure:frontend:dist:
+    # main.go embeds frontend/dist, which is a build artifact and therefore not
+    # in git. Any Go tooling — vet, test, a bare `go build` — fails on a fresh
+    # clone without it. The tests never read the embedded assets, so a
+    # placeholder is enough; real builds overwrite it via `bun run build`.
+    internal: true
+    status:
+      - test -d frontend/dist
+    cmds:
+      - mkdir -p frontend/dist
+      - echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
 
   tags:
     summary: Prints the sing-box build tags

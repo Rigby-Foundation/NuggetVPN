@@ -35,6 +35,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
+      - name: Create placeholder frontend assets
+        # main.go embeds frontend/dist, a build artifact that is not in git, so
+        # Go tooling cannot even load the package without it. The tests never
+        # read the embedded assets; the build job compiles the real frontend.
+        shell: bash
+        run: |
+          mkdir -p frontend/dist
+          echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
+
       - name: Vet
         run: go vet -tags "$SING_BOX_TAGS" ./...
         shell: bash
