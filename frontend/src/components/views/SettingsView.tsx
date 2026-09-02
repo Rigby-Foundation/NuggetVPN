@@ -1,4 +1,5 @@
 import { openApplications } from "@/lib/backend";
+import PageShell from "@/components/layout/PageShell";
 import * as React from "react";
 import {
   CheckCircle2,
@@ -59,8 +60,8 @@ function SettingsView({
   const [newDomain, setNewDomain] = React.useState("");
   const [newChainId, setNewChainId] = React.useState("");
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
-  const normalizedRoutingMode =
-    appSettings.routing_mode === "selected" ? "apps_domains" : appSettings.routing_mode;
+  // The legacy "selected" routing mode is collapsed by Normalize() in Go
+  // before the settings ever reach here, so this reads the value directly.
   const availableChainProfiles = profiles.filter(
     (p) => p.id !== selectedProfileId && !appSettings.proxy_chain.includes(p.id)
   );
@@ -121,15 +122,8 @@ function SettingsView({
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col">
-      <div className="flex-none px-6 pt-6 pb-2">
-        <h1 className="text-3xl font-black tracking-tight mb-2">Settings</h1>
-        <p className="text-muted-foreground mb-4">
-          Configure your client preferences
-        </p>
-      </div>
-
-      <div className="flex-1 overflow-hidden px-6 pb-6">
+    <PageShell fill title="Settings" description="Client preferences and tunnel behaviour.">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <Tabs defaultValue="general" className="h-full flex flex-col">
           <TabsList className="w-full justify-start mb-4">
             <TabsTrigger value="general">General</TabsTrigger>
@@ -178,6 +172,28 @@ function SettingsView({
 
                 <Card>
                   <CardContent>
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Check my public address</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Asks ipinfo.io which address your traffic comes from, so
+                          the connection screen can show it. This is a request to a
+                          third party; turn it off and nothing is sent.
+                        </div>
+                      </div>
+                      <Switch
+                        checked={appSettings.ip_check_enabled !== false}
+                        onCheckedChange={(checked) =>
+                          onSettingsChange("ip_check_enabled", checked)
+                        }
+                        aria-label="Check my public address"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent>
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <div className="text-sm font-medium">Synchronization</div>
@@ -187,7 +203,7 @@ function SettingsView({
                       </div>
                       {appSettings.auth_server && (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-green-500 font-mono flex items-center gap-1">
+                          <span className="text-xs text-status-connected font-mono flex items-center gap-1">
                             <CheckCircle2 size={12} /> Connected
                           </span>
                         </div>
@@ -525,7 +541,7 @@ function SettingsView({
                   </div>
 
                   <Tabs
-                    value={normalizedRoutingMode}
+                    value={appSettings.routing_mode}
                     onValueChange={(val) =>
                       onSettingsChange("routing_mode", val as AppSettings["routing_mode"])
                     }
@@ -789,7 +805,7 @@ function SettingsView({
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

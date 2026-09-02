@@ -1,123 +1,131 @@
 import { Plus, RefreshCw, Trash2 } from "lucide-react";
 
+import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import SelectableCard from "@/components/ui/selectable-card";
 import { cn } from "@/lib/utils";
+import { LOCAL } from "@/hooks/use-profiles";
 import { ConfigSource } from "@/types";
 
 interface ConfigurationViewProps {
-  sources: ConfigSource[];
-  selectedSource: string;
-  selectedProfileId: string;
-  refreshingSourceDomain: string;
-  onSelectSource: (source: ConfigSource) => void;
-  onDeleteSource: (source: ConfigSource) => void;
-  onRefreshSource: (source: ConfigSource) => void;
-  onAdd: () => void;
+    sources: ConfigSource[];
+    selectedSource: string;
+    selectedProfileId: string;
+    refreshingSourceDomain: string;
+    onSelectSource: (source: ConfigSource) => void;
+    onDeleteSource: (source: ConfigSource) => void;
+    onRefreshSource: (source: ConfigSource) => void;
+    onAdd: () => void;
 }
 
 function ConfigurationView({
-  sources,
-  selectedSource,
-  selectedProfileId,
-  refreshingSourceDomain,
-  onSelectSource,
-  onDeleteSource,
-  onRefreshSource,
-  onAdd,
+    sources,
+    selectedSource,
+    selectedProfileId,
+    refreshingSourceDomain,
+    onSelectSource,
+    onDeleteSource,
+    onRefreshSource,
+    onAdd,
 }: ConfigurationViewProps) {
-  const isSelected = (source: ConfigSource) =>
-    source.kind === "subscription"
-      ? selectedSource === source.domain
-      : selectedSource === "local" && selectedProfileId === source.profileId;
+    const isSelected = (source: ConfigSource) =>
+        source.kind === "subscription"
+            ? selectedSource === source.domain
+            : selectedSource === LOCAL && selectedProfileId === source.profileId;
 
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <ScrollArea className="h-full">
-        <div className="p-6">
-          <h2 className="text-lg font-bold mb-4">Configuration</h2>
-          <div className="space-y-2">
-            {sources.length === 0 && (
-              <div className="text-xs text-muted-foreground">
-                No configurations yet. Import a subscription or add a profile.
-              </div>
-            )}
-
-            {sources.map((source) => {
-              const sourceDomain =
-                source.kind === "subscription"
-                  ? (source.domain || "").trim() || "local"
-                  : "local";
-              const isRefreshingThis =
-                source.kind === "subscription" &&
-                refreshingSourceDomain === sourceDomain;
-              return (
-              <Card
-                key={source.key}
-                className={cn(
-                  "p-4 group hover:border-primary/50 transition-colors overflow-hidden cursor-pointer",
-                  isSelected(source) && "border-primary/60 bg-primary/5"
-                )}
-                onClick={() => onSelectSource(source)}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold truncate">
-                      {source.label}
-                    </div>
-                    <div className="text-xs text-muted-foreground font-mono mt-1 truncate">
-                      {source.detail}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRefreshSource(source);
-                    }}
-                    disabled={isRefreshingThis || source.kind !== "subscription"}
-                    className="shrink-0"
-                    title={
-                      source.kind === "subscription"
-                        ? "Refresh subscription"
-                        : "Only subscriptions can be refreshed"
-                    }
-                  >
-                    <RefreshCw
-                      size={16}
-                      className={cn(isRefreshingThis && "animate-spin")}
-                    />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDeleteSource(source);
-                    }}
-                    className="shrink-0 hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+    return (
+        <PageShell
+            title="Configuration"
+            description="Subscriptions and individual profiles you have added."
+            actions={
+                sources.length > 0 ? (
+                    <Button size="sm" variant="outline" onClick={onAdd}>
+                        <Plus size={14} className="mr-2" aria-hidden="true" />
+                        Add
+                    </Button>
+                ) : null
+            }
+        >
+            {sources.length === 0 ? (
+                <div className="rounded-lg border border-dashed py-14 px-6 text-center">
+                    <p className="text-sm font-medium">Nothing configured yet</p>
+                    <p className="text-xs text-muted-foreground mt-1 mb-4">
+                        Import a subscription URL, or paste a single share link.
+                    </p>
+                    <Button onClick={onAdd}>
+                        <Plus size={16} className="mr-2" aria-hidden="true" />
+                        Add profile or subscription
+                    </Button>
                 </div>
-              </Card>
-              );
-            })}
+            ) : (
+                <div className="space-y-2">
+                    {sources.map((source) => {
+                        const domain =
+                            source.kind === "subscription"
+                                ? (source.domain || "").trim() || LOCAL
+                                : LOCAL;
+                        const refreshing =
+                            source.kind === "subscription" &&
+                            refreshingSourceDomain === domain;
 
-            <Button
-              variant="outline"
-              className="w-full py-8 border-dashed"
-              onClick={onAdd}
-            >
-              <Plus size={16} className="mr-2" /> Add Profile / Subscription
-            </Button>
-          </div>
-        </div>
-      </ScrollArea>
-    </div>
-  );
+                        return (
+                            <SelectableCard
+                                key={source.key}
+                                selected={isSelected(source)}
+                                onSelect={() => onSelectSource(source)}
+                                label={`${source.label}, ${source.detail}`}
+                                className="group"
+                            >
+                                <div className="p-4 flex items-center gap-2">
+                                    <span className="flex-1 min-w-0">
+                                        <span className="block font-medium truncate">
+                                            {source.label}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground font-mono mt-0.5 truncate">
+                                            {source.detail}
+                                        </span>
+                                    </span>
+
+                                    {source.kind === "subscription" ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={`Refresh ${source.label}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onRefreshSource(source);
+                                            }}
+                                            disabled={refreshing}
+                                            className="shrink-0"
+                                        >
+                                            <RefreshCw
+                                                size={16}
+                                                className={cn(refreshing && "animate-spin")}
+                                                aria-hidden="true"
+                                            />
+                                        </Button>
+                                    ) : null}
+
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Delete ${source.label}`}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onDeleteSource(source);
+                                        }}
+                                        className="shrink-0 hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                        <Trash2 size={16} aria-hidden="true" />
+                                    </Button>
+                                </div>
+                            </SelectableCard>
+                        );
+                    })}
+                </div>
+            )}
+        </PageShell>
+    );
 }
 
 export default ConfigurationView;

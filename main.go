@@ -56,6 +56,7 @@ func runCoreService() error {
 	flags := flag.NewFlagSet("core-service", flag.ContinueOnError)
 	flags.Bool("core-service", true, "run the privileged core service")
 	socket := flags.String("socket", storage.ControlSocketPath(), "control socket path")
+	tokenFile := flags.String("token-file", storage.ControlTokenPath(), "path to the control token")
 	uid := flags.Int("uid", -1, "uid that should own the control socket")
 	gid := flags.Int("gid", -1, "gid that should own the control socket")
 	parent := flags.Int("parent", 0, "pid of the GUI process to watch")
@@ -64,8 +65,17 @@ func runCoreService() error {
 		return err
 	}
 
+	// Consuming the token here also deletes the file, so the credential exists
+	// on disk only for the moment between the GUI writing it and the elevated
+	// process starting.
+	token, err := core.ReadTokenFile(*tokenFile)
+	if err != nil {
+		return err
+	}
+
 	return core.RunService(core.ServiceOptions{
 		SocketPath: *socket,
+		Token:      token,
 		OwnerUID:   *uid,
 		OwnerGID:   *gid,
 		ParentPID:  *parent,
@@ -144,7 +154,7 @@ func newSystemTray(app *application.App, window *application.WebviewWindow, serv
 	})
 	menu.AddSeparator()
 	menu.Add("Disconnect").OnClick(func(*application.Context) {
-		if _, err := service.StopVPN(); err != nil {
+		if _, err := service.Disconnect(); err != nil {
 			app.Logger.Error("tray disconnect failed", "error", err)
 		}
 	})

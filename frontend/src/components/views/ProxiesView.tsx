@@ -1,181 +1,194 @@
 import { Check, RefreshCw, Zap } from "lucide-react";
 
-import { Profile } from "@/types";
-
+import PageShell from "@/components/layout/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import SelectableCard from "@/components/ui/selectable-card";
 import { cn } from "@/lib/utils";
+import { LOCAL } from "@/hooks/use-profiles";
+import { Profile, ProxyMode } from "@/types";
 
 interface ProxiesViewProps {
-  profiles: Profile[];
-  profilePings: Record<string, number | null>;
-  selectedSourceDomain: string;
-  selectedProxyMode: "manual" | "auto";
-  selectedProfileId: string;
-  isRefreshingSource: boolean;
-  onSelectProxy: (id: string) => void;
-  onSelectAuto: () => void;
-  onRefreshSource: () => void;
+    profiles: Profile[];
+    profilePings: Record<string, number | null>;
+    selectedSourceDomain: string;
+    selectedProxyMode: ProxyMode;
+    selectedProfileId: string;
+    isRefreshingSource: boolean;
+    onSelectProxy: (id: string) => void;
+    onSelectAuto: () => void;
+    onRefreshSource: () => void;
+}
+
+function pingLabel(ping: number | null | undefined): string {
+    if (ping === undefined) return "…";
+    if (ping === null) return "n/a";
+    return `${ping} ms`;
+}
+
+/** Colour the latency so the list can be read without parsing every number. */
+function pingTone(ping: number | null | undefined): string {
+    if (ping === undefined || ping === null) return "text-muted-foreground";
+    if (ping < 120) return "text-status-connected";
+    if (ping < 300) return "text-status-connecting";
+    return "text-status-error";
 }
 
 function ProxiesView({
-  profiles,
-  profilePings,
-  selectedSourceDomain,
-  selectedProxyMode,
-  selectedProfileId,
-  isRefreshingSource,
-  onSelectProxy,
-  onSelectAuto,
-  onRefreshSource,
+    profiles,
+    profilePings,
+    selectedSourceDomain,
+    selectedProxyMode,
+    selectedProfileId,
+    isRefreshingSource,
+    onSelectProxy,
+    onSelectAuto,
+    onRefreshSource,
 }: ProxiesViewProps) {
-  const normalizedDomain = selectedSourceDomain.trim() || "local";
-  const domainLabel = normalizedDomain === "local" ? "Local" : normalizedDomain;
-  const isSubscriptionSource = normalizedDomain !== "local";
-  const domainProfiles = isSubscriptionSource
-    ? profiles.filter((profile) => {
-        const domain = (profile.source_domain || "").trim() || "local";
-        return domain === normalizedDomain;
-      })
-    : [];
+    const domain = selectedSourceDomain.trim() || LOCAL;
+    const isSubscription = domain !== LOCAL;
+    const domainProfiles = isSubscription
+        ? profiles.filter(
+              (profile) => ((profile.source_domain || "").trim() || LOCAL) === domain
+          )
+        : [];
 
-  const bestProxy = domainProfiles.reduce<Profile | null>((best, profile) => {
-    const ping = profilePings[profile.id];
-    if (ping === null || ping === undefined) {
-      return best;
-    }
-    if (!best) return profile;
-    const bestPing = profilePings[best.id];
-    if (bestPing === null || bestPing === undefined) return profile;
-    return ping < bestPing ? profile : best;
-  }, null);
+    const best = domainProfiles.reduce<Profile | null>((winner, profile) => {
+        const ping = profilePings[profile.id];
+        if (ping === null || ping === undefined) return winner;
+        if (!winner) return profile;
+        const bestPing = profilePings[winner.id];
+        if (bestPing === null || bestPing === undefined) return profile;
+        return ping < bestPing ? profile : winner;
+    }, null);
 
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <ScrollArea className="h-full">
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold mb-1">Proxies</h2>
-              <p className="text-xs text-muted-foreground">
-                {domainProfiles.length === 0
-                  ? "No proxies available for this configuration."
-                  : `Showing proxies from ${domainLabel}.`}
-              </p>
-            </div>
-            {isSubscriptionSource && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRefreshSource}
-                disabled={isRefreshingSource}
-                className="shrink-0"
-              >
-                <RefreshCw
-                  size={14}
-                  className={cn("mr-2", isRefreshingSource && "animate-spin")}
-                />
-                Refresh
-              </Button>
-            )}
-          </div>
+    return (
+        <PageShell
+            title="Proxies"
+            description={
+                isSubscription
+                    ? `${domainProfiles.length} from ${domain}`
+                    : "This configuration is a single profile and has no server list."
+            }
+            actions={
+                isSubscription ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onRefreshSource}
+                        disabled={isRefreshingSource}
+                    >
+                        <RefreshCw
+                            size={14}
+                            className={cn("mr-2", isRefreshingSource && "animate-spin")}
+                            aria-hidden="true"
+                        />
+                        {isRefreshingSource ? "Refreshing…" : "Refresh"}
+                    </Button>
+                ) : null
+            }
+        >
+            {isSubscription ? (
+                <div className="space-y-2">
+                    <SelectableCard
+                        selected={selectedProxyMode === "auto"}
+                        onSelect={onSelectAuto}
+                        label="Automatic server selection"
+                    >
+                        <div className="p-4 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span
+                                    className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0"
+                                    aria-hidden="true"
+                                >
+                                    <Zap size={16} className="text-primary" />
+                                </span>
+                                <span className="min-w-0">
+                                    <span className="font-medium flex items-center gap-2">
+                                        Automatic
+                                        {selectedProxyMode === "auto" ? (
+                                            <Badge variant="secondary" className="gap-1">
+                                                <Check size={12} aria-hidden="true" /> Selected
+                                            </Badge>
+                                        ) : null}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground truncate">
+                                        {best
+                                            ? `Fastest right now: ${best.name}`
+                                            : "Picks the lowest-latency server that answers."}
+                                    </span>
+                                </span>
+                            </div>
+                            {best ? (
+                                <span
+                                    className={cn(
+                                        "text-xs font-mono tnum shrink-0",
+                                        pingTone(profilePings[best.id])
+                                    )}
+                                >
+                                    {pingLabel(profilePings[best.id])}
+                                </span>
+                            ) : null}
+                        </div>
+                    </SelectableCard>
 
-          {isSubscriptionSource && (
-            <Card
-              className={cn(
-                "cursor-pointer transition-colors",
-                selectedProxyMode === "auto" && "border-primary/60 bg-primary/5"
-              )}
-              onClick={onSelectAuto}
-            >
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Zap size={16} className="text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold flex items-center gap-2 min-w-0">
-                      Auto
-                      {selectedProxyMode === "auto" && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Check size={12} /> Selected
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {bestProxy
-                        ? `Best ping: ${bestProxy.name}`
-                        : "Selects the lowest latency proxy server."}
-                    </div>
-                  </div>
-                </div>
-                {bestProxy && profilePings[bestProxy.id] !== undefined && (
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {profilePings[bestProxy.id] === null
-                      ? "n/a"
-                      : `${profilePings[bestProxy.id]} ms`}
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {domainProfiles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {isSubscriptionSource
-                ? "No proxies available for this configuration."
-                : "This configuration does not expose a proxy list."}
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {domainProfiles.map((profile) => {
-                const ping = profilePings[profile.id];
-                const isSelected =
-                  selectedProxyMode === "manual" &&
-                  selectedProfileId === profile.id;
-                const pingLabel =
-                  ping === undefined ? "..." : ping === null ? "n/a" : `${ping} ms`;
-                return (
-                  <Card
-                    key={profile.id}
-                    className={cn(
-                      "cursor-pointer transition-colors !py-3",
-                      isSelected && "border-primary/60 bg-primary/5"
+                    {domainProfiles.length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-8 text-center">
+                            No servers in this subscription yet. Try refreshing it.
+                        </p>
+                    ) : (
+                        <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
+                            {domainProfiles.map((profile) => {
+                                const ping = profilePings[profile.id];
+                                const selected =
+                                    selectedProxyMode === "manual" &&
+                                    selectedProfileId === profile.id;
+                                return (
+                                    <SelectableCard
+                                        key={profile.id}
+                                        selected={selected}
+                                        onSelect={() => onSelectProxy(profile.id)}
+                                        label={`${profile.name}, ${profile.protocol}, ${pingLabel(ping)}`}
+                                    >
+                                        <div className="p-4 flex items-center justify-between gap-3">
+                                            <span className="min-w-0">
+                                                <span className="font-medium flex items-center gap-2 min-w-0">
+                                                    <span className="truncate">{profile.name}</span>
+                                                    {selected ? (
+                                                        <Badge variant="secondary" className="gap-1 shrink-0">
+                                                            <Check size={12} aria-hidden="true" /> Selected
+                                                        </Badge>
+                                                    ) : null}
+                                                </span>
+                                                <span
+                                                    className="block text-xs text-muted-foreground font-mono truncate"
+                                                    title={`${profile.server} (${profile.protocol})`}
+                                                >
+                                                    {profile.server} · {profile.protocol}
+                                                </span>
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    "text-xs font-mono tnum shrink-0",
+                                                    pingTone(ping)
+                                                )}
+                                            >
+                                                {pingLabel(ping)}
+                                            </span>
+                                        </div>
+                                    </SelectableCard>
+                                );
+                            })}
+                        </div>
                     )}
-                    onClick={() => onSelectProxy(profile.id)}
-                  >
-                    <CardContent className="p-4 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold flex items-center gap-2 min-w-0">
-                          <span className="truncate">{profile.name}</span>
-                          {isSelected && (
-                            <Badge variant="secondary" className="gap-1">
-                              <Check size={12} /> Selected
-                            </Badge>
-                          )}
-                        </div>
-                        <div
-                          className="text-xs text-muted-foreground font-mono truncate"
-                          title={`${profile.server} (${profile.protocol})`}
-                        >
-                          {profile.server} ({profile.protocol})
-                        </div>
-                      </div>
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {pingLabel}
-                      </span>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
+                </div>
+            ) : (
+                <p className="text-xs text-muted-foreground py-8 text-center">
+                    Pick a subscription from the top bar to see its servers.
+                </p>
+            )}
+        </PageShell>
+    );
 }
 
 export default ProxiesView;

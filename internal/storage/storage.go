@@ -116,6 +116,15 @@ func ControlSocketPath() string {
 // is informational only.
 func CoreConfigPath() string { return filepath.Join(RuntimeDir(), "config.json") }
 
+// ControlTokenPath is the 0600 file the GUI drops the control-socket token in
+// for the elevated service to pick up.
+//
+// The token goes through a file rather than a command-line argument because
+// argv is world-readable on Linux (/proc/<pid>/cmdline) and readable by other
+// processes on Windows, which would hand every local account the credential for
+// a root-owned control socket.
+func ControlTokenPath() string { return filepath.Join(RuntimeDir(), "core.token") }
+
 // EnsureDirs creates every directory the app writes to.
 func EnsureDirs() error {
 	for _, dir := range []string{DataDir(), LogDir(), RuntimeDir()} {

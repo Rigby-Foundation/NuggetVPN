@@ -13,17 +13,41 @@ NuggetVPN --core-service   the privileged core (started by the GUI)
 
 Creating a TUN interface requires root, but a browser engine should never run as root. So the GUI re-executes *itself* behind the platform's authorization prompt (`osascript` on macOS, `pkexec` on Linux, UAC on Windows) and drives that process over a unix socket owned by your user account. Both sides are the same executable, so the UI and the tunnel can never drift to different sing-box versions.
 
-The core service holds a live `*box.Box`: starting a profile is a function call, not a config file plus a process spawn. Logs come back through sing-box's `PlatformWriter` interface and stream straight into the UI.
+The core service holds a live `*box.Box`: starting a profile is a function call, not a config file plus a process spawn. Logs, connection state and byte counters come back over the same connection and stream straight into the UI.
 
 ```
 ┌────────────────┐   unix socket    ┌──────────────────────────┐
 │  GUI (user)    │ ───────────────► │  --core-service (root)   │
 │  React + Wails │   JSON lines     │  sing-box as a library   │
 │                │ ◄─────────────── │  TUN + routing + DNS     │
-└────────────────┘  logs / state    └──────────────────────────┘
+└────────────────┘ logs/state/stats └──────────────────────────┘
 ```
 
 Quitting the GUI shuts the core down, and the core independently watches the GUI's pid — so a crash cannot leave a root process holding your routing table.
+
+### The control socket is authenticated
+
+Anything that can talk to that socket can hand an arbitrary sing-box config to a
+root process, so file permissions are not enough on their own — `chmod` and
+`chown` do nothing for `AF_UNIX` on Windows. Every connection must open with a
+handshake carrying a 256-bit per-session token. The GUI generates it, writes it
+to a `0600` file, and the elevated process reads and deletes that file on
+startup; a connection that cannot produce it is closed without being told
+anything, including whether a tunnel exists. The token travels through a file
+rather than a command-line argument because argv is world-readable on Linux.
+
+### There is no Clash API listener
+
+The traffic counters come from sing-box's own accounting, read in-process and
+pushed to the UI over the control socket. sing-box builds that accounting
+whenever a `clash_api` block is present, and leaving `external_controller`
+unset means it never opens a socket for it.
+
+That is deliberate. Setting `external_controller` would publish an
+unauthenticated control plane for the *root* core on loopback, and sing-box
+serves it with permissive CORS — so every local program, and every web page you
+visit, could read your live connection list and drive the tunnel. Two integers
+are not worth that.
 
 ## Features
 
@@ -42,7 +66,7 @@ sing-box implements Reality on top of uTLS, so a Reality outbound is only valid 
 
 ## Prerequisites
 
-- **Go** 1.24 or newer.
+- **Go** 1.25.5 or newer (the version `go.mod` requires; CI pins the same).
 - **Bun** (or Node.js) for the frontend.
 - **Wails CLI** v3.0.0-alpha2.117:
   ```bash
@@ -94,7 +118,7 @@ sing-box gates its features behind build tags. Miss one and the feature disappea
 | `with_quic` | no Hysteria, Hysteria2 or TUIC |
 | `with_gvisor` | the TUN interface cannot start |
 | `with_wireguard` | no WireGuard endpoints |
-| `with_clash_api` | no traffic counters |
+| `with_clash_api` | no traffic counters (sing-box builds its byte accounting with this tag; the app reads it in-process and never opens the HTTP listener) |
 
 `buildtags.go` turns a missing tag into a compile error, and the tag list lives in
 `Taskfile.yml` as `SING_BOX_TAGS`, applied automatically by every build task —
@@ -135,7 +159,7 @@ These are the same paths the previous build used, so profiles and settings survi
 - **`internal/remote/`** — subscriptions and profile sync.
 - **`internal/probe/`** — latency and connectivity probes.
 - **`internal/storage/`**, **`internal/models/`** — persistence and shared types.
-- **`frontend/`** — React application; `src/lib/backend.ts` bridges it to the Go bindings.
+- **`frontend/`** — React application. `src/lib/backend.ts` bridges it to the Go bindings; `src/hooks/` holds the state that mirrors the backend (connection, traffic, logs, profiles).
 
 ## Known limitations
 

@@ -14,7 +14,7 @@ export function MacWindowControls({
   className,
 }: MacWindowControlsProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)} data-tauri-drag-region>
+    <div className={cn("flex items-center gap-2", className)}>
       <button
         type="button"
         onClick={onClose}

@@ -14,7 +14,7 @@ export function WindowControls({
     onClose,
 }: WindowControlsProps) {
     return (
-        <div className="flex justify-end select-none transition-colors duration-200" data-tauri-drag-region>
+        <div className="flex justify-end select-none transition-colors duration-200">
             <div className="flex items-center text-foreground z-50">
                 <Button
                     variant="ghost"

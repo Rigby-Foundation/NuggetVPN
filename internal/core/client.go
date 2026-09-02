@@ -2,11 +2,14 @@ package core
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -19,9 +22,14 @@ const dialTimeout = 2 * time.Second
 // after the user approves the prompt.
 const startupTimeout = 60 * time.Second
 
+// staleServiceTimeout bounds how long we wait for a service we cannot
+// authenticate against to notice its own parent died and exit.
+const staleServiceTimeout = 10 * time.Second
+
 // Client drives the privileged core service from the GUI process.
 type Client struct {
 	socketPath string
+	tokenPath  string
 	version    string
 
 	mu       sync.Mutex
@@ -30,15 +38,19 @@ type Client struct {
 	nextID   uint64
 	pending  map[uint64]chan Response
 	closing  bool
+	token    string
 	onLog    func(level, message string)
 	onState  func(running bool)
+	onStats  func(up, down int64)
 	elevated bool
 }
 
-// NewClient returns a client for the given control socket.
-func NewClient(socketPath, version string) *Client {
+// NewClient returns a client for the given control socket. tokenPath is where
+// the per-session credential is handed to the elevated service.
+func NewClient(socketPath, tokenPath, version string) *Client {
 	return &Client{
 		socketPath: socketPath,
+		tokenPath:  tokenPath,
 		version:    version,
 		pending:    map[uint64]chan Response{},
 	}
@@ -58,6 +70,14 @@ func (c *Client) OnState(handler func(running bool)) {
 	c.onState = handler
 }
 
+// OnStats registers the sink for the byte counters the core pushes once a
+// second while the tunnel is up.
+func (c *Client) OnStats(handler func(up, down int64)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onStats = handler
+}
+
 // Connected reports whether the control connection is currently open.
 func (c *Client) Connected() bool {
 	c.mu.Lock()
@@ -71,17 +91,26 @@ func (c *Client) Ensure() error {
 	if c.Connected() {
 		return nil
 	}
+
 	if err := c.connect(); err == nil {
-		// A service left over from a previous build must be replaced.
-		if response, pingErr := c.request(Request{Cmd: CmdPing}); pingErr == nil {
-			if response.Version == c.version {
-				return nil
-			}
+		response, handshakeErr := c.handshake()
+		switch {
+		case handshakeErr == nil && response.Version == c.version:
+			return nil
+
+		case handshakeErr == nil:
+			// A service left over from a previous build must be replaced.
 			_, _ = c.request(Request{Cmd: CmdShutdown})
 			c.disconnect()
 			time.Sleep(300 * time.Millisecond)
-		} else {
+
+		default:
+			// Something is listening that will not accept our token: almost
+			// always a service from an earlier GUI session, whose token file is
+			// long gone. We cannot command it, but its parent watcher will reap
+			// it within a couple of seconds, so wait rather than fighting it.
 			c.disconnect()
+			c.waitForStaleService()
 		}
 	}
 
@@ -97,7 +126,7 @@ func (c *Client) Ensure() error {
 	deadline := time.Now().Add(startupTimeout)
 	for time.Now().Before(deadline) {
 		if err := c.connect(); err == nil {
-			if _, err := c.request(Request{Cmd: CmdPing}); err == nil {
+			if _, err := c.handshake(); err == nil {
 				return nil
 			}
 			c.disconnect()
@@ -107,16 +136,80 @@ func (c *Client) Ensure() error {
 	return errors.New("timed out waiting for the privileged core service to start")
 }
 
+// waitForStaleService blocks until nothing answers on the socket any more, or
+// the timeout expires.
+func (c *Client) waitForStaleService() {
+	deadline := time.Now().Add(staleServiceTimeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("unix", c.socketPath, dialTimeout)
+		if err != nil {
+			return
+		}
+		_ = conn.Close()
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+// handshake authenticates the open connection. It must be the first thing sent
+// on a connection; the service closes anything that does not lead with it.
+func (c *Client) handshake() (Response, error) {
+	c.mu.Lock()
+	token := c.token
+	c.mu.Unlock()
+
+	if token == "" {
+		return Response{}, errors.New("no control token for this session")
+	}
+	return c.request(Request{Cmd: CmdHello, Token: token})
+}
+
+// newToken generates the per-session credential and writes it where the
+// elevated service will read it, with owner-only permissions.
+//
+// It goes through a file rather than argv because argv is world-readable on
+// Linux and inspectable by other processes on Windows, and the credential opens
+// a root-owned control socket that accepts arbitrary sing-box configs.
+func (c *Client) newToken() (string, error) {
+	buffer := make([]byte, 32)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", fmt.Errorf("generate control token: %w", err)
+	}
+	token := hex.EncodeToString(buffer)
+
+	if err := os.MkdirAll(filepath.Dir(c.tokenPath), 0o755); err != nil {
+		return "", err
+	}
+	// Created with the final mode rather than written and chmod-ed, so the
+	// token is never readable by anyone else, even briefly.
+	file, err := os.OpenFile(c.tokenPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return "", fmt.Errorf("write control token: %w", err)
+	}
+	defer file.Close()
+	if _, err := file.WriteString(token); err != nil {
+		return "", fmt.Errorf("write control token: %w", err)
+	}
+
+	c.mu.Lock()
+	c.token = token
+	c.mu.Unlock()
+	return token, nil
+}
+
 // launchService re-executes this binary with --core-service under elevation.
 func (c *Client) launchService() error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate executable: %w", err)
 	}
+	if _, err := c.newToken(); err != nil {
+		return err
+	}
 
 	args := []string{
 		"--core-service",
 		"--socket", c.socketPath,
+		"--token-file", c.tokenPath,
 		"--uid", strconv.Itoa(os.Getuid()),
 		"--gid", strconv.Itoa(os.Getgid()),
 		"--parent", strconv.Itoa(os.Getpid()),
@@ -183,13 +276,16 @@ func (c *Client) readLoop(conn net.Conn) {
 			Version string `json:"version"`
 			Level   string `json:"level"`
 			Message string `json:"message"`
+			Up      int64  `json:"up"`
+			Down    int64  `json:"down"`
 		}
 		if err := json.Unmarshal(line, &envelope); err != nil {
 			continue
 		}
 
 		if envelope.Event != "" {
-			c.dispatchEvent(envelope.Event, envelope.Level, envelope.Message, envelope.Running)
+			c.dispatchEvent(envelope.Event, envelope.Level, envelope.Message,
+				envelope.Running, envelope.Up, envelope.Down)
 			continue
 		}
 
@@ -204,6 +300,8 @@ func (c *Client) readLoop(conn net.Conn) {
 				Error:   envelope.Error,
 				Running: envelope.Running,
 				Version: envelope.Version,
+				Up:      envelope.Up,
+				Down:    envelope.Down,
 			}
 			close(waiter)
 		}
@@ -214,13 +312,16 @@ func (c *Client) readLoop(conn net.Conn) {
 	c.mu.Unlock()
 	if stillCurrent {
 		c.disconnect()
-		c.dispatchEvent(EventState, "", "", false)
+		// The core is gone, so whatever the UI last heard is now wrong: say so
+		// explicitly rather than leaving it showing a tunnel that no longer
+		// exists.
+		c.dispatchEvent(EventState, "", "", false, 0, 0)
 	}
 }
 
-func (c *Client) dispatchEvent(name, level, message string, running bool) {
+func (c *Client) dispatchEvent(name, level, message string, running bool, up, down int64) {
 	c.mu.Lock()
-	onLog, onState := c.onLog, c.onState
+	onLog, onState, onStats := c.onLog, c.onState, c.onStats
 	c.mu.Unlock()
 
 	switch name {
@@ -231,6 +332,10 @@ func (c *Client) dispatchEvent(name, level, message string, running bool) {
 	case EventState:
 		if onState != nil {
 			onState(running)
+		}
+	case EventStats:
+		if onStats != nil {
+			onStats(up, down)
 		}
 	}
 }
@@ -301,6 +406,19 @@ func (c *Client) Running() bool {
 		return false
 	}
 	return response.Running
+}
+
+// Stats reads the byte counters on demand. The core also pushes them once a
+// second, so this is only for callers that need a value right now.
+func (c *Client) Stats() (up, down int64, ok bool) {
+	if !c.Connected() {
+		return 0, 0, false
+	}
+	response, err := c.request(Request{Cmd: CmdStats})
+	if err != nil {
+		return 0, 0, false
+	}
+	return response.Up, response.Down, response.Running
 }
 
 // Shutdown stops the tunnel and asks the privileged service to exit. Called
