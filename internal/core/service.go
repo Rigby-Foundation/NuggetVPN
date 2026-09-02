@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,14 +11,24 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// statsInterval is how often the running tunnel's byte counters are pushed to
+// connected clients. The GUI renders a per-second rate, so anything slower
+// would make the speed readout lie.
+const statsInterval = time.Second
 
 // ServiceOptions configures the privileged core service.
 type ServiceOptions struct {
 	// SocketPath is the unix socket the GUI connects to.
 	SocketPath string
+	// Token authenticates clients. An empty token is refused outright rather
+	// than silently accepting everyone.
+	Token string
 	// OwnerUID receives ownership of the socket so the unprivileged GUI can
 	// talk to the service without opening it up to every local account.
 	OwnerUID int
@@ -47,6 +58,10 @@ type Service struct {
 type serviceClient struct {
 	encoder *json.Encoder
 	mu      sync.Mutex
+	// authenticated flips once a valid CmdHello arrives. Until then the
+	// connection may not do anything at all. It is atomic because the serve
+	// goroutine sets it while broadcast reads it from the ticker goroutine.
+	authenticated atomic.Bool
 }
 
 func (c *serviceClient) send(payload any) error {
@@ -55,11 +70,30 @@ func (c *serviceClient) send(payload any) error {
 	return c.encoder.Encode(payload)
 }
 
+// ReadTokenFile loads the shared secret the GUI wrote for the service. The file
+// is removed once read so a stale token cannot be replayed by a later process.
+func ReadTokenFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read control token: %w", err)
+	}
+	_ = os.Remove(path)
+
+	token := strings.TrimSpace(string(data))
+	if token == "" {
+		return "", errors.New("control token file is empty")
+	}
+	return token, nil
+}
+
 // RunService starts the privileged service and blocks until the GUI asks it to
 // shut down or the parent process disappears.
 func RunService(options ServiceOptions) error {
 	if options.SocketPath == "" {
 		return errors.New("core service requires --socket")
+	}
+	if options.Token == "" {
+		return errors.New("core service requires a control token")
 	}
 	if options.WorkingDir != "" {
 		if err := os.MkdirAll(options.WorkingDir, 0o755); err == nil {
@@ -90,6 +124,8 @@ func (s *Service) run() error {
 	defer os.Remove(s.options.SocketPath)
 
 	// The service runs as root; hand the socket to the user that launched it.
+	// This is defence in depth only. The token is what actually authenticates,
+	// because chown and chmod do nothing for AF_UNIX sockets on Windows.
 	if s.options.OwnerUID > 0 {
 		gid := s.options.OwnerGID
 		if gid < 0 {
@@ -106,6 +142,7 @@ func (s *Service) run() error {
 	if s.options.ParentPID > 0 {
 		go s.watchParent()
 	}
+	go s.pushStats()
 
 	go func() {
 		<-s.done
@@ -147,6 +184,28 @@ func (s *Service) watchParent() {
 	}
 }
 
+// pushStats broadcasts the byte counters while the tunnel is up, so the GUI
+// never polls for them. Counting belongs here: the core owns the numbers, and a
+// GUI that is minimised, backgrounded or mid-reload cannot drop samples it
+// never had to ask for.
+func (s *Service) pushStats() {
+	ticker := time.NewTicker(statsInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-ticker.C:
+			up, down, ok := s.instance.Stats()
+			if !ok {
+				continue
+			}
+			s.broadcast(Event{Event: EventStats, Up: up, Down: down})
+		}
+	}
+}
+
 func (s *Service) shutdown() {
 	s.doneOnce.Do(func() { close(s.done) })
 }
@@ -179,6 +238,25 @@ func (s *Service) serve(conn net.Conn) {
 			_ = client.send(Response{OK: false, Error: "malformed request: " + err.Error()})
 			continue
 		}
+
+		// Nothing but the handshake is served to an unauthenticated peer, and a
+		// wrong token drops the connection rather than inviting another guess.
+		if !client.authenticated.Load() {
+			if request.Cmd != CmdHello || !s.tokenMatches(request.Token) {
+				_ = client.send(Response{ID: request.ID, OK: false, Error: "unauthorized"})
+				log.Printf("rejected an unauthenticated control connection")
+				return
+			}
+			client.authenticated.Store(true)
+			_ = client.send(Response{
+				ID:      request.ID,
+				OK:      true,
+				Version: s.options.Version,
+				Running: s.instance.Running(),
+			})
+			continue
+		}
+
 		response := s.handle(request)
 		if err := client.send(response); err != nil {
 			return
@@ -194,10 +272,24 @@ func (s *Service) serve(conn net.Conn) {
 	}
 }
 
+// tokenMatches compares in constant time so a wrong guess leaks nothing through
+// timing. ConstantTimeCompare already returns 0 for mismatched lengths.
+func (s *Service) tokenMatches(candidate string) bool {
+	if s.options.Token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(candidate), []byte(s.options.Token)) == 1
+}
+
 func (s *Service) handle(request Request) Response {
 	response := Response{ID: request.ID, OK: true}
 
 	switch request.Cmd {
+	case CmdHello:
+		// Already authenticated; a repeated handshake is harmless.
+		response.Version = s.options.Version
+		response.Running = s.instance.Running()
+
 	case CmdPing:
 		response.Version = s.options.Version
 		response.Running = s.instance.Running()
@@ -224,6 +316,11 @@ func (s *Service) handle(request Request) Response {
 		response.Running = s.instance.Running()
 		response.Version = s.options.Version
 
+	case CmdStats:
+		up, down, ok := s.instance.Stats()
+		response.Running = ok
+		response.Up, response.Down = up, down
+
 	case CmdShutdown:
 		response.Running = false
 
@@ -245,7 +342,11 @@ func (s *Service) broadcast(event Event) {
 	s.mu.Lock()
 	clients := make([]*serviceClient, 0, len(s.clients))
 	for client := range s.clients {
-		clients = append(clients, client)
+		// An unauthenticated peer is told nothing at all, not even that the
+		// tunnel exists.
+		if client.authenticated.Load() {
+			clients = append(clients, client)
+		}
 	}
 	s.mu.Unlock()
 

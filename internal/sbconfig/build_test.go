@@ -24,10 +24,9 @@ func buildFor(t *testing.T, configLink string, mutate func(*models.AppSettings))
 	}
 
 	result, err := Build(Request{
-		Profile:        models.Profile{ID: "p1", Name: "test", ConfigLink: configLink},
-		Profiles:       []models.Profile{{ID: "p1", ConfigLink: configLink}},
-		Settings:       settings,
-		ClashAPIListen: "127.0.0.1:19190",
+		Profile:  models.Profile{ID: "p1", Name: "test", ConfigLink: configLink},
+		Profiles: []models.Profile{{ID: "p1", ConfigLink: configLink}},
+		Settings: settings,
 	})
 	if err != nil {
 		t.Fatalf("Build(%q) failed: %v", configLink, err)
@@ -341,5 +340,34 @@ func TestRigbyLinkReportsUnsupported(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "rigby") {
 		t.Fatalf("error should name the protocol, got %v", err)
+	}
+}
+
+// TestNoExternalController pins the decision to keep sing-box's Clash API
+// listener switched off. An external_controller would publish an
+// unauthenticated control plane for the privileged core on loopback, served
+// with permissive CORS, so any local process or visited web page could read the
+// live connection list and drive the tunnel. The counters are read in-process
+// instead; the empty clash_api block is what builds them.
+func TestNoExternalController(t *testing.T) {
+	result := buildFor(t, protocolLinks["vless-reality"], nil)
+
+	var config struct {
+		Experimental struct {
+			ClashAPI *struct {
+				ExternalController string `json:"external_controller"`
+			} `json:"clash_api"`
+		} `json:"experimental"`
+	}
+	if err := json.Unmarshal(result.JSON, &config); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+
+	if config.Experimental.ClashAPI == nil {
+		t.Fatal("clash_api block is missing; traffic counters would not be built")
+	}
+	if config.Experimental.ClashAPI.ExternalController != "" {
+		t.Fatalf("config publishes a Clash API listener on %q",
+			config.Experimental.ClashAPI.ExternalController)
 	}
 }

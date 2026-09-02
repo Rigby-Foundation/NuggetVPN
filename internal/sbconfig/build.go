@@ -40,9 +40,6 @@ type Request struct {
 
 	// MixedPort exposes a local HTTP/SOCKS proxy; zero disables the inbound.
 	MixedPort int
-	// ClashAPIListen enables the Clash-compatible API used for live traffic
-	// stats; empty disables it.
-	ClashAPIListen string
 	// CacheFilePath persists the fake-IP mapping across restarts.
 	CacheFilePath string
 }
@@ -322,11 +319,15 @@ func buildRouteRules(settings models.AppSettings, splitTunnel bool) ([]map[strin
 
 func buildExperimental(request Request) map[string]any {
 	experimental := map[string]any{}
-	if request.ClashAPIListen != "" {
-		experimental["clash_api"] = map[string]any{
-			"external_controller": request.ClashAPIListen,
-		}
-	}
+	// An empty clash_api block builds sing-box's traffic accounting without
+	// starting its HTTP listener. The app reads the counters in-process, over
+	// the control socket it already has.
+	//
+	// Setting external_controller here instead would publish an unauthenticated
+	// control plane for a *root* process on loopback, and sing-box serves it
+	// with permissive CORS, so every local program and every web page the user
+	// visits could read the live connection list and drive the core.
+	experimental["clash_api"] = map[string]any{}
 	if request.CacheFilePath != "" {
 		experimental["cache_file"] = map[string]any{
 			"enabled":      true,

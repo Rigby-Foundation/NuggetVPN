@@ -1,12 +1,11 @@
 /**
  * Bridge between the React app and the Wails v3 runtime.
  *
- * The components were written against Tauri's `invoke`/`listen` shape, so this
- * module keeps that surface and maps it onto the bound Go service. Calls go
- * through `Call.ByName` rather than the generated bindings in
+ * Calls go through `Call.ByName` rather than the generated bindings in
  * `frontend/bindings/`, which keeps `bun run build` working on its own without
  * a binding-generation step. `TestBridgeCommandTableMatchesApp` in the Go test
- * suite fails if a name here stops matching a method on App.
+ * suite fails if a name here stops matching a method on App, and
+ * `TestBoundMethodsAreReachable` fails if a Go method is left unwired.
  */
 import { Call, Events } from "@wailsio/runtime";
 
@@ -27,15 +26,15 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     delete_profile: { method: "DeleteProfile", args: ["id"] },
     delete_profiles_by_source: { method: "DeleteProfilesBySource", args: ["sourceDomain"] },
     delete_profiles_by_ids: { method: "DeleteProfilesByIds", args: ["ids"] },
-    update_profile_usage: { method: "UpdateProfileUsage", args: ["id", "up", "down"] },
 
     get_settings: { method: "GetSettings", args: [] },
     save_settings: { method: "SaveSettings", args: ["settings"] },
 
-    start_vpn: { method: "StartVPN", args: ["profileId"] },
-    stop_vpn: { method: "StopVPN", args: [] },
-    is_running: { method: "IsRunning", args: [] },
+    connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
+    disconnect: { method: "Disconnect", args: [] },
+    get_connection_state: { method: "GetConnectionState", args: [] },
     get_traffic: { method: "GetTraffic", args: [] },
+    check_ip: { method: "CheckIP", args: [] },
 
     ping_profiles: { method: "PingProfiles", args: ["sourceDomain"] },
     probe_profiles_connectivity: {
@@ -80,16 +79,34 @@ export async function invoke<T = unknown>(
 
 export type UnlistenFn = () => void;
 
-/** Subscribes to a backend event, mirroring Tauri's `{ payload }` shape. */
+/** Subscribes to a backend event. */
 export function listen<T = unknown>(
     event: string,
-    handler: (message: { payload: T }) => void
-): Promise<UnlistenFn> {
-    const unsubscribe = Events.On(event, (wailsEvent: { data: unknown }) => {
-        handler({ payload: wailsEvent.data as T });
+    handler: (payload: T) => void
+): UnlistenFn {
+    return Events.On(event, (wailsEvent: { data: unknown }) => {
+        handler(wailsEvent.data as T);
     });
-    return Promise.resolve(unsubscribe);
 }
+
+/**
+ * Wails delivers an event's arguments as an array when the Go side emitted more
+ * than one, and as the bare value when it emitted one. Every emit in app.go
+ * sends a single payload, so unwrap the one-element case.
+ */
+export function eventPayload<T>(data: unknown): T {
+    if (Array.isArray(data) && data.length === 1) {
+        return data[0] as T;
+    }
+    return data as T;
+}
+
+/** Names of the events the backend pushes. */
+export const EVENTS = {
+    log: "vpn-log",
+    state: "vpn-state",
+    traffic: "vpn-traffic",
+} as const;
 
 /** Window chrome controls used by the custom title bar. */
 export const appWindow = {
@@ -107,8 +124,6 @@ export function quitApp(): Promise<unknown> {
 
 interface SaveDialogOptions {
     defaultPath?: string;
-    /** Accepted for call-site compatibility; the native dialog infers the type. */
-    filters?: { name: string; extensions: string[] }[];
 }
 
 /** Native save dialog; resolves to null when the user cancels. */
@@ -128,6 +143,15 @@ export async function writeTextFile(path: string, contents: string): Promise<voi
 export async function openApplications(): Promise<string[]> {
     const selected = await invoke<string[] | null>("select_applications");
     return selected ?? [];
+}
+
+/** Turns a rejected backend call into something worth showing a user. */
+export function errorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    const text = String(error ?? "").trim();
+    return text || "Something went wrong.";
 }
 
 /** The command table, exported so the Go test suite can check it for drift. */

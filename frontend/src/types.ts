@@ -20,16 +20,44 @@ export interface AppSettings {
     tls_padding: boolean;
     sni_spoof_enabled: boolean;
     sni_spoof_value: string;
+    /** Null means the user has never chosen; the backend treats that as on. */
+    ip_check_enabled: boolean | null;
     auth_server: string | null;
     auth_token: string | null;
     skip_auth: boolean;
     pending_sync_upload: boolean;
-    routing_mode: "all" | "apps" | "domains" | "apps_domains" | "selected";
+    routing_mode: "all" | "apps" | "domains" | "apps_domains";
     routing_apps: string[];
     routing_domains: string[];
     proxy_chain_enabled: boolean;
     proxy_chain: string[];
     proxy_chain_exit: string;
+}
+
+/**
+ * Connection status, mirroring the Go constants.
+ *
+ * "connecting" is a real state rather than a spinner the UI invents: bringing
+ * a tunnel up can mean probing and trying several servers in turn.
+ */
+export type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
+
+export interface ConnectionState {
+    status: ConnectionStatus;
+    profile_id?: string;
+    profile?: string;
+    error?: string;
+    /** Unix milliseconds the tunnel came up; absent unless connected. */
+    since?: number;
+}
+
+export interface TrafficSample {
+    up: number;
+    down: number;
+    up_rate: number;
+    down_rate: number;
+    total_up: number;
+    total_down: number;
 }
 
 export interface IpInfo {
@@ -41,6 +69,14 @@ export interface ProfilePing {
     id: string;
     ping_ms: number | null;
 }
+
+export interface RefreshSummary {
+    refreshed: number;
+    failed: number;
+    skipped: number;
+}
+
+export type ProxyMode = "manual" | "auto";
 
 export type ConfigSource =
     | {

@@ -1,120 +1,126 @@
-import { Clock, Globe, Power, Server, Settings } from "lucide-react";
+import { FileText, Power, Server, Settings, Signal } from "lucide-react";
 
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import { cn } from "@/lib/utils";
+import { ConnectionStatus } from "@/types";
 
 interface AppSidebarProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  onClose: () => void;
-  onMinimize: () => void;
-  onMaximize: () => void;
-  platform?: string;
+    activeTab: string;
+    onTabChange: (tab: string) => void;
+    onClose: () => void;
+    onMinimize: () => void;
+    onMaximize: () => void;
+    platform?: string;
+    status: ConnectionStatus;
 }
 
+const TABS = [
+    { id: "connection", label: "Connection", icon: Power },
+    { id: "configuration", label: "Configuration", icon: Server },
+    { id: "proxies", label: "Proxies", icon: Signal },
+    { id: "logs", label: "Logs", icon: FileText },
+] as const;
+
+const STATUS_DOT: Record<ConnectionStatus, string> = {
+    idle: "bg-status-idle",
+    connecting: "bg-status-connecting animate-pulse",
+    connected: "bg-status-connected",
+    error: "bg-status-error",
+};
+
+const STATUS_LABEL: Record<ConnectionStatus, string> = {
+    idle: "Not connected",
+    connecting: "Connecting",
+    connected: "Connected",
+    error: "Connection failed",
+};
+
 function AppSidebar({
-  activeTab,
-  onTabChange,
-  onClose,
-  onMinimize,
-  onMaximize,
-  platform,
+    activeTab,
+    onTabChange,
+    onClose,
+    onMinimize,
+    onMaximize,
+    platform,
+    status,
 }: AppSidebarProps) {
-  return (
-    <Sidebar variant="inset" className="select-none">
-      <SidebarHeader
-        className={cn(
-          "flex-row items-center justify-between px-4",
-          platform === "macos" ? "h-12" : "h-8"
-        )}
-        data-tauri-drag-region
-      >
-        <div className="flex items-center gap-2">
-          {platform === "macos" ? (
-            <MacWindowControls
-              onClose={onClose}
-              onMinimize={onMinimize}
-              onMaximize={onMaximize}
-            />
-          ) : (
-            <div className="flex items-center h-full">
-              <span className="text-xl unbounded tracking-tight">Nugget</span>
-            </div>
-          )}
-        </div>
-      </SidebarHeader>
+    const isMac = platform === "macos";
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeTab === "connection"}
-                  onClick={() => onTabChange("connection")}
-                >
-                  <Power size={18} />
-                  <span>Connection</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeTab === "configuration"}
-                  onClick={() => onTabChange("configuration")}
-                >
-                  <Server size={18} />
-                  <span>Configuration</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeTab === "proxies"}
-                  onClick={() => onTabChange("proxies")}
-                >
-                  <Globe size={18} />
-                  <span>Proxies</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeTab === "logs"}
-                  onClick={() => onTabChange("logs")}
-                >
-                  <Clock size={18} />
-                  <span>Logs</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={activeTab === "settings"}
-              onClick={() => onTabChange("settings")}
+    return (
+        <Sidebar variant="inset" className="select-none">
+            <SidebarHeader
+                className={cn(
+                    "drag-region flex-row items-center justify-between px-4",
+                    isMac ? "h-12" : "h-8"
+                )}
             >
-              <Settings size={18} />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
-  );
+                {isMac ? (
+                    <MacWindowControls
+                        onClose={onClose}
+                        onMinimize={onMinimize}
+                        onMaximize={onMaximize}
+                    />
+                ) : (
+                    <span className="text-xl unbounded tracking-tight">Nugget</span>
+                )}
+            </SidebarHeader>
+
+            <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            {TABS.map((tab) => (
+                                <SidebarMenuItem key={tab.id}>
+                                    <SidebarMenuButton
+                                        isActive={activeTab === tab.id}
+                                        onClick={() => onTabChange(tab.id)}
+                                    >
+                                        <tab.icon size={18} aria-hidden="true" />
+                                        <span>{tab.label}</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter className="gap-2">
+                {/* The tunnel state is visible from every screen, not only the
+                    one screen that happens to be about connecting. */}
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                    <span
+                        className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[status])}
+                        aria-hidden="true"
+                    />
+                    <span className="truncate">{STATUS_LABEL[status]}</span>
+                </div>
+
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            isActive={activeTab === "settings"}
+                            onClick={() => onTabChange("settings")}
+                        >
+                            <Settings size={18} aria-hidden="true" />
+                            <span>Settings</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarFooter>
+        </Sidebar>
+    );
 }
 
 export default AppSidebar;

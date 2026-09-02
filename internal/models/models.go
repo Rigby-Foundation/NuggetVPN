@@ -4,6 +4,8 @@
 // files keep working after the migration.
 package models
 
+import "strings"
+
 // Profile is a single saved proxy entry.
 type Profile struct {
 	ID              string  `json:"id"`
@@ -20,7 +22,7 @@ type Profile struct {
 // NormalizedSourceDomain reports the grouping key for a profile; profiles that
 // were added by hand report "local".
 func (p Profile) NormalizedSourceDomain() string {
-	if domain := trimSpace(p.SourceDomain); domain != "" {
+	if domain := strings.TrimSpace(p.SourceDomain); domain != "" {
 		return domain
 	}
 	return "local"
@@ -37,15 +39,20 @@ const (
 
 // AppSettings mirrors the settings object the frontend owns.
 type AppSettings struct {
-	MTU               uint32   `json:"mtu"`
-	DNS               string   `json:"dns"`
-	TLSFragment       bool     `json:"tls_fragment"`
-	TLSFragmentSize   string   `json:"tls_fragment_size"`
-	TLSFragmentSleep  string   `json:"tls_fragment_sleep"`
-	TLSMixedSNICase   bool     `json:"tls_mixed_sni_case"`
-	TLSPadding        bool     `json:"tls_padding"`
-	SNISpoofEnabled   bool     `json:"sni_spoof_enabled"`
-	SNISpoofValue     string   `json:"sni_spoof_value"`
+	MTU              uint32 `json:"mtu"`
+	DNS              string `json:"dns"`
+	TLSFragment      bool   `json:"tls_fragment"`
+	TLSFragmentSize  string `json:"tls_fragment_size"`
+	TLSFragmentSleep string `json:"tls_fragment_sleep"`
+	TLSMixedSNICase  bool   `json:"tls_mixed_sni_case"`
+	TLSPadding       bool   `json:"tls_padding"`
+	SNISpoofEnabled  bool   `json:"sni_spoof_enabled"`
+	SNISpoofValue    string `json:"sni_spoof_value"`
+	// IPCheckEnabled governs the public-address lookup, which is a request to a
+	// third party. A pointer so an existing settings.json that predates the
+	// setting is treated as "not chosen" and defaults to on, rather than
+	// silently switching the feature off on upgrade.
+	IPCheckEnabled    *bool    `json:"ip_check_enabled"`
 	AuthServer        *string  `json:"auth_server"`
 	AuthToken         *string  `json:"auth_token"`
 	SkipAuth          bool     `json:"skip_auth"`
@@ -60,11 +67,13 @@ type AppSettings struct {
 
 // DefaultSettings matches the previous Rust defaults.
 func DefaultSettings() AppSettings {
+	enabled := true
 	return AppSettings{
 		MTU:              9000,
 		DNS:              "1.1.1.1",
 		TLSFragmentSize:  "100-200",
 		TLSFragmentSleep: "10-20",
+		IPCheckEnabled:   &enabled,
 		RoutingMode:      RoutingAll,
 		RoutingApps:      []string{},
 		RoutingDomains:   []string{},
@@ -74,12 +83,20 @@ func DefaultSettings() AppSettings {
 
 // Normalize fills in values that must never be empty once the settings reach
 // the config generator, and collapses the legacy "selected" routing mode.
+//
+// This is the only place either of those happens: the renderer used to keep its
+// own copy of the same rules, which is one contract in two languages waiting to
+// drift apart.
 func (s *AppSettings) Normalize() {
 	if s.MTU == 0 {
 		s.MTU = 9000
 	}
-	if trimSpace(s.DNS) == "" {
+	if strings.TrimSpace(s.DNS) == "" {
 		s.DNS = "1.1.1.1"
+	}
+	if s.IPCheckEnabled == nil {
+		enabled := true
+		s.IPCheckEnabled = &enabled
 	}
 	switch s.RoutingMode {
 	case RoutingAll, RoutingApps, RoutingDomains, RoutingAppsDomains:
@@ -99,6 +116,11 @@ func (s *AppSettings) Normalize() {
 	}
 }
 
+// IPCheckOn reports whether the public-address lookup may run.
+func (s AppSettings) IPCheckOn() bool {
+	return s.IPCheckEnabled == nil || *s.IPCheckEnabled
+}
+
 // SplitTunnelling reports whether traffic should default to DIRECT and only
 // matched apps/domains go through the proxy.
 func (s AppSettings) SplitTunnelling() bool { return s.RoutingMode != RoutingAll }
@@ -111,19 +133,4 @@ func (s AppSettings) IncludeApps() bool {
 // IncludeDomains reports whether per-domain routing rules should be emitted.
 func (s AppSettings) IncludeDomains() bool {
 	return s.RoutingMode == RoutingDomains || s.RoutingMode == RoutingAppsDomains
-}
-
-func trimSpace(value string) string {
-	start, end := 0, len(value)
-	for start < end && isSpace(value[start]) {
-		start++
-	}
-	for end > start && isSpace(value[end-1]) {
-		end--
-	}
-	return value[start:end]
-}
-
-func isSpace(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\v' || b == '\f'
 }
