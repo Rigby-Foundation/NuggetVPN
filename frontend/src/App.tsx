@@ -58,6 +58,23 @@ const PENDING_SETTINGS: AppSettings = {
 
 const IP_RECHECK_MS = 5 * 60 * 1000;
 
+/**
+ * Best guess at the platform before the backend answers.
+ *
+ * The window chrome differs per platform — traffic lights on macOS, a wordmark
+ * plus minimise/maximise/close everywhere else — and the window is frameless,
+ * so getting this wrong means the user has no working controls. Defaulting to
+ * "macos" put macOS traffic lights on Windows whenever the backend call did not
+ * land. The user agent is available synchronously and is right often enough to
+ * be a better starting point than a fixed guess.
+ */
+function guessPlatform(): string {
+    const agent = navigator.userAgent;
+    if (agent.includes("Windows")) return "windows";
+    if (agent.includes("Mac OS")) return "macos";
+    return "linux";
+}
+
 function App() {
     const { theme, setTheme } = useTheme();
     const isMobile = useIsMobile();
@@ -82,7 +99,7 @@ function App() {
     const [activeTab, setActiveTab] = useState("connection");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
-    const [platform, setPlatform] = useState("macos");
+    const [platform, setPlatform] = useState(guessPlatform);
     const [profilePings, setProfilePings] = useState<Record<string, number | null>>({});
     const [refreshingDomain, setRefreshingDomain] = useState("");
     const [ipInfo, setIpInfo] = useState<IpInfo | null>(null);
@@ -96,15 +113,25 @@ function App() {
         return stored;
     }, []);
 
+    // settingsRef mirrors the latest settings so updateSetting can build the
+    // next value without depending on `settings` and being rebuilt on every
+    // keystroke in the settings form.
+    const settingsRef = useRef(settings);
+    settingsRef.current = settings;
+
     const updateSetting = useCallback(
         <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-            setSettings((current) => {
-                const next = { ...current, [key]: value };
-                void saveSettings(next).catch((error) =>
-                    toast.error(`Could not save settings: ${errorMessage(error)}`)
-                );
-                return next;
-            });
+            // The save happens here, not inside a setSettings updater. React may
+            // invoke an updater more than once for a single change, so a request
+            // fired from inside one produces duplicate saves — and, when they
+            // fail, a stack of identical error toasts.
+            const next = { ...settingsRef.current, [key]: value };
+            setSettings(next);
+            void saveSettings(next).catch((error) =>
+                toast.error(`Could not save settings: ${errorMessage(error)}`, {
+                    id: "save-settings",
+                })
+            );
         },
         [saveSettings]
     );

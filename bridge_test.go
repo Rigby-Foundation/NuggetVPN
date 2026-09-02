@@ -62,32 +62,37 @@ func TestBridgeCommandTableMatchesApp(t *testing.T) {
 	}
 }
 
-// TestServiceFQNMatchesModulePath guards the service name the bridge builds its
-// call strings from; it must track the module path in go.mod.
-func TestServiceFQNMatchesModulePath(t *testing.T) {
+// TestServiceFQNIsMainPackage guards the service name the bridge builds its call
+// strings from.
+//
+// Wails derives the name from reflect.Type.PkgPath(), which for a type declared
+// in a `package main` binary is the literal "main" — not the module path. This
+// test hardcodes that rather than deriving it from reflection on purpose: a
+// test binary keeps the full import path for the package under test, so
+// reflect.TypeOf(&App{}).Elem().PkgPath() returns
+// "github.com/Rigby-Foundation/NuggetVPN" here and "main" in the shipped app.
+// The earlier version of this test derived the expected value from go.mod, so
+// it passed happily while every call from the real app failed with "unknown
+// bound method name".
+//
+// If App is ever moved out of package main, this becomes the real import path
+// and reflection becomes trustworthy again.
+func TestServiceFQNIsMainPackage(t *testing.T) {
 	bridge, err := os.ReadFile("frontend/src/lib/backend.ts")
 	if err != nil {
 		t.Fatalf("read bridge: %v", err)
 	}
-	goMod, err := os.ReadFile("go.mod")
-	if err != nil {
-		t.Fatalf("read go.mod: %v", err)
-	}
 
-	var modulePath string
-	for _, line := range strings.Split(string(goMod), "\n") {
-		if after, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
-			modulePath = strings.TrimSpace(after)
-			break
-		}
-	}
-	if modulePath == "" {
-		t.Fatal("could not read the module path from go.mod")
-	}
-
-	want := `const SERVICE = "` + modulePath + `.App";`
+	typeName := reflect.TypeOf(&App{}).Elem().Name()
+	want := `const SERVICE = "main.` + typeName + `";`
 	if !strings.Contains(string(bridge), want) {
-		t.Errorf("bridge SERVICE constant does not match the module path; expected %s", want)
+		t.Errorf("bridge SERVICE constant is wrong; expected %s", want)
+	}
+
+	// The module path must not appear in the constant: that is the exact
+	// mistake this test exists to prevent.
+	if strings.Contains(string(bridge), `const SERVICE = "github.com/`) {
+		t.Error("bridge SERVICE uses the module path; a package main binary reports \"main\"")
 	}
 }
 

@@ -11,9 +11,21 @@ import { Call, Events } from "@wailsio/runtime";
 
 /**
  * Fully qualified name of the bound service: `<package path>.<type>`.
- * It must match the Go module path in go.mod.
+ *
+ * The package path is the literal string `main`, not the module path. Wails
+ * builds this name from `reflect.Type.PkgPath()`, and for a type declared in a
+ * `package main` binary that returns `"main"`.
+ *
+ * This is worth spelling out because it is easy to get wrong in a way no Go
+ * test can catch: inside a test binary the package under test keeps its full
+ * import path, so reflection there reports
+ * `github.com/Rigby-Foundation/NuggetVPN`. A test that derives the expected
+ * name from reflection therefore passes while every call from the real app
+ * fails with "unknown bound method name". Moving App out of package main would
+ * remove the discrepancy; until then this constant is the source of truth and
+ * `TestServiceFQNIsMainPackage` pins it.
  */
-const SERVICE = "github.com/Rigby-Foundation/NuggetVPN.App";
+const SERVICE = "main.App";
 
 /**
  * Maps the command names the UI uses onto Go methods. Wails passes arguments
