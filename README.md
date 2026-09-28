@@ -1,6 +1,20 @@
 # NuggetVPN
 
-NuggetVPN is a modern, lightweight, and fast VPN client built with [Wails v3](https://v3.wails.io/) and [React 19](https://react.dev/). [sing-box](https://sing-box.sagernet.org/) is compiled **into** the application as a Go library — there is no bundled `sing-box` executable and nothing is shelled out to.
+NuggetVPN is a modern, lightweight, and fast VPN client built with [Wails v3](https://v3.wails.io/) and [React 19](https://react.dev/). The proxy core is compiled **into** the application as a Go library — there is no bundled executable and nothing is shelled out to.
+
+### The core
+
+The core is [TodayCore](https://github.com/TumGovic/TodayCore), a fork of
+[sing-box](https://sing-box.sagernet.org/) 1.15.0-alpha.6 carrying selected
+client-side features from Xray-core 26.9.9: the XHTTP outbound transport,
+REALITY with `X25519MLKEM768` hybrid key share, and experimental VLESS
+post-quantum encryption.
+
+It keeps sing-box's module path, so it is wired in with a `replace` directive
+rather than an import rewrite, and the configuration format is unchanged. Every
+`sing-box` below therefore describes the core this is built on; the generated
+configs in the test suite are decoded by the core's own option parser, so a
+field name it does not accept fails the build rather than the tunnel.
 
 ## Architecture
 
@@ -51,7 +65,8 @@ are not worth that.
 
 ## Features
 
-- **Protocol support** — VLESS (including **Reality** + XTLS Vision), VMess, Trojan, Shadowsocks, Hysteria, Hysteria2, TUIC, WireGuard, SOCKS, HTTP and SSH, over TCP, WebSocket, gRPC, HTTP/2 and HTTPUpgrade.
+- **Protocol support** — VLESS (including **Reality** + XTLS Vision), VMess, Trojan, Shadowsocks, Hysteria, Hysteria2, TUIC, WireGuard, SOCKS, HTTP and SSH, over TCP, WebSocket, gRPC, HTTP/2, HTTPUpgrade and **XHTTP**.
+- **Xray client features** — XHTTP links (`type=xhttp`, and the older `splithttp` spelling) with `auto` / `packet-up` / `stream-up` / `stream-one` modes, and VLESS post-quantum `encryption` passed through from the link. Both are outbound-only, which is all a client needs.
 - **Profile management** — subscription import and refresh, manual `vless://`, `ss://`, `vmess://` … links, persistent storage.
 - **Custom sing-box configs** — paste a full sing-box JSON config and it runs verbatim; paste just an `outbounds` document and the app layers its own TUN, DNS and routing on top.
 - **Routing graph** — a node canvas on its own tab. Match traffic by application, domain or IP/CIDR and send each match through the tunnel, straight out, or nowhere at all; whatever matches nothing takes the default. Rules become sing-box route rules in order, so the picture is the configuration.

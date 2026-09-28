@@ -444,3 +444,85 @@ func FuzzParseOutbound(f *testing.F) {
 		}
 	})
 }
+
+// TestXHTTPTransport covers the transport the core adds from Xray. Before it
+// was recognised, `type=xhttp` fell through to plain TCP — a config that builds
+// and connects to nothing, which is the failure mode worth a test.
+func TestXHTTPTransport(t *testing.T) {
+	cases := []struct {
+		name     string
+		link     string
+		wantMode string
+	}{
+		{
+			name: "xhttp with a mode",
+			link: "vless://11111111-2222-3333-4444-555555555555@example.com:443" +
+				"?security=tls&type=xhttp&path=%2Fdownload&host=cdn.example.com&mode=stream-one",
+			wantMode: "stream-one",
+		},
+		{
+			// splithttp is what XHTTP shipped as first, and older generators
+			// still emit it.
+			name: "the splithttp alias",
+			link: "vless://11111111-2222-3333-4444-555555555555@example.com:443" +
+				"?security=tls&type=splithttp&path=%2Fx&mode=packet-up",
+			wantMode: "packet-up",
+		},
+		{
+			name: "an unknown mode is dropped rather than forwarded",
+			link: "vless://11111111-2222-3333-4444-555555555555@example.com:443" +
+				"?security=tls&type=xhttp&path=%2Fx&mode=teleport",
+			wantMode: "",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			outbound := mustParse(t, testCase.link)
+
+			if got := stringField(t, outbound, "transport", "type"); got != "xhttp" {
+				t.Fatalf("transport type = %q, want xhttp", got)
+			}
+			mode, present := field(outbound, "transport", "mode")
+			if testCase.wantMode == "" {
+				if present {
+					t.Errorf("unknown mode was forwarded as %v", mode)
+				}
+				return
+			}
+			if !present || mode != testCase.wantMode {
+				t.Errorf("mode = %v, want %q", mode, testCase.wantMode)
+			}
+		})
+	}
+}
+
+// TestXHTTPDropsVision guards the same rule Vision already had: it only exists
+// on raw TCP, so a link pairing it with XHTTP must not pass the flow through.
+func TestXHTTPDropsVision(t *testing.T) {
+	outbound := mustParse(t, "vless://11111111-2222-3333-4444-555555555555@example.com:443"+
+		"?security=tls&type=xhttp&path=%2Fx&flow=xtls-rprx-vision")
+
+	if _, present := outbound["flow"]; present {
+		t.Error("Vision was kept on an XHTTP transport, where it does not exist")
+	}
+}
+
+// TestVLESSEncryptionPassthrough covers the post-quantum encryption the core
+// adds. "none" is the historical default and means nothing, so it must not be
+// emitted as a real value.
+func TestVLESSEncryptionPassthrough(t *testing.T) {
+	const pq = "mlkem768x25519plus.native.1rtt.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+	outbound := mustParse(t, "vless://11111111-2222-3333-4444-555555555555@example.com:443"+
+		"?security=tls&encryption="+pq)
+	if got := stringField(t, outbound, "encryption"); got != pq {
+		t.Errorf("encryption = %q, want it passed through", got)
+	}
+
+	plain := mustParse(t, "vless://11111111-2222-3333-4444-555555555555@example.com:443"+
+		"?security=tls&encryption=none")
+	if _, present := plain["encryption"]; present {
+		t.Error("encryption=none should not reach the config")
+	}
+}

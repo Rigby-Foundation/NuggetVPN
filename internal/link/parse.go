@@ -152,6 +152,14 @@ func parseVLESS(u *url.URL) (Outbound, error) {
 		}
 	}
 
+	// VLESS post-quantum encryption. Links have always carried
+	// `encryption=none`, which is the default and means nothing, so only a real
+	// value is passed through.
+	if encryption := strings.TrimSpace(firstParam(params, "encryption")); encryption != "" &&
+		!strings.EqualFold(encryption, "none") {
+		outbound["encryption"] = encryption
+	}
+
 	if transport := buildTransport(transportType, params, host); transport != nil {
 		outbound["transport"] = transport
 	}
@@ -703,6 +711,11 @@ func normalizeTransport(value string) string {
 		return "httpupgrade"
 	case "quic":
 		return "quic"
+	case "xhttp", "splithttp":
+		// Xray's XHTTP, which the core supports on outbounds. "splithttp" is
+		// the name it shipped under first and is still what older share links
+		// carry.
+		return "xhttp"
 	default:
 		return ""
 	}
@@ -777,8 +790,46 @@ func buildTransport(transportType string, params url.Values, host string) map[st
 
 	case "quic":
 		return map[string]any{"type": "quic"}
+
+	case "xhttp":
+		// XHTTP keeps Xray's camelCase field names rather than sing-box's
+		// snake_case, because the core accepts the Xray spelling verbatim.
+		path := firstParam(params, "path")
+		if path == "" {
+			path = "/"
+		}
+		hostHeader := firstParam(params, "host")
+		if hostHeader == "" {
+			hostHeader = host
+		}
+		transport := map[string]any{
+			"type": "xhttp",
+			"host": hostHeader,
+			"path": path,
+		}
+		if mode := normalizeXHTTPMode(firstParam(params, "mode")); mode != "" {
+			transport["mode"] = mode
+		}
+		// Share links carry the padding range as `extra` in some generators and
+		// as the Xray field name in others.
+		if padding := firstParam(params, "xPaddingBytes", "xpaddingbytes"); padding != "" {
+			transport["xPaddingBytes"] = padding
+		}
+		return transport
 	}
 	return nil
+}
+
+// normalizeXHTTPMode keeps only the modes the core accepts, so a typo in a
+// share link fails the config with a clear message instead of being sent to
+// the server as a mode it does not implement.
+func normalizeXHTTPMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "auto", "packet-up", "stream-up", "stream-one":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }
 
 // applySNISpoof lets the user override the TLS server name globally.

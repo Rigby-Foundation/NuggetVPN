@@ -57,6 +57,12 @@ var protocolLinks = map[string]string{
 		"?encryption=none&security=tls&sni=example.com&type=ws&path=%2Fws%3Fed%3D2048&host=example.com#WS",
 	"vless-grpc": "vless://11111111-2222-3333-4444-555555555555@example.com:443" +
 		"?encryption=none&security=tls&type=grpc&serviceName=gsvc#GRPC",
+	// XHTTP comes from the core's Xray port. It is in this table so the
+	// generated transport is decoded by the core's own option parser, which is
+	// the only thing that proves the Xray camelCase field names are right.
+	"vless-xhttp": "vless://11111111-2222-3333-4444-555555555555@example.com:443" +
+		"?encryption=none&security=tls&type=xhttp&path=%2Fdl&host=cdn.example.com" +
+		"&mode=stream-one#XHTTP",
 	"vmess": "vmess://eyJ2IjoiMiIsInBzIjoiVk1lc3MgTm9kZSIsImFkZCI6ImV4YW1wbGUuY29tIiwicG9y" +
 		"dCI6IjQ0MyIsImlkIjoiMTExMTExMTEtMjIyMi0zMzMzLTQ0NDQtNTU1NTU1NTU1NTU1IiwiYWlkIjoi" +
 		"MCIsInNjeSI6ImF1dG8iLCJuZXQiOiJ3cyIsInR5cGUiOiJub25lIiwiaG9zdCI6ImV4YW1wbGUuY29t" +
