@@ -14,7 +14,11 @@ export function WindowControls({
     onClose,
 }: WindowControlsProps) {
     return (
-        <div className="flex justify-end select-none transition-colors duration-200">
+        // The strip is a drag region: on a frameless window it is the title bar,
+        // and it is the first place anyone tries to grab. The buttons opt back
+        // out through the .drag-region rule in App.css, or they would move the
+        // window instead of being clicked.
+        <div className="drag-region flex justify-end select-none transition-colors duration-200">
             <div className="flex items-center text-foreground z-50">
                 <Button
                     variant="ghost"
