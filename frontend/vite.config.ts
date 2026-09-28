@@ -19,6 +19,12 @@ export default defineConfig({
         emptyOutDir: true,
     },
     server: {
+        // Bind IPv4 explicitly. Vite defaults to the hostname "localhost",
+        // which on Windows resolves to ::1 first, so the dev server ends up
+        // listening on IPv6 only — and the Wails dev proxy, which dials
+        // 127.0.0.1, gets a refused connection and serves HTTP 502 instead of
+        // the app.
+        host: "127.0.0.1",
         port: 1420,
         strictPort: true,
     },
