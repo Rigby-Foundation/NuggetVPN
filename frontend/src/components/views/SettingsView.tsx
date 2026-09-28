@@ -1,5 +1,6 @@
 
 import PageShell from "@/components/layout/PageShell";
+import SubscriptionIdentity from "@/components/views/SubscriptionIdentity";
 import * as React from "react";
 import {
   CheckCircle2,
@@ -45,6 +46,7 @@ interface SettingsViewProps {
   onSettingsChange: SettingsChangeHandler;
   onConnectSync: () => void;
   onDisconnectSync: () => void;
+  onRegenerateHWID: () => void;
 }
 
 function SettingsView({
@@ -56,6 +58,7 @@ function SettingsView({
   onSettingsChange,
   onConnectSync,
   onDisconnectSync,
+  onRegenerateHWID,
 }: SettingsViewProps) {
   const [newChainId, setNewChainId] = React.useState("");
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
@@ -86,6 +89,7 @@ function SettingsView({
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="connection">Connection</TabsTrigger>
             <TabsTrigger value="tls">TLS</TabsTrigger>
+            <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
 
           </TabsList>
 
@@ -486,6 +490,15 @@ function SettingsView({
             </ScrollArea>
           </TabsContent>
 
+          <TabsContent value="subscriptions" className="flex-1 m-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <SubscriptionIdentity
+                appSettings={appSettings}
+                onSettingsChange={onSettingsChange}
+                onRegenerateHWID={onRegenerateHWID}
+              />
+            </ScrollArea>
+          </TabsContent>
         </Tabs>
       </div>
     </PageShell>

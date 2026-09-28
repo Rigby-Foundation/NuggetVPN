@@ -26,6 +26,18 @@ export interface AppSettings {
     auth_token: string | null;
     skip_auth: boolean;
     pending_sync_upload: boolean;
+    /**
+     * How this client presents itself when fetching a subscription. Some
+     * panels only serve known clients, and some count devices by the x-hwid
+     * header and refuse the request without one.
+     */
+    subscription_user_agent: string;
+    /** Null means never chosen; the backend treats that as on. */
+    hwid_enabled: boolean | null;
+    hwid: string;
+    device_os: string;
+    device_os_version: string;
+    device_model: string;
     /** The routing graph. Go owns migration from the legacy fields below. */
     routing_rules: RoutingRule[];
     default_action: RoutingAction;

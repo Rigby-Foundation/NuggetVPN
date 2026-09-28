@@ -11,8 +11,8 @@ import (
 
 // ImportSubscription fetches a subscription URL and adds its profiles.
 func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
-	profiles, _ := a.snapshot()
-	updated, err := a.remote.ImportSubscription(a.context(), profiles, url)
+	profiles, settings := a.snapshot()
+	updated, err := a.remote.ImportSubscription(a.context(), profiles, settings, url)
 	if err != nil {
 		return nil, err
 	}
@@ -21,8 +21,8 @@ func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
 
 // RefreshSubscriptionsOnStartup re-fetches every saved subscription.
 func (a *App) RefreshSubscriptionsOnStartup() (remote.RefreshSummary, error) {
-	profiles, _ := a.snapshot()
-	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, "")
+	profiles, settings := a.snapshot()
+	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, "")
 	if err != nil {
 		return summary, err
 	}
@@ -32,8 +32,8 @@ func (a *App) RefreshSubscriptionsOnStartup() (remote.RefreshSummary, error) {
 
 // RefreshSubscriptionByDomain re-fetches a single subscription.
 func (a *App) RefreshSubscriptionByDomain(sourceDomain string) (remote.RefreshSummary, error) {
-	profiles, _ := a.snapshot()
-	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, sourceDomain)
+	profiles, settings := a.snapshot()
+	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, sourceDomain)
 	if err != nil {
 		return summary, err
 	}
@@ -53,7 +53,7 @@ func (a *App) RegisterUser(server, username, password string) (string, error) {
 
 // PushProfilesToServer uploads local profiles.
 func (a *App) PushProfilesToServer(settings models.AppSettings) (string, error) {
-	profiles, _ := a.snapshot()
+	profiles, settings := a.snapshot()
 	return a.remote.PushProfiles(a.context(), settings, profiles)
 }
 

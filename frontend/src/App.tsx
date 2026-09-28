@@ -49,6 +49,12 @@ const PENDING_SETTINGS: AppSettings = {
     auth_token: null,
     skip_auth: false,
     pending_sync_upload: false,
+    subscription_user_agent: "NuggetVPN/1.0",
+    hwid_enabled: true,
+    hwid: "",
+    device_os: "",
+    device_os_version: "",
+    device_model: "",
     routing_rules: [],
     default_action: "proxy",
     routing_layout: {},
@@ -538,6 +544,18 @@ function App() {
                                                 auth_token: null,
                                                 skip_auth: false,
                                             });
+                                        }}
+                                        onRegenerateHWID={() => {
+                                            // Go owns the format, so it mints
+                                            // the value and returns the saved
+                                            // settings.
+                                            void invoke<AppSettings>("regenerate_hwid")
+                                                .then(setSettings)
+                                                .catch((error) =>
+                                                    toast.error(
+                                                        `Could not generate a device ID: ${errorMessage(error)}`
+                                                    )
+                                                );
                                         }}
                                     />
                                 )}

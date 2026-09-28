@@ -59,6 +59,16 @@ type AppSettings struct {
 	SkipAuth          bool    `json:"skip_auth"`
 	PendingSyncUpload bool    `json:"pending_sync_upload"`
 
+	// How this client presents itself when fetching a subscription. Some
+	// panels gate the endpoint on the User-Agent, and some count devices by
+	// the x-hwid header and refuse the request without one — see identity.go.
+	SubscriptionUserAgent string `json:"subscription_user_agent"`
+	HWIDEnabled           *bool  `json:"hwid_enabled"`
+	HWID                  string `json:"hwid"`
+	DeviceOS              string `json:"device_os"`
+	DeviceOSVersion       string `json:"device_os_version"`
+	DeviceModel           string `json:"device_model"`
+
 	// The routing graph. RoutingRules is nil (not empty) only on settings
 	// written before it existed, which is what triggers the one-time migration
 	// from the fields below it.
@@ -123,6 +133,7 @@ func (s *AppSettings) Normalize() {
 		s.ProxyChain = []string{}
 	}
 	s.normalizeRouting()
+	s.normalizeIdentity()
 }
 
 // IPCheckOn reports whether the public-address lookup may run.

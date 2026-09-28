@@ -39,6 +39,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
 
     get_settings: { method: "GetSettings", args: [] },
     save_settings: { method: "SaveSettings", args: ["settings"] },
+    regenerate_hwid: { method: "RegenerateHWID", args: [] },
 
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },

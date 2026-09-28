@@ -17,8 +17,9 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
 
-// subscriptionUserAgent mimics curl; several providers reject unknown clients.
-const subscriptionUserAgent = "curl/8.7.1 NuggetVPN/1.0"
+// Requests carry the identity headers from settings: some panels gate the
+// subscription endpoint on the User-Agent, and some count devices by x-hwid
+// and refuse the request without it. See models/identity.go.
 
 // RefreshSummary reports the outcome of a subscription refresh pass.
 type RefreshSummary struct {
@@ -39,12 +40,18 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) get(ctx context.Context, rawURL string) (string, int, error) {
+func (c *Client) get(
+	ctx context.Context,
+	rawURL string,
+	settings models.AppSettings,
+) (string, int, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", 0, err
 	}
-	request.Header.Set("User-Agent", subscriptionUserAgent)
+	for name, value := range settings.SubscriptionHeaders() {
+		request.Header.Set(name, value)
+	}
 
 	response, err := c.http.Do(request)
 	if err != nil {
@@ -63,6 +70,7 @@ func (c *Client) get(ctx context.Context, rawURL string) (string, int, error) {
 func (c *Client) ImportSubscription(
 	ctx context.Context,
 	profiles []models.Profile,
+	settings models.AppSettings,
 	rawURL string,
 ) ([]models.Profile, error) {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
@@ -71,12 +79,13 @@ func (c *Client) ImportSubscription(
 	}
 	sourceDomain := parsed.Hostname()
 
-	body, status, err := c.get(ctx, rawURL)
+	body, status, err := c.get(ctx, rawURL, settings)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription: %w", err)
 	}
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("subscription server returned %d: %s", status, preview(body, 180))
+		return nil, fmt.Errorf("subscription server returned %d: %s",
+			status, explainStatus(status, settings, preview(body, 180)))
 	}
 
 	imported := buildProfiles(SubscriptionLinks(body), sourceDomain, rawURL)
@@ -92,6 +101,7 @@ func (c *Client) ImportSubscription(
 func (c *Client) RefreshSubscriptions(
 	ctx context.Context,
 	profiles []models.Profile,
+	settings models.AppSettings,
 	onlyDomain string,
 ) ([]models.Profile, RefreshSummary, error) {
 	summary := RefreshSummary{}
@@ -136,7 +146,7 @@ func (c *Client) RefreshSubscriptions(
 			continue
 		}
 
-		body, status, err := c.get(ctx, subURL)
+		body, status, err := c.get(ctx, subURL, settings)
 		if err != nil {
 			if strict {
 				return profiles, summary, fmt.Errorf(
@@ -148,7 +158,8 @@ func (c *Client) RefreshSubscriptions(
 		if status < 200 || status >= 300 {
 			if strict {
 				return profiles, summary, fmt.Errorf(
-					"subscription server %q returned %d: %s", sourceDomain, status, preview(body, 180))
+					"subscription server %q returned %d: %s",
+					sourceDomain, status, explainStatus(status, settings, preview(body, 180)))
 			}
 			summary.Failed++
 			continue
@@ -280,4 +291,24 @@ func preview(body string, limit int) string {
 		return compact
 	}
 	return compact[:limit]
+}
+
+// explainStatus adds a hint to the statuses that a device-limited panel
+// produces, because on their own they look like a broken subscription.
+//
+// Remnawave answers 404 when its device limit is on and the request carried no
+// x-hwid, which is indistinguishable from a wrong URL; 403 is the usual answer
+// when a provider does not recognise the client. Neither says what to change.
+func explainStatus(status int, settings models.AppSettings, body string) string {
+	switch status {
+	case 404:
+		if !settings.HWIDOn() {
+			return body + " — if this subscription enforces a device limit, " +
+				"turn on the device id in Settings and try again"
+		}
+	case 403:
+		return body + " — this provider may only accept known clients; " +
+			"try a different subscription user agent in Settings"
+	}
+	return body
 }
