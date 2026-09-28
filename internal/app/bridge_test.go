@@ -1,12 +1,16 @@
-package main
+package app
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 )
+
+// bridgePath is the command table, relative to this package.
+var bridgePath = filepath.Join("..", "..", "frontend", "src", "lib", "backend.ts")
 
 // bridgeEntry is one row of the command table in frontend/src/lib/backend.ts.
 type bridgeEntry struct {
@@ -17,15 +21,19 @@ type bridgeEntry struct {
 // commandTablePattern matches `method: "Name", args: [...]` entries.
 var commandTablePattern = regexp.MustCompile(`method:\s*"(\w+)",\s*args:\s*\[([^\]]*)\]`)
 
-func parseBridgeCommands(t *testing.T) []bridgeEntry {
+func readBridge(t *testing.T) string {
 	t.Helper()
-
-	source, err := os.ReadFile("frontend/src/lib/backend.ts")
+	source, err := os.ReadFile(bridgePath)
 	if err != nil {
 		t.Fatalf("read bridge: %v", err)
 	}
+	return string(source)
+}
 
-	matches := commandTablePattern.FindAllStringSubmatch(string(source), -1)
+func parseBridgeCommands(t *testing.T) []bridgeEntry {
+	t.Helper()
+
+	matches := commandTablePattern.FindAllStringSubmatch(readBridge(t), -1)
 	if len(matches) == 0 {
 		t.Fatal("no commands found in the bridge table; did its format change?")
 	}
@@ -62,37 +70,21 @@ func TestBridgeCommandTableMatchesApp(t *testing.T) {
 	}
 }
 
-// TestServiceFQNIsMainPackage guards the service name the bridge builds its call
-// strings from.
+// TestServiceFQNMatchesGo checks the name the frontend calls the service by.
 //
-// Wails derives the name from reflect.Type.PkgPath(), which for a type declared
-// in a `package main` binary is the literal "main" — not the module path. This
-// test hardcodes that rather than deriving it from reflection on purpose: a
-// test binary keeps the full import path for the package under test, so
-// reflect.TypeOf(&App{}).Elem().PkgPath() returns
-// "github.com/Rigby-Foundation/NuggetVPN" here and "main" in the shipped app.
-// The earlier version of this test derived the expected value from go.mod, so
-// it passed happily while every call from the real app failed with "unknown
-// bound method name".
-//
-// If App is ever moved out of package main, this becomes the real import path
-// and reflection becomes trustworthy again.
-func TestServiceFQNIsMainPackage(t *testing.T) {
-	bridge, err := os.ReadFile("frontend/src/lib/backend.ts")
-	if err != nil {
-		t.Fatalf("read bridge: %v", err)
-	}
+// Wails builds it as `<package path>.<type>` from reflection, and this test now
+// derives the expectation the same way. It could not do that while App lived in
+// package main: there, reflection reports "main" in the shipped binary and the
+// full import path inside a test binary, so the two never agreed and a wrong
+// constant shipped — every call failing with "unknown bound method name" while
+// the suite stayed green. Out here both report this package, so a mismatch is a
+// test failure rather than a runtime one.
+func TestServiceFQNMatchesGo(t *testing.T) {
+	appType := reflect.TypeOf(&App{}).Elem()
 
-	typeName := reflect.TypeOf(&App{}).Elem().Name()
-	want := `const SERVICE = "main.` + typeName + `";`
-	if !strings.Contains(string(bridge), want) {
+	want := `const SERVICE = "` + appType.PkgPath() + "." + appType.Name() + `";`
+	if !strings.Contains(readBridge(t), want) {
 		t.Errorf("bridge SERVICE constant is wrong; expected %s", want)
-	}
-
-	// The module path must not appear in the constant: that is the exact
-	// mistake this test exists to prevent.
-	if strings.Contains(string(bridge), `const SERVICE = "github.com/`) {
-		t.Error("bridge SERVICE uses the module path; a package main binary reports \"main\"")
 	}
 }
 

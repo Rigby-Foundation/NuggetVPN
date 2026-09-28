@@ -1,0 +1,430 @@
+package app
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+	
+	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"path/filepath"
+	"os"
+)
+
+type ConnectionState struct {
+	Status    string `json:"status"`
+	ProfileID string `json:"profile_id,omitempty"`
+	Profile   string `json:"profile,omitempty"`
+	Error     string `json:"error,omitempty"`
+	// Since is the unix millisecond timestamp the tunnel came up, so the UI can
+	// render a duration without keeping its own timer honest.
+	Since int64 `json:"since,omitempty"`
+}
+
+
+// probeCandidates bounds how many servers get a TCP reachability check before
+// connecting; the ICMP sweep has already ranked them by then.
+const (
+	probeCandidates = 8
+	// probeTimeoutMS is the per-server budget for that check.
+	probeTimeoutMS = 1200
+)
+
+// Connection status values reported to the UI.
+const (
+	StatusIdle       = "idle"
+	StatusConnecting = "connecting"
+	StatusConnected  = "connected"
+	StatusError      = "error"
+)
+
+// Proxy selection modes accepted by Connect.
+const (
+	ModeAuto   = "auto"
+	ModeManual = "manual"
+)
+
+// ConnectionState is the single source of truth the UI renders from.
+//
+// It replaced a bare "is it running" boolean: a VPN client that cannot tell
+// "connecting" from "connected", or notice that the tunnel died, shows the user
+
+// ---------------------------------------------------------------------------
+// Connection state
+// ---------------------------------------------------------------------------
+
+// setState records the new state and tells the UI. Every transition goes
+// through here so the event and the state can never disagree.
+func (a *App) setState(state ConnectionState) ConnectionState {
+	a.mu.Lock()
+	a.state = state
+	a.mu.Unlock()
+
+	a.emit(stateEventName, state)
+	return state
+}
+
+// GetConnectionState returns the current connection state. The UI calls it once
+// on startup to reconcile; after that it follows the vpn-state event.
+func (a *App) GetConnectionState() ConnectionState {
+	a.mu.Lock()
+	state := a.state
+	a.mu.Unlock()
+
+	// Reconcile with the core, which is the real authority: the GUI may have
+	// been reloaded, or the tunnel may have died while nobody was listening.
+	running := a.core.Running()
+	switch {
+	case running && state.Status != StatusConnected:
+		state.Status = StatusConnected
+		if state.Since == 0 {
+			state.Since = time.Now().UnixMilli()
+		}
+		return a.setState(state)
+	case !running && state.Status == StatusConnected:
+		return a.setState(ConnectionState{Status: StatusIdle})
+	}
+	return state
+}
+
+// handleCoreState reacts to the core reporting that the tunnel went up or down
+// on its own. A tunnel that drops without the UI noticing is the failure mode
+// this exists to prevent.
+func (a *App) handleCoreState(running bool) {
+	a.mu.Lock()
+	state := a.state
+	a.mu.Unlock()
+
+	if running {
+		// Connect drives its own transitions; a start it triggered is already
+		// reflected. This only matters for a state change we did not ask for.
+		if state.Status == StatusConnected {
+			return
+		}
+		state.Status = StatusConnected
+		state.Error = ""
+		if state.Since == 0 {
+			state.Since = time.Now().UnixMilli()
+		}
+		a.setState(state)
+		return
+	}
+
+	// A drop while connecting is just a failed attempt; the failover loop is
+	// still working through its candidates and will report the outcome.
+	if state.Status == StatusConnecting {
+		return
+	}
+	if state.Status == StatusIdle {
+		return
+	}
+
+	a.flushUsage()
+	a.resetTraffic()
+	a.appendLog("The tunnel stopped unexpectedly")
+	a.setState(ConnectionState{
+		Status: StatusError,
+		Error:  "The connection dropped.",
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Connecting
+// ---------------------------------------------------------------------------
+
+// Connect brings the tunnel up for one configuration source.
+//
+// sourceDomain selects a subscription (or "local" for hand-added profiles),
+// mode is "auto" or "manual", and profileID pins a specific server in manual
+// mode. The candidate ordering, reachability probing and retry-on-failure that
+// this performs used to live in the click handler in the renderer; it is real
+// product logic, it is the thing users notice when it is wrong, and here it can
+// be tested and can report progress as it goes.
+func (a *App) Connect(sourceDomain, mode, profileID string) (ConnectionState, error) {
+	a.connectMu.Lock()
+	defer a.connectMu.Unlock()
+
+	profiles, settings := a.snapshot()
+	if len(profiles) == 0 {
+		return a.fail("No profiles found. Add a profile or import a subscription.")
+	}
+
+	plan, err := a.planConnection(profiles, settings, sourceDomain, mode, profileID)
+	if err != nil {
+		return a.fail(err.Error())
+	}
+
+	a.setState(ConnectionState{Status: StatusConnecting})
+	a.resetTraffic()
+
+	var lastErr error
+	for index, candidate := range plan.order {
+		profile, ok := profileByID(profiles, candidate)
+		if !ok {
+			continue
+		}
+
+		if len(plan.order) > 1 {
+			a.appendLog(fmt.Sprintf("Trying %s (%d of %d)",
+				profile.Name, index+1, len(plan.order)))
+		}
+		a.setState(ConnectionState{
+			Status:    StatusConnecting,
+			ProfileID: profile.ID,
+			Profile:   profile.Name,
+		})
+
+		if err := a.startProfile(profile, profiles, settings); err != nil {
+			lastErr = err
+			a.appendLog(fmt.Sprintf("%s failed: %v", profile.Name, err))
+			if !plan.resilient {
+				return a.fail(err.Error())
+			}
+			continue
+		}
+
+		a.beginSession(profile.ID)
+		return a.setState(ConnectionState{
+			Status:    StatusConnected,
+			ProfileID: profile.ID,
+			Profile:   profile.Name,
+			Since:     time.Now().UnixMilli(),
+		}), nil
+	}
+
+	if lastErr != nil {
+		return a.fail(fmt.Sprintf("No working server found (last error: %v).", lastErr))
+	}
+	return a.fail("No proxy available for this configuration.")
+}
+
+// Disconnect tears the tunnel down, leaving the privileged service running so
+// the next connection does not need another password prompt.
+func (a *App) Disconnect() (ConnectionState, error) {
+	a.connectMu.Lock()
+	defer a.connectMu.Unlock()
+
+	a.flushUsage()
+
+	// Go idle *before* asking the core to stop. Stopping makes the core
+	// broadcast that the tunnel is down, and that event races the reply to this
+	// very call; if it arrived while the state still said "connected" it would
+	// be read as an unexpected drop and reported to the user as a failure.
+	// handleCoreState ignores a down event once the state is already idle.
+	state := a.setState(ConnectionState{Status: StatusIdle})
+
+	if err := a.core.Stop(); err != nil {
+		return a.setState(ConnectionState{Status: StatusError, Error: err.Error()}), err
+	}
+	a.resetTraffic()
+	a.appendLog("VPN stopped")
+	return state, nil
+}
+
+// fail records an error state and returns it as both value and error, so the
+// caller in the UI can render either.
+func (a *App) fail(message string) (ConnectionState, error) {
+	return a.setState(ConnectionState{Status: StatusError, Error: message}),
+		fmt.Errorf("%s", message)
+}
+
+// connectionPlan is the ordered list of servers to try.
+type connectionPlan struct {
+	order []string
+	// resilient means a failing server is skipped rather than surfaced. It is
+	// off when the user pinned one specific server, because silently connecting
+	// them somewhere else would be a lie.
+	resilient bool
+}
+
+// planConnection ranks the servers to attempt.
+func (a *App) planConnection(
+	profiles []models.Profile,
+	settings models.AppSettings,
+	sourceDomain, mode, profileID string,
+) (connectionPlan, error) {
+	domain := strings.TrimSpace(sourceDomain)
+	if domain == "" {
+		domain = "local"
+	}
+	selected := strings.TrimSpace(profileID)
+
+	chainActive := settings.ProxyChainEnabled && len(settings.ProxyChain) > 0
+	inChain := map[string]bool{}
+	if chainActive {
+		for _, id := range settings.ProxyChain {
+			inChain[id] = true
+		}
+	}
+
+	var domainProfiles, eligible []models.Profile
+	for _, profile := range profiles {
+		if profile.NormalizedSourceDomain() != domain {
+			continue
+		}
+		domainProfiles = append(domainProfiles, profile)
+		if !inChain[profile.ID] {
+			eligible = append(eligible, profile)
+		}
+	}
+	if len(domainProfiles) == 0 {
+		return connectionPlan{}, fmt.Errorf("no proxy available for this configuration")
+	}
+
+	// A server that is already a hop in the chain cannot also be the exit.
+	if inChain[selected] {
+		selected = ""
+	}
+	// Pinning an exit while chaining means the user chose it deliberately.
+	forcedExit := chainActive && selected != ""
+
+	candidates := eligible
+	if len(candidates) == 0 {
+		candidates = domainProfiles
+	}
+
+	if mode == ModeAuto && !forcedExit {
+		order := a.rankByLatency(candidates, settings, domain)
+		if len(order) == 0 {
+			return connectionPlan{}, fmt.Errorf("no proxy available for this configuration")
+		}
+		return connectionPlan{order: order, resilient: true}, nil
+	}
+
+	if selected == "" {
+		selected = candidates[0].ID
+	}
+
+	// Manual selection inside a subscription still falls back to its siblings:
+	// subscription servers come and go, and a dead one should not strand the
+	// user. A single hand-added profile has no siblings to fall back to.
+	if mode == ModeManual && domain != "local" && !forcedExit {
+		order := []string{selected}
+		for _, profile := range candidates {
+			if profile.ID != selected {
+				order = append(order, profile.ID)
+			}
+		}
+		return connectionPlan{order: order, resilient: true}, nil
+	}
+	return connectionPlan{order: []string{selected}}, nil
+}
+
+// rankByLatency sorts candidates fastest-first, using an ICMP sweep refined by
+// a TCP handshake check on the leaders. ICMP is cheap but often filtered, so a
+// server that answers a real TCP connect outranks one that only pings.
+func (a *App) rankByLatency(
+	candidates []models.Profile,
+	settings models.AppSettings,
+	domain string,
+) []string {
+	pings := map[string]uint64{}
+	const unreachable = ^uint64(0)
+	for _, result := range probe.Ping(candidates, settings, domain) {
+		if result.PingMS != nil {
+			pings[result.ID] = *result.PingMS
+			continue
+		}
+		pings[result.ID] = unreachable
+	}
+
+	order := make([]string, 0, len(candidates))
+	for _, profile := range candidates {
+		order = append(order, profile.ID)
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		left, ok := pings[order[i]]
+		if !ok {
+			left = unreachable
+		}
+		right, ok := pings[order[j]]
+		if !ok {
+			right = unreachable
+		}
+		return left < right
+	})
+	if len(order) < 2 {
+		return order
+	}
+
+	limit := min(len(order), probeCandidates)
+	results := probe.Connectivity(candidates, settings, domain, order[:limit], probeTimeoutMS)
+
+	reachable := make([]string, 0, limit)
+	seen := map[string]bool{}
+	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].PingMS == nil {
+			return false
+		}
+		if results[j].PingMS == nil {
+			return true
+		}
+		return *results[i].PingMS < *results[j].PingMS
+	})
+	for _, result := range results {
+		if result.PingMS == nil {
+			continue
+		}
+		reachable = append(reachable, result.ID)
+		seen[result.ID] = true
+	}
+
+	// Everything the TCP check could not reach keeps its ICMP ranking and goes
+	// to the back, rather than being discarded: the check can be wrong.
+	for _, id := range order {
+		if !seen[id] {
+			reachable = append(reachable, id)
+		}
+	}
+	return reachable
+}
+
+// startProfile generates a config for one profile and hands it to the core.
+func (a *App) startProfile(
+	profile models.Profile,
+	profiles []models.Profile,
+	settings models.AppSettings,
+) error {
+	result, err := sbconfig.Build(sbconfig.Request{
+		Profile:       profile,
+		Profiles:      profiles,
+		Settings:      settings,
+		MixedPort:     MixedPort,
+		CacheFilePath: filepath.Join(storage.RuntimeDir(), "cache.db"),
+	})
+	if err != nil {
+		return err
+	}
+
+	// Mirror the config to disk purely so users can inspect what ran.
+	_ = os.WriteFile(storage.CoreConfigPath(), result.JSON, 0o600)
+
+	a.appendLog(fmt.Sprintf("Starting %s (%s)", profile.Name, profile.Protocol))
+	if result.Verbatim {
+		a.appendLog("Using the profile's own sing-box config verbatim")
+	} else {
+		mode := "full tunnel"
+		if settings.SplitTunnelling() {
+			mode = fmt.Sprintf("split tunnel (default: %s, %d rule entries)",
+				settings.DefaultAction, result.SplitRules)
+		}
+		a.appendLog("Routing mode: " + mode)
+		if result.ChainHops > 0 {
+			a.appendLog(fmt.Sprintf("Proxy chain: %d hop(s) before the exit", result.ChainHops))
+		}
+	}
+
+	return a.core.Start(result.JSON)
+}
+
+func profileByID(profiles []models.Profile, id string) (models.Profile, bool) {
+	for _, profile := range profiles {
+		if profile.ID == id {
+			return profile, true
+		}
+	}
+	return models.Profile{}, false
+}

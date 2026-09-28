@@ -151,7 +151,7 @@ These are the same paths the previous build used, so profiles and settings survi
 ## Project structure
 
 - **`main.go`** — entry point, mode dispatch (GUI vs core service), window and system tray.
-- **`app.go`** — everything the frontend can call.
+- **`internal/app/`** — everything the frontend can call, split by concern (`connection.go`, `traffic.go`, `profiles.go`, `settings.go`, `remote.go`, `system.go`). It is a package rather than part of `main` on purpose: Wails names a bound service after its package path, and a type in `package main` reports that path as `"main"` in the binary but as the real import path inside a test — so the name the frontend must call by was one no test could check.
 - **`Taskfile.yml`, `build/`** — the Wails v3 build and packaging pipeline, including `build/darwin/make-dmg.sh`.
 - **`internal/core/`** — embedded sing-box lifecycle, the privileged service and its client.
 - **`internal/sbconfig/`** — turns a profile plus settings into a sing-box config; `route.go` compiles the routing graph into route rules.
