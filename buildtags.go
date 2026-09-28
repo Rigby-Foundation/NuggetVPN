@@ -7,7 +7,8 @@ package main
 //
 //	with_utls        VLESS Reality (sing-box implements Reality on top of uTLS)
 //	with_quic        Hysteria, Hysteria2 and TUIC
-//	with_gvisor      the userspace network stack the TUN interface uses
+//	with_gvisor      the legacy gVisor TUN stack (the core uses its own as of
+//	                 1.15; kept so a config that still names it can run)
 //	with_wireguard   WireGuard endpoints
 //	with_clash_api   the traffic counters shown in the UI
 //

@@ -131,7 +131,7 @@ sing-box gates its features behind build tags. Miss one and the feature disappea
 | --- | --- |
 | `with_utls` | VLESS Reality does not work |
 | `with_quic` | no Hysteria, Hysteria2 or TUIC |
-| `with_gvisor` | the TUN interface cannot start |
+| `with_gvisor` | the legacy gVisor stack is unavailable. The core uses its own TCP/IP stack as of 1.15 and the generated config no longer names one, so this only matters for a hand-written config that does |
 | `with_wireguard` | no WireGuard endpoints |
 | `with_clash_api` | no traffic counters (sing-box builds its byte accounting with this tag; the app reads it in-process and never opens the HTTP listener) |
 

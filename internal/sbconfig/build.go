@@ -192,13 +192,17 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 		})
 	}
 
+	// No `stack`: the core has its own TCP/IP stack as of 1.15, and its docs
+	// say to omit the option to get it. Naming a stack pins the legacy gvisor
+	// or system path, which is deprecated and scheduled for removal in 1.17 —
+	// and on this core that meant running the old stack underneath a core built
+	// around the new one.
 	tun := map[string]any{
 		"type":       "tun",
 		"tag":        "tun-in",
 		"address":    []string{tunAddress},
 		"mtu":        settings.MTU,
 		"auto_route": true,
-		"stack":      "gvisor",
 	}
 	// strict_route is only implemented on Linux and Windows.
 	if runtime.GOOS != "darwin" {

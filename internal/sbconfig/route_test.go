@@ -248,3 +248,40 @@ func contains(values []string, want string) bool {
 	}
 	return false
 }
+
+// TestTunUsesTheCoreStack pins the decision to let the core pick its own
+// TCP/IP stack.
+//
+// `stack` is deprecated as of 1.15 and scheduled for removal in 1.17, and its
+// docs say to omit the option to get sing-tun's own stack. We used to hardcode
+// "gvisor", which pinned the legacy path on a core rewritten around the new
+// one. Nothing in a config review would catch that, because the field is still
+// accepted — it just quietly selects the old implementation.
+func TestTunUsesTheCoreStack(t *testing.T) {
+	result := buildFor(t, protocolLinks["vless-reality"], nil)
+
+	var config struct {
+		Inbounds []struct {
+			Type  string `json:"type"`
+			Stack string `json:"stack"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal(result.JSON, &config); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+
+	found := false
+	for _, inbound := range config.Inbounds {
+		if inbound.Type != "tun" {
+			continue
+		}
+		found = true
+		if inbound.Stack != "" {
+			t.Errorf("tun names a deprecated stack %q; omit it for the core's own",
+				inbound.Stack)
+		}
+	}
+	if !found {
+		t.Fatal("no tun inbound in the generated config")
+	}
+}
