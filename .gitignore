@@ -17,7 +17,9 @@ build/linux/*.desktop
 build/linux/appimage/build
 build/linux/appimage/*.png
 build/linux/appimage/NuggetVPN
-build/windows/*.syso
+# Windows resource objects. Wails v3 writes the one it links into the binary at
+# the repository root, not under build/windows/, so both are covered.
+*.syso
 
 .env
 .env.*
