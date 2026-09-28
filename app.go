@@ -575,7 +575,8 @@ func (a *App) startProfile(
 	} else {
 		mode := "full tunnel"
 		if settings.SplitTunnelling() {
-			mode = fmt.Sprintf("split tunnel (%s, %d rules)", settings.RoutingMode, result.SplitRules)
+			mode = fmt.Sprintf("split tunnel (default: %s, %d rule entries)",
+				settings.DefaultAction, result.SplitRules)
 		}
 		a.appendLog("Routing mode: " + mode)
 		if result.ChainHops > 0 {

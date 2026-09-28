@@ -97,7 +97,7 @@ func Build(request Request) (Result, error) {
 	outbounds = append(outbounds, map[string]any{"type": "direct", "tag": DirectTag})
 
 	splitTunnel := settings.SplitTunnelling()
-	routeRules, splitRuleCount := buildRouteRules(settings, splitTunnel)
+	routeRules, splitRuleCount := buildRouteRules(settings)
 
 	config := map[string]any{
 		"log": map[string]any{
@@ -111,7 +111,7 @@ func Build(request Request) (Result, error) {
 		}(),
 		"route": map[string]any{
 			"rules":                   routeRules,
-			"final":                   finalOutbound(splitTunnel),
+			"final":                   finalOutbound(settings),
 			"auto_detect_interface":   true,
 			"default_domain_resolver": map[string]any{"server": dnsDirectTag},
 		},
@@ -238,11 +238,17 @@ func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []str
 	}
 
 	if splitTunnel {
-		if domains := cleanList(settings.RoutingDomains); len(domains) > 0 && settings.IncludeDomains() {
-			rules = append(rules, map[string]any{
-				"domain_suffix": domains,
-				"server":        dnsProxyTag,
-			})
+		// Domains the graph sends through the tunnel must also be resolved
+		// through it, or the exit dials an address the local resolver picked.
+		if exact, suffixes := proxiedDomains(settings); len(exact)+len(suffixes) > 0 {
+			rule := map[string]any{"server": dnsProxyTag}
+			if len(exact) > 0 {
+				rule["domain"] = exact
+			}
+			if len(suffixes) > 0 {
+				rule["domain_suffix"] = suffixes
+			}
+			rules = append(rules, rule)
 		}
 		dns["final"] = dnsDirectTag
 	} else {
@@ -265,58 +271,6 @@ func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []str
 	return dns
 }
 
-// buildRouteRules returns the routing table and how many split-tunnel rules it
-// contains, which the UI reports in the log pane.
-func buildRouteRules(settings models.AppSettings, splitTunnel bool) ([]map[string]any, int) {
-	rules := []map[string]any{
-		// Sniffing gives the router real domains for fake-IP traffic.
-		{"action": "sniff"},
-		{"protocol": "dns", "action": "hijack-dns"},
-		{"ip_is_private": true, "outbound": DirectTag},
-	}
-	if !splitTunnel {
-		return rules, 0
-	}
-
-	splitCount := 0
-
-	if settings.IncludeApps() {
-		processPaths := extractProcessPaths(settings.RoutingApps)
-		processNames := mergeProcessNames(expandProcessNames(settings.RoutingApps), processPaths)
-
-		if len(processNames) > 0 {
-			rules = append(rules, map[string]any{
-				"process_name": processNames,
-				"outbound":     ExitTag,
-			})
-			splitCount += len(processNames)
-		}
-		if len(processPaths) > 0 {
-			rules = append(rules, map[string]any{
-				"process_path": processPaths,
-				"outbound":     ExitTag,
-			})
-			splitCount += len(processPaths)
-		}
-	}
-
-	if settings.IncludeDomains() {
-		if domains := cleanList(settings.RoutingDomains); len(domains) > 0 {
-			rules = append(rules, map[string]any{
-				"domain_suffix": domains,
-				"outbound":      ExitTag,
-			})
-			splitCount += len(domains)
-		}
-	}
-
-	rules = append(rules, map[string]any{
-		"port":     []int{winboxPort},
-		"outbound": ExitTag,
-	})
-	return rules, splitCount
-}
-
 func buildExperimental(request Request) map[string]any {
 	experimental := map[string]any{}
 	// An empty clash_api block builds sing-box's traffic accounting without
@@ -336,13 +290,6 @@ func buildExperimental(request Request) map[string]any {
 		}
 	}
 	return experimental
-}
-
-func finalOutbound(splitTunnel bool) string {
-	if splitTunnel {
-		return DirectTag
-	}
-	return ExitTag
 }
 
 // proxyServerDomains lists the hostnames the tunnel itself dials, so they can

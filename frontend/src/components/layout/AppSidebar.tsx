@@ -1,4 +1,4 @@
-import { FileText, Power, Server, Settings, Signal } from "lucide-react";
+import { FileText, Power, Server, Settings, Signal, Waypoints } from "lucide-react";
 
 import {
     Sidebar,
@@ -29,6 +29,7 @@ const TABS = [
     { id: "connection", label: "Connection", icon: Power },
     { id: "configuration", label: "Configuration", icon: Server },
     { id: "proxies", label: "Proxies", icon: Signal },
+    { id: "routing", label: "Routing", icon: Waypoints },
     { id: "logs", label: "Logs", icon: FileText },
 ] as const;
 

@@ -28,13 +28,14 @@ func (p Profile) NormalizedSourceDomain() string {
 	return "local"
 }
 
-// RoutingMode values accepted from the UI.
+// Legacy routing modes. These are read once, to migrate settings written before
+// the routing graph existed, and then never again — see normalizeRouting.
 const (
 	RoutingAll         = "all"
 	RoutingApps        = "apps"
 	RoutingDomains     = "domains"
 	RoutingAppsDomains = "apps_domains"
-	RoutingSelected    = "selected" // legacy alias for apps_domains
+	RoutingSelected    = "selected" // older alias for apps_domains
 )
 
 // AppSettings mirrors the settings object the frontend owns.
@@ -52,20 +53,31 @@ type AppSettings struct {
 	// third party. A pointer so an existing settings.json that predates the
 	// setting is treated as "not chosen" and defaults to on, rather than
 	// silently switching the feature off on upgrade.
-	IPCheckEnabled    *bool    `json:"ip_check_enabled"`
-	AuthServer        *string  `json:"auth_server"`
-	AuthToken         *string  `json:"auth_token"`
-	SkipAuth          bool     `json:"skip_auth"`
-	PendingSyncUpload bool     `json:"pending_sync_upload"`
-	RoutingMode       string   `json:"routing_mode"`
-	RoutingApps       []string `json:"routing_apps"`
-	RoutingDomains    []string `json:"routing_domains"`
+	IPCheckEnabled    *bool   `json:"ip_check_enabled"`
+	AuthServer        *string `json:"auth_server"`
+	AuthToken         *string `json:"auth_token"`
+	SkipAuth          bool    `json:"skip_auth"`
+	PendingSyncUpload bool    `json:"pending_sync_upload"`
+
+	// The routing graph. RoutingRules is nil (not empty) only on settings
+	// written before it existed, which is what triggers the one-time migration
+	// from the fields below it.
+	RoutingRules  []RoutingRule    `json:"routing_rules"`
+	DefaultAction string           `json:"default_action"`
+	RoutingLayout map[string]Point `json:"routing_layout"`
+
+	// Superseded by RoutingRules; kept so an upgrade can migrate them and so a
+	// downgrade does not lose the user's old configuration.
+	RoutingMode    string   `json:"routing_mode"`
+	RoutingApps    []string `json:"routing_apps"`
+	RoutingDomains []string `json:"routing_domains"`
+
 	ProxyChainEnabled bool     `json:"proxy_chain_enabled"`
 	ProxyChain        []string `json:"proxy_chain"`
 	ProxyChainExit    string   `json:"proxy_chain_exit"`
 }
 
-// DefaultSettings matches the previous Rust defaults.
+// DefaultSettings is the configuration a fresh install starts from.
 func DefaultSettings() AppSettings {
 	enabled := true
 	return AppSettings{
@@ -74,6 +86,9 @@ func DefaultSettings() AppSettings {
 		TLSFragmentSize:  "100-200",
 		TLSFragmentSleep: "10-20",
 		IPCheckEnabled:   &enabled,
+		RoutingRules:     []RoutingRule{},
+		DefaultAction:    ActionProxy,
+		RoutingLayout:    map[string]Point{},
 		RoutingMode:      RoutingAll,
 		RoutingApps:      []string{},
 		RoutingDomains:   []string{},
@@ -82,10 +97,10 @@ func DefaultSettings() AppSettings {
 }
 
 // Normalize fills in values that must never be empty once the settings reach
-// the config generator, and collapses the legacy "selected" routing mode.
+// the config generator, and migrates the routing graph on first load.
 //
-// This is the only place either of those happens: the renderer used to keep its
-// own copy of the same rules, which is one contract in two languages waiting to
+// This is the only place any of that happens: the renderer used to keep its own
+// copy of the same rules, which is one contract in two languages waiting to
 // drift apart.
 func (s *AppSettings) Normalize() {
 	if s.MTU == 0 {
@@ -98,13 +113,6 @@ func (s *AppSettings) Normalize() {
 		enabled := true
 		s.IPCheckEnabled = &enabled
 	}
-	switch s.RoutingMode {
-	case RoutingAll, RoutingApps, RoutingDomains, RoutingAppsDomains:
-	case RoutingSelected:
-		s.RoutingMode = RoutingAppsDomains
-	default:
-		s.RoutingMode = RoutingAll
-	}
 	if s.RoutingApps == nil {
 		s.RoutingApps = []string{}
 	}
@@ -114,23 +122,10 @@ func (s *AppSettings) Normalize() {
 	if s.ProxyChain == nil {
 		s.ProxyChain = []string{}
 	}
+	s.normalizeRouting()
 }
 
 // IPCheckOn reports whether the public-address lookup may run.
 func (s AppSettings) IPCheckOn() bool {
 	return s.IPCheckEnabled == nil || *s.IPCheckEnabled
-}
-
-// SplitTunnelling reports whether traffic should default to DIRECT and only
-// matched apps/domains go through the proxy.
-func (s AppSettings) SplitTunnelling() bool { return s.RoutingMode != RoutingAll }
-
-// IncludeApps reports whether per-process routing rules should be emitted.
-func (s AppSettings) IncludeApps() bool {
-	return s.RoutingMode == RoutingApps || s.RoutingMode == RoutingAppsDomains
-}
-
-// IncludeDomains reports whether per-domain routing rules should be emitted.
-func (s AppSettings) IncludeDomains() bool {
-	return s.RoutingMode == RoutingDomains || s.RoutingMode == RoutingAppsDomains
 }

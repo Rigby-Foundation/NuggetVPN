@@ -218,6 +218,10 @@ func TestFullTunnelUsesFakeIP(t *testing.T) {
 
 func TestSplitTunnelRoutesDirectByDefault(t *testing.T) {
 	result := buildFor(t, protocolLinks["vless-reality"], func(settings *models.AppSettings) {
+		// A settings.json written before the routing graph has neither key,
+		// which is what triggers the migration.
+		settings.RoutingRules = nil
+		settings.DefaultAction = ""
 		settings.RoutingMode = models.RoutingAppsDomains
 		settings.RoutingDomains = []string{"example.org", "example.net"}
 		settings.RoutingApps = []string{"Safari.app"}
@@ -239,6 +243,8 @@ func TestSplitTunnelRoutesDirectByDefault(t *testing.T) {
 // build, which used "selected" instead of "apps_domains".
 func TestLegacySelectedRoutingMode(t *testing.T) {
 	result := buildFor(t, protocolLinks["vless-reality"], func(settings *models.AppSettings) {
+		settings.RoutingRules = nil
+		settings.DefaultAction = ""
 		settings.RoutingMode = "selected"
 		settings.RoutingDomains = []string{"example.org"}
 	})

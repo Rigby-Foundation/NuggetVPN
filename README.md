@@ -54,7 +54,7 @@ are not worth that.
 - **Protocol support** — VLESS (including **Reality** + XTLS Vision), VMess, Trojan, Shadowsocks, Hysteria, Hysteria2, TUIC, WireGuard, SOCKS, HTTP and SSH, over TCP, WebSocket, gRPC, HTTP/2 and HTTPUpgrade.
 - **Profile management** — subscription import and refresh, manual `vless://`, `ss://`, `vmess://` … links, persistent storage.
 - **Custom sing-box configs** — paste a full sing-box JSON config and it runs verbatim; paste just an `outbounds` document and the app layers its own TUN, DNS and routing on top.
-- **Split tunnelling** — route selected applications and/or domains through the proxy while everything else goes direct.
+- **Routing graph** — a node canvas on its own tab. Match traffic by application, domain or IP/CIDR and send each match through the tunnel, straight out, or nowhere at all; whatever matches nothing takes the default. Rules become sing-box route rules in order, so the picture is the configuration.
 - **Proxy chaining** — stack multiple profiles; each hop dials through the previous one.
 - **Live traffic counters** — real byte counts from the core, not estimates.
 - **Real-time logging** — sing-box logs streamed into the app and mirrored to `session.log`.
@@ -154,11 +154,11 @@ These are the same paths the previous build used, so profiles and settings survi
 - **`app.go`** — everything the frontend can call.
 - **`Taskfile.yml`, `build/`** — the Wails v3 build and packaging pipeline, including `build/darwin/make-dmg.sh`.
 - **`internal/core/`** — embedded sing-box lifecycle, the privileged service and its client.
-- **`internal/sbconfig/`** — turns a profile plus settings into a sing-box config.
+- **`internal/sbconfig/`** — turns a profile plus settings into a sing-box config; `route.go` compiles the routing graph into route rules.
 - **`internal/link/`** — share links, sing-box JSON and legacy Clash YAML → sing-box outbounds.
 - **`internal/remote/`** — subscriptions and profile sync.
 - **`internal/probe/`** — latency and connectivity probes.
-- **`internal/storage/`**, **`internal/models/`** — persistence and shared types.
+- **`internal/storage/`**, **`internal/models/`** — persistence and shared types; `models/routing.go` owns the routing graph and its one-time migration from the old routing modes.
 - **`frontend/`** — React application. `src/lib/backend.ts` bridges it to the Go bindings; `src/hooks/` holds the state that mirrors the backend (connection, traffic, logs, profiles).
 
 ## Known limitations

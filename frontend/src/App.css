@@ -79,6 +79,15 @@
     --color-status-connected: var(--status-connected);
     --color-status-error: var(--status-error);
 
+    /* Routing graph. Each traffic source owns a hue, and an edge is drawn in
+       its source's colour, so a rule can be traced across the canvas without
+       reading the node it came from. */
+    --color-routing-apps: var(--routing-apps);
+    --color-routing-domains: var(--routing-domains);
+    --color-routing-ip: var(--routing-ip);
+    --color-routing-direct: var(--routing-direct);
+    --color-routing-default: var(--routing-default);
+
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
@@ -122,6 +131,12 @@
     --status-connected: oklch(0.62 0.155 58);
     --status-error: oklch(0.55 0.225 27.325);
 
+    --routing-apps: oklch(0.6 0.2 350);
+    --routing-domains: oklch(0.53 0.2 300);
+    --routing-ip: oklch(0.6 0.16 40);
+    --routing-direct: oklch(0.58 0.13 220);
+    --routing-default: oklch(0.58 0.02 286);
+
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
     --sidebar-primary: oklch(0.58 0.145 58);
@@ -160,6 +175,12 @@
     --status-connecting: oklch(0.75 0.1 72);
     --status-connected: oklch(0.79 0.15 68);
     --status-error: oklch(0.704 0.191 22.216);
+
+    --routing-apps: oklch(0.72 0.19 350);
+    --routing-domains: oklch(0.7 0.18 300);
+    --routing-ip: oklch(0.75 0.16 45);
+    --routing-direct: oklch(0.72 0.13 225);
+    --routing-default: oklch(0.62 0.02 286);
 
     --sidebar: oklch(0.21 0.006 285.885);
     --sidebar-foreground: oklch(0.985 0 0);
@@ -271,4 +292,55 @@
     *, *::before, *::after {
         transition-duration: 0.01ms !important;
     }
+}
+
+/* React Flow theming.
+   The library ships light-mode defaults; these map its variables onto the app
+   tokens so the canvas follows the theme instead of fighting it. */
+.react-flow {
+    --xy-background-color: transparent;
+    --xy-edge-stroke-default: var(--routing-default);
+    --xy-node-border-default: transparent;
+    --xy-node-background-color-default: transparent;
+    --xy-attribution-background-color: transparent;
+}
+
+.react-flow__background-pattern {
+    color: color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.react-flow__controls-button {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    color: var(--foreground);
+    fill: currentColor;
+}
+
+.react-flow__controls-button:hover {
+    background: var(--accent);
+}
+
+.react-flow__attribution {
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+
+/* The node shells draw their own chrome. */
+.react-flow__node {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: auto;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+.react-flow__handle {
+    border: 2px solid var(--background);
+}
+
+/* React Flow's built-in node types centre their text; the custom nodes here
+   draw their own chrome and want normal left alignment. */
+.react-flow__node {
+    text-align: left;
 }

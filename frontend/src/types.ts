@@ -26,6 +26,12 @@ export interface AppSettings {
     auth_token: string | null;
     skip_auth: boolean;
     pending_sync_upload: boolean;
+    /** The routing graph. Go owns migration from the legacy fields below. */
+    routing_rules: RoutingRule[];
+    default_action: RoutingAction;
+    /** Canvas positions, keyed by node id, so the graph survives a restart. */
+    routing_layout: Record<string, CanvasPoint>;
+    /** Superseded by routing_rules; read only by the one-time migration. */
     routing_mode: "all" | "apps" | "domains" | "apps_domains";
     routing_apps: string[];
     routing_domains: string[];
@@ -95,3 +101,21 @@ export type ConfigSource =
         detail: string;
         profileId: string;
     };
+
+/** A source kind a routing rule can match on. */
+export type RoutingSource = "apps" | "domains" | "ip";
+
+/** Where a routing rule sends what it matches. */
+export type RoutingAction = "proxy" | "direct" | "block";
+
+export interface RoutingRule {
+    id: string;
+    kind: RoutingSource;
+    values: string[];
+    action: RoutingAction;
+}
+
+export interface CanvasPoint {
+    x: number;
+    y: number;
+}

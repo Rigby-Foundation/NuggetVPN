@@ -15,6 +15,7 @@ import ConnectionView from "@/components/views/ConnectionView";
 import ConfigurationView from "@/components/views/ConfigurationView";
 import LogsView from "@/components/views/LogsView";
 import ProxiesView from "@/components/views/ProxiesView";
+import RoutingView from "@/components/views/RoutingView";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -48,6 +49,9 @@ const PENDING_SETTINGS: AppSettings = {
     auth_token: null,
     skip_auth: false,
     pending_sync_upload: false,
+    routing_rules: [],
+    default_action: "proxy",
+    routing_layout: {},
     routing_mode: "all",
     routing_apps: [],
     routing_domains: [],
@@ -119,13 +123,13 @@ function App() {
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
 
-    const updateSetting = useCallback(
-        <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-            // The save happens here, not inside a setSettings updater. React may
-            // invoke an updater more than once for a single change, so a request
-            // fired from inside one produces duplicate saves — and, when they
-            // fail, a stack of identical error toasts.
-            const next = { ...settingsRef.current, [key]: value };
+    // The save happens here, not inside a setSettings updater. React may invoke
+    // an updater more than once for a single change, so a request fired from
+    // inside one produces duplicate saves — and, when they fail, a stack of
+    // identical error toasts.
+    const patchSettings = useCallback(
+        (patch: Partial<AppSettings>) => {
+            const next = { ...settingsRef.current, ...patch };
             setSettings(next);
             void saveSettings(next).catch((error) =>
                 toast.error(`Could not save settings: ${errorMessage(error)}`, {
@@ -134,6 +138,13 @@ function App() {
             );
         },
         [saveSettings]
+    );
+
+    const updateSetting = useCallback(
+        <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+            patchSettings({ [key]: value } as Partial<AppSettings>);
+        },
+        [patchSettings]
     );
 
     // ---- startup ----------------------------------------------------------
@@ -528,6 +539,13 @@ function App() {
                                                 skip_auth: false,
                                             });
                                         }}
+                                    />
+                                )}
+
+                                {activeTab === "routing" && (
+                                    <RoutingView
+                                        settings={settings}
+                                        onChange={patchSettings}
                                     />
                                 )}
 
