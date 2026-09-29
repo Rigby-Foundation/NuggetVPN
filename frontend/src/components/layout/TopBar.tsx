@@ -70,7 +70,7 @@ function TopBar({
                                     {selected?.label ?? t("topbar.select")}
                                 </span>
                                 <ChevronDown
-                                    className="ml-1.5 h-4 w-4 opacity-60 shrink-0"
+                                    className="ms-1.5 h-4 w-4 opacity-60 shrink-0"
                                     aria-hidden="true"
                                 />
                             </Button>

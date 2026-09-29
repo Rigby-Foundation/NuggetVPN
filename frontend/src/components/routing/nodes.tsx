@@ -316,7 +316,7 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
             <div className="relative">
                 <Search
                     size={11}
-                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    className="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                 />
                 <Input
@@ -324,11 +324,11 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
                     onChange={(event) => setFilter(event.target.value)}
                     placeholder={t("routing.filterPlaceholder", { count: values.length })}
                     aria-label={t("routing.filter")}
-                    className="nodrag h-7 pl-6 text-[11px] font-mono"
+                    className="nodrag h-7 ps-6 text-[11px] font-mono"
                 />
             </div>
             {/* nowheel: scrolling here scrolls the list, not the canvas. */}
-            <div className="nowheel nodrag max-h-60 space-y-1 overflow-y-auto pr-0.5">
+            <div className="nowheel nodrag max-h-60 space-y-1 overflow-y-auto pe-0.5">
                 {shown.map((value) => (
                     <ValueRow key={value} value={value} onRemove={() => remove(value)} />
                 ))}

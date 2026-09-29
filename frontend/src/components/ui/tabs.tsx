@@ -139,7 +139,7 @@ function TabsList({
       >
         <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 z-0 rounded-md bg-background shadow-sm transition-[transform,width,height,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] opacity-0 dark:bg-input/30"
+            className="pointer-events-none absolute start-0 top-0 z-0 rounded-md bg-background shadow-sm transition-[transform,width,height,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] opacity-0 dark:bg-input/30"
             style={{
               transform: `translate3d(${indicator.x}px, ${indicator.y}px, 0)`,
               width: indicator.width,

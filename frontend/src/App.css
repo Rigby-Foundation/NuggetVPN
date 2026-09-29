@@ -633,6 +633,13 @@
 :root[data-motion="slide"] [data-enter-dir="back"] {
     --enter-name: nugget-in-from-left;
 }
+/* Right to left, forward is towards the left: mirror the slide. */
+:root[dir="rtl"][data-motion="slide"] {
+    --enter-name: nugget-in-from-left;
+}
+:root[dir="rtl"][data-motion="slide"] [data-enter-dir="back"] {
+    --enter-name: nugget-in-from-right;
+}
 :root[data-motion="rise"] {
     --enter-name: nugget-in-from-below;
 }

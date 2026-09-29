@@ -175,12 +175,12 @@ function Onboarding({
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     {t("onboarding.checking")}
                   </>
                 ) : (
                   <>
-                    {t("common.continue")} <ArrowRight size={18} className="ml-2" />
+                    {t("common.continue")} <ArrowRight size={18} className="ms-2 rtl:-scale-x-100" />
                   </>
                 )}
               </Button>
@@ -215,7 +215,7 @@ function Onboarding({
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     {t("common.working")}
                   </>
                 ) : isRegistering ? (

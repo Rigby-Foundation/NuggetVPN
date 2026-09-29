@@ -50,7 +50,7 @@ function Option({
             aria-pressed={active}
             title={hint}
             className={cn(
-                "rounded-xl border-2 p-2 text-left transition-colors",
+                "rounded-xl border-2 p-2 text-start transition-colors",
                 active ? "" : "border-transparent hover:border-border"
             )}
             style={active ? { borderColor: accent } : undefined}
@@ -166,7 +166,7 @@ function ThemePicker({ theme, setTheme }: Props) {
                 onClick={() => setTheme("system")}
                 aria-pressed={theme === "system"}
                 className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors",
+                    "flex w-full items-center gap-3 rounded-xl border-2 p-3 text-start transition-colors",
                     theme === "system"
                         ? "border-primary"
                         : "border-transparent bg-muted/30 hover:border-border"
@@ -228,7 +228,7 @@ function ThemePicker({ theme, setTheme }: Props) {
                             type="button"
                             onClick={() => setEditing({ theme: custom, isNew: false })}
                             aria-label={t("picker.edit", { name: custom.name || t("picker.untitled") })}
-                            className="absolute left-3.5 top-3.5 grid h-6 w-6 place-items-center rounded-md bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+                            className="absolute start-3.5 top-3.5 grid h-6 w-6 place-items-center rounded-md bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
                         >
                             <Pencil size={11} aria-hidden="true" />
                         </button>
@@ -239,7 +239,7 @@ function ThemePicker({ theme, setTheme }: Props) {
                     onClick={() =>
                         setEditing({ theme: newCustomTheme(currentlyDark ? "dark" : "light"), isNew: true })
                     }
-                    className="flex flex-col rounded-xl border-2 border-transparent p-2 text-left hover:border-border"
+                    className="flex flex-col rounded-xl border-2 border-transparent p-2 text-start hover:border-border"
                 >
                     <span className="grid h-14 w-full place-items-center rounded-lg border-2 border-dashed text-muted-foreground">
                         <Plus size={18} aria-hidden="true" />

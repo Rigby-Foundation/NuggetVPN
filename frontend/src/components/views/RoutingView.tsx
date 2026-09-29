@@ -359,7 +359,7 @@ function Palette({
                         key={kind}
                         type="button"
                         onClick={() => onAddSource(kind)}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-left"
+                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
                     >
                         <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
                         <span className="truncate">{t(meta.label)}</span>
@@ -381,7 +381,7 @@ function Palette({
                         aria-pressed={isDefault}
                         title={t("routing.sendUnmatched", { action: t(meta.label) })}
                         className={cn(
-                            "w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-left",
+                            "w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-start",
                             isDefault ? "bg-accent" : "hover:bg-accent"
                         )}
                     >
@@ -402,7 +402,7 @@ function Palette({
             <button
                 type="button"
                 onClick={onAddNote}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-left"
+                className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
             >
                 <StickyNote size={15} className="text-muted-foreground" aria-hidden="true" />
                 <span className="truncate">{t("routing.note")}</span>
@@ -785,7 +785,10 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
             ) : null}
 
             <div className="flex-1 min-h-0 mx-4 mb-4 flex gap-3">
-                <div className="flex-1 min-w-0 rounded-xl border overflow-hidden">
+                {/* The graph reads left to right in every language: sources
+                    on the left, destinations on the right, the way the edges
+                    are drawn. It is not mirrored in right-to-left layouts. */}
+                <div className="flex-1 min-w-0 rounded-xl border overflow-hidden" dir="ltr">
                     <GeoCodesContext.Provider value={geoCodes}>
                         <ReactFlowProvider>
                             <RoutingCanvas

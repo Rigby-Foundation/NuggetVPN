@@ -62,6 +62,7 @@ var trayLabels = map[string]trayText{
 	"uk": {"Відкрити NuggetVPN", "Відключитися", "Вийти з NuggetVPN"},
 	"zh": {"打开 NuggetVPN", "断开连接", "退出 NuggetVPN"},
 	"ja": {"NuggetVPN を開く", "切断", "NuggetVPN を終了"},
+	"fa": {"باز کردن NuggetVPN", "قطع اتصال", "خروج از NuggetVPN"},
 }
 
 // SetUILanguage relabels the tray menu in the language the UI is showing.

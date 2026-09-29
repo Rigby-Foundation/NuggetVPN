@@ -362,7 +362,7 @@ function SettingsView({
                     aria-checked={active}
                     onClick={() => setChoice(id)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-colors",
+                      "flex w-full items-center justify-between gap-3 rounded-lg border-2 px-3 py-2.5 text-start transition-colors",
                       active ? "border-primary bg-primary/5" : "border-transparent bg-muted/30 hover:border-border"
                     )}
                   >
@@ -440,7 +440,7 @@ function SettingsView({
                       aria-checked={active}
                       onClick={() => onSettingsChange("close_action", option.id)}
                       className={cn(
-                        "flex w-full items-start gap-3 rounded-lg border-2 p-3 text-left transition-colors",
+                        "flex w-full items-start gap-3 rounded-lg border-2 p-3 text-start transition-colors",
                         active ? "border-primary bg-primary/5" : "border-transparent bg-muted/30 hover:border-border"
                       )}
                     >
@@ -830,7 +830,7 @@ function SettingsView({
               className="gap-1.5"
               onClick={() => navigate(null)}
             >
-              <ArrowLeft size={14} /> {t("nav.settings")}
+              <ArrowLeft size={14} className="rtl:-scale-x-100" /> {t("nav.settings")}
             </Button>
           ) : undefined
         }
@@ -838,9 +838,9 @@ function SettingsView({
         <div className="min-h-0 flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             {open ? (
-              <div className="enter-stagger space-y-4 pr-1">{detail(open.id)}</div>
+              <div className="enter-stagger space-y-4 pe-1">{detail(open.id)}</div>
             ) : (
-              <div className="enter-stagger space-y-2 pr-1">
+              <div className="enter-stagger space-y-2 pe-1">
                 {SECTIONS.filter((section) => section.id !== "beam" || beamPreview).map((section) => (
                   <SettingsRow
                     key={section.id}

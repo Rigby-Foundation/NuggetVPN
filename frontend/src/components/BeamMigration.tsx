@@ -167,9 +167,9 @@ function OutcomeRow({ outcome }: { outcome: BeamOutcome }) {
                     </span>
                 ) : null}
             </div>
-            <p className="mt-1 pl-6 text-xs text-muted-foreground">{t(copy.label)}</p>
+            <p className="mt-1 ps-6 text-xs text-muted-foreground">{t(copy.label)}</p>
             {notes.map((note) => (
-                <p key={note} className="mt-1 pl-6 text-xs text-muted-foreground break-words">
+                <p key={note} className="mt-1 ps-6 text-xs text-muted-foreground break-words">
                     {note}
                 </p>
             ))}

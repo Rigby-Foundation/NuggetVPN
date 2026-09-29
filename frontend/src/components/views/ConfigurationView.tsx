@@ -44,7 +44,7 @@ function ConfigurationView({
             actions={
                 sources.length > 0 ? (
                     <Button size="sm" variant="outline" onClick={onAdd}>
-                        <Plus size={14} className="mr-2" aria-hidden="true" />
+                        <Plus size={14} className="me-2" aria-hidden="true" />
                         {t("configuration.add")}
                     </Button>
                 ) : null
@@ -57,7 +57,7 @@ function ConfigurationView({
                         {t("configuration.emptyHint")}
                     </p>
                     <Button onClick={onAdd}>
-                        <Plus size={16} className="mr-2" aria-hidden="true" />
+                        <Plus size={16} className="me-2" aria-hidden="true" />
                         {t("configuration.emptyButton")}
                     </Button>
                 </div>

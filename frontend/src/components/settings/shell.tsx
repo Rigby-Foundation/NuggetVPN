@@ -27,7 +27,7 @@ export function SettingsRow({ icon: Icon, title, subtitle, badge, onClick }: Row
             type="button"
             onClick={onClick}
             className={cn(
-                "w-full flex items-center gap-4 rounded-xl border bg-card/60 px-4 py-3.5 text-left",
+                "w-full flex items-center gap-4 rounded-xl border bg-card/60 px-4 py-3.5 text-start",
                 "transition-colors hover:bg-accent/60"
             )}
         >
@@ -52,7 +52,7 @@ export function SettingsRow({ icon: Icon, title, subtitle, badge, onClick }: Row
                 </span>
             </span>
 
-            <ChevronRight size={18} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+            <ChevronRight size={18} className="shrink-0 text-muted-foreground rtl:-scale-x-100" aria-hidden="true" />
         </button>
     );
 }

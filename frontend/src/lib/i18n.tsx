@@ -15,8 +15,10 @@
  * frame is already in the right language.
  */
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { DirectionProvider } from "@radix-ui/react-direction";
 
 import en from "@/locales/en";
+import fa from "@/locales/fa";
 import ja from "@/locales/ja";
 import ru from "@/locales/ru";
 import uk from "@/locales/uk";
@@ -44,12 +46,13 @@ export type Script = "latin" | "cyrillic" | "hans" | "jpan" | "arab";
  * script is new — fonts that cover it in lib/appearance.ts.
  */
 export const LANGUAGES = [
-    { id: "en", label: "English", tag: "en", script: "latin" },
-    { id: "ru", label: "Русский", tag: "ru", script: "cyrillic" },
-    { id: "uk", label: "Українська", tag: "uk", script: "cyrillic" },
-    { id: "zh", label: "中文", tag: "zh-CN", script: "hans" },
-    { id: "ja", label: "日本語", tag: "ja", script: "jpan" },
-] as const satisfies readonly { id: string; label: string; tag: string; script: Script }[];
+    { id: "en", label: "English", tag: "en", script: "latin", dir: "ltr" },
+    { id: "ru", label: "Русский", tag: "ru", script: "cyrillic", dir: "ltr" },
+    { id: "uk", label: "Українська", tag: "uk", script: "cyrillic", dir: "ltr" },
+    { id: "zh", label: "中文", tag: "zh-CN", script: "hans", dir: "ltr" },
+    { id: "ja", label: "日本語", tag: "ja", script: "jpan", dir: "ltr" },
+    { id: "fa", label: "فارسی", tag: "fa", script: "arab", dir: "rtl" },
+] as const satisfies readonly { id: string; label: string; tag: string; script: Script; dir: "ltr" | "rtl" }[];
 
 export type Language = (typeof LANGUAGES)[number]["id"];
 
@@ -60,7 +63,7 @@ export function scriptOf(language: Language): Script {
 /** What the user picked: a language, or whatever the system uses. */
 export type LanguageChoice = Language | "system";
 
-const CATALOG: Record<Language, Messages> = { en, ru, uk, zh, ja };
+const CATALOG: Record<Language, Messages> = { en, ru, uk, zh, ja, fa };
 const STORAGE_KEY = "nugget.language";
 
 /** The first of the system's preferred languages this app has. */
@@ -76,6 +79,13 @@ export function systemLanguage(): Language {
 }
 
 /** The language the UI will show, read before React renders. */
+/** Sets <html lang> and dir before React renders, so the first frame is laid out right. */
+export function bootLanguage() {
+    const entry = LANGUAGES.find((item) => item.id === currentLanguage());
+    document.documentElement.lang = entry?.tag ?? "en";
+    document.documentElement.dir = entry?.dir ?? "ltr";
+}
+
 export function currentLanguage(): Language {
     const choice = loadChoice();
     return choice === "system" ? systemLanguage() : choice;
@@ -117,6 +127,8 @@ export type Translate = (key: MessageKey, params?: Params) => string;
 
 interface I18nContext {
     language: Language;
+    /** Text direction: "rtl" for Persian. Logical CSS (ms-, pe-, start-) follows it. */
+    dir: "ltr" | "rtl";
     choice: LanguageChoice;
     setChoice: (choice: LanguageChoice) => void;
     t: Translate;
@@ -158,11 +170,21 @@ export function I18nProvider({
     }, []);
 
     useEffect(() => {
-        document.documentElement.lang = LANGUAGES.find((item) => item.id === language)?.tag ?? language;
+        const entry = LANGUAGES.find((item) => item.id === language);
+        document.documentElement.lang = entry?.tag ?? language;
+        document.documentElement.dir = entry?.dir ?? "ltr";
         onLanguage?.(language);
     }, [language, onLanguage]);
 
     const t = useCallback<Translate>((key, params) => translate(language, key, params), [language]);
-    const value = useMemo(() => ({ language, choice, setChoice, t }), [language, choice, setChoice, t]);
-    return <Context.Provider value={value}>{children}</Context.Provider>;
+    const dir = LANGUAGES.find((item) => item.id === language)?.dir ?? "ltr";
+    const value = useMemo(() => ({ language, dir, choice, setChoice, t }), [language, dir, choice, setChoice, t]);
+    // Radix components take their direction from this provider, not from
+    // <html dir>: without it a ScrollArea stamps dir="ltr" on itself and
+    // everything inside it — most of every page — stays left to right.
+    return (
+        <Context.Provider value={value}>
+            <DirectionProvider dir={dir}>{children}</DirectionProvider>
+        </Context.Provider>
+    );
 }

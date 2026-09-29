@@ -12,7 +12,7 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
-import { MessageKey, useT } from "@/lib/i18n";
+import { MessageKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "@/types";
 
@@ -57,11 +57,13 @@ function AppSidebar({
     platform,
     status,
 }: AppSidebarProps) {
-    const t = useT();
+    const { t, dir } = useI18n();
     const isMac = platform === "macos";
 
+    // On the reading side: the right in a right-to-left language.
+    const side = dir === "rtl" ? "right" : "left";
     return (
-        <Sidebar variant="inset" className="select-none">
+        <Sidebar variant="inset" side={side} className="select-none">
             <SidebarHeader
                 className={cn(
                     "drag-region flex-row items-center justify-between px-4",

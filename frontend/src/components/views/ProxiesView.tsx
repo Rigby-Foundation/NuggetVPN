@@ -82,7 +82,7 @@ function ProxiesView({
                     >
                         <RefreshCw
                             size={14}
-                            className={cn("mr-2", isRefreshingSource && "animate-spin")}
+                            className={cn("me-2", isRefreshingSource && "animate-spin")}
                             aria-hidden="true"
                         />
                         {isRefreshingSource ? t("proxies.refreshing") : t("proxies.refresh")}

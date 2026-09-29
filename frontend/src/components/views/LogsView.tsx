@@ -94,11 +94,11 @@ function LogsView({
             actions={
                 <>
                     <Button variant="ghost" size="sm" onClick={onClear}>
-                        <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" />
+                        <Trash2 className="w-4 h-4 me-2" aria-hidden="true" />
                         {t("logs.clear")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={onDumpLogs}>
-                        <Download className="w-4 h-4 mr-2" aria-hidden="true" />
+                        <Download className="w-4 h-4 me-2" aria-hidden="true" />
                         {t("logs.export")}
                     </Button>
                     <Select value={logLimit} onValueChange={onLogLimitChange}>
@@ -126,7 +126,8 @@ function LogsView({
                         {t("logs.empty")}
                     </p>
                 ) : (
-                    <ol className="font-mono text-xs leading-relaxed">
+                    // dir="ltr": log lines are English whatever the UI language.
+                    <ol className="font-mono text-xs leading-relaxed" dir="ltr">
                         {logs.map((line, index) => (
                             <LogLine key={`${index}-${line}`} line={line} />
                         ))}
