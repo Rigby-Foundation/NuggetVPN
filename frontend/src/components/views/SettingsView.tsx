@@ -410,6 +410,53 @@ function SettingsView({
               />
             </SettingsGroup>
 
+            <SettingsGroup title={t("behaviour.connection")}>
+              <SettingsField
+                label={t("behaviour.autoReconnect")}
+                description={t("behaviour.autoReconnect.description")}
+                control={
+                  <Switch
+                    checked={appSettings.auto_reconnect !== false}
+                    onCheckedChange={(checked) => onSettingsChange("auto_reconnect", checked)}
+                    aria-label={t("behaviour.autoReconnect")}
+                  />
+                }
+              />
+              <SettingsField
+                label={t("behaviour.killSwitch")}
+                description={t("behaviour.killSwitch.description")}
+                control={
+                  <Switch
+                    checked={appSettings.kill_switch}
+                    onCheckedChange={(checked) => onSettingsChange("kill_switch", checked)}
+                    aria-label={t("behaviour.killSwitch")}
+                  />
+                }
+              />
+              <SettingsField
+                label={t("behaviour.fastest")}
+                description={t("behaviour.fastest.description")}
+                control={
+                  <Switch
+                    checked={appSettings.fastest_server}
+                    onCheckedChange={(checked) => onSettingsChange("fastest_server", checked)}
+                    aria-label={t("behaviour.fastest")}
+                  />
+                }
+              />
+              <SettingsField
+                label={t("behaviour.notifications")}
+                description={t("behaviour.notifications.description")}
+                control={
+                  <Switch
+                    checked={appSettings.notifications !== false}
+                    onCheckedChange={(checked) => onSettingsChange("notifications", checked)}
+                    aria-label={t("behaviour.notifications")}
+                  />
+                }
+              />
+            </SettingsGroup>
+
             <SettingsGroup title={t("settings.subscriptions")}>
               <SettingsField
                 label={t("behaviour.autoUpdate")}

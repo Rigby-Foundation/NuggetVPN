@@ -79,6 +79,10 @@ const PENDING_SETTINGS: AppSettings = {
     last_selection: null,
     launch_at_startup: false,
     auto_connect: false,
+    auto_reconnect: null,
+    kill_switch: false,
+    fastest_server: false,
+    notifications: null,
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],
@@ -471,7 +475,9 @@ function App() {
     // ---- actions ----------------------------------------------------------
     const toggleConnection = useCallback(async () => {
         try {
-            if (connection.isConnected) {
+            // Connected, reconnecting or held by the kill switch: the button
+            // stops it.
+            if (connection.isConnected || connection.state.reconnecting || connection.state.blocked) {
                 await connection.disconnect();
                 return;
             }

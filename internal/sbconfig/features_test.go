@@ -263,3 +263,72 @@ func TestLoggingOffDisablesTheCoreLog(t *testing.T) {
 		}
 	}
 }
+
+// With alternatives, the exit is a latency-tested group over every server,
+// the core accepts it, and a connection through any member is attributed to
+// that member's profile.
+func TestFastestServerGroup(t *testing.T) {
+	request := featureRequest(t)
+	request.Alternatives = []models.Profile{
+		{ID: "main", Name: "Main", ConfigLink: mainLink},
+		{ID: "jp", Name: "Japan", ConfigLink: otherLink},
+		{ID: "broken", Name: "Broken", ConfigLink: "not a link"},
+	}
+	result, err := Build(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	construct(t, result.JSON)
+
+	var config struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(result.JSON, &config); err != nil {
+		t.Fatal(err)
+	}
+	var group map[string]any
+	for _, outbound := range config.Outbounds {
+		if outbound["tag"] == ExitTag {
+			group = outbound
+		}
+	}
+	if group == nil || group["type"] != "urltest" {
+		t.Fatalf("the exit should be a urltest group: %v", group)
+	}
+	members := anyStrings(group["outbounds"])
+	if len(members) != 2 {
+		t.Fatalf("the connected server and Japan, without the broken one: %v", members)
+	}
+	for _, tag := range members {
+		if result.ServerFor[tag] == "" {
+			t.Errorf("member %s has no profile", tag)
+		}
+	}
+}
+
+// The kill switch's lockdown config is accepted by the core, lets only the
+// app itself and the local network out, and refuses everything else.
+func TestLockdownConfig(t *testing.T) {
+	data, err := Lockdown(models.DefaultSettings(), "/opt/nuggetvpn/NuggetVPN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := mustParse(t, data)
+	if len(options.Inbounds) != 1 || options.Inbounds[0].Type != "tun" {
+		t.Fatalf("lockdown must keep the TUN up: %+v", options.Inbounds)
+	}
+	construct(t, data)
+
+	var config struct {
+		Route struct {
+			Rules []map[string]any `json:"rules"`
+		} `json:"route"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatal(err)
+	}
+	last := config.Route.Rules[len(config.Route.Rules)-1]
+	if last["action"] != "reject" || len(last) != 1 {
+		t.Errorf("the last rule should refuse everything: %v", last)
+	}
+}

@@ -74,6 +74,12 @@ export interface AppSettings {
     launch_at_startup: boolean;
     auto_connect: boolean;
     /** Null means never chosen; the backend treats that as on. */
+    auto_reconnect: boolean | null;
+    kill_switch: boolean;
+    fastest_server: boolean;
+    /** Null means never chosen; the backend treats that as on. */
+    notifications: boolean | null;
+    /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;
 }
@@ -93,6 +99,11 @@ export interface ConnectionState {
     error?: string;
     /** Unix milliseconds the tunnel came up; absent unless connected. */
     since?: number;
+    /** Bringing a dropped tunnel back; attempt counts the tries. */
+    reconnecting?: boolean;
+    attempt?: number;
+    /** The kill switch is holding all traffic. */
+    blocked?: boolean;
 }
 
 export interface TrafficSample {

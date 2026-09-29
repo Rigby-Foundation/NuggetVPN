@@ -54,6 +54,11 @@ type Request struct {
 	// converted, by URL. A list the core reads natively (.srs, .json) is
 	// fetched by the core and needs no entry.
 	RuleLists map[string]RuleList
+
+	// Alternatives are other servers the core may move to. With any, the
+	// exit becomes a group that keeps measuring every server's latency and
+	// sends traffic through the fastest, switching as that changes.
+	Alternatives []models.Profile
 }
 
 // Result is a generated configuration plus the details the caller reports back
@@ -105,14 +110,57 @@ func Build(request Request) (Result, error) {
 		return Result{}, chainErr
 	}
 
-	exit["tag"] = ExitTag
-	if len(chainTags) > 0 {
-		exit["detour"] = chainTags[len(chainTags)-1]
+	// Each server traffic can leave through: the connected one, and any
+	// alternatives the exit may switch to.
+	exitTags := map[string]string{}
+	addExit := func(outbound link.Outbound, tag string) {
+		outbound["tag"] = tag
+		if len(chainTags) > 0 {
+			outbound["detour"] = chainTags[len(chainTags)-1]
+		}
+		if outbound.IsEndpoint() {
+			endpoints = append(endpoints, stripProbeFields(outbound))
+		} else {
+			outbounds = append(outbounds, outbound)
+		}
 	}
-	if exit.IsEndpoint() {
-		endpoints = append(endpoints, stripProbeFields(exit))
+	if len(request.Alternatives) == 0 {
+		addExit(exit, ExitTag)
 	} else {
-		outbounds = append(outbounds, exit)
+		members := []string{"exit-1"}
+		addExit(exit, "exit-1")
+		exitTags["exit-1"] = request.Profile.ID
+		for _, alternative := range request.Alternatives {
+			if alternative.ID == request.Profile.ID {
+				continue
+			}
+			// One that cannot be used is left out of the group; the rest
+			// still switch.
+			if _, full := link.FullConfig(alternative.ConfigLink); full {
+				continue
+			}
+			outbound, err := link.ParseOutbound(alternative.ConfigLink, settings)
+			if err != nil {
+				continue
+			}
+			tag := fmt.Sprintf("exit-%d", len(members)+1)
+			addExit(outbound, tag)
+			exitTags[tag] = alternative.ID
+			members = append(members, tag)
+		}
+		outbounds = append(outbounds, map[string]any{
+			"type":      "urltest",
+			"tag":       ExitTag,
+			"outbounds": members,
+			// A tiny page that exists to be fetched for this purpose.
+			"url":      "https://www.gstatic.com/generate_204",
+			"interval": "3m",
+			// Stay on the current server unless another is clearly faster;
+			// hopping for a few milliseconds would drop connections for
+			// nothing.
+			"tolerance":                   80,
+			"interrupt_exist_connections": false,
+		})
 	}
 
 	// Rules and the default can send traffic through servers other than the
@@ -155,7 +203,7 @@ func Build(request Request) (Result, error) {
 		SplitRules: splitRuleCount,
 		RuleOwners: owners,
 		Warnings:   plan.warnings,
-		ServerFor:  invert(outboundFor, request.Profile.ID),
+		ServerFor:  merge(invert(outboundFor, request.Profile.ID), exitTags),
 	}, nil
 }
 
@@ -171,6 +219,14 @@ func invert(outboundFor map[string]string, connected string) map[string]string {
 	}
 	result[ExitTag] = connected
 	return result
+}
+
+// merge adds extra's entries to base.
+func merge(base, extra map[string]string) map[string]string {
+	for key, value := range extra {
+		base[key] = value
+	}
+	return base
 }
 
 // buildLog configures the core's log. With logging off the core does not

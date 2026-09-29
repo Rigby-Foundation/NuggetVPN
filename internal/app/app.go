@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
@@ -98,11 +99,24 @@ type App struct {
 	// serverFor maps the running config's outbound tags to server profile
 	// ids; see sbconfig.Result.ServerFor.
 	serverFor map[string]string
+
+	// connectGen counts connects and disconnects, so a reconnect in progress
+	// can tell it has been superseded. lastConnect is what to reconnect to.
+	connectGen  atomic.Uint64
+	lastConnect connectRequest
+	// alternatives are the servers the exit may switch between, from the
+	// last connect; see sbconfig.Request.Alternatives.
+	alternatives []models.Profile
+	// lockedDown is set while the kill switch's lockdown config runs.
+	lockedDown atomic.Bool
+
+	// notifier shows system notifications; nil in tests.
+	notifier *notifications.NotificationService
 }
 
 // New loads persisted state and prepares the core client. icon is the tray
 // icon.
-func New(version string, icon []byte) *App {
+func New(version string, icon []byte, notifier *notifications.NotificationService) *App {
 	_ = storage.EnsureDirs()
 
 	service := &App{
@@ -117,6 +131,8 @@ func New(version string, icon []byte) *App {
 		http:   &http.Client{Timeout: 8 * time.Second},
 		state:  ConnectionState{Status: StatusIdle},
 		icon:   icon,
+
+		notifier: notifier,
 	}
 	service.settings.Normalize()
 	service.settings.LaunchAtStartup = autostart.Enabled()
@@ -145,6 +161,7 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	})
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)
+	a.prepareNotifications()
 	return nil
 }
 

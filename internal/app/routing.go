@@ -60,7 +60,15 @@ func (a *App) reapplyRouting() error {
 	}
 	a.appendLog("Routing changed; restarting the tunnel")
 	a.flushUsage()
-	if err := a.startProfile(profile, profiles, settings); err != nil {
+	// The servers the exit could switch between when the tunnel came up;
+	// ranking them again would mean a full latency sweep.
+	a.mu.Lock()
+	alternatives := a.alternatives
+	a.mu.Unlock()
+	if !settings.FastestServer {
+		alternatives = nil
+	}
+	if err := a.startProfile(profile, profiles, settings, alternatives); err != nil {
 		_, failure := a.fail(fmt.Sprintf("Could not apply the new routing: %v", err))
 		return failure
 	}

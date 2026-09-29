@@ -19,6 +19,7 @@ import (
 	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/app"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
@@ -89,7 +90,8 @@ func runCoreService() error {
 }
 
 func runGUI() {
-	service := app.New(version, appIcon)
+	notifier := notifications.New()
+	service := app.New(version, appIcon, notifier)
 
 	// Started by the system at login: come up without a window, unless
 	// closing is set to quit — then there would be no tray icon to reopen it
@@ -108,6 +110,7 @@ func runGUI() {
 		Icon:        appIcon,
 		Services: []application.Service{
 			application.NewService(service),
+			application.NewService(notifier),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

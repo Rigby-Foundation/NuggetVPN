@@ -6,6 +6,7 @@ import {
     Globe,
     Loader2,
     Power,
+    ShieldAlert,
     TriangleAlert,
 } from "lucide-react";
 
@@ -122,11 +123,14 @@ function ConnectionView({
     const t = useT();
     const presentation = PRESENTATION[state.status];
     const elapsed = useElapsed(state.status === "connected" ? state.since : undefined);
-    const busy = state.status === "connecting";
+    // A reconnect can be stopped from the button; a first connect cannot.
+    const busy = state.status === "connecting" && !state.reconnecting;
 
     // What the button will do, which is not always the inverse of the label:
     // from an error state the action is to try again.
-    const action = t(state.status === "connected" ? "connection.disconnect" : "connection.connect");
+    const action = t(
+        state.status === "connected" || state.reconnecting || state.blocked ? "connection.disconnect" : "connection.connect"
+    );
 
     return (
         <div className="enter-stagger absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 py-6 overflow-y-auto">
@@ -213,13 +217,25 @@ function ConnectionView({
                         <p className="text-sm text-status-error max-w-md">
                             {state.error || t(presentation.hint)}
                         </p>
-                        <Button size="sm" variant="ghost" onClick={onDismissError}>
-                            {t("connection.dismiss")}
-                        </Button>
+                        {state.blocked ? null : (
+                            <Button size="sm" variant="ghost" onClick={onDismissError}>
+                                {t("connection.dismiss")}
+                            </Button>
+                        )}
                     </>
+                ) : state.reconnecting ? (
+                    <p className="text-sm text-muted-foreground">
+                        {t("connection.reconnecting", { attempt: state.attempt ?? 1 })}
+                    </p>
                 ) : (
                     <p className="text-sm text-muted-foreground">{t(presentation.hint)}</p>
                 )}
+                {state.blocked ? (
+                    <p className="flex items-center gap-1.5 rounded-full bg-status-error/10 px-3 py-1 text-xs text-status-error">
+                        <ShieldAlert size={13} aria-hidden="true" />
+                        {t("connection.blocked")}
+                    </p>
+                ) : null}
             </div>
 
             {state.status === "connected" ? (

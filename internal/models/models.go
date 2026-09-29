@@ -126,6 +126,18 @@ type AppSettings struct {
 	LaunchAtStartup bool `json:"launch_at_startup"`
 	// AutoConnect connects to the last server when the app starts.
 	AutoConnect bool `json:"auto_connect"`
+	// AutoReconnect brings the tunnel back when it stops without being
+	// asked to. A pointer so older settings default to on.
+	AutoReconnect *bool `json:"auto_reconnect"`
+	// KillSwitch blocks all traffic while the tunnel is being brought back,
+	// so nothing leaves unprotected in the meantime.
+	KillSwitch bool `json:"kill_switch"`
+	// FastestServer, in automatic mode, lets the core keep measuring the
+	// best servers and move traffic to whichever is fastest.
+	FastestServer bool `json:"fastest_server"`
+	// Notifications shows a system notification when the connection drops
+	// and when it comes back. A pointer so older settings default to on.
+	Notifications *bool `json:"notifications"`
 	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
 	// Off means never automatically, for every subscription — a refresh by
 	// hand still works. A pointer so older settings default to on.
@@ -230,6 +242,14 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.GeoFiles == nil {
 		s.GeoFiles = map[string]GeoFile{}
+	}
+	if s.Notifications == nil {
+		enabled := true
+		s.Notifications = &enabled
+	}
+	if s.AutoReconnect == nil {
+		enabled := true
+		s.AutoReconnect = &enabled
 	}
 	if s.SubscriptionAutoUpdate == nil {
 		enabled := true
