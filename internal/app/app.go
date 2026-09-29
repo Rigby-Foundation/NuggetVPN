@@ -53,8 +53,9 @@ type App struct {
 	app    *application.App
 	window *application.WebviewWindow
 	// tray is built during ServiceStartup, from icon.
-	tray *application.SystemTray
-	icon []byte
+	tray     *application.SystemTray
+	trayMenu trayMenu
+	icon     []byte
 	// quitting tells the window-close hook to stop swallowing the close.
 	quitting bool
 

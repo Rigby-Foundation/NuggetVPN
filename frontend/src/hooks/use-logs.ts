@@ -4,10 +4,10 @@ import { EVENTS, eventPayload, listen } from "@/lib/backend";
 
 /** Options offered in the logs view. */
 export const LOG_LIMITS = [
-    { value: "100", label: "100 lines" },
-    { value: "500", label: "500 lines" },
-    { value: "1000", label: "1000 lines" },
-    { value: "20000", label: "20,000 lines" },
+    { value: "100" },
+    { value: "500" },
+    { value: "1000" },
+    { value: "20000" },
 ] as const;
 
 const DEFAULT_LIMIT = "1000";

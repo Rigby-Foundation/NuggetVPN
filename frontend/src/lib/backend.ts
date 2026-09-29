@@ -52,6 +52,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     export_routing: { method: "ExportRouting", args: [] },
     import_routing: { method: "ImportRouting", args: [] },
 
+    set_ui_language: { method: "SetUILanguage", args: ["language"] },
+
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },
     get_connection_state: { method: "GetConnectionState", args: [] },

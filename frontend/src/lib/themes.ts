@@ -11,11 +11,13 @@
  * copy of the two surface colours and the accent, since the picker has to draw
  * a theme it is not currently wearing.
  */
+import type { MessageKey } from "@/lib/i18n";
+
 export interface ThemePreset {
     id: string;
-    label: string;
+    label: MessageKey;
     /** Why this one exists, shown under the name. */
-    hint: string;
+    hint: MessageKey;
     /** Which group it belongs to in the picker. */
     mode: "light" | "dark";
     /** The class next-themes applies for this preset. */
@@ -32,8 +34,8 @@ export interface ThemePreset {
 export const THEME_PRESETS: ThemePreset[] = [
     {
         id: "light",
-        label: "Light",
-        hint: "The default",
+        label: "theme.light",
+        hint: "theme.light.hint",
         mode: "light",
         className: "light",
         swatch: {
@@ -44,8 +46,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "paper",
-        label: "Paper",
-        hint: "Warm light, easier at night",
+        label: "theme.paper",
+        hint: "theme.paper.hint",
         mode: "light",
         className: "theme-light-paper",
         swatch: {
@@ -56,8 +58,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "frost",
-        label: "Frost",
-        hint: "Cool light, blue accent",
+        label: "theme.frost",
+        hint: "theme.frost.hint",
         mode: "light",
         className: "theme-light-frost",
         swatch: {
@@ -69,8 +71,8 @@ export const THEME_PRESETS: ThemePreset[] = [
 
     {
         id: "dark",
-        label: "Dark",
-        hint: "The default",
+        label: "theme.dark",
+        hint: "theme.dark.hint",
         mode: "dark",
         className: "dark",
         swatch: {
@@ -81,8 +83,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "oled",
-        label: "OLED black",
-        hint: "True black — saves power on an OLED screen",
+        label: "theme.oled",
+        hint: "theme.oled.hint",
         mode: "dark",
         className: "theme-dark-oled",
         swatch: {
@@ -93,8 +95,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "contrast",
-        label: "High contrast",
-        hint: "Brighter text and stronger borders",
+        label: "theme.contrast",
+        hint: "theme.contrast.hint",
         mode: "dark",
         className: "theme-dark-contrast",
         swatch: {
@@ -105,8 +107,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "slate",
-        label: "Slate",
-        hint: "Cool grey",
+        label: "theme.slate",
+        hint: "theme.slate.hint",
         mode: "dark",
         className: "theme-dark-slate",
         swatch: {
@@ -117,8 +119,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "stone",
-        label: "Stone",
-        hint: "Warm grey",
+        label: "theme.stone",
+        hint: "theme.stone.hint",
         mode: "dark",
         className: "theme-dark-stone",
         swatch: {
@@ -129,8 +131,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "nord",
-        label: "Nord",
-        hint: "The arctic palette, a lighter dark",
+        label: "theme.nord",
+        hint: "theme.nord.hint",
         mode: "dark",
         className: "theme-dark-nord",
         swatch: {
@@ -141,8 +143,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "cosmos",
-        label: "Cosmos",
-        hint: "Deep space blue, cyan accent",
+        label: "theme.cosmos",
+        hint: "theme.cosmos.hint",
         mode: "dark",
         className: "theme-dark-cosmos",
         swatch: {
@@ -153,8 +155,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "violet",
-        label: "Violet",
-        hint: "Purple throughout",
+        label: "theme.violet",
+        hint: "theme.violet.hint",
         mode: "dark",
         className: "theme-dark-violet",
         swatch: {
@@ -165,8 +167,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "emerald",
-        label: "Emerald",
-        hint: "Green throughout",
+        label: "theme.emerald",
+        hint: "theme.emerald.hint",
         mode: "dark",
         className: "theme-dark-emerald",
         swatch: {
@@ -177,8 +179,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "sunset",
-        label: "Sunset",
-        hint: "Warm ground, orange accent",
+        label: "theme.sunset",
+        hint: "theme.sunset.hint",
         mode: "dark",
         className: "theme-dark-sunset",
         swatch: {
@@ -189,8 +191,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "rose",
-        label: "Rose",
-        hint: "Pink throughout",
+        label: "theme.rose",
+        hint: "theme.rose.hint",
         mode: "dark",
         className: "theme-dark-rose",
         swatch: {
@@ -201,8 +203,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     {
         id: "mocha",
-        label: "Mocha",
-        hint: "Coffee, with a caramel accent",
+        label: "theme.mocha",
+        hint: "theme.mocha.hint",
         mode: "dark",
         className: "theme-dark-mocha",
         swatch: {

@@ -352,7 +352,7 @@ func TestMigrateFallsBackToBeamsCopy(t *testing.T) {
 	for _, outcome := range result.Outcomes {
 		outcomes[outcome.Name] = outcome
 	}
-	if got := outcomes["Cached"]; got.Source != SourceCached || got.Profiles != 2 || got.Note == "" {
+	if got := outcomes["Cached"]; got.Source != SourceCached || got.Profiles != 2 || got.Error == "" {
 		t.Errorf("Cached outcome = %+v", got)
 	}
 	if got := outcomes["Dead"]; got.Source != SourceFailed || got.Profiles != 0 {

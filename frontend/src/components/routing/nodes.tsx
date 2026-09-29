@@ -21,6 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { RoutingAction, RoutingSource } from "@/types";
 
@@ -31,60 +32,60 @@ import { RoutingAction, RoutingSource } from "@/types";
  */
 export const SOURCE_META: Record<
     RoutingSource,
-    { label: string; hint: string; icon: typeof Globe; accent: string; placeholder: string }
+    { label: MessageKey; hint: MessageKey; icon: typeof Globe; accent: string; placeholder: string }
 > = {
     apps: {
-        label: "Applications",
-        hint: "Matched by process name",
+        label: "routing.source.apps",
+        hint: "routing.source.apps.hint",
         icon: MonitorSmartphone,
         accent: "var(--routing-apps)",
         placeholder: "Firefox.exe",
     },
     domains: {
-        label: "Domains",
-        hint: "Sites and subdomains",
+        label: "routing.source.domains",
+        hint: "routing.source.domains.hint",
         icon: Globe,
         accent: "var(--routing-domains)",
         placeholder: "example.com",
     },
     ip: {
-        label: "IP / Networks",
-        hint: "Addresses and CIDR blocks",
+        label: "routing.source.ip",
+        hint: "routing.source.ip.hint",
         icon: Network,
         accent: "var(--routing-ip)",
         placeholder: "1.1.1.0/24",
     },
     domain_regex: {
-        label: "Domain pattern",
-        hint: "Regular expression",
+        label: "routing.source.regex",
+        hint: "routing.source.regex.hint",
         icon: Regex,
         accent: "var(--routing-domains)",
         placeholder: "^ads?\\.",
     },
     port: {
-        label: "Ports",
-        hint: "Single ports or ranges",
+        label: "routing.source.port",
+        hint: "routing.source.port.hint",
         icon: Hash,
         accent: "var(--routing-port)",
         placeholder: "443 or 8000-8080",
     },
     protocol: {
-        label: "Protocols",
-        hint: "Detected by inspecting the connection",
+        label: "routing.source.protocol",
+        hint: "routing.source.protocol.hint",
         icon: Radio,
         accent: "var(--routing-protocol)",
         placeholder: "quic",
     },
     geosite: {
-        label: "Service",
-        hint: "Known service, by rule-set",
+        label: "routing.source.geosite",
+        hint: "routing.source.geosite.hint",
         icon: Landmark,
         accent: "var(--routing-geo)",
         placeholder: "netflix",
     },
     geoip: {
-        label: "Country",
-        hint: "Addresses in a country, by rule-set",
+        label: "routing.source.geoip",
+        hint: "routing.source.geoip.hint",
         icon: Globe2,
         accent: "var(--routing-geo)",
         placeholder: "ru",
@@ -98,26 +99,26 @@ export const SNIFFABLE_PROTOCOLS = [
 
 export const ACTION_META: Record<
     RoutingAction,
-    { label: string; hint: string; status: string; icon: typeof Shield; accent: string }
+    { label: MessageKey; hint: MessageKey; status: MessageKey; icon: typeof Shield; accent: string }
 > = {
     proxy: {
-        label: "Through the VPN",
-        hint: "Encrypted in the tunnel",
-        status: "Traffic is encrypted",
+        label: "routing.action.proxy",
+        hint: "routing.action.proxy.hint",
+        status: "routing.action.proxy.status",
         icon: Shield,
         accent: "var(--status-connected)",
     },
     direct: {
-        label: "Direct",
-        hint: "Bypasses the tunnel",
-        status: "Goes out on your own connection",
+        label: "routing.action.direct",
+        hint: "routing.action.direct.hint",
+        status: "routing.action.direct.status",
         icon: ArrowRightLeft,
         accent: "var(--routing-direct)",
     },
     block: {
-        label: "Block",
-        hint: "Drops the connection",
-        status: "Connection is refused",
+        label: "routing.action.block",
+        hint: "routing.action.block.hint",
+        status: "routing.action.block.status",
         icon: Ban,
         accent: "var(--status-error)",
     },
@@ -141,6 +142,7 @@ function NodeShell({
     onDelete?: () => void;
     children?: React.ReactNode;
 }) {
+    const t = useT();
     return (
         <div
             className={cn(
@@ -175,7 +177,7 @@ function NodeShell({
                     <button
                         type="button"
                         onClick={onDelete}
-                        aria-label={`Remove ${title}`}
+                        aria-label={t("routing.remove", { name: title })}
                         className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     >
                         <Trash2 size={13} aria-hidden="true" />
@@ -211,6 +213,7 @@ function ProtocolChips({
     values: string[];
     onChange: (values: string[]) => void;
 }) {
+    const t = useT();
     const remaining = SNIFFABLE_PROTOCOLS.filter((protocol) => !values.includes(protocol));
     if (remaining.length === 0) {
         return null;
@@ -222,7 +225,7 @@ function ProtocolChips({
                     key={protocol}
                     type="button"
                     onClick={() => onChange([...values, protocol])}
-                    aria-label={`Add ${protocol}`}
+                    aria-label={t("routing.add", { name: protocol })}
                     className="nodrag flex items-center gap-0.5 rounded-md border border-dashed px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-solid hover:bg-muted hover:text-foreground"
                 >
                     <Plus size={10} aria-hidden="true" />
@@ -239,6 +242,7 @@ const COLLAPSED_ROWS = 6;
 const EXPANDED_ROWS = 100;
 
 function ValueRow({ value, onRemove }: { value: string; onRemove: () => void }) {
+    const t = useT();
     return (
         <div className="group flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
             <span className="flex-1 min-w-0 truncate font-mono text-[11px]" title={value}>
@@ -247,7 +251,7 @@ function ValueRow({ value, onRemove }: { value: string; onRemove: () => void }) 
             <button
                 type="button"
                 onClick={onRemove}
-                aria-label={`Remove ${value}`}
+                aria-label={t("routing.remove", { name: value })}
                 className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive"
             >
                 <Trash2 size={12} aria-hidden="true" />
@@ -267,6 +271,7 @@ function ValueRow({ value, onRemove }: { value: string; onRemove: () => void }) 
  * list with a filter, which is how you would look for one of them anyway.
  */
 function ValueList({ values, onChange }: { values: string[]; onChange: (values: string[]) => void }) {
+    const t = useT();
     const [expanded, setExpanded] = useState(false);
     const [filter, setFilter] = useState("");
 
@@ -299,7 +304,7 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
                     onClick={() => setExpanded(true)}
                     className="nodrag w-full rounded-md py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 >
-                    Show all {values.length.toLocaleString()}
+                    {t("routing.showAll", { count: values.length })}
                 </button>
             </>
         );
@@ -317,8 +322,8 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
                 <Input
                     value={filter}
                     onChange={(event) => setFilter(event.target.value)}
-                    placeholder={`Filter ${values.length.toLocaleString()} entries`}
-                    aria-label="Filter entries"
+                    placeholder={t("routing.filterPlaceholder", { count: values.length })}
+                    aria-label={t("routing.filter")}
                     className="nodrag h-7 pl-6 text-[11px] font-mono"
                 />
             </div>
@@ -328,14 +333,14 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
                     <ValueRow key={value} value={value} onRemove={() => remove(value)} />
                 ))}
                 {shown.length === 0 ? (
-                    <p className="py-1.5 text-center text-[11px] text-muted-foreground">No entry matches.</p>
+                    <p className="py-1.5 text-center text-[11px] text-muted-foreground">{t("routing.noMatch")}</p>
                 ) : null}
             </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span>
                     {matches.length > shown.length
-                        ? `${shown.length} of ${matches.length.toLocaleString()} shown — filter to narrow`
-                        : `${matches.length.toLocaleString()} ${needle ? "matching" : "entries"}`}
+                        ? t("routing.shownOf", { shown: shown.length, count: matches.length })
+                        : t(needle ? "routing.matching" : "routing.entries", { count: matches.length })}
                 </span>
                 <button
                     type="button"
@@ -345,7 +350,7 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
                     }}
                     className="nodrag hover:text-foreground"
                 >
-                    Collapse
+                    {t("routing.collapse")}
                 </button>
             </div>
         </div>
@@ -377,6 +382,7 @@ function GeoSuggestions({
     values: string[];
     onPick: (code: string) => void;
 }) {
+    const t = useT();
     const codes = useContext(GeoCodesContext)[kind];
     if (!codes || codes.length === 0) {
         return null;
@@ -385,7 +391,7 @@ function GeoSuggestions({
     if (!needle) {
         return (
             <p className="pt-1 text-[10px] text-muted-foreground">
-                {codes.length.toLocaleString()} codes in your {kind}.dat — start typing
+                {t("routing.geoCodes", { count: codes.length, file: `${kind}.dat` })}
             </p>
         );
     }
@@ -402,7 +408,7 @@ function GeoSuggestions({
         .sort((a, b) => rank(a) - rank(b) || a.length - b.length)
         .slice(0, 8);
     if (matches.length === 0) {
-        return <p className="pt-1 text-[10px] text-muted-foreground">Not in your {kind}.dat</p>;
+        return <p className="pt-1 text-[10px] text-muted-foreground">{t("routing.geoMissing", { file: `${kind}.dat` })}</p>;
     }
     return (
         <div className="flex flex-wrap gap-1 pt-1.5">
@@ -435,6 +441,7 @@ export interface CommentNodeData {
  */
 export function CommentNode({ data, selected }: NodeProps) {
     const { text, onChange, onDelete } = data as CommentNodeData;
+    const t = useT();
     const [draft, setDraft] = useState(text);
     useEffect(() => setDraft(text), [text]);
 
@@ -447,11 +454,11 @@ export function CommentNode({ data, selected }: NodeProps) {
         >
             <div className="flex items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
                 <StickyNote size={13} aria-hidden="true" />
-                <span className="flex-1 text-xs font-medium">Note</span>
+                <span className="flex-1 text-xs font-medium">{t("routing.note")}</span>
                 <button
                     type="button"
                     onClick={onDelete}
-                    aria-label="Remove note"
+                    aria-label={t("routing.removeNote")}
                     className="rounded p-1 hover:bg-destructive/10 hover:text-destructive"
                 >
                     <Trash2 size={12} aria-hidden="true" />
@@ -463,8 +470,8 @@ export function CommentNode({ data, selected }: NodeProps) {
                 onBlur={() => {
                     if (draft !== text) onChange(draft);
                 }}
-                placeholder="Write a note…"
-                aria-label="Note"
+                placeholder={t("routing.notePlaceholder")}
+                aria-label={t("routing.note")}
                 maxLength={2000}
                 rows={3}
                 className="nodrag nowheel mt-1 block min-h-16 w-full resize-none bg-transparent px-3 pb-3 text-xs leading-relaxed outline-none [field-sizing:content] placeholder:text-muted-foreground/60"
@@ -477,6 +484,7 @@ export function CommentNode({ data, selected }: NodeProps) {
 export function SourceNode({ data, selected }: NodeProps) {
     const { kind, values, onChange, onDelete } = data as SourceNodeData;
     const meta = SOURCE_META[kind];
+    const t = useT();
     const [draft, setDraft] = useState("");
 
     const commit = () => {
@@ -501,15 +509,15 @@ export function SourceNode({ data, selected }: NodeProps) {
         <NodeShell
             accent={meta.accent}
             icon={meta.icon}
-            title={meta.label}
-            subtitle={meta.hint}
+            title={t(meta.label)}
+            subtitle={t(meta.hint)}
             selected={selected}
             onDelete={onDelete}
         >
             <div className="px-3.5 pb-3 space-y-1">
                 {values.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground py-1.5">
-                        Nothing listed yet — this rule does nothing.
+                        {t("routing.emptyRule")}
                     </p>
                 ) : (
                     <ValueList values={values} onChange={onChange} />
@@ -525,7 +533,7 @@ export function SourceNode({ data, selected }: NodeProps) {
                             onKeyDown={onKeyDown}
                             onBlur={commit}
                             placeholder={meta.placeholder}
-                            aria-label={`Add to ${meta.label}`}
+                            aria-label={t("routing.addTo", { name: t(meta.label) })}
                             className="h-7 text-[11px] font-mono nodrag"
                         />
                         <Button
@@ -533,7 +541,7 @@ export function SourceNode({ data, selected }: NodeProps) {
                             size="icon"
                             variant="ghost"
                             onClick={commit}
-                            aria-label={`Add to ${meta.label}`}
+                            aria-label={t("routing.addTo", { name: t(meta.label) })}
                             className="h-7 w-7 shrink-0"
                         >
                             <Plus size={13} aria-hidden="true" />
@@ -570,17 +578,18 @@ export function SourceNode({ data, selected }: NodeProps) {
  * border, and a custom type reusing the name inherits all of it.
  */
 export function CatchAllNode({ selected }: NodeProps) {
+    const t = useT();
     return (
         <NodeShell
             accent="var(--routing-default)"
             icon={MoreHorizontal}
-            title="Everything else"
-            subtitle="Traffic no rule matched"
+            title={t("routing.catchAll")}
+            subtitle={t("routing.catchAll.hint")}
             selected={selected}
         >
             <div className="px-3.5 pb-3">
                 <p className="text-[11px] text-muted-foreground">
-                    Connect this to choose the default.
+                    {t("routing.catchAll.connect")}
                 </p>
             </div>
             <Handle
@@ -603,13 +612,14 @@ export interface ActionNodeData {
 export function ActionNode({ data, selected }: NodeProps) {
     const { action, inbound } = data as ActionNodeData;
     const meta = ACTION_META[action];
+    const t = useT();
 
     return (
         <NodeShell
             accent={meta.accent}
             icon={meta.icon}
-            title={meta.label}
-            subtitle={meta.hint}
+            title={t(meta.label)}
+            subtitle={t(meta.hint)}
             selected={selected}
         >
             <div className="px-3.5 pb-3">
@@ -620,13 +630,11 @@ export function ActionNode({ data, selected }: NodeProps) {
                         aria-hidden="true"
                     />
                     <span className="text-[11px] text-muted-foreground truncate">
-                        {meta.status}
+                        {t(meta.status)}
                     </span>
                 </div>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    {inbound === 0
-                        ? "Nothing routed here."
-                        : `${inbound} source${inbound === 1 ? "" : "s"} routed here.`}
+                    {inbound === 0 ? t("routing.inboundNone") : t("routing.inbound", { count: inbound })}
                 </p>
             </div>
 

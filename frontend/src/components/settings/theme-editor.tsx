@@ -19,6 +19,7 @@ import {
     customThemeKnobs,
     CustomTheme,
 } from "@/lib/appearance";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,6 +83,7 @@ function Slider({
 
 /** A small slice of the real UI, drawn in the theme being edited. */
 function Preview({ theme }: { theme: CustomTheme }) {
+    const t = useT();
     // The class re-declares every token on this element, from the knobs set
     // inline beside it, so real components render in the edited theme without
     // touching the rest of the window.
@@ -96,18 +98,18 @@ function Preview({ theme }: { theme: CustomTheme }) {
                         <div className="truncate text-sm font-medium">Frankfurt</div>
                         <div className="text-xs text-muted-foreground">VLESS · 42 ms</div>
                     </div>
-                    <Badge>Connected</Badge>
+                    <Badge>{t("status.connected")}</Badge>
                 </div>
                 <div className="flex items-center justify-between rounded-md bg-muted px-2.5 py-2">
-                    <span className="text-xs text-muted-foreground">Split tunnelling</span>
-                    <Switch checked aria-label="Preview switch" />
+                    <span className="text-xs text-muted-foreground">{t("editor.previewSwitch")}</span>
+                    <Switch checked aria-label={t("editor.previewSwitch")} />
                 </div>
                 <div className="flex gap-2">
                     <Button size="sm" className="flex-1">
-                        Connect
+                        {t("connection.connect")}
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1">
-                        Details
+                        {t("editor.previewDetails")}
                     </Button>
                 </div>
             </div>
@@ -122,12 +124,13 @@ function Segmented({
     value: "light" | "dark";
     onChange: (value: "light" | "dark") => void;
 }) {
+    const t = useT();
     return (
         <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
             {(
                 [
-                    ["dark", "Dark", Moon],
-                    ["light", "Light", Sun],
+                    ["dark", t("picker.dark"), Moon],
+                    ["light", t("picker.light"), Sun],
                 ] as const
             ).map(([id, label, Icon]) => (
                 <button
@@ -161,6 +164,7 @@ export default function ThemeEditor({
     onDelete: (id: string) => void;
     onClose: () => void;
 }) {
+    const t = useT();
     const [draft, setDraft] = useState<CustomTheme | null>(theme);
     useEffect(() => setDraft(theme), [theme]);
 
@@ -192,9 +196,9 @@ export default function ThemeEditor({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{isNew ? "New theme" : "Edit theme"}</DialogTitle>
+                    <DialogTitle>{t(isNew ? "editor.newTitle" : "editor.editTitle")}</DialogTitle>
                     <DialogDescription>
-                        Text stays readable whatever you pick: the accent's brightness is set by the mode.
+                        {t("editor.description")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -204,17 +208,17 @@ export default function ThemeEditor({
                             value={draft.name}
                             maxLength={40}
                             onChange={(event) => set({ name: event.target.value })}
-                            aria-label="Theme name"
-                            placeholder="Theme name"
+                            aria-label={t("editor.name")}
+                            placeholder={t("editor.name")}
                         />
                         <Segmented value={draft.mode} onChange={switchMode} />
 
                         <section className="space-y-2.5">
                             <h4 className="text-xs font-medium text-muted-foreground">
-                                Background
+                                {t("editor.background")}
                             </h4>
                             <Slider
-                                label="Hue"
+                                label={t("editor.hue")}
                                 value={h}
                                 min={0}
                                 max={360}
@@ -225,7 +229,7 @@ export default function ThemeEditor({
                                 onChange={(value) => setBackground({ h: value })}
                             />
                             <Slider
-                                label="Tint"
+                                label={t("editor.tint")}
                                 value={c}
                                 min={0}
                                 max={0.08}
@@ -236,7 +240,7 @@ export default function ThemeEditor({
                                 onChange={(value) => setBackground({ c: value })}
                             />
                             <Slider
-                                label={draft.mode === "dark" ? "Darkness" : "Brightness"}
+                                label={t(draft.mode === "dark" ? "editor.darkness" : "editor.brightness")}
                                 value={l}
                                 min={range.min}
                                 max={range.max}
@@ -250,10 +254,10 @@ export default function ThemeEditor({
 
                         <section className="space-y-2.5">
                             <h4 className="text-xs font-medium text-muted-foreground">
-                                Accent
+                                {t("editor.accent")}
                             </h4>
                             <Slider
-                                label="Hue"
+                                label={t("editor.hue")}
                                 value={draft.accent.h}
                                 min={0}
                                 max={360}
@@ -264,7 +268,7 @@ export default function ThemeEditor({
                                 onChange={(value) => setAccent({ h: value })}
                             />
                             <Slider
-                                label="Vividness"
+                                label={t("editor.vividness")}
                                 value={draft.accent.c}
                                 min={0.02}
                                 max={0.22}
@@ -279,7 +283,7 @@ export default function ThemeEditor({
 
                     <div className="space-y-2">
                         <h4 className="text-xs font-medium text-muted-foreground">
-                            Preview
+                            {t("editor.preview")}
                         </h4>
                         <Preview theme={draft} />
                     </div>
@@ -299,10 +303,10 @@ export default function ThemeEditor({
                     )}
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={onClose}>
-                            Cancel
+                            {t("common.cancel")}
                         </Button>
-                        <Button onClick={() => onSave({ ...draft, name: draft.name.trim() || "My theme" })}>
-                            {isNew ? "Create and use" : "Save"}
+                        <Button onClick={() => onSave({ ...draft, name: draft.name.trim() })}>
+                            {t(isNew ? "editor.create" : "common.save")}
                         </Button>
                     </div>
                 </DialogFooter>

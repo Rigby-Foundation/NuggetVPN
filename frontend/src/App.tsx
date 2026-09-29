@@ -25,6 +25,7 @@ import { useLogs } from "@/hooks/use-logs";
 import { LOCAL, profileDomain, reconcileSelection, useProfiles } from "@/hooks/use-profiles";
 import { useTraffic } from "@/hooks/use-traffic";
 import { stripAnsi } from "@/lib/ansi";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
     AppSettings,
@@ -106,6 +107,7 @@ function guessPlatform(): string {
 
 function App() {
     const { theme, setTheme } = useTheme();
+    const t = useT();
     const appearance = useAppearance();
     const isMobile = useIsMobile();
 
@@ -164,12 +166,12 @@ function App() {
             const next = { ...settingsRef.current, ...patch };
             setSettings(next);
             void saveSettings(next).catch((error) =>
-                toast.error(`Could not save settings: ${errorMessage(error)}`, {
+                toast.error(t("toast.saveFailed", { error: errorMessage(error) }), {
                     id: "save-settings",
                 })
             );
         },
-        [saveSettings]
+        [saveSettings, t]
     );
 
     const updateSetting = useCallback(
@@ -458,7 +460,7 @@ function App() {
                 return;
             }
             if (profiles.length === 0) {
-                toast.error("Add a profile or import a subscription first.", {
+                toast.error(t("toast.noProfiles"), {
                     id: "no-profiles",
                 });
                 return;
@@ -469,7 +471,7 @@ function App() {
             // renders it; the toast is for when the user is on another tab.
             toast.error(errorMessage(error), { id: "connect" });
         }
-    }, [connection, profiles.length, selection]);
+    }, [connection, profiles.length, selection, t]);
 
     const handleAddProfile = useCallback(
         async (name: string, link: string) => {
@@ -521,10 +523,10 @@ function App() {
                     }
                 }
             } catch (error) {
-                toast.error(`Delete failed: ${errorMessage(error)}`);
+                toast.error(t("toast.deleteFailed", { error: errorMessage(error) }));
             }
         },
-        [appendLog, deleteIds, profiles, saveSettings, settings]
+        [appendLog, deleteIds, profiles, saveSettings, settings, t]
     );
 
     const handleRefreshSource = useCallback(
@@ -544,18 +546,18 @@ function App() {
                     `${domain}: ${summary.refreshed} updated, ${summary.failed} failed, ` +
                         `${summary.skipped} skipped.`,
                 ]);
-                toast.success(`Refreshed ${domain}`, { id: `refresh-${domain}` });
+                toast.success(t("toast.refreshed", { name: domain }), { id: `refresh-${domain}` });
             } catch (error) {
                 const message = errorMessage(error);
                 appendLog([`Refresh failed for ${domain}: ${message}`]);
-                toast.error(`Could not refresh ${domain}: ${message.slice(0, 200)}`, {
+                toast.error(t("toast.refreshFailed", { name: domain, error: message.slice(0, 200) }), {
                     id: `refresh-${domain}`,
                 });
             } finally {
                 setRefreshingDomain("");
             }
         },
-        [appendLog, refreshDomain]
+        [appendLog, refreshDomain, t]
     );
 
     const handleDumpLogs = useCallback(async () => {
@@ -566,11 +568,11 @@ function App() {
             }
             // Colour codes are for the live view; a text file gets plain text.
             await writeTextFile(path, logs.map(stripAnsi).join("\n"));
-            toast.success("Logs exported.");
+            toast.success(t("toast.logsExported"));
         } catch (error) {
-            toast.error(`Export failed: ${errorMessage(error)}`);
+            toast.error(t("toast.exportFailed", { error: errorMessage(error) }));
         }
-    }, [logs]);
+    }, [logs, t]);
 
     const selectSource = useCallback(
         (source: ConfigSource, focusProxies: boolean) => {
@@ -742,7 +744,7 @@ function App() {
                                                 .then(setSettings)
                                                 .catch((error) =>
                                                     toast.error(
-                                                        `Could not generate a device ID: ${errorMessage(error)}`
+                                                        t("toast.hwidFailed", { error: errorMessage(error) })
                                                     )
                                                 );
                                         }}

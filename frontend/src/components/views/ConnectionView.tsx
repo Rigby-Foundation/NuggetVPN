@@ -11,6 +11,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
+import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConnectionState, IpInfo, TrafficSample } from "@/types";
 
@@ -27,24 +28,24 @@ interface ConnectionViewProps {
 /** Per-state presentation. Everything visual keys off this one table. */
 const PRESENTATION = {
     idle: {
-        label: "Not connected",
-        hint: "Tap to connect",
+        label: "status.idle",
+        hint: "connection.hint.idle",
         ring: "border-border",
         disc: "bg-muted/60 border border-border",
         icon: "text-muted-foreground",
         dot: "bg-status-idle",
     },
     connecting: {
-        label: "Connecting",
-        hint: "Finding the fastest server…",
+        label: "status.connecting",
+        hint: "connection.hint.connecting",
         ring: "border-status-connecting/40",
         disc: "bg-status-connecting/15 border border-status-connecting/40",
         icon: "text-status-connecting",
         dot: "bg-status-connecting",
     },
     connected: {
-        label: "Connected",
-        hint: "Your traffic is going through the tunnel",
+        label: "status.connected",
+        hint: "connection.hint.connected",
         ring: "border-status-connected/40",
         disc:
             "bg-linear-to-tr from-status-connected to-status-connecting " +
@@ -53,14 +54,14 @@ const PRESENTATION = {
         dot: "bg-status-connected",
     },
     error: {
-        label: "Not connected",
-        hint: "The last attempt failed",
+        label: "status.idle",
+        hint: "connection.hint.error",
         ring: "border-status-error/40",
         disc: "bg-status-error/10 border border-status-error/40",
         icon: "text-status-error",
         dot: "bg-status-error",
     },
-} as const;
+} as const satisfies Record<string, { label: MessageKey; hint: MessageKey; ring: string; disc: string; icon: string; dot: string }>;
 
 /** Ticks once a second while connected, so the duration counts up. */
 function useElapsed(since: number | undefined): string {
@@ -118,13 +119,14 @@ function ConnectionView({
     isCheckingIp,
     ipCheckEnabled,
 }: ConnectionViewProps) {
+    const t = useT();
     const presentation = PRESENTATION[state.status];
     const elapsed = useElapsed(state.status === "connected" ? state.since : undefined);
     const busy = state.status === "connecting";
 
     // What the button will do, which is not always the inverse of the label:
     // from an error state the action is to try again.
-    const action = state.status === "connected" ? "Disconnect" : "Connect";
+    const action = t(state.status === "connected" ? "connection.disconnect" : "connection.connect");
 
     return (
         <div className="enter-stagger absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 py-6 overflow-y-auto">
@@ -133,7 +135,7 @@ function ConnectionView({
                     className={cn("h-2 w-2 rounded-full", presentation.dot)}
                     aria-hidden="true"
                 />
-                <span className="font-medium text-foreground">{presentation.label}</span>
+                <span className="font-medium text-foreground">{t(presentation.label)}</span>
                 {state.profile ? (
                     <>
                         <span aria-hidden="true">·</span>
@@ -209,14 +211,14 @@ function ConnectionView({
                 {state.status === "error" ? (
                     <>
                         <p className="text-sm text-status-error max-w-md">
-                            {state.error || presentation.hint}
+                            {state.error || t(presentation.hint)}
                         </p>
                         <Button size="sm" variant="ghost" onClick={onDismissError}>
-                            Dismiss
+                            {t("connection.dismiss")}
                         </Button>
                     </>
                 ) : (
-                    <p className="text-sm text-muted-foreground">{presentation.hint}</p>
+                    <p className="text-sm text-muted-foreground">{t(presentation.hint)}</p>
                 )}
             </div>
 
@@ -229,30 +231,30 @@ function ConnectionView({
                 >
                     <Stat
                         icon={<ArrowUp size={16} />}
-                        label="Upload"
+                        label={t("connection.upload")}
                         value={formatRate(traffic.up_rate)}
-                        hint={`${formatBytes(traffic.up)} this session`}
+                        hint={t("connection.thisSession", { amount: formatBytes(traffic.up) })}
                     />
                     <Stat
                         icon={<ArrowDown size={16} />}
-                        label="Download"
+                        label={t("connection.download")}
                         value={formatRate(traffic.down_rate)}
-                        hint={`${formatBytes(traffic.down)} this session`}
+                        hint={t("connection.thisSession", { amount: formatBytes(traffic.down) })}
                     />
-                    <Stat icon={<Clock size={16} />} label="Duration" value={elapsed} />
+                    <Stat icon={<Clock size={16} />} label={t("connection.duration")} value={elapsed} />
                     <Stat
                         icon={<Globe size={16} />}
-                        label="Public IP"
+                        label={t("connection.publicIp")}
                         value={
                             !ipCheckEnabled
-                                ? "Off"
+                                ? t("connection.ipOff")
                                 : isCheckingIp
-                                  ? "Checking…"
+                                  ? t("connection.checking")
                                   : ipInfo?.ip || "—"
                         }
                         hint={
                             !ipCheckEnabled
-                                ? "The public address check is turned off in settings"
+                                ? t("connection.ipOffHint")
                                 : ipInfo?.region || undefined
                         }
                     />

@@ -4,6 +4,7 @@ import PageShell from "@/components/layout/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import SelectableCard from "@/components/ui/selectable-card";
+import { Translate, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
 import { Profile, ProxyMode } from "@/types";
@@ -20,10 +21,10 @@ interface ProxiesViewProps {
     onRefreshSource: () => void;
 }
 
-function pingLabel(ping: number | null | undefined): string {
+function pingLabel(t: Translate, ping: number | null | undefined): string {
     if (ping === undefined) return "…";
-    if (ping === null) return "n/a";
-    return `${ping} ms`;
+    if (ping === null) return t("proxies.noPing");
+    return t("proxies.ms", { ms: ping });
 }
 
 /** Colour the latency so the list can be read without parsing every number. */
@@ -45,6 +46,7 @@ function ProxiesView({
     onSelectAuto,
     onRefreshSource,
 }: ProxiesViewProps) {
+    const t = useT();
     const domain = selectedSourceDomain.trim() || LOCAL;
     const isSubscription = domain !== LOCAL;
     const domainProfiles = isSubscription
@@ -64,11 +66,11 @@ function ProxiesView({
 
     return (
         <PageShell
-            title="Proxies"
+            title={t("proxies.title")}
             description={
                 isSubscription
-                    ? `${domainProfiles.length} from ${domain}`
-                    : "This configuration is a single profile and has no server list."
+                    ? t("proxies.description", { count: domainProfiles.length, domain })
+                    : t("proxies.single")
             }
             actions={
                 isSubscription ? (
@@ -83,7 +85,7 @@ function ProxiesView({
                             className={cn("mr-2", isRefreshingSource && "animate-spin")}
                             aria-hidden="true"
                         />
-                        {isRefreshingSource ? "Refreshing…" : "Refresh"}
+                        {isRefreshingSource ? t("proxies.refreshing") : t("proxies.refresh")}
                     </Button>
                 ) : null
             }
@@ -93,7 +95,7 @@ function ProxiesView({
                     <SelectableCard
                         selected={selectedProxyMode === "auto"}
                         onSelect={onSelectAuto}
-                        label="Automatic server selection"
+                        label={t("proxies.autoLabel")}
                     >
                         <div className="p-4 flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3 min-w-0">
@@ -105,17 +107,17 @@ function ProxiesView({
                                 </span>
                                 <span className="min-w-0">
                                     <span className="font-medium flex items-center gap-2">
-                                        Automatic
+                                        {t("proxies.auto")}
                                         {selectedProxyMode === "auto" ? (
                                             <Badge variant="secondary" className="gap-1">
-                                                <Check size={12} aria-hidden="true" /> Selected
+                                                <Check size={12} aria-hidden="true" /> {t("proxies.selected")}
                                             </Badge>
                                         ) : null}
                                     </span>
                                     <span className="block text-xs text-muted-foreground truncate">
                                         {best
-                                            ? `Fastest right now: ${best.name}`
-                                            : "Picks the lowest-latency server that answers."}
+                                            ? t("proxies.fastest", { name: best.name })
+                                            : t("proxies.autoHint")}
                                     </span>
                                 </span>
                             </div>
@@ -126,7 +128,7 @@ function ProxiesView({
                                         pingTone(profilePings[best.id])
                                     )}
                                 >
-                                    {pingLabel(profilePings[best.id])}
+                                    {pingLabel(t, profilePings[best.id])}
                                 </span>
                             ) : null}
                         </div>
@@ -134,7 +136,7 @@ function ProxiesView({
 
                     {domainProfiles.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-8 text-center">
-                            No servers in this subscription yet. Try refreshing it.
+                            {t("proxies.empty")}
                         </p>
                     ) : (
                         <div className="enter-stagger grid gap-2 grid-cols-1 lg:grid-cols-2">
@@ -148,7 +150,7 @@ function ProxiesView({
                                         key={profile.id}
                                         selected={selected}
                                         onSelect={() => onSelectProxy(profile.id)}
-                                        label={`${profile.name}, ${profile.protocol}, ${pingLabel(ping)}`}
+                                        label={`${profile.name}, ${profile.protocol}, ${pingLabel(t, ping)}`}
                                     >
                                         <div className="p-4 flex items-center justify-between gap-3">
                                             <span className="min-w-0">
@@ -156,7 +158,7 @@ function ProxiesView({
                                                     <span className="truncate">{profile.name}</span>
                                                     {selected ? (
                                                         <Badge variant="secondary" className="gap-1 shrink-0">
-                                                            <Check size={12} aria-hidden="true" /> Selected
+                                                            <Check size={12} aria-hidden="true" /> {t("proxies.selected")}
                                                         </Badge>
                                                     ) : null}
                                                 </span>
@@ -173,7 +175,7 @@ function ProxiesView({
                                                     pingTone(ping)
                                                 )}
                                             >
-                                                {pingLabel(ping)}
+                                                {pingLabel(t, ping)}
                                             </span>
                                         </div>
                                     </SelectableCard>
@@ -184,7 +186,7 @@ function ProxiesView({
                 </div>
             ) : (
                 <p className="text-xs text-muted-foreground py-8 text-center">
-                    Pick a subscription from the top bar to see its servers.
+                    {t("proxies.pick")}
                 </p>
             )}
         </PageShell>

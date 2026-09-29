@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import SelectableCard from "@/components/ui/selectable-card";
 import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
+import { useT } from "@/lib/i18n";
 import { ConfigSource } from "@/types";
 
 interface ConfigurationViewProps {
@@ -28,6 +29,9 @@ function ConfigurationView({
     onRefreshSource,
     onAdd,
 }: ConfigurationViewProps) {
+    const t = useT();
+    const detailOf = (source: ConfigSource) =>
+        source.kind === "subscription" ? t("sources.proxies", { count: source.count }) : source.detail;
     const isSelected = (source: ConfigSource) =>
         source.kind === "subscription"
             ? selectedSource === source.domain
@@ -35,26 +39,26 @@ function ConfigurationView({
 
     return (
         <PageShell
-            title="Configuration"
-            description="Subscriptions and individual profiles you have added."
+            title={t("configuration.title")}
+            description={t("configuration.description")}
             actions={
                 sources.length > 0 ? (
                     <Button size="sm" variant="outline" onClick={onAdd}>
                         <Plus size={14} className="mr-2" aria-hidden="true" />
-                        Add
+                        {t("configuration.add")}
                     </Button>
                 ) : null
             }
         >
             {sources.length === 0 ? (
                 <div className="rounded-lg border border-dashed py-14 px-6 text-center">
-                    <p className="text-sm font-medium">Nothing configured yet</p>
+                    <p className="text-sm font-medium">{t("configuration.emptyTitle")}</p>
                     <p className="text-xs text-muted-foreground mt-1 mb-4">
-                        Import a subscription URL, or paste a single share link.
+                        {t("configuration.emptyHint")}
                     </p>
                     <Button onClick={onAdd}>
                         <Plus size={16} className="mr-2" aria-hidden="true" />
-                        Add profile or subscription
+                        {t("configuration.emptyButton")}
                     </Button>
                 </div>
             ) : (
@@ -73,7 +77,7 @@ function ConfigurationView({
                                 key={source.key}
                                 selected={isSelected(source)}
                                 onSelect={() => onSelectSource(source)}
-                                label={`${source.label}, ${source.detail}`}
+                                label={`${source.label}, ${detailOf(source)}`}
                                 className="group"
                             >
                                 <div className="p-4 flex items-center gap-2">
@@ -82,7 +86,7 @@ function ConfigurationView({
                                             {source.label}
                                         </span>
                                         <span className="block text-xs text-muted-foreground font-mono mt-0.5 truncate">
-                                            {source.detail}
+                                            {detailOf(source)}
                                         </span>
                                     </span>
 
@@ -90,7 +94,7 @@ function ConfigurationView({
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            aria-label={`Refresh ${source.label}`}
+                                            aria-label={t("configuration.refresh", { name: source.label })}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 onRefreshSource(source);
@@ -109,7 +113,7 @@ function ConfigurationView({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Delete ${source.label}`}
+                                        aria-label={t("configuration.delete", { name: source.label })}
                                         onClick={(event) => {
                                             event.stopPropagation();
                                             onDeleteSource(source);

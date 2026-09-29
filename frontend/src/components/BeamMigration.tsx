@@ -11,7 +11,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/format";
-import { FONTS, MOTIONS, RADII } from "@/lib/appearance";
+import { fontLabel, MOTIONS, RADII } from "@/lib/appearance";
+import { MessageKey, Translate, useI18n, useT } from "@/lib/i18n";
 import { THEME_PRESETS } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { BeamItem, BeamMigrationReport, BeamOutcome, BeamPreview, BeamSubscription } from "@/types";
@@ -31,24 +32,56 @@ interface PanelProps {
     onImport: () => Promise<BeamMigrationReport>;
     /** Shown as "Not now" before importing, and "Continue" after. */
     onClose?: () => void;
-    closeLabel?: string;
 }
 
-function expiry(seconds: number): { text: string; expired: boolean } | null {
-    if (!seconds) return null;
-    const date = new Date(seconds * 1000);
-    const expired = date.getTime() < Date.now();
-    const when = date.toLocaleDateString();
-    return { text: expired ? `expired ${when}` : `until ${when}`, expired };
+/** Each item key from Go, as a title and an explanation. */
+const ITEM_COPY: Record<string, { title: MessageKey; detail?: MessageKey }> = {
+    device_id: { title: "beam.item.deviceId", detail: "beam.item.deviceIdKept" },
+    device_id_invalid: { title: "beam.item.deviceId", detail: "beam.item.deviceIdInvalid" },
+    device_headers_off: { title: "beam.item.deviceHeaders", detail: "beam.item.deviceHeadersOff" },
+    client_identity: { title: "beam.item.clientIdentity" },
+    dns: { title: "beam.item.dns" },
+    mtu: { title: "beam.item.mtu" },
+    split_exclude: { title: "beam.item.split", detail: "beam.item.splitExclude" },
+    split_include: { title: "beam.item.split", detail: "beam.item.splitInclude" },
+    split_mode_unknown: { title: "beam.item.split", detail: "beam.item.splitModeUnknown" },
+    split_existing: { title: "beam.item.split", detail: "beam.item.splitExisting" },
+    advanced_graph: { title: "beam.item.advancedGraph", detail: "beam.item.advancedGraphDetail" },
+    theme_unknown: { title: "beam.item.theme", detail: "beam.item.themeUnknown" },
+    unreadable: { title: "beam.item.unreadable" },
+};
+
+/** An item as the title and detail to show. */
+function describe(t: Translate, item: BeamItem): { title: string; detail?: string } {
+    const copy = ITEM_COPY[item.key];
+    if (!copy) {
+        return { title: item.key, detail: item.value };
+    }
+    const params = { value: item.value ?? "", count: item.count ?? 0 };
+    return {
+        title: t(copy.title),
+        // Without its own sentence, the item's detail is its value.
+        detail: copy.detail ? t(copy.detail, params) : item.value,
+    };
 }
 
 function SubscriptionRow({ subscription }: { subscription: BeamSubscription }) {
-    const expires = subscription.host ? expiry(subscription.expires_at) : null;
+    const { t, language } = useI18n();
+    const expires = (() => {
+        if (!subscription.host || !subscription.expires_at) return null;
+        const date = new Date(subscription.expires_at * 1000);
+        const when = date.toLocaleDateString(language);
+        const expired = date.getTime() < Date.now();
+        return { text: t(expired ? "beam.expired" : "beam.until", { date: when }), expired };
+    })();
     const facts = [
-        subscription.host ? subscription.provider || subscription.host : "Added by hand",
-        subscription.host ? null : `${subscription.cached_nodes} servers`,
+        subscription.host ? subscription.provider || subscription.host : t("beam.addedByHand"),
+        subscription.host ? null : t("beam.servers", { count: subscription.cached_nodes }),
         subscription.data_limit > 0
-            ? `${formatBytes(subscription.data_used)} of ${formatBytes(subscription.data_limit)}`
+            ? t("beam.usage", {
+                  used: formatBytes(subscription.data_used),
+                  limit: formatBytes(subscription.data_limit),
+              })
             : null,
     ].filter(Boolean);
 
@@ -59,7 +92,7 @@ function SubscriptionRow({ subscription }: { subscription: BeamSubscription }) {
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
-                    {subscription.name || subscription.host || "Beam profile"}
+                    {subscription.name || subscription.host || t("beam.profile")}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {facts.join(" · ")}
@@ -78,18 +111,24 @@ function SubscriptionRow({ subscription }: { subscription: BeamSubscription }) {
     );
 }
 
-function ItemList({ items, tone }: { items: BeamItem[]; tone: "carried" | "skipped" }) {
+function ItemList({
+    items,
+    tone,
+}: {
+    items: { title: string; detail?: string }[];
+    tone: "carried" | "skipped";
+}) {
     return (
         <ul className="space-y-1.5">
             {items.map((item) => (
-                <li key={item.label + item.detail} className="flex gap-2 text-xs">
+                <li key={item.title + item.detail} className="flex gap-2 text-xs">
                     {tone === "carried" ? (
                         <Check size={13} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
                     ) : (
                         <CircleAlert size={13} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     )}
                     <span>
-                        <span className="font-medium">{item.label}</span>
+                        <span className="font-medium">{item.title}</span>
                         {item.detail ? <span className="text-muted-foreground"> — {item.detail}</span> : null}
                     </span>
                 </li>
@@ -98,15 +137,21 @@ function ItemList({ items, tone }: { items: BeamItem[]; tone: "carried" | "skipp
     );
 }
 
-const OUTCOME_COPY: Record<BeamOutcome["source"], { label: string; good: boolean }> = {
-    fetched: { label: "Up to date from the provider", good: true },
-    local: { label: "Imported", good: true },
-    cached: { label: "Beam's saved copy — the provider could not be reached", good: true },
-    failed: { label: "Not imported", good: false },
+const OUTCOME_COPY: Record<BeamOutcome["source"], { label: MessageKey; good: boolean }> = {
+    fetched: { label: "beam.outcome.fetched", good: true },
+    local: { label: "beam.outcome.local", good: true },
+    cached: { label: "beam.outcome.cached", good: true },
+    failed: { label: "beam.outcome.failed", good: false },
 };
 
 function OutcomeRow({ outcome }: { outcome: BeamOutcome }) {
+    const t = useT();
     const copy = OUTCOME_COPY[outcome.source];
+    const notes = [
+        outcome.no_servers ? t("beam.outcome.noServers") : null,
+        outcome.error ?? null,
+        outcome.shared_host ? t("beam.outcome.sharedHost") : null,
+    ].filter(Boolean);
     return (
         <li className="rounded-lg bg-muted/40 px-3 py-2.5">
             <div className="flex items-center gap-2">
@@ -118,36 +163,39 @@ function OutcomeRow({ outcome }: { outcome: BeamOutcome }) {
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{outcome.name}</span>
                 {outcome.profiles > 0 ? (
                     <span className="shrink-0 text-xs text-muted-foreground">
-                        {outcome.profiles} server{outcome.profiles === 1 ? "" : "s"}
+                        {t("beam.servers", { count: outcome.profiles })}
                     </span>
                 ) : null}
             </div>
-            <p className="mt-1 pl-6 text-xs text-muted-foreground">{copy.label}</p>
-            {outcome.note ? (
-                <p className="mt-1 pl-6 text-xs text-muted-foreground break-words">{outcome.note}</p>
-            ) : null}
+            <p className="mt-1 pl-6 text-xs text-muted-foreground">{t(copy.label)}</p>
+            {notes.map((note) => (
+                <p key={note} className="mt-1 pl-6 text-xs text-muted-foreground break-words">
+                    {note}
+                </p>
+            ))}
         </li>
     );
 }
 
-export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "Not now" }: PanelProps) {
+export function BeamMigrationPanel({ preview, onImport, onClose }: PanelProps) {
+    const t = useT();
     const [phase, setPhase] = useState<"offer" | "working" | "done">("offer");
     const [report, setReport] = useState<BeamMigrationReport | null>(null);
     const [error, setError] = useState("");
 
     const theme = THEME_PRESETS.find((preset) => preset.id === preview.theme);
     const { font, radius, motion } = preview.appearance ?? { font: "", radius: "", motion: "" };
-    const label = (options: { id: string; label: string }[], id: string) =>
-        options.find((option) => option.id === id)?.label;
+    const radiusOption = RADII.find((option) => option.id === radius);
+    const motionOption = MOTIONS.find((option) => option.id === motion);
     const look = [
-        ["Theme", theme?.label],
-        ["Font", label(FONTS, font)],
-        ["Corners", label(RADII, radius)],
-        ["Page transition", label(MOTIONS, motion)],
+        [t("beam.item.theme"), theme ? t(theme.label) : null],
+        [t("appearance.font"), font ? fontLabel(t, font) : null],
+        [t("appearance.corners"), radiusOption ? t(radiusOption.label) : null],
+        [t("appearance.motion"), motionOption ? t(motionOption.label) : null],
     ].filter((entry): entry is [string, string] => Boolean(entry[1]));
-    const carried: BeamItem[] = [
-        ...preview.carried,
-        ...look.map(([itemLabel, detail]) => ({ label: itemLabel, detail })),
+    const carried = [
+        ...preview.carried.map((item) => describe(t, item)),
+        ...look.map(([title, detail]) => ({ title, detail })),
     ];
 
     const run = async () => {
@@ -167,10 +215,8 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
         return (
             <div className="space-y-4">
                 <p className="text-sm">
-                    {total > 0
-                        ? `Imported ${total} server${total === 1 ? "" : "s"}.`
-                        : "Nothing could be imported."}{" "}
-                    <span className="text-muted-foreground">Beam's own files were not changed.</span>
+                    {total > 0 ? t("beam.imported", { count: total }) : t("beam.importedNothing")}{" "}
+                    <span className="text-muted-foreground">{t("beam.untouched")}</span>
                 </p>
                 <ul className="space-y-2">
                     {report.outcomes.map((outcome) => (
@@ -179,7 +225,7 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
                 </ul>
                 {onClose ? (
                     <Button className="w-full" onClick={onClose}>
-                        Continue
+                        {t("common.continue")}
                     </Button>
                 ) : null}
             </div>
@@ -190,37 +236,27 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
         <div className="space-y-5">
             {preview.subscriptions.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-xs font-medium text-muted-foreground">
-                        Subscriptions
-                    </h4>
+                    <h4 className="text-xs font-medium text-muted-foreground">{t("beam.subscriptions")}</h4>
                     <ul className="space-y-2">
                         {preview.subscriptions.map((subscription, index) => (
                             <SubscriptionRow key={index} subscription={subscription} />
                         ))}
                     </ul>
-                    <p className="text-xs text-muted-foreground">
-                        Each is fetched fresh from its provider, using Beam's device id so it
-                        counts as the same device. Beam's saved servers are the fallback if a
-                        provider can't be reached.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("beam.fetchNote")}</p>
                 </section>
             ) : null}
 
             {carried.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-xs font-medium text-muted-foreground">
-                        Comes across
-                    </h4>
+                    <h4 className="text-xs font-medium text-muted-foreground">{t("beam.carried")}</h4>
                     <ItemList items={carried} tone="carried" />
                 </section>
             ) : null}
 
             {preview.skipped.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-xs font-medium text-muted-foreground">
-                        Stays behind
-                    </h4>
-                    <ItemList items={preview.skipped} tone="skipped" />
+                    <h4 className="text-xs font-medium text-muted-foreground">{t("beam.skipped")}</h4>
+                    <ItemList items={preview.skipped.map((item) => describe(t, item))} tone="skipped" />
                 </section>
             ) : null}
 
@@ -231,17 +267,17 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
             <div className={cn("flex gap-2", onClose ? "" : "justify-end")}>
                 {onClose ? (
                     <Button variant="ghost" className="flex-1" onClick={onClose} disabled={phase === "working"}>
-                        {closeLabel}
+                        {t("beam.notNow")}
                     </Button>
                 ) : null}
                 <Button className={onClose ? "flex-1 gap-2" : "gap-2"} onClick={run} disabled={phase === "working"}>
                     {phase === "working" ? (
                         <>
-                            <Loader2 size={15} className="animate-spin" /> Importing…
+                            <Loader2 size={15} className="animate-spin" /> {t("beam.importing")}
                         </>
                     ) : (
                         <>
-                            <ArrowRightLeft size={15} /> Import from Beam
+                            <ArrowRightLeft size={15} /> {t("beam.import")}
                         </>
                     )}
                 </Button>
@@ -260,6 +296,7 @@ export function BeamMigrationDialog({
     onImport: () => Promise<BeamMigrationReport>;
     onClose: () => void;
 }) {
+    const t = useT();
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/40 p-6 backdrop-blur-2xl">
             <div className="flex max-h-full w-full max-w-md flex-col rounded-2xl border bg-card shadow-2xl">
@@ -268,10 +305,8 @@ export function BeamMigrationDialog({
                         <PackageOpen size={20} />
                     </span>
                     <div>
-                        <h2 className="text-lg font-semibold tracking-tight">Found Beam on this computer</h2>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Bring your subscriptions and settings across instead of setting up again.
-                        </p>
+                        <h2 className="text-lg font-semibold tracking-tight">{t("beam.found")}</h2>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{t("beam.foundHint")}</p>
                     </div>
                 </header>
                 <div className="min-h-0 overflow-y-auto px-6 pb-6">

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { LOG_LIMITS } from "@/hooks/use-logs";
 import { parseAnsi, stripAnsi } from "@/lib/ansi";
+import { useT } from "@/lib/i18n";
 
 interface LogsViewProps {
     logs: string[];
@@ -61,6 +62,7 @@ function LogsView({
     onDumpLogs,
     onClear,
 }: LogsViewProps) {
+    const t = useT();
     const scrollRef = useRef<HTMLDivElement>(null);
     const pinnedRef = useRef(true);
 
@@ -87,26 +89,26 @@ function LogsView({
     return (
         <PageShell
             fill
-            title="Logs"
-            description={`${logs.length.toLocaleString()} lines from the core`}
+            title={t("logs.title")}
+            description={t("logs.description", { count: logs.length })}
             actions={
                 <>
                     <Button variant="ghost" size="sm" onClick={onClear}>
                         <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" />
-                        Clear
+                        {t("logs.clear")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={onDumpLogs}>
                         <Download className="w-4 h-4 mr-2" aria-hidden="true" />
-                        Export
+                        {t("logs.export")}
                     </Button>
                     <Select value={logLimit} onValueChange={onLogLimitChange}>
-                        <SelectTrigger className="w-[140px]" aria-label="Lines to keep">
+                        <SelectTrigger className="w-[140px]" aria-label={t("logs.keep")}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {LOG_LIMITS.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
+                                    {t("logs.lines", { count: Number(option.value) })}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -121,7 +123,7 @@ function LogsView({
             >
                 {logs.length === 0 ? (
                     <p className="text-xs text-muted-foreground p-4 text-center">
-                        Nothing logged yet.
+                        {t("logs.empty")}
                     </p>
                 ) : (
                     <ol className="font-mono text-xs leading-relaxed">

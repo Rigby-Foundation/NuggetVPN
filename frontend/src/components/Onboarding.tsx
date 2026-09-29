@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { invoke } from "@/lib/backend";
 import { Server, ArrowRight, Loader2 } from "lucide-react";
 import { AppSettings, Profile } from "../types";
@@ -15,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useT } from "@/lib/i18n";
 
 interface OnboardingProps {
   settings: AppSettings;
@@ -27,12 +29,15 @@ function Onboarding({
   onComplete,
   onSettingsChange,
 }: OnboardingProps) {
+  const t = useT();
   const [step, setStep] = useState(0);
   const [serverUrl, setServerUrl] = useState("http://127.0.0.1:3001");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState("");
+  // Good news, shown apart from the error box rather than in it.
+  const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSkip = async () => {
@@ -52,7 +57,7 @@ function Onboarding({
       }
       setStep(1);
     } catch (_e) {
-      setError("Could not reach server");
+      setError(t("onboarding.unreachable"));
     } finally {
       setIsLoading(false);
     }
@@ -61,6 +66,7 @@ function Onboarding({
   const handleAuth = async () => {
     setIsLoading(true);
     setError("");
+    setNotice("");
     try {
       if (isRegistering) {
         await invoke("register_user", {
@@ -69,7 +75,7 @@ function Onboarding({
           password,
         });
         setIsRegistering(false);
-        setError("Registration successful! Please log in.");
+        setNotice(t("onboarding.registered"));
         setIsLoading(false);
         return;
       }
@@ -94,9 +100,8 @@ function Onboarding({
           newSettings.pending_sync_upload = true;
           await invoke("save_settings", { settings: newSettings });
           onSettingsChange(newSettings);
-          alert(
-            "Sync configured! Please restart the application to upload your profiles."
-          );
+          // A toast in the app's own style, not the browser's alert() box.
+          toast.success(t("onboarding.restartToUpload"), { duration: 8000 });
         } else {
           try {
             await invoke("pull_profiles_from_server", { settings: newSettings });
@@ -110,7 +115,7 @@ function Onboarding({
         onComplete();
       }
     } catch (e: unknown) {
-      setError(String(e) || "An error occurred");
+      setError(String(e) || t("onboarding.failed"));
     } finally {
       setIsLoading(false);
     }
@@ -125,14 +130,14 @@ function Onboarding({
           </div>
           <div className="space-y-2">
             <CardTitle className="text-3xl font-black tracking-tight">
-              Welcome to NuggetVPN
+              {t("onboarding.title")}
             </CardTitle>
             <CardDescription className="text-base">
               {step === 0
-                ? "Connect to your sync server to get started"
+                ? t("onboarding.subtitle")
                 : isRegistering
-                  ? "Create your account"
-                  : "Sign in to your account"}
+                  ? t("onboarding.createAccountTitle")
+                  : t("onboarding.signInTitle")}
             </CardDescription>
           </div>
         </CardHeader>
@@ -143,11 +148,16 @@ function Onboarding({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          {notice && (
+            <Alert className="mb-6">
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          )}
 
           {step === 0 ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="server-url">SERVER URL</Label>
+                <Label htmlFor="server-url">{t("onboarding.server")}</Label>
                 <Input
                   id="server-url"
                   type="text"
@@ -166,11 +176,11 @@ function Onboarding({
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Checking...
+                    {t("onboarding.checking")}
                   </>
                 ) : (
                   <>
-                    Continue <ArrowRight size={18} className="ml-2" />
+                    {t("common.continue")} <ArrowRight size={18} className="ml-2" />
                   </>
                 )}
               </Button>
@@ -178,7 +188,7 @@ function Onboarding({
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">USERNAME</Label>
+                <Label htmlFor="username">{t("onboarding.username")}</Label>
                 <Input
                   id="username"
                   type="text"
@@ -188,7 +198,7 @@ function Onboarding({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">PASSWORD</Label>
+                <Label htmlFor="password">{t("onboarding.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -206,12 +216,12 @@ function Onboarding({
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    {t("common.working")}
                   </>
                 ) : isRegistering ? (
-                  "Create Account"
+                  t("onboarding.createAccount")
                 ) : (
-                  "Sign In"
+                  t("onboarding.signIn")
                 )}
               </Button>
 
@@ -221,17 +231,18 @@ function Onboarding({
                   onClick={() => setStep(0)}
                   className="text-muted-foreground"
                 >
-                  Back
+                  {t("common.back")}
                 </Button>
                 <Button
                   variant="link"
                   onClick={() => {
                     setIsRegistering(!isRegistering);
                     setError("");
+                    setNotice("");
                   }}
                   className="text-primary"
                 >
-                  {isRegistering ? "Already have an account?" : "Need an account?"}
+                  {isRegistering ? t("onboarding.haveAccount") : t("onboarding.needAccount")}
                 </Button>
               </div>
             </div>
@@ -244,7 +255,7 @@ function Onboarding({
             onClick={handleSkip}
             className="w-full text-muted-foreground"
           >
-            Skip Synchronization
+            {t("onboarding.skip")}
           </Button>
         </CardFooter>
       </Card>

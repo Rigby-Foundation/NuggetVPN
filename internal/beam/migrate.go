@@ -15,10 +15,31 @@ import (
 )
 
 // Item is one line of "what comes across" or "what does not", for the UI.
+//
+// It carries a key and the variable part, not a sentence: the UI words it,
+// in whichever language it is showing. The keys are the Item* constants.
 type Item struct {
-	Label  string `json:"label"`
-	Detail string `json:"detail"`
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+	Count int    `json:"count,omitempty"`
 }
+
+// Item keys.
+const (
+	ItemDeviceID         = "device_id"
+	ItemDeviceIDInvalid  = "device_id_invalid"
+	ItemDeviceHeadersOff = "device_headers_off"
+	ItemClientIdentity   = "client_identity"
+	ItemDNS              = "dns"
+	ItemMTU              = "mtu"
+	ItemSplitExclude     = "split_exclude"
+	ItemSplitInclude     = "split_include"
+	ItemSplitMode        = "split_mode_unknown"
+	ItemSplitExisting    = "split_existing"
+	ItemAdvancedGraph    = "advanced_graph"
+	ItemThemeUnknown     = "theme_unknown"
+	ItemUnreadable       = "unreadable"
+)
 
 // SubscriptionPreview describes one Beam profile without exposing its URL,
 // which is the credential for that subscription.
@@ -78,16 +99,10 @@ func NewPreview(data *Data) Preview {
 	preview.Theme, _ = themeFor(data.Settings)
 	preview.Appearance = appearanceFor(data.Settings)
 	if data.Settings != nil && preview.Theme == "" && strings.TrimSpace(data.Settings.Appearance.Theme) != "" {
-		preview.Skipped = append(preview.Skipped, Item{
-			Label:  "Theme",
-			Detail: fmt.Sprintf("Beam's %q theme has no equivalent here.", data.Settings.Appearance.Theme),
-		})
+		preview.Skipped = append(preview.Skipped, Item{Key: ItemThemeUnknown, Value: data.Settings.Appearance.Theme})
 	}
 	if len(data.Unreadable) > 0 {
-		preview.Skipped = append(preview.Skipped, Item{
-			Label:  "Unreadable profiles",
-			Detail: strings.Join(data.Unreadable, ", "),
-		})
+		preview.Skipped = append(preview.Skipped, Item{Key: ItemUnreadable, Value: strings.Join(data.Unreadable, ", ")})
 	}
 	return preview
 }
@@ -112,22 +127,16 @@ func ApplySettings(current models.AppSettings, beam *Settings) (models.AppSettin
 	if hwid := strings.TrimSpace(compat.HWID); hwid != "" {
 		if models.ValidHWID(hwid) {
 			next.HWID = hwid
-			carried = append(carried, Item{
-				Label:  "Device id",
-				Detail: "Kept, so providers that limit devices see the same device, not a new one.",
-			})
+			carried = append(carried, Item{Key: ItemDeviceID})
 		} else {
-			skipped = append(skipped, Item{
-				Label:  "Device id",
-				Detail: "Not in a format providers accept, so NuggetVPN's own is used.",
-			})
+			skipped = append(skipped, Item{Key: ItemDeviceIDInvalid})
 		}
 	}
 	switch strings.ToLower(strings.TrimSpace(compat.HWIDMode)) {
 	case "off", "disabled", "none", "false":
 		off := false
 		next.HWIDEnabled = &off
-		carried = append(carried, Item{Label: "Device headers", Detail: "Off, as in Beam."})
+		carried = append(carried, Item{Key: ItemDeviceHeadersOff})
 	}
 	if compat.Enabled {
 		version := strings.TrimSpace(compat.UserAgentVersion)
@@ -136,25 +145,22 @@ func ApplySettings(current models.AppSettings, beam *Settings) (models.AppSettin
 			agent = "Happ/" + version
 		}
 		next.SubscriptionUserAgent = agent
-		carried = append(carried, Item{Label: "Client identity", Detail: agent})
+		carried = append(carried, Item{Key: ItemClientIdentity, Value: agent})
 	}
 
 	if dns := strings.TrimSpace(beam.Connection.PrimaryDNS); dns != "" {
 		next.DNS = dns
-		carried = append(carried, Item{Label: "DNS server", Detail: dns})
+		carried = append(carried, Item{Key: ItemDNS, Value: dns})
 	}
 	if mtu := beam.Connection.MTU; mtu >= 576 && mtu <= 65535 {
 		next.MTU = uint32(mtu)
-		carried = append(carried, Item{Label: "MTU", Detail: fmt.Sprint(mtu)})
+		carried = append(carried, Item{Key: ItemMTU, Value: fmt.Sprint(mtu)})
 	}
 
 	next, carried, skipped = applySplitTunnel(next, beam, carried, skipped)
 
 	if len(beam.ProTunGraph.Nodes) > 0 {
-		skipped = append(skipped, Item{
-			Label:  "Advanced routing graph",
-			Detail: "Beam's graph has no direct translation; rebuild it on the Routing page.",
-		})
+		skipped = append(skipped, Item{Key: ItemAdvancedGraph})
 	}
 	return next, carried, skipped
 }
@@ -186,29 +192,23 @@ func applySplitTunnel(next models.AppSettings, beam *Settings, carried, skipped 
 		return next, carried, skipped
 	}
 
-	var ruleAction, defaultAction, summary string
+	var ruleAction, defaultAction, key string
 	switch strings.ToLower(strings.TrimSpace(split.Mode)) {
 	case "exclude":
 		ruleAction, defaultAction = models.ActionDirect, models.ActionProxy
-		summary = "the listed apps and sites bypass the VPN"
+		key = ItemSplitExclude
 	case "include":
 		ruleAction, defaultAction = models.ActionProxy, models.ActionDirect
-		summary = "only the listed apps and sites use the VPN"
+		key = ItemSplitInclude
 	default:
-		skipped = append(skipped, Item{
-			Label:  "Split tunnelling",
-			Detail: fmt.Sprintf("Unrecognised mode %q.", split.Mode),
-		})
+		skipped = append(skipped, Item{Key: ItemSplitMode, Value: split.Mode})
 		return next, carried, skipped
 	}
 
 	// Rules someone already built here are theirs; the migration does not
 	// merge into them or overwrite them.
 	if len(next.RoutingRules) > 0 {
-		skipped = append(skipped, Item{
-			Label:  "Split tunnelling",
-			Detail: "You already have routing rules here, so they were left alone.",
-		})
+		skipped = append(skipped, Item{Key: ItemSplitExisting})
 		return next, carried, skipped
 	}
 
@@ -226,10 +226,7 @@ func applySplitTunnel(next models.AppSettings, beam *Settings, carried, skipped 
 	}
 	next.RoutingRules = rules
 	next.DefaultAction = defaultAction
-	carried = append(carried, Item{
-		Label:  "Split tunnelling",
-		Detail: fmt.Sprintf("%d entries; %s.", total, summary),
-	})
+	carried = append(carried, Item{Key: key, Count: total})
 	return next, carried, skipped
 }
 
@@ -355,7 +352,13 @@ type Outcome struct {
 	Host     string `json:"host"`
 	Profiles int    `json:"profiles"`
 	Source   string `json:"source"`
-	Note     string `json:"note,omitempty"`
+	// Error is the fetch failure as the network reported it, if any.
+	Error string `json:"error,omitempty"`
+	// NoServers: the provider answered, but with nothing usable.
+	NoServers bool `json:"no_servers,omitempty"`
+	// SharedHost: another Beam subscription uses the same host. This app
+	// refreshes one subscription per host, so the two will merge on refresh.
+	SharedHost bool `json:"shared_host,omitempty"`
 }
 
 // Selection is the server Beam had selected, located among the new profiles.
@@ -429,9 +432,9 @@ func Migrate(
 					outcome.Source = SourceFailed
 				}
 				if err != nil {
-					outcome.Note = err.Error()
+					outcome.Error = err.Error()
 				} else {
-					outcome.Note = "The provider returned no servers."
+					outcome.NoServers = true
 				}
 			}
 
@@ -439,8 +442,7 @@ func Migrate(
 			// host share one refresh URL and the next refresh would fold them
 			// into one. Say so rather than let that happen silently.
 			if hostsSeen[host] && len(imported) > 0 {
-				outcome.Note = strings.TrimSpace(outcome.Note + " Another Beam subscription uses the same host; " +
-					"NuggetVPN refreshes one subscription per host, so they will merge on refresh.")
+				outcome.SharedHost = true
 			}
 			hostsSeen[host] = true
 

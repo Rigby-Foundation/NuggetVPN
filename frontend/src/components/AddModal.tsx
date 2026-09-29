@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useT } from "@/lib/i18n";
 
 interface AddModalProps {
   isOpen: boolean;
@@ -26,10 +27,13 @@ function AddModal({
   onSaveProfile,
   onImportSubscription,
 }: AddModalProps) {
+  const t = useT();
   const [name, setName] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const isSubscription = /^https?:\/\//i.test(inputLink.trim());
 
   const handleProcess = async () => {
     const link = inputLink.trim();
@@ -38,20 +42,18 @@ function AddModal({
     setErrorMsg("");
 
     try {
-      const isSubscription = /^https?:\/\//i.test(link);
-      const isJsonConfig = /^\s*\{/.test(link);
-
       if (isSubscription) {
         await onImportSubscription(link);
         handleClose();
         return;
       }
 
-      const finalName = name || (isJsonConfig ? "Custom Sing-box" : "New Profile");
+      const isJsonConfig = /^\s*\{/.test(link);
+      const finalName = name || t(isJsonConfig ? "add.defaultJsonName" : "add.defaultName");
       await onSaveProfile(finalName, link);
       handleClose();
     } catch (e) {
-      setErrorMsg("Error: " + e);
+      setErrorMsg(String(e));
     } finally {
       setIsLoading(false);
     }
@@ -68,32 +70,30 @@ function AddModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Profile / Subscription</DialogTitle>
+          <DialogTitle>{t("add.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="config-link">
-              Config Link, Subscription URL, or sing-box JSON
-            </Label>
+            <Label htmlFor="config-link">{t("add.linkLabel")}</Label>
             <Textarea
               id="config-link"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
-              placeholder="Paste vless://... OR https://example.com/sub OR a sing-box config"
+              placeholder={t("add.linkPlaceholder")}
               className="font-mono text-xs resize-none"
               rows={3}
             />
           </div>
 
-          {!inputLink.trim().startsWith("http") && (
+          {!isSubscription && (
             <div className="grid gap-2">
-              <Label htmlFor="profile-name">Profile Name (Optional)</Label>
+              <Label htmlFor="profile-name">{t("add.nameLabel")}</Label>
               <Input
                 id="profile-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Server"
+                placeholder={t("add.namePlaceholder")}
               />
             </div>
           )}
@@ -107,15 +107,15 @@ function AddModal({
 
         <DialogFooter className="sm:justify-end gap-2">
           <Button variant="secondary" onClick={handleClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleProcess} disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLoading
-              ? "Processing..."
-              : inputLink.trim().startsWith("http")
-              ? "Import Sub"
-              : "Add Profile"}
+              ? t("common.working")
+              : isSubscription
+                ? t("add.importSubscription")
+                : t("add.addProfile")}
           </Button>
         </DialogFooter>
       </DialogContent>

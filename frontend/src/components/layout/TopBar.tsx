@@ -8,6 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LOCAL } from "@/hooks/use-profiles";
+import { useT } from "@/lib/i18n";
 import { ConfigSource } from "@/types";
 
 interface TopBarProps {
@@ -28,6 +29,7 @@ function TopBar({
     onSourceSelect,
     onAddProfile,
 }: TopBarProps) {
+    const t = useT();
     const isSelected = (source: ConfigSource) =>
         source.kind === "subscription"
             ? source.domain === selectedSourceDomain
@@ -45,11 +47,11 @@ function TopBar({
         <div className="drag-region h-16 border-b flex items-center justify-between gap-4 px-6 shrink-0">
             <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-xs font-medium text-muted-foreground">
-                    Configuration
+                    {t("topbar.configuration")}
                 </span>
                 {sources.length === 0 ? (
                     <span className="text-base font-medium text-muted-foreground">
-                        None yet
+                        {t("topbar.none")}
                     </span>
                 ) : (
                     <DropdownMenu>
@@ -59,13 +61,13 @@ function TopBar({
                                 disabled={locked}
                                 title={
                                     locked
-                                        ? "Disconnect before switching configuration"
+                                        ? t("topbar.locked")
                                         : undefined
                                 }
                                 className="p-0! h-auto font-semibold text-base max-w-full justify-start hover:bg-transparent"
                             >
                                 <span className="truncate">
-                                    {selected?.label ?? "Select a configuration"}
+                                    {selected?.label ?? t("topbar.select")}
                                 </span>
                                 <ChevronDown
                                     className="ml-1.5 h-4 w-4 opacity-60 shrink-0"
@@ -82,7 +84,9 @@ function TopBar({
                                 >
                                     <span className="truncate">{source.label}</span>
                                     <span className="text-muted-foreground font-mono shrink-0">
-                                        {source.detail}
+                                        {source.kind === "subscription"
+                                            ? t("sources.proxies", { count: source.count })
+                                            : source.detail}
                                     </span>
                                 </DropdownMenuItem>
                             ))}
@@ -96,7 +100,7 @@ function TopBar({
                 variant="secondary"
                 onClick={onAddProfile}
                 disabled={locked}
-                aria-label="Add a profile or subscription"
+                aria-label={t("topbar.add")}
                 className="rounded-full shrink-0"
             >
                 <Plus size={16} aria-hidden="true" />

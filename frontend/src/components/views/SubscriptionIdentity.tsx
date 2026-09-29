@@ -13,6 +13,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useT } from "@/lib/i18n";
 import { AppSettings } from "@/types";
 
 /**
@@ -23,7 +24,7 @@ import { AppSettings } from "@/types";
  * `Happ/<version>` is the format Happ itself sends.
  */
 const USER_AGENTS = [
-    { value: "NuggetVPN/1.0", label: "NuggetVPN (default)" },
+    { value: "NuggetVPN/1.0", label: "NuggetVPN" },
     { value: "Happ/3.13.0", label: "Happ" },
     { value: "v2rayNG/1.9.16", label: "v2rayNG" },
     { value: "Streisand", label: "Streisand" },
@@ -49,6 +50,7 @@ function SubscriptionIdentity({
     onSettingsChange,
     onRegenerateHWID,
 }: Props) {
+    const t = useT();
     const known = USER_AGENTS.some(
         (agent) => agent.value === appSettings.subscription_user_agent
     );
@@ -72,16 +74,14 @@ function SubscriptionIdentity({
             <Card>
                 <CardContent className="space-y-4">
                     <div>
-                        <div className="text-sm font-medium">Client identity</div>
+                        <div className="text-sm font-medium">{t("identity.title")}</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                            Sent when fetching a subscription. Some providers only
-                            serve clients they recognise and answer with an error
-                            for anything else.
+                            {t("identity.description")}
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="user-agent">User agent</Label>
+                        <Label htmlFor="user-agent">{t("identity.userAgent")}</Label>
                         <Select
                             value={
                                 custom
@@ -103,10 +103,12 @@ function SubscriptionIdentity({
                             <SelectContent>
                                 {USER_AGENTS.map((agent) => (
                                     <SelectItem key={agent.value} value={agent.value}>
-                                        {agent.label}
+                                        {agent.value === "NuggetVPN/1.0"
+                                            ? t("identity.defaultAgent", { name: agent.label })
+                                            : agent.label}
                                     </SelectItem>
                                 ))}
-                                <SelectItem value={CUSTOM}>Custom…</SelectItem>
+                                <SelectItem value={CUSTOM}>{t("identity.custom")}</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -120,7 +122,7 @@ function SubscriptionIdentity({
                                     )
                                 }
                                 placeholder="Happ/3.13.0"
-                                aria-label="Custom user agent"
+                                aria-label={t("identity.customLabel")}
                                 className="font-mono text-xs"
                             />
                         ) : null}
@@ -132,13 +134,9 @@ function SubscriptionIdentity({
                 <CardContent className="space-y-4">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="text-sm font-medium">Device ID</div>
+                            <div className="text-sm font-medium">{t("identity.deviceId")}</div>
                             <div className="text-xs text-muted-foreground mt-1">
-                                Providers that limit how many devices a subscription
-                                may be used on count them by this id. Without it
-                                they refuse the subscription outright, which looks
-                                like a broken link. It is a random value for this
-                                installation, not a hardware serial.
+                                {t("identity.deviceIdDescription")}
                             </div>
                         </div>
                         <Switch
@@ -146,14 +144,14 @@ function SubscriptionIdentity({
                             onCheckedChange={(checked) =>
                                 onSettingsChange("hwid_enabled", checked)
                             }
-                            aria-label="Send a device ID"
+                            aria-label={t("identity.sendDeviceId")}
                         />
                     </div>
 
                     {hwidOn ? (
                         <>
                             <div className="space-y-2">
-                                <Label htmlFor="hwid">Device ID</Label>
+                                <Label htmlFor="hwid">{t("identity.deviceId")}</Label>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         id="hwid"
@@ -165,8 +163,8 @@ function SubscriptionIdentity({
                                         variant="outline"
                                         size="icon"
                                         onClick={copyHWID}
-                                        aria-label="Copy device ID"
-                                        title="Copy"
+                                        aria-label={t("identity.copy")}
+                                        title={t("identity.copy")}
                                     >
                                         {copied ? (
                                             <Check size={14} aria-hidden="true" />
@@ -178,21 +176,20 @@ function SubscriptionIdentity({
                                         variant="outline"
                                         size="icon"
                                         onClick={onRegenerateHWID}
-                                        aria-label="Generate a new device ID"
-                                        title="Generate a new one"
+                                        aria-label={t("identity.regenerate")}
+                                        title={t("identity.regenerate")}
                                     >
                                         <RefreshCw size={14} aria-hidden="true" />
                                     </Button>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Generating a new one looks like a new device to
-                                    your provider, and may use up another slot.
+                                    {t("identity.regenerateWarning")}
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div className="space-y-2">
-                                    <Label htmlFor="device-os">System</Label>
+                                    <Label htmlFor="device-os">{t("identity.system")}</Label>
                                     <Input
                                         id="device-os"
                                         value={appSettings.device_os}
@@ -203,7 +200,7 @@ function SubscriptionIdentity({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="device-os-version">Version</Label>
+                                    <Label htmlFor="device-os-version">{t("identity.version")}</Label>
                                     <Input
                                         id="device-os-version"
                                         value={appSettings.device_os_version}
@@ -217,7 +214,7 @@ function SubscriptionIdentity({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="device-model">Model</Label>
+                                    <Label htmlFor="device-model">{t("identity.model")}</Label>
                                     <Input
                                         id="device-model"
                                         value={appSettings.device_model}
@@ -229,8 +226,7 @@ function SubscriptionIdentity({
                                 </div>
                             </div>
                             <p className="text-[11px] text-muted-foreground">
-                                Only the ID is required. These just make the entry
-                                readable in your provider&apos;s device list.
+                                {t("identity.optionalFields")}
                             </p>
                         </>
                     ) : null}

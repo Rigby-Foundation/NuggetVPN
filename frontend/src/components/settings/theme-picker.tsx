@@ -8,7 +8,8 @@ import {
     CustomTheme,
     newCustomTheme,
 } from "@/lib/appearance";
-import { THEME_PRESETS, type ThemePreset } from "@/lib/themes";
+import { useT } from "@/lib/i18n";
+import { THEME_PRESETS } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
 /**
@@ -73,12 +74,19 @@ function Option({
     );
 }
 
+/** What a swatch needs: its words, already translated, and its colours. */
+interface SwatchPreset {
+    label: string;
+    hint: string;
+    swatch: { background: string; surface: string; accent: string };
+}
+
 function PresetOption({
     preset,
     active,
     onSelect,
 }: {
-    preset: ThemePreset;
+    preset: SwatchPreset;
     active: boolean;
     onSelect: () => void;
 }) {
@@ -122,18 +130,21 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /** A custom theme shown the way a preset is, from its own numbers. */
-function asPreset(theme: CustomTheme): ThemePreset {
+function asPreset(theme: CustomTheme, t: ReturnType<typeof useT>): SwatchPreset {
     return {
-        id: theme.id,
-        label: theme.name,
-        hint: theme.mode === "dark" ? "Custom, dark" : "Custom, light",
-        mode: theme.mode,
-        className: "",
+        label: theme.name || t("picker.untitled"),
+        hint: t(theme.mode === "dark" ? "picker.customDark" : "picker.customLight"),
         swatch: customThemeSwatch(theme),
     };
 }
 
 function ThemePicker({ theme, setTheme }: Props) {
+    const t = useT();
+    const translated = (preset: (typeof THEME_PRESETS)[number]): SwatchPreset => ({
+        label: t(preset.label),
+        hint: t(preset.hint),
+        swatch: preset.swatch,
+    });
     const light = THEME_PRESETS.filter((preset) => preset.mode === "light");
     const dark = THEME_PRESETS.filter((preset) => preset.mode === "dark");
     const { prefs, activeCustom, showCustomTheme, saveCustomTheme, deleteCustomTheme } =
@@ -169,54 +180,54 @@ function ThemePicker({ theme, setTheme }: Props) {
                 </span>
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium">System</span>
+                        <span className="text-xs font-medium">{t("picker.system")}</span>
                         {theme === "system" ? (
                             <Check size={12} className="text-primary" aria-hidden="true" />
                         ) : null}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
-                        Follows the desktop setting
+                        {t("picker.systemHint")}
                     </span>
                 </span>
             </button>
 
-            <Group title="Light">
+            <Group title={t("picker.light")}>
                 {light.map((preset) => (
                     <PresetOption
                         key={preset.id}
-                        preset={preset}
+                        preset={translated(preset)}
                         active={theme === preset.id}
                         onSelect={() => setTheme(preset.id)}
                     />
                 ))}
             </Group>
 
-            <Group title="Dark">
+            <Group title={t("picker.dark")}>
                 {dark.map((preset) => (
                     <PresetOption
                         key={preset.id}
-                        preset={preset}
+                        preset={translated(preset)}
                         active={theme === preset.id}
                         onSelect={() => setTheme(preset.id)}
                     />
                 ))}
             </Group>
 
-            <Group title="Custom">
+            <Group title={t("picker.custom")}>
                 {prefs.customThemes.map((custom) => (
                     // The edit control sits beside the option, not inside it:
                     // a button inside a button is invalid and would steal the
                     // click that selects the theme.
                     <div key={custom.id} className="relative">
                         <PresetOption
-                            preset={asPreset(custom)}
+                            preset={asPreset(custom, t)}
                             active={activeCustom?.id === custom.id}
                             onSelect={() => showCustomTheme(custom)}
                         />
                         <button
                             type="button"
                             onClick={() => setEditing({ theme: custom, isNew: false })}
-                            aria-label={`Edit ${custom.name}`}
+                            aria-label={t("picker.edit", { name: custom.name || t("picker.untitled") })}
                             className="absolute left-3.5 top-3.5 grid h-6 w-6 place-items-center rounded-md bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
                         >
                             <Pencil size={11} aria-hidden="true" />
@@ -233,8 +244,8 @@ function ThemePicker({ theme, setTheme }: Props) {
                     <span className="grid h-14 w-full place-items-center rounded-lg border-2 border-dashed text-muted-foreground">
                         <Plus size={18} aria-hidden="true" />
                     </span>
-                    <span className="mt-2 px-0.5 text-xs font-medium">New theme</span>
-                    <span className="block px-0.5 text-[11px] text-muted-foreground">Pick your own colours</span>
+                    <span className="mt-2 px-0.5 text-xs font-medium">{t("picker.new")}</span>
+                    <span className="block px-0.5 text-[11px] text-muted-foreground">{t("picker.newHint")}</span>
                 </button>
             </Group>
 

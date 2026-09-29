@@ -21,6 +21,7 @@ import { ACTION_META, GeoCodesContext, NODE_TYPES, SOURCE_META } from "@/compone
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { errorMessage, invoke } from "@/lib/backend";
+import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
     AppSettings,
@@ -345,10 +346,11 @@ function Palette({
     onSetDefault: (action: RoutingAction) => void;
     geoPanel: React.ReactNode;
 }) {
+    const t = useT();
     return (
         <aside className="w-56 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
             <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
-                Traffic sources
+                {t("routing.sources")}
             </p>
             {SOURCE_KINDS.map((kind) => {
                 const meta = SOURCE_META[kind];
@@ -360,13 +362,13 @@ function Palette({
                         className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-left"
                     >
                         <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
-                        <span className="truncate">{meta.label}</span>
+                        <span className="truncate">{t(meta.label)}</span>
                     </button>
                 );
             })}
 
             <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                Everything else
+                {t("routing.catchAll")}
             </p>
             {ACTIONS.map((action) => {
                 const meta = ACTION_META[action];
@@ -377,17 +379,17 @@ function Palette({
                         type="button"
                         onClick={() => onSetDefault(action)}
                         aria-pressed={isDefault}
-                        title={`Send unmatched traffic: ${meta.label}`}
+                        title={t("routing.sendUnmatched", { action: t(meta.label) })}
                         className={cn(
                             "w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-left",
                             isDefault ? "bg-accent" : "hover:bg-accent"
                         )}
                     >
                         <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
-                        <span className="truncate flex-1">{meta.label}</span>
+                        <span className="truncate flex-1">{t(meta.label)}</span>
                         {isDefault ? (
                             <span className="text-[10px] text-muted-foreground shrink-0">
-                                default
+                                {t("routing.default")}
                             </span>
                         ) : null}
                     </button>
@@ -395,7 +397,7 @@ function Palette({
             })}
 
             <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                Canvas
+                {t("routing.canvas")}
             </p>
             <button
                 type="button"
@@ -403,22 +405,21 @@ function Palette({
                 className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-left"
             >
                 <StickyNote size={15} className="text-muted-foreground" aria-hidden="true" />
-                <span className="truncate">Note</span>
+                <span className="truncate">{t("routing.note")}</span>
             </button>
 
             {geoPanel}
 
             <p className="px-2 pt-3 text-[11px] leading-relaxed text-muted-foreground">
-                Drag from a source&apos;s right edge onto a destination to change
-                where it goes.
+                {t("routing.dragHint")}
             </p>
         </aside>
     );
 }
 
-const GEO_KINDS: { kind: GeoKind; label: string; icon: typeof Globe2 }[] = [
-    { kind: "geosite", label: "Services", icon: Landmark },
-    { kind: "geoip", label: "Countries", icon: Globe2 },
+const GEO_KINDS: { kind: GeoKind; label: MessageKey; icon: typeof Globe2 }[] = [
+    { kind: "geosite", label: "routing.geo.services", icon: Landmark },
+    { kind: "geoip", label: "routing.geo.countries", icon: Globe2 },
 ];
 
 /**
@@ -433,6 +434,7 @@ function GeoPanel({
     settings: AppSettings;
     onChange: (patch: Partial<AppSettings>) => void;
 }) {
+    const t = useT();
     const [busy, setBusy] = useState<string | null>(null);
     const [urlFor, setUrlFor] = useState<GeoKind | null>(null);
     const [url, setUrl] = useState("");
@@ -454,7 +456,7 @@ function GeoPanel({
     return (
         <>
             <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                Geo data
+                {t("routing.geo.title")}
             </p>
             <div className="space-y-2 px-1">
                 {GEO_KINDS.map(({ kind, label, icon: Icon }) => {
@@ -463,12 +465,12 @@ function GeoPanel({
                         <div key={kind} className="rounded-lg bg-muted/40 p-2">
                             <div className="flex items-center gap-2 text-xs">
                                 <Icon size={13} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                                <span className="font-medium">{label}</span>
+                                <span className="font-medium">{t(label)}</span>
                             </div>
                             <p className="mt-1 truncate text-[11px] text-muted-foreground" title={file?.url ?? file?.name}>
                                 {file
-                                    ? `${file.name} · ${file.codes.toLocaleString()} codes`
-                                    : "Built-in rule-sets"}
+                                    ? t("routing.geo.file", { name: file.name, count: file.codes })
+                                    : t("routing.geo.builtIn")}
                             </p>
                             {urlFor === kind ? (
                                 <form
@@ -489,7 +491,7 @@ function GeoPanel({
                                             if (event.key === "Escape") setUrlFor(null);
                                         }}
                                         placeholder={`https://…/${kind}.dat`}
-                                        aria-label={`${kind}.dat address`}
+                                        aria-label={t("routing.geo.address", { file: `${kind}.dat` })}
                                         className="h-7 text-[11px]"
                                     />
                                     <Button
@@ -497,7 +499,7 @@ function GeoPanel({
                                         size="icon"
                                         className="h-7 w-7 shrink-0"
                                         disabled={!url.trim() || busy !== null}
-                                        aria-label="Download"
+                                        aria-label={t("routing.geo.download")}
                                     >
                                         {busy === kind ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                                     </Button>
@@ -506,16 +508,16 @@ function GeoPanel({
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                     <GeoButton
                                         icon={FileUp}
-                                        label="File"
+                                        label={t("routing.geo.fromFile")}
                                         disabled={busy !== null}
                                         busy={busy === kind + "-file"}
                                         onClick={() => void run(kind + "-file", "import_geo_file")}
                                     />
-                                    <GeoButton icon={Link2} label="URL" disabled={busy !== null} onClick={() => setUrlFor(kind)} />
+                                    <GeoButton icon={Link2} label={t("routing.geo.fromUrl")} disabled={busy !== null} onClick={() => setUrlFor(kind)} />
                                     {file?.source === "url" && file.url ? (
                                         <GeoButton
                                             icon={RefreshCw}
-                                            label="Update"
+                                            label={t("routing.geo.update")}
                                             disabled={busy !== null}
                                             busy={busy === kind + "-update"}
                                             onClick={() => void run(kind + "-update", "download_geo_file", { url: file.url })}
@@ -524,7 +526,7 @@ function GeoPanel({
                                     {file ? (
                                         <GeoButton
                                             icon={Trash2}
-                                            label="Remove"
+                                            label={t("routing.geo.remove")}
                                             disabled={busy !== null}
                                             busy={busy === kind + "-remove"}
                                             onClick={() => void run(kind + "-remove", "remove_geo_file", { kind })}
@@ -536,8 +538,7 @@ function GeoPanel({
                     );
                 })}
                 <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
-                    geoip.dat and geosite.dat as Happ and Xray use them. While one is loaded, its
-                    codes replace the built-in ones for that kind.
+                    {t("routing.geo.explain")}
                 </p>
             </div>
         </>
@@ -554,6 +555,7 @@ function GeoOfferBanner({
     onDone: (kind: GeoKind) => void;
     onChange: (patch: Partial<AppSettings>) => void;
 }) {
+    const t = useT();
     const [busy, setBusy] = useState<GeoKind | null>(null);
     const host = (address: string) => {
         try {
@@ -567,7 +569,7 @@ function GeoOfferBanner({
             {(Object.entries(offer) as [GeoKind, string][]).map(([kind, address]) => (
                 <div key={kind} className="flex items-center gap-3 text-xs">
                     <span className="min-w-0 flex-1 truncate">
-                        This routing uses a {kind}.dat from{" "}
+                        {t("routing.geo.offer", { file: `${kind}.dat` })}{" "}
                         <span className="font-mono text-muted-foreground" title={address}>
                             {host(address)}
                         </span>
@@ -590,10 +592,10 @@ function GeoOfferBanner({
                         }}
                     >
                         {busy === kind ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                        Download
+                        {t("routing.geo.download")}
                     </Button>
                     <Button size="sm" variant="ghost" className="h-7" onClick={() => onDone(kind)}>
-                        Skip
+                        {t("routing.geo.skip")}
                     </Button>
                 </div>
             ))}
@@ -628,10 +630,9 @@ function GeoButton({
 }
 
 function RoutingView({ settings, onChange }: RoutingViewProps) {
+    const t = useT();
     const rules = settings.routing_rules ?? [];
-    const defaultLabel = (
-        ACTION_META[settings.default_action]?.label ?? "Through the VPN"
-    ).toLowerCase();
+    const defaultLabel = t(ACTION_META[settings.default_action]?.label ?? "routing.action.proxy");
 
     // Codes from the user's own geo files, for suggestions in the nodes.
     // Reloaded whenever a file is added, replaced or removed.
@@ -660,11 +661,11 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
     const exportRouting = useCallback(async () => {
         try {
             const path = await invoke<string>("export_routing");
-            if (path) toast.success(`Routing saved to ${path.split(/[\\/]/).pop()}`);
+            if (path) toast.success(t("routing.saved", { file: path.split(/[\\/]/).pop() ?? path }));
         } catch (error) {
-            toast.error(`Could not save the routing: ${errorMessage(error)}`);
+            toast.error(t("routing.saveFailed", { error: errorMessage(error) }));
         }
-    }, []);
+    }, [t]);
 
     const importRouting = useCallback(async () => {
         // Kept so the import can be undone: it replaces the whole graph.
@@ -687,7 +688,7 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
             toast(
                 (shown) => (
                     <span className="flex items-center gap-3 text-sm">
-                        Routing loaded.
+                        {t("routing.loaded")}
                         <button
                             type="button"
                             className="font-medium text-primary"
@@ -697,7 +698,7 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
                                 toast.dismiss(shown.id);
                             }}
                         >
-                            Undo
+                            {t("common.undo")}
                         </button>
                     </span>
                 ),
@@ -706,7 +707,7 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
         } catch (error) {
             toast.error(errorMessage(error), { id: "routing-import" });
         }
-    }, [onChange, settings]);
+    }, [onChange, settings, t]);
 
     // The canvas hands back a focuser so adding a node from the palette brings
     // it into view instead of dropping it below the fold.
@@ -747,23 +748,23 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
         <div className="enter-stagger absolute inset-0 flex flex-col">
             <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3 shrink-0">
                 <div className="min-w-0">
-                    <h1 className="text-base font-semibold tracking-tight">Routing</h1>
+                    <h1 className="text-base font-semibold tracking-tight">{t("nav.routing")}</h1>
                     <p className="text-xs text-muted-foreground mt-0.5">
                         {rules.length === 0
-                            ? `No rules — everything goes ${defaultLabel}.`
-                            : `${rules.length} rule${rules.length === 1 ? "" : "s"}; everything else goes ${defaultLabel}.`}
+                            ? t("routing.summaryNone", { action: defaultLabel })
+                            : t("routing.summary", { count: rules.length, action: defaultLabel })}
                     </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()}>
-                        <Upload size={14} aria-hidden="true" /> Import
+                        <Upload size={14} aria-hidden="true" /> {t("routing.import")}
                     </Button>
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void exportRouting()}>
-                        <Download size={14} aria-hidden="true" /> Export
+                        <Download size={14} aria-hidden="true" /> {t("routing.export")}
                     </Button>
                     {rules.length > 0 ? (
                         <Button variant="ghost" size="sm" onClick={() => onChange({ routing_rules: [] })}>
-                            Clear rules
+                            {t("routing.clear")}
                         </Button>
                     ) : null}
                 </div>

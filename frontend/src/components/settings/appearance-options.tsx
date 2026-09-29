@@ -2,7 +2,8 @@ import { ReactNode } from "react";
 import { ArrowRight, ArrowUp, Blend, Minus, type LucideIcon } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
-import { FONTS, MOTIONS, RADII } from "@/lib/appearance";
+import { FONTS, fontLabel, MOTIONS, RADII } from "@/lib/appearance";
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,29 +48,24 @@ function ChoiceCard({
 const sampleFont = (family: string) => `${family}, ui-sans-serif, system-ui, sans-serif`;
 
 /**
- * The greeting in the sample follows the system language. The app has no
- * language setting of its own, so the system locale is the only signal of
- * what script someone will actually be reading.
+ * The sample word is in the app's own language, and so in the script the
+ * font will actually be asked to draw — Cyrillic for Russian and Ukrainian,
+ * CJK for Chinese and Japanese, where a font is likeliest to fall back.
  */
-const SAMPLE_WORD = (() => {
-    try {
-        return navigator.language.toLowerCase().startsWith("ru") ? "Привет" : "Hello";
-    } catch {
-        return "Hello";
-    }
-})();
 
 export function FontPicker() {
     const { prefs, setFont } = useAppearance();
+    const { t } = useI18n();
+    const sample = t("appearance.fontSample");
     return (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {FONTS.map((font) => (
                 <ChoiceCard key={font.id} active={prefs.font === font.id} onSelect={() => setFont(font.id)}>
                     <span className="text-lg font-semibold leading-tight" style={{ fontFamily: sampleFont(font.family) }}>
-                        Aa {SAMPLE_WORD}
+                        Aa {sample}
                     </span>
                     <span className="text-xs text-muted-foreground" style={{ fontFamily: sampleFont(font.family) }}>
-                        {font.label}
+                        {fontLabel(t, font.id)}
                     </span>
                 </ChoiceCard>
             ))}
@@ -79,6 +75,7 @@ export function FontPicker() {
 
 export function RadiusPicker() {
     const { prefs, setRadius } = useAppearance();
+    const t = useT();
     return (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {RADII.map((radius) => (
@@ -88,7 +85,7 @@ export function RadiusPicker() {
                         style={{ borderRadius: radius.value }}
                         aria-hidden="true"
                     />
-                    <span className="text-xs font-medium">{radius.label}</span>
+                    <span className="text-xs font-medium">{t(radius.label)}</span>
                 </ChoiceCard>
             ))}
         </div>
@@ -104,6 +101,7 @@ const MOTION_ICONS: Record<string, LucideIcon> = {
 
 export function MotionPicker() {
     const { prefs, setMotion } = useAppearance();
+    const t = useT();
     return (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {MOTIONS.map((motion) => {
@@ -111,8 +109,8 @@ export function MotionPicker() {
                 return (
                     <ChoiceCard key={motion.id} active={prefs.motion === motion.id} onSelect={() => setMotion(motion.id)}>
                         <Icon size={18} aria-hidden="true" />
-                        <span className="text-xs font-medium">{motion.label}</span>
-                        <span className="text-[11px] text-muted-foreground">{motion.hint}</span>
+                        <span className="text-xs font-medium">{t(motion.label)}</span>
+                        <span className="text-[11px] text-muted-foreground">{t(motion.hint)}</span>
                     </ChoiceCard>
                 );
             })}

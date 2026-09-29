@@ -1,6 +1,7 @@
 import { Minus, Square, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 interface WindowControlsProps {
     onMinimize: () => void;
@@ -13,6 +14,7 @@ export function WindowControls({
     onMaximize,
     onClose,
 }: WindowControlsProps) {
+    const t = useT();
     return (
         // The strip is a drag region: on a frameless window it is the title bar,
         // and it is the first place anyone tries to grab. The buttons opt back
@@ -24,6 +26,7 @@ export function WindowControls({
                     variant="ghost"
                     size="icon"
                     onClick={onMinimize}
+                    aria-label={t("window.minimize")}
                     className="h-8 w-10 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-none cursor-default"
                 >
                     <Minus size={16} />
@@ -32,6 +35,7 @@ export function WindowControls({
                     variant="ghost"
                     size="icon"
                     onClick={onMaximize}
+                    aria-label={t("window.maximize")}
                     className="h-8 w-10 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-none cursor-default"
                 >
                     <Square size={14} />
@@ -40,6 +44,7 @@ export function WindowControls({
                     variant="ghost"
                     size="icon"
                     onClick={onClose}
+                    aria-label={t("window.close")}
                     className="h-8 w-10 hover:bg-red-500 hover:text-white rounded-none cursor-default"
                 >
                     <X size={16} />

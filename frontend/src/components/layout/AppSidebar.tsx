@@ -12,6 +12,7 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
+import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "@/types";
 
@@ -26,12 +27,12 @@ interface AppSidebarProps {
 }
 
 const TABS = [
-    { id: "connection", label: "Connection", icon: Power },
-    { id: "configuration", label: "Configuration", icon: Server },
-    { id: "proxies", label: "Proxies", icon: Signal },
-    { id: "routing", label: "Routing", icon: Waypoints },
-    { id: "logs", label: "Logs", icon: FileText },
-] as const;
+    { id: "connection", label: "nav.connection", icon: Power },
+    { id: "configuration", label: "nav.configuration", icon: Server },
+    { id: "proxies", label: "nav.proxies", icon: Signal },
+    { id: "routing", label: "nav.routing", icon: Waypoints },
+    { id: "logs", label: "nav.logs", icon: FileText },
+] as const satisfies readonly { id: string; label: MessageKey; icon: unknown }[];
 
 const STATUS_DOT: Record<ConnectionStatus, string> = {
     idle: "bg-status-idle",
@@ -40,11 +41,11 @@ const STATUS_DOT: Record<ConnectionStatus, string> = {
     error: "bg-status-error",
 };
 
-const STATUS_LABEL: Record<ConnectionStatus, string> = {
-    idle: "Not connected",
-    connecting: "Connecting",
-    connected: "Connected",
-    error: "Connection failed",
+const STATUS_LABEL: Record<ConnectionStatus, MessageKey> = {
+    idle: "status.idle",
+    connecting: "status.connecting",
+    connected: "status.connected",
+    error: "status.error",
 };
 
 function AppSidebar({
@@ -56,6 +57,7 @@ function AppSidebar({
     platform,
     status,
 }: AppSidebarProps) {
+    const t = useT();
     const isMac = platform === "macos";
 
     return (
@@ -88,7 +90,7 @@ function AppSidebar({
                                         onClick={() => onTabChange(tab.id)}
                                     >
                                         <tab.icon size={18} aria-hidden="true" />
-                                        <span>{tab.label}</span>
+                                        <span>{t(tab.label)}</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
@@ -105,7 +107,7 @@ function AppSidebar({
                         className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[status])}
                         aria-hidden="true"
                     />
-                    <span className="truncate">{STATUS_LABEL[status]}</span>
+                    <span className="truncate">{t(STATUS_LABEL[status])}</span>
                 </div>
 
                 <SidebarMenu>
@@ -115,7 +117,7 @@ function AppSidebar({
                             onClick={() => onTabChange("settings")}
                         >
                             <Settings size={18} aria-hidden="true" />
-                            <span>Settings</span>
+                            <span>{t("nav.settings")}</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

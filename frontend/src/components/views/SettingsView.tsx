@@ -10,6 +10,7 @@ import {
   Power,
   SlidersHorizontal,
   Fingerprint,
+  Languages,
   PackageOpen,
   Palette,
   Plus,
@@ -31,7 +32,8 @@ import {
   MotionPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
-import { FONTS } from "@/lib/appearance";
+import { fontLabel } from "@/lib/appearance";
+import { LANGUAGES, LanguageChoice, MessageKey, useI18n } from "@/lib/i18n";
 import {
   SettingsField,
   SettingsGroup,
@@ -79,6 +81,7 @@ interface SettingsViewProps {
 
 type SectionId =
   | "appearance"
+  | "language"
   | "behaviour"
   | "connection"
   | "tls"
@@ -91,39 +94,38 @@ type SectionId =
 interface Section {
   id: SectionId;
   icon: LucideIcon;
-  title: string;
+  title: MessageKey;
   /** What the section is for, when nothing better can be said about its state. */
-  blurb: string;
+  blurb: MessageKey;
 }
 
 const CLOSE_OPTIONS: {
   id: CloseAction;
   icon: LucideIcon;
-  label: string;
-  summary: string;
-  description: string;
+  label: MessageKey;
+  summary: MessageKey;
+  description: MessageKey;
 }[] = [
   {
     id: "tray",
     icon: Minimize2,
-    label: "Keep running in the tray",
-    summary: "closes to the tray",
-    description: "The window hides; the tray icon brings it back.",
+    label: "close.tray",
+    summary: "close.tray.summary",
+    description: "close.tray.description",
   },
   {
     id: "hide",
     icon: EyeOff,
-    label: "Hide completely",
-    summary: "hides completely",
-    description:
-      "No window, no taskbar entry and no tray icon. To bring it back, launch NuggetVPN again — it opens the copy that is already running.",
+    label: "close.hide",
+    summary: "close.hide.summary",
+    description: "close.hide.description",
   },
   {
     id: "quit",
     icon: Power,
-    label: "Quit",
-    summary: "quits on close",
-    description: "Closes the app and disconnects.",
+    label: "close.quit",
+    summary: "close.quit.summary",
+    description: "close.quit.description",
   },
 ];
 
@@ -131,56 +133,62 @@ const SECTIONS: Section[] = [
   {
     id: "appearance",
     icon: Palette,
-    title: "Appearance",
-    blurb: "Theme and colours",
+    title: "settings.appearance",
+    blurb: "settings.appearance.blurb",
+  },
+  {
+    id: "language",
+    icon: Languages,
+    title: "settings.language",
+    blurb: "settings.language.blurb",
   },
   {
     id: "behaviour",
     icon: SlidersHorizontal,
-    title: "Behaviour",
-    blurb: "Startup, updates, and closing the window",
+    title: "settings.behaviour",
+    blurb: "settings.behaviour.blurb",
   },
   {
     id: "connection",
     icon: Router,
-    title: "Connection",
-    blurb: "Packet size and name resolution",
+    title: "settings.connection",
+    blurb: "settings.connection.blurb",
   },
   {
     id: "tls",
     icon: ShieldHalf,
-    title: "TLS and obfuscation",
-    blurb: "Make the handshake harder to filter",
+    title: "settings.tls",
+    blurb: "settings.tls.blurb",
   },
   {
     id: "chain",
     icon: Waypoints,
-    title: "Proxy chain",
-    blurb: "Route through more than one server",
+    title: "settings.chain",
+    blurb: "settings.chain.blurb",
   },
   {
     id: "subscriptions",
     icon: Fingerprint,
-    title: "Subscriptions",
-    blurb: "Client identity and device id",
+    title: "settings.subscriptions",
+    blurb: "settings.subscriptions.blurb",
   },
   {
     id: "privacy",
     icon: Eye,
-    title: "Privacy",
-    blurb: "What this app sends elsewhere",
+    title: "settings.privacy",
+    blurb: "settings.privacy.blurb",
   },
   {
     id: "sync",
     icon: RefreshCw,
-    title: "Synchronisation",
-    blurb: "Profiles across your devices",
+    title: "settings.sync",
+    blurb: "settings.sync.blurb",
   },
   {
     id: "beam",
     icon: PackageOpen,
-    title: "Import from Beam",
-    blurb: "Subscriptions and settings from Beam",
+    title: "settings.beam",
+    blurb: "settings.beam.blurb",
   },
 ];
 
@@ -218,6 +226,8 @@ function SettingsView({
     }
   }, [homeSignal]);
   const { prefs: appearance, activeCustom } = useAppearance();
+  const { t, choice, setChoice, language } = useI18n();
+  const languageName = (id: string) => LANGUAGES.find((item) => item.id === id)?.label ?? id;
   const [newChainId, setNewChainId] = React.useState("");
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
@@ -248,48 +258,56 @@ function SettingsView({
     switch (section.id) {
       case "appearance": {
         const preset = THEME_PRESETS.find((item) => item.id === theme);
-        const themeName = activeCustom?.name ?? preset?.label ?? "System theme";
-        const font = FONTS.find((item) => item.id === appearance.font)?.label;
-        return [themeName, font].filter(Boolean).join(" · ");
+        const themeName = activeCustom
+          ? activeCustom.name || t("picker.untitled")
+          : preset
+            ? t(preset.label)
+            : t("settings.appearance.systemTheme");
+        return [themeName, fontLabel(t, appearance.font)].filter(Boolean).join(" · ");
+      }
+      case "language": {
+        return choice === "system"
+          ? t("settings.language.system", { language: languageName(language) })
+          : languageName(choice);
       }
       case "behaviour": {
         const parts = [
-          appSettings.launch_at_startup ? "Starts at login" : "",
-          appSettings.auto_connect ? "connects automatically" : "",
-          CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "",
+          appSettings.launch_at_startup ? t("behaviour.summary.startup") : "",
+          appSettings.auto_connect ? t("behaviour.summary.autoConnect") : "",
+          t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
         ].filter(Boolean);
         return parts.join(" · ");
       }
       case "connection":
-        return `MTU ${appSettings.mtu} · DNS ${appSettings.dns || "not set"}`;
+        return t("connection.summary", { mtu: String(appSettings.mtu), dns: appSettings.dns || "—" });
       case "tls": {
         const enabled = [
-          appSettings.tls_fragment && "fragmentation",
-          appSettings.tls_mixed_sni_case && "mixed case",
-          appSettings.tls_padding && "padding",
-          appSettings.sni_spoof_enabled && "SNI spoof",
+          appSettings.tls_fragment && t("tls.fragmentation"),
+          appSettings.tls_mixed_sni_case && t("tls.mixedCase"),
+          appSettings.tls_padding && t("tls.padding"),
+          appSettings.sni_spoof_enabled && t("tls.sniSpoof"),
         ].filter(Boolean) as string[];
-        return enabled.length === 0 ? "Nothing enabled" : enabled.join(", ");
+        return enabled.length === 0 ? t("tls.nothing") : enabled.join(", ");
       }
       case "chain": {
-        if (!appSettings.proxy_chain_enabled) return "Off";
+        if (!appSettings.proxy_chain_enabled) return t("common.off");
         const count = appSettings.proxy_chain.length;
         return count === 0
-          ? "On, but no hops added"
-          : `${count} hop${count === 1 ? "" : "s"} before the exit`;
+          ? t("chain.summaryEmpty")
+          : t("chain.summary", { count });
       }
       case "subscriptions":
-        return appSettings.subscription_user_agent || "Default identity";
+        return appSettings.subscription_user_agent || t("identity.defaultIdentity");
       case "privacy":
         return appSettings.ip_check_enabled === false
-          ? "Address check off"
-          : "Address check on";
+          ? t("privacy.summaryOff")
+          : t("privacy.summaryOn");
       case "sync":
-        return appSettings.auth_server || "Not connected";
+        return appSettings.auth_server || t("status.idle");
       case "beam": {
-        if (appSettings.beam_migration === "done") return "Already imported; can be run again";
+        if (appSettings.beam_migration === "done") return t("settings.beam.done");
         const count = beamPreview?.subscriptions.length ?? 0;
-        return `Found ${count} profile${count === 1 ? "" : "s"} on this computer`;
+        return t("settings.beam.found", { count });
       }
       default:
         return section.blurb;
@@ -302,81 +320,114 @@ function SettingsView({
         return (
           <>
             <SettingsGroup
-              title="Theme"
-              description="Applies straight away and is remembered for next time."
+              title={t("appearance.theme")}
+              description={t("appearance.theme.description")}
             >
               <ThemePicker theme={theme} setTheme={setTheme} />
             </SettingsGroup>
 
-            <SettingsGroup title="Font" description="Used for all text in the app.">
+            <SettingsGroup title={t("appearance.font")} description={t("appearance.font.description")}>
               <FontPicker />
             </SettingsGroup>
 
             <SettingsGroup
-              title="Corners"
-              description="How rounded buttons, cards and fields are."
+              title={t("appearance.corners")}
+              description={t("appearance.corners.description")}
             >
               <RadiusPicker />
             </SettingsGroup>
 
             <SettingsGroup
-              title="Page transition"
-              description="How the view animates when you switch tabs. If your system asks for reduced motion, movement becomes a fade."
+              title={t("appearance.motion")}
+              description={t("appearance.motion.description")}
             >
               <MotionPicker />
             </SettingsGroup>
           </>
         );
 
+      case "language":
+        return (
+          <SettingsGroup title={t("settings.language")} description={t("settings.language.description")}>
+            <div className="space-y-2" role="radiogroup" aria-label={t("settings.language")}>
+              {(["system", ...LANGUAGES.map((item) => item.id)] as LanguageChoice[]).map((id) => {
+                const active = choice === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setChoice(id)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-colors",
+                      active ? "border-primary bg-primary/5" : "border-transparent bg-muted/30 hover:border-border"
+                    )}
+                  >
+                    {/* Each language is named in itself, so it can be found
+                        whatever language the app is showing now. */}
+                    <span className="text-sm font-medium" lang={id === "system" ? undefined : id}>
+                      {id === "system" ? t("settings.language.followSystem") : languageName(id)}
+                    </span>
+                    {id === "system" ? (
+                      <span className="text-xs text-muted-foreground">{languageName(language)}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </SettingsGroup>
+        );
+
       case "behaviour":
         return (
           <>
-            <SettingsGroup title="Startup">
+            <SettingsGroup title={t("behaviour.startup")}>
               <SettingsField
-                label="Launch at system startup"
-                description="Starts NuggetVPN when you log in, without opening its window."
+                label={t("behaviour.launch")}
+                description={t("behaviour.launch.description")}
                 control={
                   <Switch
                     checked={appSettings.launch_at_startup}
                     onCheckedChange={(checked) => onSettingsChange("launch_at_startup", checked)}
-                    aria-label="Launch at system startup"
+                    aria-label={t("behaviour.launch")}
                   />
                 }
               />
               <SettingsField
-                label="Connect automatically"
-                description="Connects to the server you used last as soon as the app starts."
+                label={t("behaviour.autoConnect")}
+                description={t("behaviour.autoConnect.description")}
                 control={
                   <Switch
                     checked={appSettings.auto_connect}
                     onCheckedChange={(checked) => onSettingsChange("auto_connect", checked)}
-                    aria-label="Connect automatically"
+                    aria-label={t("behaviour.autoConnect")}
                   />
                 }
               />
             </SettingsGroup>
 
-            <SettingsGroup title="Subscriptions">
+            <SettingsGroup title={t("settings.subscriptions")}>
               <SettingsField
-                label="Update subscriptions automatically"
-                description="Refreshes every subscription when the app starts and every six hours. Off means never automatically — for all of them — though you can still refresh one by hand."
+                label={t("behaviour.autoUpdate")}
+                description={t("behaviour.autoUpdate.description")}
                 control={
                   <Switch
                     checked={appSettings.subscription_auto_update !== false}
                     onCheckedChange={(checked) =>
                       onSettingsChange("subscription_auto_update", checked)
                     }
-                    aria-label="Update subscriptions automatically"
+                    aria-label={t("behaviour.autoUpdate")}
                   />
                 }
               />
             </SettingsGroup>
 
             <SettingsGroup
-              title="Closing the window"
-              description="The VPN keeps running in the first two cases."
+              title={t("behaviour.closing")}
+              description={t("behaviour.closing.description")}
             >
-              <div className="space-y-2" role="radiogroup" aria-label="Closing the window">
+              <div className="space-y-2" role="radiogroup" aria-label={t("behaviour.closing")}>
                 {CLOSE_OPTIONS.map((option) => {
                   const active = appSettings.close_action === option.id;
                   return (
@@ -393,8 +444,8 @@ function SettingsView({
                     >
                       <option.icon size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <span>
-                        <span className="block text-sm font-medium">{option.label}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">{option.description}</span>
+                        <span className="block text-sm font-medium">{t(option.label)}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{t(option.description)}</span>
                       </span>
                     </button>
                   );
@@ -411,7 +462,7 @@ function SettingsView({
               <SettingsField
                 stacked
                 label="MTU"
-                description="The largest packet the tunnel will carry. 9000 suits most links; lower it if large transfers stall."
+                description={t("connection.mtu.description")}
                 control={
                   <Input
                     id="mtu"
@@ -428,8 +479,8 @@ function SettingsView({
             <SettingsGroup>
               <SettingsField
                 stacked
-                label="DNS server"
-                description="Where names are resolved while connected, for example 1.1.1.1."
+                label={t("connection.dns")}
+                description={t("connection.dns.description")}
                 control={
                   <Input
                     id="dns"
@@ -448,15 +499,15 @@ function SettingsView({
           <>
             <SettingsGroup>
               <SettingsField
-                label="Fragmentation"
-                description="Splits the TLS record so the server name is not in one readable piece."
+                label={t("tls.fragmentation.title")}
+                description={t("tls.fragmentation.description")}
                 control={
                   <Switch
                     checked={appSettings.tls_fragment}
                     onCheckedChange={(checked) =>
                       onSettingsChange("tls_fragment", checked)
                     }
-                    aria-label="TLS fragmentation"
+                    aria-label={t("tls.fragmentation.title")}
                   />
                 }
               />
@@ -464,7 +515,7 @@ function SettingsView({
               {appSettings.tls_fragment && (
                 <div className="grid grid-cols-2 gap-4 border-t pt-4">
                   <div>
-                    <Label className="mb-1 block text-xs">Size range</Label>
+                    <Label className="mb-1 block text-xs">{t("tls.sizeRange")}</Label>
                     <Input
                       type="text"
                       value={appSettings.tls_fragment_size}
@@ -475,7 +526,7 @@ function SettingsView({
                     />
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs">Sleep range (ms)</Label>
+                    <Label className="mb-1 block text-xs">{t("tls.sleepRange")}</Label>
                     <Input
                       type="text"
                       value={appSettings.tls_fragment_sleep}
@@ -491,29 +542,29 @@ function SettingsView({
 
             <SettingsGroup>
               <SettingsField
-                label="Mixed SNI case"
-                description="Randomises the capitalisation of the server name, so a filter matching it literally misses."
+                label={t("tls.mixedCase.title")}
+                description={t("tls.mixedCase.description")}
                 control={
                   <Switch
                     checked={appSettings.tls_mixed_sni_case}
                     onCheckedChange={(checked) =>
                       onSettingsChange("tls_mixed_sni_case", checked)
                     }
-                    aria-label="Mixed SNI case"
+                    aria-label={t("tls.mixedCase.title")}
                   />
                 }
               />
 
               <SettingsField
-                label="Record padding"
-                description="Adds random bytes so handshakes are not all the same length."
+                label={t("tls.padding.title")}
+                description={t("tls.padding.description")}
                 control={
                   <Switch
                     checked={appSettings.tls_padding}
                     onCheckedChange={(checked) =>
                       onSettingsChange("tls_padding", checked)
                     }
-                    aria-label="TLS padding"
+                    aria-label={t("tls.padding.title")}
                   />
                 }
               />
@@ -521,22 +572,22 @@ function SettingsView({
 
             <SettingsGroup>
               <SettingsField
-                label="SNI spoof"
-                description="Sends a different server name in the handshake."
+                label={t("tls.sniSpoof")}
+                description={t("tls.sniSpoof.description")}
                 control={
                   <Switch
                     checked={appSettings.sni_spoof_enabled}
                     onCheckedChange={(checked) =>
                       onSettingsChange("sni_spoof_enabled", checked)
                     }
-                    aria-label="SNI spoof"
+                    aria-label={t("tls.sniSpoof")}
                   />
                 }
               />
 
               {appSettings.sni_spoof_enabled && (
                 <div className="border-t pt-4">
-                  <Label className="mb-1 block text-xs">Domain to send</Label>
+                  <Label className="mb-1 block text-xs">{t("tls.sniSpoof.domain")}</Label>
                   <Input
                     type="text"
                     value={appSettings.sni_spoof_value}
@@ -555,15 +606,15 @@ function SettingsView({
         return (
           <SettingsGroup>
             <SettingsField
-              label="Chain through other profiles"
-              description="Traffic passes through each hop in turn before reaching the exit."
+              label={t("chain.title")}
+              description={t("chain.description")}
               control={
                 <Switch
                   checked={appSettings.proxy_chain_enabled}
                   onCheckedChange={(checked) =>
                     onSettingsChange("proxy_chain_enabled", checked)
                   }
-                  aria-label="Proxy chain"
+                  aria-label={t("settings.chain")}
                 />
               }
             />
@@ -571,14 +622,13 @@ function SettingsView({
             {appSettings.proxy_chain_enabled && (
               <div className="space-y-3 border-t pt-4">
                 <div className="text-xs text-muted-foreground">
-                  Exit profile:{" "}
+                  {t("chain.exit")}{" "}
                   <span className="font-medium text-foreground">
-                    {selectedProfile?.name || "None selected"}
+                    {selectedProfile?.name || t("chain.noneSelected")}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Order runs from the first hop, closest to you, to the last one
-                  before the exit.
+                  {t("chain.order")}
                 </p>
 
                 <div className="flex gap-2">
@@ -591,8 +641,8 @@ function SettingsView({
                       <SelectValue
                         placeholder={
                           availableChainProfiles.length === 0
-                            ? "No profiles available"
-                            : "Select profile to add"
+                            ? t("chain.noProfiles")
+                            : t("chain.select")
                         }
                       />
                     </SelectTrigger>
@@ -610,13 +660,13 @@ function SettingsView({
                     onClick={handleAddChainProxy}
                     disabled={!newChainId}
                   >
-                    <Plus size={12} /> Add
+                    <Plus size={12} /> {t("common.add")}
                   </Button>
                 </div>
 
                 {appSettings.proxy_chain.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No proxies in the chain.
+                    {t("chain.empty")}
                   </p>
                 ) : (
                   <div className="max-h-[220px] divide-y overflow-y-auto rounded-md border">
@@ -629,10 +679,10 @@ function SettingsView({
                         >
                           <div className="min-w-0 flex-1">
                             <div className="text-xs text-muted-foreground">
-                              Hop {index + 1}
+                              {t("chain.hop", { index: index + 1 })}
                             </div>
                             <div className="truncate">
-                              {profile?.name || "Unknown profile"}
+                              {profile?.name || t("chain.unknown")}
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
@@ -642,7 +692,7 @@ function SettingsView({
                               className="h-6 w-6 text-muted-foreground"
                               onClick={() => handleMoveChainProxy(index, -1)}
                               disabled={index === 0}
-                              aria-label={`Move hop ${index + 1} up`}
+                              aria-label={t("chain.moveUp", { index: index + 1 })}
                             >
                               <ChevronUp size={14} />
                             </Button>
@@ -654,7 +704,7 @@ function SettingsView({
                               disabled={
                                 index === appSettings.proxy_chain.length - 1
                               }
-                              aria-label={`Move hop ${index + 1} down`}
+                              aria-label={t("chain.moveDown", { index: index + 1 })}
                             >
                               <ChevronDown size={14} />
                             </Button>
@@ -668,7 +718,7 @@ function SettingsView({
                                   appSettings.proxy_chain.filter((p) => p !== id)
                                 )
                               }
-                              aria-label={`Remove hop ${index + 1}`}
+                              aria-label={t("chain.remove", { index: index + 1 })}
                             >
                               <Trash2 size={14} />
                             </Button>
@@ -696,15 +746,15 @@ function SettingsView({
         return (
           <SettingsGroup>
             <SettingsField
-              label="Check my public address"
-              description="Asks ipinfo.io which address your traffic comes from, so the connection screen can show it. This is a request to a third party; turn it off and nothing is sent."
+              label={t("privacy.ipCheck")}
+              description={t("privacy.ipCheck.description")}
               control={
                 <Switch
                   checked={appSettings.ip_check_enabled !== false}
                   onCheckedChange={(checked) =>
                     onSettingsChange("ip_check_enabled", checked)
                   }
-                  aria-label="Check my public address"
+                  aria-label={t("privacy.ipCheck")}
                 />
               }
             />
@@ -714,15 +764,15 @@ function SettingsView({
       case "sync":
         return (
           <SettingsGroup
-            title="Sync server"
-            description="Keeps your profiles the same on every device signed in to the same server."
+            title={t("sync.title")}
+            description={t("sync.description")}
           >
             {appSettings.auth_server ? (
               <>
                 <div className="rounded-xl bg-muted p-4">
                   <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                     <CheckCircle2 size={12} className="text-status-connected" />
-                    Connected to
+                    {t("sync.connectedTo")}
                   </div>
                   <div className="truncate font-mono text-sm">
                     {appSettings.auth_server}
@@ -733,12 +783,12 @@ function SettingsView({
                   className="w-full"
                   onClick={onDisconnectSync}
                 >
-                  Disconnect
+                  {t("connection.disconnect")}
                 </Button>
               </>
             ) : (
               <Button className="w-full gap-2" onClick={onConnectSync}>
-                <RefreshCw size={16} /> Connect sync server
+                <RefreshCw size={16} /> {t("sync.connect")}
               </Button>
             )}
           </SettingsGroup>
@@ -748,7 +798,7 @@ function SettingsView({
         return beamPreview ? (
           <SettingsGroup
             title="Beam"
-            description="Beam's own files are only read, never changed, so this is safe to run again."
+            description={t("settings.beam.description")}
           >
             <BeamMigrationPanel preview={beamPreview} onImport={onMigrateFromBeam} />
           </SettingsGroup>
@@ -768,8 +818,8 @@ function SettingsView({
       <PageShell
         key={openId ?? "list"}
         fill
-        title={open ? open.title : "Settings"}
-        description={open ? open.blurb : "Client preferences and tunnel behaviour."}
+        title={open ? t(open.title) : t("nav.settings")}
+        description={open ? t(open.blurb) : t("settings.description")}
         actions={
           open ? (
             <Button
@@ -778,7 +828,7 @@ function SettingsView({
               className="gap-1.5"
               onClick={() => navigate(null)}
             >
-              <ArrowLeft size={14} /> Settings
+              <ArrowLeft size={14} /> {t("nav.settings")}
             </Button>
           ) : undefined
         }
@@ -793,7 +843,7 @@ function SettingsView({
                   <SettingsRow
                     key={section.id}
                     icon={section.icon}
-                    title={section.title}
+                    title={t(section.title)}
                     subtitle={subtitleFor(section)}
                     onClick={() => navigate(section.id)}
                   />

@@ -192,8 +192,10 @@ export interface SavedSelection {
 
 /** One line of what a Beam migration carries across, or leaves behind. */
 export interface BeamItem {
-    label: string;
-    detail: string;
+    /** Which message; see ITEM_COPY in BeamMigration.tsx. */
+    key: string;
+    value?: string;
+    count?: number;
 }
 
 /** A Beam profile, described without its subscription URL. */
@@ -236,7 +238,10 @@ export interface BeamOutcome {
     host: string;
     profiles: number;
     source: "fetched" | "cached" | "failed" | "local";
-    note?: string;
+    /** The fetch failure as the network reported it. */
+    error?: string;
+    no_servers?: boolean;
+    shared_host?: boolean;
 }
 
 export interface BeamMigrationReport {

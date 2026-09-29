@@ -12,12 +12,15 @@ import "@fontsource-variable/manrope";
 import "@fontsource-variable/geologica";
 import "@fontsource-variable/onest";
 
+import type { MessageKey, Translate } from "@/lib/i18n";
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
 
 export interface FontOption {
     id: string;
+    /** A font's own name, which is not translated; see fontLabel. */
     label: string;
     /** Goes into --app-font; the stack in App.css supplies the fallbacks. */
     family: string;
@@ -30,33 +33,39 @@ export const FONTS: FontOption[] = [
     { id: "manrope", label: "Manrope", family: "'Manrope Variable'" },
     { id: "geologica", label: "Geologica", family: "'Geologica Variable'" },
     { id: "onest", label: "Onest", family: "'Onest Variable'" },
-    { id: "system", label: "System", family: "system-ui" },
+    { id: "system", label: "", family: "system-ui" },
 ];
+
+/** A font's name as shown: its own name, or the translated "System". */
+export function fontLabel(t: Translate, id: string): string {
+    if (id === "system") return t("appearance.font.system");
+    return FONTS.find((font) => font.id === id)?.label ?? id;
+}
 
 export interface RadiusOption {
     id: string;
-    label: string;
+    label: MessageKey;
     value: string;
 }
 
 export const RADII: RadiusOption[] = [
-    { id: "small", label: "Small", value: "0.375rem" },
-    { id: "medium", label: "Medium", value: "0.625rem" },
-    { id: "large", label: "Large", value: "0.875rem" },
-    { id: "round", label: "Round", value: "1.25rem" },
+    { id: "small", label: "appearance.radius.small", value: "0.375rem" },
+    { id: "medium", label: "appearance.radius.medium", value: "0.625rem" },
+    { id: "large", label: "appearance.radius.large", value: "0.875rem" },
+    { id: "round", label: "appearance.radius.round", value: "1.25rem" },
 ];
 
 export interface MotionOption {
     id: string;
-    label: string;
-    hint: string;
+    label: MessageKey;
+    hint: MessageKey;
 }
 
 export const MOTIONS: MotionOption[] = [
-    { id: "slide", label: "Slide", hint: "From the right" },
-    { id: "rise", label: "Rise", hint: "From below" },
-    { id: "fade", label: "Fade", hint: "Cross-fade" },
-    { id: "none", label: "None", hint: "Instant" },
+    { id: "slide", label: "appearance.motion.slide", hint: "appearance.motion.slide.hint" },
+    { id: "rise", label: "appearance.motion.rise", hint: "appearance.motion.rise.hint" },
+    { id: "fade", label: "appearance.motion.fade", hint: "appearance.motion.fade.hint" },
+    { id: "none", label: "appearance.motion.none", hint: "appearance.motion.none.hint" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -157,7 +166,7 @@ export function customThemeSwatch(theme: CustomTheme) {
 export function newCustomTheme(mode: "light" | "dark" = "dark"): CustomTheme {
     return {
         id: CUSTOM_PREFIX + Math.random().toString(36).slice(2, 10),
-        name: "My theme",
+        name: "",
         mode,
         background: mode === "dark" ? { h: 285, c: 0.02, l: 0.15 } : { h: 85, c: 0.01, l: 0.98 },
         accent: { h: 70, c: 0.15 },
@@ -201,7 +210,7 @@ function sanitizeTheme(raw: unknown): CustomTheme | null {
     const range = BACKGROUND_LIGHTNESS[mode];
     return {
         id: value.id,
-        name: typeof value.name === "string" && value.name.trim() ? value.name.slice(0, 40) : "Custom",
+        name: typeof value.name === "string" && value.name.trim() ? value.name.slice(0, 40) : "",
         mode,
         background: {
             h: clamp(value.background?.h, 0, 360, 285),
