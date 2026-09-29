@@ -6,22 +6,72 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
 
+// privateRanges are the networks that must never enter the tunnel. They are
+// listed explicitly, rather than relying on a matcher, because the TUN excludes
+// them at the interface where only a prefix list will do.
+var privateRanges = []string{
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"169.254.0.0/16",
+	"224.0.0.0/4",
+	"255.255.255.255/32",
+}
+
+// localSuffixes only mean something on the local network.
+var localSuffixes = []string{"local", "lan", "home.arpa"}
+
+// connectivityCheckDomains are what Windows fetches to decide whether it has
+// internet at all.
+var connectivityCheckDomains = []string{"msftconnecttest.com", "msftncsi.com"}
+
 // buildRouteRules turns the routing graph into sing-box route rules, and
 // reports how many of the user's entries were emitted.
 //
 // Order matters: sing-box takes the first matching rule, so the graph is
 // emitted top to bottom and whatever matches nothing falls through to
 // route.final.
-func buildRouteRules(settings models.AppSettings) ([]map[string]any, int) {
+func buildRouteRules(settings models.AppSettings, serverDomains []string) ([]map[string]any, int) {
 	rules := []map[string]any{
-		// Sniffing gives the router real domains for fake-IP traffic.
-		{"action": "sniff"},
-		{"protocol": "dns", "action": "hijack-dns"},
+		// Anything still reaching port 53 is DNS. The TUN captures it through
+		// dns_mode as well; this covers the local mixed proxy.
+		{"port": []int{53}, "action": "hijack-dns"},
+		// Name the sniffers rather than running all of them, and bound how
+		// long a connection waits to be identified. An unbounded sniff on
+		// every connection adds latency to protocols that will never match.
+		{
+			"action":  "sniff",
+			"sniffer": []string{"tls", "http", "quic"},
+			"timeout": "500ms",
+		},
 	}
 
 	// Private ranges stay on the local network whatever the graph says;
 	// tunnelling them breaks LAN access and, with it, the user's printer.
 	rules = append(rules, map[string]any{"ip_is_private": true, "outbound": DirectTag})
+
+	// The proxy's own hostname must never be routed into the tunnel it is
+	// dialing, or the connection chases its own tail.
+	if len(serverDomains) > 0 {
+		rules = append(rules, map[string]any{
+			"domain":   serverDomains,
+			"outbound": DirectTag,
+		})
+	}
+
+	// Names that only mean something on the local network.
+	rules = append(rules, map[string]any{
+		"domain_suffix": localSuffixes,
+		"outbound":      DirectTag,
+	})
+
+	// Windows decides whether it has internet by fetching these. Through a
+	// tunnel the check is unreliable, and when it fails Windows reports no
+	// connectivity and some applications refuse to work at all.
+	rules = append(rules, map[string]any{
+		"domain_suffix": connectivityCheckDomains,
+		"outbound":      DirectTag,
+	})
 
 	matched := 0
 	for _, rule := range settings.UsableRules() {
@@ -71,6 +121,12 @@ func buildRouteRules(settings models.AppSettings) ([]map[string]any, int) {
 			"outbound": ExitTag,
 		})
 	}
+
+	// The resolver is pinned to IPv4, so a name never yields a v6 address. An
+	// application dialing a v6 literal anyway would otherwise sit waiting for a
+	// route that does not exist; refusing it fails fast and lets the app fall
+	// back to IPv4.
+	rules = append(rules, map[string]any{"ip_version": 6, "action": "reject"})
 
 	// route.final cannot reject, so a default of "block" becomes a catch-all
 	// rule at the very bottom instead.

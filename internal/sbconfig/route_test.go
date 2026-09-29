@@ -18,6 +18,7 @@ type routeRule struct {
 	Outbound     string   `json:"outbound"`
 	Action       string   `json:"action"`
 	IPIsPrivate  bool     `json:"ip_is_private"`
+	IPVersion    int      `json:"ip_version"`
 	Port         []int    `json:"port"`
 }
 
@@ -113,9 +114,15 @@ func TestDomainMatchingIsNotASuffixTrap(t *testing.T) {
 		Values: []string{"example.com", "*.wildcard.net"}, Action: models.ActionProxy,
 	})
 
-	rule, ok := findRule(rules, func(r routeRule) bool { return len(r.Domain)+len(r.DomainSuffix) > 0 })
+	// Find the rule this test's graph produced, which is the one routed to the
+	// proxy. The config also carries domain rules sending traffic *direct* —
+	// the local network, the Windows connectivity checks, and the proxy's own
+	// hostname, which here happens to be example.com too.
+	rule, ok := findRule(rules, func(r routeRule) bool {
+		return r.Outbound == ExitTag && len(r.Domain)+len(r.DomainSuffix) > 0
+	})
 	if !ok {
-		t.Fatal("no domain rule emitted")
+		t.Fatalf("no proxied domain rule emitted: %+v", rules)
 	}
 
 	if !contains(rule.Domain, "example.com") {
@@ -152,17 +159,41 @@ func TestDefaultBlockEmitsCatchAll(t *testing.T) {
 	}
 }
 
-// TestFullTunnelKeepsFakeIP guards the DNS decision: fake-IP is only safe when
-// every connection is resolved at the far end, so any rule that sends traffic
-// off the tunnel has to switch it off.
-func TestFullTunnelKeepsFakeIP(t *testing.T) {
+// TestFullTunnelSendsQueriesThroughTheTunnel checks where DNS goes, which is
+// the question fake-IP used to answer. A query resolved locally tells the
+// network which sites are being visited even though the traffic itself is
+// tunnelled.
+func TestFullTunnelSendsQueriesThroughTheTunnel(t *testing.T) {
 	_, final, full := graph(t, models.ActionProxy)
 	if final != ExitTag {
 		t.Errorf("full tunnel final = %q, want %q", final, ExitTag)
 	}
-	if !strings.Contains(string(full), "fakeip") {
-		t.Error("a full tunnel should use fake-IP DNS")
+	if strings.Contains(string(full), "fakeip") {
+		t.Error("fake-IP is no longer used")
 	}
+
+	var config struct {
+		DNS struct {
+			Final   string `json:"final"`
+			Servers []struct {
+				Tag    string `json:"tag"`
+				Detour string `json:"detour"`
+			} `json:"servers"`
+		} `json:"dns"`
+	}
+	if err := json.Unmarshal(full, &config); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, server := range config.DNS.Servers {
+		if server.Tag == config.DNS.Final {
+			if server.Detour != ExitTag {
+				t.Errorf("the default resolver %q has detour %q, want %q — queries would leak",
+					server.Tag, server.Detour, ExitTag)
+			}
+			return
+		}
+	}
+	t.Errorf("dns.final %q names no server", config.DNS.Final)
 
 	// One direct rule is enough to make it unsafe.
 	_, _, split := graph(t, models.ActionProxy, models.RoutingRule{
@@ -216,7 +247,10 @@ func TestUnusableRulesAreDropped(t *testing.T) {
 	)
 
 	for _, rule := range rules {
-		if rule.IPIsPrivate || rule.Action == "sniff" || rule.Action == "hijack-dns" || len(rule.Port) > 0 {
+		// The generated rules that legitimately carry no source matcher: the
+		// LAN bypass, sniffing, the DNS hijack and the IPv6 refusal.
+		if rule.IPIsPrivate || rule.IPVersion != 0 ||
+			rule.Action == "sniff" || rule.Action == "hijack-dns" || len(rule.Port) > 0 {
 			continue
 		}
 		if len(rule.Domain)+len(rule.DomainSuffix)+len(rule.IPCIDR)+

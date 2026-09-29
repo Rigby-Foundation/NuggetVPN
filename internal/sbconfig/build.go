@@ -21,11 +21,11 @@ const (
 
 	dnsProxyTag  = "dns-proxy"
 	dnsDirectTag = "dns-direct"
-	dnsFakeTag   = "dns-fake"
+	dnsLocalTag  = "dns-local"
 
-	// fakeIPRange must not overlap the TUN interface address below.
-	fakeIPRange = "198.18.0.0/15"
 	tunAddress  = "172.19.0.1/30"
+	// tunInterfaceName is what the adapter is called in the OS.
+	tunInterfaceName = "NuggetVPN"
 
 	// winboxPort is routed through the proxy even in split mode, matching the
 	// behaviour of the previous builds.
@@ -97,14 +97,15 @@ func Build(request Request) (Result, error) {
 	outbounds = append(outbounds, map[string]any{"type": "direct", "tag": DirectTag})
 
 	splitTunnel := settings.SplitTunnelling()
-	routeRules, splitRuleCount := buildRouteRules(settings)
+	serverDomains := proxyServerDomains(outbounds, endpoints)
+	routeRules, splitRuleCount := buildRouteRules(settings, serverDomains)
 
 	config := map[string]any{
 		"log": map[string]any{
 			"level":     "info",
 			"timestamp": true,
 		},
-		"dns":      buildDNS(settings, splitTunnel, proxyServerDomains(outbounds, endpoints)),
+		"dns":      buildDNS(settings, splitTunnel, serverDomains),
 		"inbounds": buildInbounds(settings, request.MixedPort),
 		"outbounds": func() []map[string]any {
 			return outbounds
@@ -198,11 +199,22 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 	// and on this core that meant running the old stack underneath a core built
 	// around the new one.
 	tun := map[string]any{
-		"type":       "tun",
-		"tag":        "tun-in",
-		"address":    []string{tunAddress},
-		"mtu":        settings.MTU,
-		"auto_route": true,
+		"type": "tun",
+		"tag":  "tun-in",
+		// Name the adapter so it is identifiable in the OS network settings
+		// rather than appearing as an anonymous tun0.
+		"interface_name": tunInterfaceName,
+		"address":        []string{tunAddress},
+		"mtu":            settings.MTU,
+		"auto_route":     true,
+		// The 1.15 way to capture DNS. It replaces guessing at DNS by sniffing
+		// the protocol on every connection, which mistook other traffic for
+		// DNS and filled the log with unpack errors.
+		"dns_mode": "hijack",
+		// Keep the local network off the tunnel at the interface rather than
+		// routing it back out afterwards: the printer and the router stay
+		// reachable even if a routing rule is wrong.
+		"route_exclude_address": privateRanges,
 	}
 	// strict_route is only implemented on Linux and Windows.
 	if runtime.GOOS != "darwin" {
@@ -214,21 +226,30 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 
 // buildDNS wires the resolver.
 //
-// Full tunnel uses fake-IP so DNS never leaks and the proxy resolves names at
-// the exit. Split tunnelling cannot use fake-IP, because direct traffic needs
-// real addresses, so it resolves locally and sends only the proxied domains
-// through the tunnel.
+// Names resolve for real, through the tunnel, rather than through fake-IP.
+// Fake-IP hands out synthetic addresses and maps them back when a connection
+// arrives, which saves a round trip but means every connection depends on a
+// mapping surviving in the cache file — and a client that resolves names its
+// own way (Windows and the browsers both do DNS-over-HTTPS by default) never
+// asks for one, so the mechanism is bypassed exactly when it would matter.
+// Sending queries through the proxy keeps them off the local network just the
+// same, and `reverse_mapping` still recovers the domain for logs and rules.
 func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []string) map[string]any {
 	servers := []map[string]any{
-		{"type": "udp", "tag": dnsProxyTag, "server": settings.DNS, "detour": ExitTag},
-		// No detour: sing-box rejects detouring to an empty direct outbound.
-		{"type": "udp", "tag": dnsDirectTag, "server": settings.DNS},
+		{"type": "udp", "tag": dnsProxyTag, "server": settings.DNS, "server_port": 53, "detour": ExitTag},
+		// No detour: this is the bootstrap used to resolve the proxy's own
+		// hostname, which cannot go through the tunnel it is dialing.
+		{"type": "udp", "tag": dnsDirectTag, "server": settings.DNS, "server_port": 53},
+		// The system resolver, for names only the local network knows.
+		{"type": "local", "tag": dnsLocalTag},
 	}
 
-	var rules []map[string]any
+	rules := []map[string]any{
+		{"domain_suffix": localSuffixes, "server": dnsLocalTag},
+	}
 
-	// The proxy's own hostname must always resolve for real, or the tunnel
-	// would try to dial a fake address.
+	// The proxy's own hostname must resolve outside the tunnel, or the tunnel
+	// has to be up before it can be established.
 	if len(serverDomains) > 0 {
 		rules = append(rules, map[string]any{
 			"domain": serverDomains,
@@ -239,6 +260,9 @@ func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []str
 	dns := map[string]any{
 		"strategy":          "ipv4_only",
 		"independent_cache": true,
+		// Recovers the domain behind an address for logging and rule matching
+		// now that there is no fake-IP mapping to consult.
+		"reverse_mapping": true,
 	}
 
 	if splitTunnel {
@@ -256,22 +280,11 @@ func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []str
 		}
 		dns["final"] = dnsDirectTag
 	} else {
-		servers = append(servers, map[string]any{
-			"type":        "fakeip",
-			"tag":         dnsFakeTag,
-			"inet4_range": fakeIPRange,
-		})
-		rules = append(rules, map[string]any{
-			"query_type": []string{"A", "AAAA"},
-			"server":     dnsFakeTag,
-		})
 		dns["final"] = dnsProxyTag
 	}
 
 	dns["servers"] = servers
-	if len(rules) > 0 {
-		dns["rules"] = rules
-	}
+	dns["rules"] = rules
 	return dns
 }
 
@@ -290,7 +303,8 @@ func buildExperimental(request Request) map[string]any {
 		experimental["cache_file"] = map[string]any{
 			"enabled":      true,
 			"path":         request.CacheFilePath,
-			"store_fakeip": true,
+			"store_dns":    true,
+			"store_fakeip": false,
 		}
 	}
 	return experimental

@@ -136,6 +136,11 @@ func parseVLESS(u *url.URL) (Outbound, error) {
 		"server":      host,
 		"server_port": port,
 		"uuid":        uuid,
+		// UDP over VLESS needs an encoding, and xudp is the one XTLS Vision
+		// expects. Without it UDP leaves the tunnel and nothing comes back,
+		// which takes QUIC and HTTP/3 with it — so most of the modern web
+		// hangs while TCP sites still load.
+		"packet_encoding": firstParamOr(params, "xudp", "packetEncoding", "packet_encoding"),
 	}
 
 	security := strings.ToLower(firstParam(params, "security"))
@@ -959,4 +964,13 @@ func intValue(value any) int {
 	default:
 		return 0
 	}
+}
+
+// firstParamOr returns the first present parameter, or fallback when none of
+// the keys carry a value.
+func firstParamOr(values url.Values, fallback string, keys ...string) string {
+	if value := firstParam(values, keys...); value != "" {
+		return value
+	}
+	return fallback
 }

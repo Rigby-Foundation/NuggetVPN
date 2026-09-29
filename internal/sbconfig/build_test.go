@@ -206,15 +206,20 @@ func TestFlowDroppedForNonTCPTransport(t *testing.T) {
 	mustParse(t, result.JSON)
 }
 
-func TestFullTunnelUsesFakeIP(t *testing.T) {
+// TestFullTunnelResolvesThroughTheProxy replaces an earlier test that required
+// fake-IP. Fake-IP was dropped: it only works for clients that ask this
+// resolver, and Windows and the browsers do DNS-over-HTTPS by default, so it
+// was bypassed exactly when it would have mattered. Resolving for real through
+// the proxy keeps queries off the local network just the same.
+func TestFullTunnelResolvesThroughTheProxy(t *testing.T) {
 	result := buildFor(t, protocolLinks["vless-reality"], nil)
 	options := mustParse(t, result.JSON)
 
 	if options.Route.Final != ExitTag {
 		t.Fatalf("full tunnel must default to the proxy, got %q", options.Route.Final)
 	}
-	if !strings.Contains(string(result.JSON), "fakeip") {
-		t.Fatal("full tunnel should enable fake-IP DNS")
+	if strings.Contains(string(result.JSON), "fakeip") {
+		t.Fatal("fake-IP is no longer used; a synthetic address needs a mapping to survive")
 	}
 	// The proxy's own hostname must resolve for real.
 	if !strings.Contains(string(result.JSON), `"domain": [`) {
