@@ -17,6 +17,7 @@ import LogsView from "@/components/views/LogsView";
 import ProxiesView from "@/components/views/ProxiesView";
 import RoutingView from "@/components/views/RoutingView";
 import ConnectionsView from "@/components/views/ConnectionsView";
+import { subscriptionAlert } from "@/components/subscription-usage";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -170,6 +171,21 @@ function App() {
             }),
         []
     );
+
+    // A subscription about to run out — of days or of data — is worth one
+    // warning per session, not one per refresh.
+    const warnedRef = useRef(new Set<string>());
+    useEffect(() => {
+        sources.forEach((source) => {
+            if (source.kind !== "subscription") return;
+            const alert = subscriptionAlert(source.info);
+            if (!alert) return;
+            const key = `${source.domain}:${alert}`;
+            if (warnedRef.current.has(key)) return;
+            warnedRef.current.add(key);
+            toast(t(`usage.alert.${alert}` as const, { name: source.label }), { id: key, icon: "⚠️", duration: 8000 });
+        });
+    }, [sources, t]);
 
     // settingsRef mirrors the latest settings so updateSetting can build the
     // next value without depending on `settings` and being rebuilt on every

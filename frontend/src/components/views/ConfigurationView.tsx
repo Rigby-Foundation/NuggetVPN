@@ -2,6 +2,7 @@ import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 
 import { Check, CheckSquare, Copy, Plus, RefreshCw, Trash2, X } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
+import { SubscriptionUsage } from "@/components/subscription-usage";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -222,8 +223,13 @@ function ConfigurationView({
                                             {source.label}
                                         </span>
                                         <span className="block text-xs text-muted-foreground font-mono mt-0.5 truncate">
-                                            {detailOf(source)}
+                                            {source.kind === "subscription" && source.label !== source.domain
+                                                ? `${source.domain} · ${detailOf(source)}`
+                                                : detailOf(source)}
                                         </span>
+                                        {source.kind === "subscription" && source.info ? (
+                                            <SubscriptionUsage info={source.info} />
+                                        ) : null}
                                     </span>
 
                                     {refreshing && selecting ? (

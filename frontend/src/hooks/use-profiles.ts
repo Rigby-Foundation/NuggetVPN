@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { invoke } from "@/lib/backend";
-import { ConfigSource, Profile, ProxyMode, RefreshSummary } from "@/types";
+import { ConfigSource, Profile, ProxyMode, RefreshSummary, SubscriptionInfo } from "@/types";
 
 /** Profiles added by hand are grouped under this pseudo-domain. */
 export const LOCAL = "local";
@@ -69,6 +69,7 @@ export function reconcileSelection(profiles: Profile[], current: Selection): Sel
 /** Groups profiles into the sources shown in the sidebar and the top bar. */
 export function buildSources(profiles: Profile[]): ConfigSource[] {
     const counts = new Map<string, number>();
+    const infos = new Map<string, SubscriptionInfo>();
     const local: Profile[] = [];
 
     profiles.forEach((profile) => {
@@ -78,6 +79,9 @@ export function buildSources(profiles: Profile[]): ConfigSource[] {
             return;
         }
         counts.set(domain, (counts.get(domain) ?? 0) + 1);
+        if (profile.subscription_info && !infos.has(domain)) {
+            infos.set(domain, profile.subscription_info);
+        }
     });
 
     const localEntries: ConfigSource[] = local
@@ -97,9 +101,11 @@ export function buildSources(profiles: Profile[]): ConfigSource[] {
             kind: "subscription" as const,
             key: `subscription:${domain}`,
             domain,
-            label: domain,
+            // The provider's own name for it, when it sends one.
+            label: infos.get(domain)?.title || domain,
             detail: `${count} ${count === 1 ? "proxy" : "proxies"}`,
             count,
+            info: infos.get(domain),
         }))
         .sort((a, b) => a.domain.localeCompare(b.domain));
 

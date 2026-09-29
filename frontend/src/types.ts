@@ -8,6 +8,23 @@ export interface Profile {
     subscription_url?: string;
     total_up?: number;
     total_down?: number;
+    /** Pinned to the top of its list. */
+    favorite?: boolean;
+    subscription_info?: SubscriptionInfo | null;
+}
+
+/** A subscription's account details; see models.SubscriptionInfo. */
+export interface SubscriptionInfo {
+    upload: number;
+    download: number;
+    /** Bytes; 0 means no data limit. */
+    total: number;
+    /** Unix seconds; 0 means no expiry. */
+    expire: number;
+    title?: string;
+    support_url?: string;
+    web_page_url?: string;
+    updated_at: number;
 }
 
 export interface AppSettings {
@@ -141,6 +158,7 @@ export type ConfigSource =
         label: string;
         detail: string;
         count: number;
+        info?: SubscriptionInfo;
     }
     | {
         kind: "profile";

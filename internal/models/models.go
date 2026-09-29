@@ -17,6 +17,28 @@ type Profile struct {
 	SubscriptionURL string  `json:"subscription_url"`
 	TotalUp         *uint64 `json:"total_up"`
 	TotalDown       *uint64 `json:"total_down"`
+	// Favorite pins the server to the top of its list.
+	Favorite bool `json:"favorite,omitempty"`
+	// SubscriptionInfo is what the subscription said about itself when it
+	// was last fetched; the same for every profile of one subscription.
+	SubscriptionInfo *SubscriptionInfo `json:"subscription_info,omitempty"`
+}
+
+// SubscriptionInfo is a subscription's account details, as its server
+// reports them in response headers. Sizes are bytes; a zero Total means no
+// data limit and a zero Expire no expiry date.
+type SubscriptionInfo struct {
+	Upload   int64 `json:"upload"`
+	Download int64 `json:"download"`
+	Total    int64 `json:"total"`
+	// Expire is a unix time in seconds.
+	Expire int64 `json:"expire"`
+	// Title is the provider's name for the subscription.
+	Title      string `json:"title,omitempty"`
+	SupportURL string `json:"support_url,omitempty"`
+	WebPageURL string `json:"web_page_url,omitempty"`
+	// UpdatedAt is when this was read, in unix seconds.
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 // NormalizedSourceDomain reports the grouping key for a profile; profiles that

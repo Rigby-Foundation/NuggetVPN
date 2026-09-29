@@ -45,9 +45,20 @@ func (c *Client) get(
 	rawURL string,
 	settings models.AppSettings,
 ) (string, int, error) {
+	body, status, _, err := c.getWithHeaders(ctx, rawURL, settings)
+	return body, status, err
+}
+
+// getWithHeaders is get, also returning the response headers — where a
+// subscription says how much data is left and when it expires.
+func (c *Client) getWithHeaders(
+	ctx context.Context,
+	rawURL string,
+	settings models.AppSettings,
+) (string, int, http.Header, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	for name, value := range settings.SubscriptionHeaders() {
 		request.Header.Set(name, value)
@@ -55,15 +66,15 @@ func (c *Client) get(
 
 	response, err := c.http.Do(request)
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
-		return "", response.StatusCode, err
+		return "", response.StatusCode, response.Header, err
 	}
-	return string(body), response.StatusCode, nil
+	return string(body), response.StatusCode, response.Header, nil
 }
 
 // ImportSubscription fetches a subscription and appends its profiles.
@@ -79,7 +90,7 @@ func (c *Client) ImportSubscription(
 	}
 	sourceDomain := parsed.Hostname()
 
-	body, status, err := c.get(ctx, rawURL, settings)
+	body, status, headers, err := c.getWithHeaders(ctx, rawURL, settings)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription: %w", err)
 	}
@@ -92,6 +103,7 @@ func (c *Client) ImportSubscription(
 	if len(imported) == 0 {
 		return nil, fmt.Errorf("no supported profiles found in subscription")
 	}
+	attachInfo(imported, ParseSubscriptionInfo(headers, time.Now()))
 	return append(profiles, imported...), nil
 }
 
@@ -146,7 +158,7 @@ func (c *Client) RefreshSubscriptions(
 			continue
 		}
 
-		body, status, err := c.get(ctx, subURL, settings)
+		body, status, headers, err := c.getWithHeaders(ctx, subURL, settings)
 		if err != nil {
 			if strict {
 				return profiles, summary, fmt.Errorf(
@@ -185,6 +197,7 @@ func (c *Client) RefreshSubscriptions(
 				previous = append(previous, profile)
 			}
 		}
+		attachInfo(fresh, ParseSubscriptionInfo(headers, time.Now()))
 		result = append(filtered, KeepIdentities(previous, fresh)...)
 		summary.Refreshed++
 	}
@@ -266,6 +279,12 @@ func KeepIdentities(previous, fresh []models.Profile) []models.Profile {
 			profile.ID = old.ID
 			profile.TotalUp = old.TotalUp
 			profile.TotalDown = old.TotalDown
+			profile.Favorite = old.Favorite
+			// A response without the header says nothing new; keep what
+			// the last one said rather than forgetting it.
+			if profile.SubscriptionInfo == nil {
+				profile.SubscriptionInfo = old.SubscriptionInfo
+			}
 		}
 		kept[i] = profile
 	}
