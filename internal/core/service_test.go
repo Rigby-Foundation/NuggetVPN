@@ -73,8 +73,25 @@ func startTestService(t *testing.T) *Client {
 func startTestServiceOnSocket(t *testing.T) (*Client, string) {
 	t.Helper()
 
-	directory := t.TempDir()
+	// Claim the test's temp directory first, though the socket does not live
+	// there. Go removes it in a cleanup registered on the first TempDir call,
+	// and cleanups run last-registered first: registered here, it runs after
+	// the service below has stopped, rather than while the core still holds
+	// the cache file testConfig puts in it (which Windows refuses to delete).
+	_ = t.TempDir()
+
+	// Not t.TempDir(): its name includes the test's, and on macOS, under an
+	// already long $TMPDIR, the longest test names pushed the socket path past
+	// the 104-byte limit of a unix socket address, so bind failed.
+	directory, err := os.MkdirTemp("", "nvpn-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(directory) })
 	socket := filepath.Join(directory, "core.sock")
+	if len(socket) > 100 {
+		t.Fatalf("socket path %q is too long for a unix socket", socket)
+	}
 	service := &Service{
 		options: ServiceOptions{
 			SocketPath: socket,
