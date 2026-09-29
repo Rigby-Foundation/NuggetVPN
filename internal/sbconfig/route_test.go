@@ -319,3 +319,32 @@ func TestTunUsesTheCoreStack(t *testing.T) {
 		t.Fatal("no tun inbound in the generated config")
 	}
 }
+
+// TestTunInterfaceNameByPlatform covers every platform rather than only the
+// one the test happens to run on, because the rule differs per platform and
+// getting Darwin wrong is fatal rather than cosmetic.
+//
+// macOS utun devices are created through a control socket that parses the name
+// as utun<number>. The core passes a configured name through untouched, so any
+// other name fails the interface with "bad tun name" and the tunnel never
+// starts. Leaving it empty lets the core pick the next free utun.
+func TestTunInterfaceNameByPlatform(t *testing.T) {
+	for _, goos := range []string{"darwin", "ios"} {
+		if name := tunInterfaceNameFor(goos); name != "" {
+			t.Errorf("tunInterfaceNameFor(%q) = %q; a named interface is refused there",
+				goos, name)
+		}
+	}
+	for _, goos := range []string{"windows", "linux"} {
+		name := tunInterfaceNameFor(goos)
+		if name == "" {
+			t.Errorf("tunInterfaceNameFor(%q) is empty; the adapter should be identifiable", goos)
+			continue
+		}
+		// Linux caps an interface name at IFNAMSIZ-1.
+		if len(name) > 15 {
+			t.Errorf("tunInterfaceNameFor(%q) = %q is %d characters, over the 15 limit",
+				goos, name, len(name))
+		}
+	}
+}

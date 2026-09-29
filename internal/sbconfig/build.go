@@ -24,8 +24,6 @@ const (
 	dnsLocalTag  = "dns-local"
 
 	tunAddress  = "172.19.0.1/30"
-	// tunInterfaceName is what the adapter is called in the OS.
-	tunInterfaceName = "NuggetVPN"
 
 	// winboxPort is routed through the proxy even in split mode, matching the
 	// behaviour of the previous builds.
@@ -199,14 +197,11 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 	// and on this core that meant running the old stack underneath a core built
 	// around the new one.
 	tun := map[string]any{
-		"type": "tun",
-		"tag":  "tun-in",
-		// Name the adapter so it is identifiable in the OS network settings
-		// rather than appearing as an anonymous tun0.
-		"interface_name": tunInterfaceName,
-		"address":        []string{tunAddress},
-		"mtu":            settings.MTU,
-		"auto_route":     true,
+		"type":       "tun",
+		"tag":        "tun-in",
+		"address":    []string{tunAddress},
+		"mtu":        settings.MTU,
+		"auto_route": true,
 		// The 1.15 way to capture DNS. It replaces guessing at DNS by sniffing
 		// the protocol on every connection, which mistook other traffic for
 		// DNS and filled the log with unpack errors.
@@ -219,6 +214,9 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 	// strict_route is only implemented on Linux and Windows.
 	if runtime.GOOS != "darwin" {
 		tun["strict_route"] = true
+	}
+	if name := tunInterfaceNameFor(runtime.GOOS); name != "" {
+		tun["interface_name"] = name
 	}
 	inbounds = append(inbounds, tun)
 	return inbounds
@@ -350,4 +348,24 @@ func cleanList(values []string) []string {
 		}
 	}
 	return dedupe(result)
+}
+
+// tunInterfaceNameFor returns the adapter name to request, or "" to let the
+// core choose.
+//
+// Naming the adapter makes it identifiable in the OS network list, but Darwin
+// will not have it: the utun control only accepts utun<number>, and the core
+// passes a configured name straight through, so anything else fails the
+// interface with "bad tun name" and the tunnel never starts. Left empty, the
+// core picks the next free utun itself.
+//
+// Linux takes the name as given (netlink, up to IFNAMSIZ), and on Windows it
+// is the Wintun adapter name.
+func tunInterfaceNameFor(goos string) string {
+	switch goos {
+	case "darwin", "ios":
+		return ""
+	default:
+		return "NuggetVPN"
+	}
 }
