@@ -1,6 +1,8 @@
 package sbconfig
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -110,6 +112,40 @@ func buildRouteRules(settings models.AppSettings, serverDomains []string) ([]map
 			rules = append(rules, withAction(map[string]any{
 				"ip_cidr": values,
 			}, rule.Action))
+
+		case models.SourceDomainRegex:
+			rules = append(rules, withAction(map[string]any{
+				"domain_regex": values,
+			}, rule.Action))
+
+		case models.SourcePort:
+			single, ranges := splitPorts(values)
+			matcher := map[string]any{}
+			if len(single) > 0 {
+				matcher["port"] = single
+			}
+			if len(ranges) > 0 {
+				matcher["port_range"] = ranges
+			}
+			if len(matcher) > 0 {
+				rules = append(rules, withAction(matcher, rule.Action))
+			}
+
+		case models.SourceProtocol:
+			rules = append(rules, withAction(map[string]any{
+				"protocol": values,
+			}, rule.Action))
+
+		case models.SourceGeoSite, models.SourceGeoIP:
+			// Geo matching is a rule-set reference; the sets themselves are
+			// declared in route.rule_set by ruleSets below.
+			tags := make([]string, 0, len(values))
+			for _, value := range values {
+				tags = append(tags, ruleSetTag(rule.Kind, value))
+			}
+			rules = append(rules, withAction(map[string]any{
+				"rule_set": tags,
+			}, rule.Action))
 		}
 		matched += len(values)
 	}
@@ -213,4 +249,96 @@ func proxiedDomains(settings models.AppSettings) (exact, suffixes []string) {
 		suffixes = append(suffixes, ruleSuffixes...)
 	}
 	return dedupe(exact), dedupe(suffixes)
+}
+
+// Rule-set sources.
+//
+// geoip and geosite as rule fields were removed in sing-box 1.12; the core
+// answers a config using them with "removed in sing-box 1.12.0". Geo matching
+// is now a rule-set reference, and the sets are fetched as compiled binaries.
+const (
+	geoSiteURL = "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-%s.srs"
+	geoIPURL   = "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-%s.srs"
+	// ruleSetUpdateInterval is how often a set is refreshed. Country and
+	// category lists move slowly, and each check is a request to GitHub.
+	ruleSetUpdateInterval = "168h"
+)
+
+// ruleSetTag names the set a geo value refers to.
+func ruleSetTag(kind, value string) string {
+	return kind + "-" + value
+}
+
+// ruleSets declares every rule-set the graph refers to.
+//
+// They download through the tunnel rather than directly: someone who needs
+// geo-based routing is often somewhere that GitHub is unreachable from, and
+// the proxy does not depend on the sets to come up.
+func ruleSets(settings models.AppSettings) []map[string]any {
+	seen := map[string]bool{}
+	var sets []map[string]any
+
+	for _, rule := range settings.UsableRules() {
+		var template string
+		switch rule.Kind {
+		case models.SourceGeoSite:
+			template = geoSiteURL
+		case models.SourceGeoIP:
+			template = geoIPURL
+		default:
+			continue
+		}
+
+		for _, value := range rule.CleanValues() {
+			tag := ruleSetTag(rule.Kind, value)
+			if seen[tag] {
+				continue
+			}
+			seen[tag] = true
+			sets = append(sets, map[string]any{
+				"type":            "remote",
+				"tag":             tag,
+				"format":          "binary",
+				"url":             fmt.Sprintf(template, value),
+				"download_detour": ExitTag,
+				"update_interval": ruleSetUpdateInterval,
+			})
+		}
+	}
+	return sets
+}
+
+// splitPorts separates single ports from inclusive ranges, which the core
+// takes in two different fields.
+func splitPorts(values []string) (single []uint16, ranges []string) {
+	for _, value := range values {
+		low, high, isRange := strings.Cut(value, "-")
+		if isRange {
+			// The core spells a range with a colon.
+			ranges = append(ranges, strings.TrimSpace(low)+":"+strings.TrimSpace(high))
+			continue
+		}
+		port, err := strconv.Atoi(strings.TrimSpace(low))
+		if err != nil {
+			continue
+		}
+		single = append(single, uint16(port))
+	}
+	return single, ranges
+}
+
+// buildRouteSection assembles the route block, including any rule-sets the graph
+// refers to. The sets are only declared when something actually uses one, so a
+// configuration without geo rules makes no network requests for them.
+func buildRouteSection(settings models.AppSettings, rules []map[string]any) map[string]any {
+	route := map[string]any{
+		"rules":                   rules,
+		"final":                   finalOutbound(settings),
+		"auto_detect_interface":   true,
+		"default_domain_resolver": map[string]any{"server": dnsDirectTag},
+	}
+	if sets := ruleSets(settings); len(sets) > 0 {
+		route["rule_set"] = sets
+	}
+	return route
 }

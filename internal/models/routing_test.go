@@ -191,3 +191,87 @@ func TestSplitTunnellingDetectsAnyLeak(t *testing.T) {
 		})
 	}
 }
+
+// TestNewSourceKindValidation covers the entries the core would refuse. A bad
+// value has to be dropped here: the core fails the whole configuration over one
+// malformed matcher, so a typo in a port would take every other rule with it.
+func TestNewSourceKindValidation(t *testing.T) {
+	cases := []struct {
+		kind     string
+		accepted []string
+		rejected []string
+	}{
+		{
+			kind:     SourcePort,
+			accepted: []string{"1", "443", "65535", "8000-8080", "80-80"},
+			rejected: []string{"0", "65536", "-1", "443-80", "http", "", "80-", "-80", "80-abc"},
+		},
+		{
+			kind: SourceProtocol,
+			// "TLS" is absent on purpose: it normalises to "tls" and is then a
+			// duplicate, which TestProtocolValuesAreCaseInsensitive covers.
+			accepted: []string{"tls", "quic", "bittorrent"},
+			rejected: []string{"vless", "tcp", "smtp", ""},
+		},
+		{
+			kind:     SourceGeoIP,
+			accepted: []string{"ru", "us", "cn-mainland"},
+			rejected: []string{"../etc/passwd", "a b", "US!", "ru/../x", ""},
+		},
+		{
+			kind:     SourceDomainRegex,
+			accepted: []string{`^ads?\.`, `.*\.example\.com$`},
+			rejected: []string{"([unclosed", "a**", ""},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.kind, func(t *testing.T) {
+			rule := RoutingRule{
+				Kind:   testCase.kind,
+				Values: append(append([]string{}, testCase.accepted...), testCase.rejected...),
+				Action: ActionProxy,
+			}
+			got := rule.CleanValues()
+
+			if len(got) != len(testCase.accepted) {
+				t.Fatalf("CleanValues() kept %v, want only %v", got, testCase.accepted)
+			}
+			for _, value := range got {
+				for _, bad := range testCase.rejected {
+					if value == bad {
+						t.Errorf("kept %q, which the core would refuse", value)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestGeoValuesAreCaseInsensitive checks a country entered as "US" is the same
+// rule as "us" rather than a second one, since the value becomes part of a
+// rule-set URL.
+func TestGeoValuesAreCaseInsensitive(t *testing.T) {
+	rule := RoutingRule{
+		Kind:   SourceGeoIP,
+		Values: []string{"US", "us", "Us"},
+		Action: ActionDirect,
+	}
+	if got := rule.CleanValues(); len(got) != 1 || got[0] != "us" {
+		t.Errorf("CleanValues() = %v, want [us]", got)
+	}
+}
+
+// TestProtocolValuesAreCaseInsensitive matches the geo behaviour: a protocol
+// typed in any case is one rule, not several.
+func TestProtocolValuesAreCaseInsensitive(t *testing.T) {
+	rule := RoutingRule{
+		Kind:   SourceProtocol,
+		Values: []string{"TLS", "tls", "Quic"},
+		Action: ActionProxy,
+	}
+	got := rule.CleanValues()
+	if len(got) != 2 || got[0] != "tls" || got[1] != "quic" {
+		t.Errorf("CleanValues() = %v, want [tls quic]", got)
+	}
+}

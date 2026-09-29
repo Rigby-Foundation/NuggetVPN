@@ -2,6 +2,11 @@ import { KeyboardEvent, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
     Ban,
+    Globe2,
+    Hash,
+    Landmark,
+    Radio,
+    Regex,
     Globe,
     MonitorSmartphone,
     MoreHorizontal,
@@ -47,7 +52,47 @@ export const SOURCE_META: Record<
         accent: "var(--routing-ip)",
         placeholder: "1.1.1.0/24",
     },
+    domain_regex: {
+        label: "Domain pattern",
+        hint: "Regular expression",
+        icon: Regex,
+        accent: "var(--routing-domains)",
+        placeholder: "^ads?\\.",
+    },
+    port: {
+        label: "Ports",
+        hint: "Single ports or ranges",
+        icon: Hash,
+        accent: "var(--routing-port)",
+        placeholder: "443 or 8000-8080",
+    },
+    protocol: {
+        label: "Protocols",
+        hint: "Detected by inspecting the connection",
+        icon: Radio,
+        accent: "var(--routing-protocol)",
+        placeholder: "quic",
+    },
+    geosite: {
+        label: "Service",
+        hint: "Known service, by rule-set",
+        icon: Landmark,
+        accent: "var(--routing-geo)",
+        placeholder: "netflix",
+    },
+    geoip: {
+        label: "Country",
+        hint: "Addresses in a country, by rule-set",
+        icon: Globe2,
+        accent: "var(--routing-geo)",
+        placeholder: "ru",
+    },
 };
+
+/** What a protocol rule may match; the core detects these by sniffing. */
+export const SNIFFABLE_PROTOCOLS = [
+    "tls", "http", "quic", "dns", "stun", "bittorrent", "dtls", "ssh", "rdp", "ntp",
+] as const;
 
 export const ACTION_META: Record<
     RoutingAction,
@@ -209,6 +254,9 @@ export function SourceNode({ data, selected }: NodeProps) {
                 )}
 
                 <div className="flex items-center gap-1.5 pt-1">
+                    {/* Protocols are a closed set the core can detect, so the
+                        list is offered rather than left to be guessed at and
+                        rejected later. */}
                     <Input
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
@@ -216,8 +264,16 @@ export function SourceNode({ data, selected }: NodeProps) {
                         onBlur={commit}
                         placeholder={meta.placeholder}
                         aria-label={`Add to ${meta.label}`}
+                        list={kind === "protocol" ? "sniffable-protocols" : undefined}
                         className="h-7 text-[11px] font-mono nodrag"
                     />
+                    {kind === "protocol" ? (
+                        <datalist id="sniffable-protocols">
+                            {SNIFFABLE_PROTOCOLS.map((protocol) => (
+                                <option key={protocol} value={protocol} />
+                            ))}
+                        </datalist>
+                    ) : null}
                     <Button
                         type="button"
                         size="icon"

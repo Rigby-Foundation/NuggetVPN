@@ -2,6 +2,8 @@ package models
 
 import (
 	"net/netip"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -19,10 +21,25 @@ import (
 
 // Source kinds a rule can match on.
 const (
-	SourceApps    = "apps"
-	SourceDomains = "domains"
-	SourceIP      = "ip"
+	SourceApps        = "apps"
+	SourceDomains     = "domains"
+	SourceIP          = "ip"
+	SourceDomainRegex = "domain_regex"
+	SourcePort        = "port"
+	SourceProtocol    = "protocol"
+	SourceGeoSite     = "geosite"
+	SourceGeoIP       = "geoip"
 )
+
+// Protocols the core can identify by sniffing a connection.
+var sniffableProtocols = []string{
+	"tls", "http", "quic", "dns", "stun", "bittorrent", "dtls", "ssh", "rdp", "ntp",
+}
+
+// SniffableProtocols lists what a protocol rule may match, for the UI.
+func SniffableProtocols() []string {
+	return append([]string(nil), sniffableProtocols...)
+}
 
 // Destinations a rule can send traffic to.
 const (
@@ -50,10 +67,65 @@ type RoutingRule struct {
 // ValidSourceKind reports whether kind is one this build understands.
 func ValidSourceKind(kind string) bool {
 	switch kind {
-	case SourceApps, SourceDomains, SourceIP:
+	case SourceApps, SourceDomains, SourceIP,
+		SourceDomainRegex, SourcePort, SourceProtocol,
+		SourceGeoSite, SourceGeoIP:
 		return true
 	}
 	return false
+}
+
+// ValidPortValue accepts a single port or an inclusive range, "8000-8080".
+//
+// The bounds are checked here rather than left to the core because a rule the
+// core refuses fails the whole configuration, taking every other rule with it.
+func ValidPortValue(value string) bool {
+	low, high, isRange := strings.Cut(value, "-")
+	lowPort, ok := parsePort(low)
+	if !ok {
+		return false
+	}
+	if !isRange {
+		return true
+	}
+	highPort, ok := parsePort(high)
+	return ok && highPort >= lowPort
+}
+
+func parsePort(value string) (int, bool) {
+	port, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || port < 1 || port > 65535 {
+		return 0, false
+	}
+	return port, true
+}
+
+// ValidProtocol reports whether the core can sniff for this protocol.
+func ValidProtocol(value string) bool {
+	for _, protocol := range sniffableProtocols {
+		if protocol == strings.ToLower(strings.TrimSpace(value)) {
+			return true
+		}
+	}
+	return false
+}
+
+// validGeoToken accepts the category and country names used by rule-sets.
+// They become part of a URL, so anything else is refused rather than fetched.
+func validGeoToken(value string) bool {
+	if value == "" || len(value) > 64 {
+		return false
+	}
+	for _, char := range value {
+		switch {
+		case char >= 'a' && char <= 'z',
+			char >= '0' && char <= '9',
+			char == '-', char == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // ValidAction reports whether action is a destination this build understands.
@@ -73,16 +145,43 @@ func (r RoutingRule) CleanValues() []string {
 
 	for _, value := range r.Values {
 		trimmed := strings.TrimSpace(value)
-		if trimmed == "" || seen[trimmed] {
+		if trimmed == "" {
 			continue
 		}
-		if r.Kind == SourceIP && !validPrefix(trimmed) {
+		// Geo tokens and protocols are case-insensitive names; normalising
+		// here means "US" and "us" are the same rule rather than two.
+		switch r.Kind {
+		case SourceGeoSite, SourceGeoIP, SourceProtocol:
+			trimmed = strings.ToLower(trimmed)
+		}
+		if seen[trimmed] || !r.validValue(trimmed) {
 			continue
 		}
 		seen[trimmed] = true
 		result = append(result, trimmed)
 	}
 	return result
+}
+
+// validValue rejects an entry the core would refuse. A bad entry has to be
+// dropped rather than passed along: the core fails the whole configuration
+// over one malformed matcher, which would take every other rule down with it.
+func (r RoutingRule) validValue(value string) bool {
+	switch r.Kind {
+	case SourceIP:
+		return validPrefix(value)
+	case SourcePort:
+		return ValidPortValue(value)
+	case SourceProtocol:
+		return ValidProtocol(value)
+	case SourceGeoSite, SourceGeoIP:
+		return validGeoToken(value)
+	case SourceDomainRegex:
+		_, err := regexp.Compile(value)
+		return err == nil
+	default:
+		return true
+	}
 }
 
 // Usable reports whether the rule would produce a sing-box rule.

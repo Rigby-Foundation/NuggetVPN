@@ -87,6 +87,9 @@
     --color-routing-ip: var(--routing-ip);
     --color-routing-direct: var(--routing-direct);
     --color-routing-default: var(--routing-default);
+    --color-routing-port: var(--routing-port);
+    --color-routing-protocol: var(--routing-protocol);
+    --color-routing-geo: var(--routing-geo);
 
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
@@ -136,6 +139,9 @@
     --routing-ip: oklch(0.6 0.16 40);
     --routing-direct: oklch(0.58 0.13 220);
     --routing-default: oklch(0.58 0.02 286);
+    --routing-port: oklch(0.55 0.15 150);
+    --routing-protocol: oklch(0.55 0.14 190);
+    --routing-geo: oklch(0.55 0.16 260);
 
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.141 0.005 285.823);
@@ -181,6 +187,9 @@
     --routing-ip: oklch(0.75 0.16 45);
     --routing-direct: oklch(0.72 0.13 225);
     --routing-default: oklch(0.62 0.02 286);
+    --routing-port: oklch(0.72 0.15 150);
+    --routing-protocol: oklch(0.72 0.13 195);
+    --routing-geo: oklch(0.7 0.15 262);
 
     --sidebar: oklch(0.21 0.006 285.885);
     --sidebar-foreground: oklch(0.985 0 0);

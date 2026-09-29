@@ -108,12 +108,7 @@ func Build(request Request) (Result, error) {
 		"outbounds": func() []map[string]any {
 			return outbounds
 		}(),
-		"route": map[string]any{
-			"rules":                   routeRules,
-			"final":                   finalOutbound(settings),
-			"auto_detect_interface":   true,
-			"default_domain_resolver": map[string]any{"server": dnsDirectTag},
-		},
+		"route": buildRouteSection(settings, routeRules),
 	}
 	if len(endpoints) > 0 {
 		config["endpoints"] = endpoints

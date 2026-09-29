@@ -115,7 +115,15 @@ export type ConfigSource =
     };
 
 /** A source kind a routing rule can match on. */
-export type RoutingSource = "apps" | "domains" | "ip";
+export type RoutingSource =
+    | "apps"
+    | "domains"
+    | "ip"
+    | "domain_regex"
+    | "port"
+    | "protocol"
+    | "geosite"
+    | "geoip";
 
 /** Where a routing rule sends what it matches. */
 export type RoutingAction = "proxy" | "direct" | "block";

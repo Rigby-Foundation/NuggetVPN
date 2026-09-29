@@ -26,7 +26,16 @@ import {
     RoutingSource,
 } from "@/types";
 
-const SOURCE_KINDS: RoutingSource[] = ["apps", "domains", "ip"];
+const SOURCE_KINDS: RoutingSource[] = [
+    "apps",
+    "domains",
+    "domain_regex",
+    "ip",
+    "port",
+    "protocol",
+    "geosite",
+    "geoip",
+];
 const ACTIONS: RoutingAction[] = ["proxy", "direct", "block"];
 
 /** The catch-all source node has a fixed id; destinations are keyed by action. */

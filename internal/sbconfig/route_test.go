@@ -19,6 +19,9 @@ type routeRule struct {
 	Action       string   `json:"action"`
 	IPIsPrivate  bool     `json:"ip_is_private"`
 	IPVersion    int      `json:"ip_version"`
+	DomainRegex  []string `json:"domain_regex"`
+	PortRange    []string `json:"port_range"`
+	Protocol     []string `json:"protocol"`
 	Port         []int    `json:"port"`
 }
 
@@ -345,6 +348,137 @@ func TestTunInterfaceNameByPlatform(t *testing.T) {
 		if len(name) > 15 {
 			t.Errorf("tunInterfaceNameFor(%q) = %q is %d characters, over the 15 limit",
 				goos, name, len(name))
+		}
+	}
+}
+
+// TestNewSourceKindsReachTheCore checks each added matcher lands in the field
+// the core expects. Every config here is decoded by the core's own option
+// parser, so a wrong field name fails the test rather than the tunnel.
+func TestNewSourceKindsReachTheCore(t *testing.T) {
+	cases := []struct {
+		name   string
+		rule   models.RoutingRule
+		verify func(*testing.T, []routeRule)
+	}{
+		{
+			name: "domain regex",
+			rule: models.RoutingRule{
+				ID: "r", Kind: models.SourceDomainRegex,
+				Values: []string{`^ads?\.`}, Action: models.ActionBlock,
+			},
+			verify: func(t *testing.T, rules []routeRule) {
+				rule, ok := findRule(rules, func(r routeRule) bool { return len(r.DomainRegex) > 0 })
+				if !ok {
+					t.Fatal("no domain_regex rule emitted")
+				}
+				if rule.Action != "reject" {
+					t.Errorf("action = %q, want reject", rule.Action)
+				}
+			},
+		},
+		{
+			name: "single ports and ranges land in separate fields",
+			rule: models.RoutingRule{
+				ID: "r", Kind: models.SourcePort,
+				Values: []string{"443", "8000-8080"}, Action: models.ActionDirect,
+			},
+			verify: func(t *testing.T, rules []routeRule) {
+				rule, ok := findRule(rules, func(r routeRule) bool {
+					return len(r.Port) > 0 && r.Outbound == DirectTag
+				})
+				if !ok {
+					t.Fatal("no port rule emitted")
+				}
+				if len(rule.Port) != 1 || rule.Port[0] != 443 {
+					t.Errorf("port = %v, want [443]", rule.Port)
+				}
+				// The core spells a range with a colon, not a dash.
+				if len(rule.PortRange) != 1 || rule.PortRange[0] != "8000:8080" {
+					t.Errorf("port_range = %v, want [8000:8080]", rule.PortRange)
+				}
+			},
+		},
+		{
+			name: "protocol",
+			rule: models.RoutingRule{
+				ID: "r", Kind: models.SourceProtocol,
+				Values: []string{"bittorrent"}, Action: models.ActionDirect,
+			},
+			verify: func(t *testing.T, rules []routeRule) {
+				if _, ok := findRule(rules, func(r routeRule) bool {
+					return contains(r.Protocol, "bittorrent")
+				}); !ok {
+					t.Fatal("no protocol rule emitted")
+				}
+			},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			rules, _, _ := graph(t, models.ActionProxy, testCase.rule)
+			testCase.verify(t, rules)
+		})
+	}
+}
+
+// TestGeoRulesDeclareTheirRuleSets covers the part that is easy to get half
+// right: a rule referencing a set the config never declares parses fine and
+// then matches nothing.
+func TestGeoRulesDeclareTheirRuleSets(t *testing.T) {
+	result := buildFor(t, protocolLinks["vless-reality"], func(settings *models.AppSettings) {
+		settings.DefaultAction = models.ActionProxy
+		settings.RoutingRules = []models.RoutingRule{
+			{ID: "a", Kind: models.SourceGeoSite, Values: []string{"netflix"}, Action: models.ActionDirect},
+			{ID: "b", Kind: models.SourceGeoIP, Values: []string{"ru", "ru"}, Action: models.ActionDirect},
+		}
+	})
+	mustParse(t, result.JSON)
+
+	var config struct {
+		Route struct {
+			Rules []struct {
+				RuleSet []string `json:"rule_set"`
+			} `json:"rules"`
+			RuleSet []struct {
+				Type           string `json:"type"`
+				Tag            string `json:"tag"`
+				Format         string `json:"format"`
+				URL            string `json:"url"`
+				DownloadDetour string `json:"download_detour"`
+			} `json:"rule_set"`
+		} `json:"route"`
+	}
+	if err := json.Unmarshal(result.JSON, &config); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	declared := map[string]bool{}
+	for _, set := range config.Route.RuleSet {
+		declared[set.Tag] = true
+		if set.Type != "remote" || set.Format != "binary" {
+			t.Errorf("%s: type=%q format=%q", set.Tag, set.Type, set.Format)
+		}
+		// Downloading direct fails for exactly the people who need geo rules.
+		if set.DownloadDetour != ExitTag {
+			t.Errorf("%s downloads via %q, want the tunnel", set.Tag, set.DownloadDetour)
+		}
+		if !strings.HasSuffix(set.URL, ".srs") {
+			t.Errorf("%s url %q is not a compiled rule-set", set.Tag, set.URL)
+		}
+	}
+
+	// The duplicate "ru" must be declared once, not twice.
+	if len(config.Route.RuleSet) != 2 {
+		t.Fatalf("expected 2 rule-sets, got %d: %+v", len(config.Route.RuleSet), config.Route.RuleSet)
+	}
+
+	for _, rule := range config.Route.Rules {
+		for _, tag := range rule.RuleSet {
+			if !declared[tag] {
+				t.Errorf("rule references undeclared rule-set %q", tag)
+			}
 		}
 	}
 }
