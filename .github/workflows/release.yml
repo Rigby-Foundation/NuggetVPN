@@ -148,6 +148,31 @@ jobs:
         if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
+      - name: Install NSIS
+        # The installer is built with makensis, which the Blacksmith Windows
+        # image does not ship (GitHub's older Windows images did). Chocolatey
+        # when the image has it, otherwise the official zip.
+        shell: pwsh
+        run: |
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            Write-Host "makensis already installed"
+            exit 0
+          }
+          $nsisDir = "${env:ProgramFiles(x86)}\NSIS"
+          if (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install nsis -y --no-progress
+          } else {
+            $version = "3.11"
+            $zip = Join-Path $env:RUNNER_TEMP "nsis.zip"
+            Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/NSIS%203/$version/nsis-$version.zip" -OutFile $zip -UserAgent "curl/8" -MaximumRedirection 10
+            Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
+            $nsisDir = Join-Path $env:RUNNER_TEMP "nsis-$version"
+          }
+          if (-not (Test-Path (Join-Path $nsisDir "makensis.exe"))) {
+            throw "makensis.exe not found in $nsisDir after installing NSIS"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
+
       - name: Package
         # Produces bin/NuggetVPN.exe plus bin/NuggetVPN-amd64-installer.exe.
         run: wails3 task windows:package
