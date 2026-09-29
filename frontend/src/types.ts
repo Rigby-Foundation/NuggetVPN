@@ -52,6 +52,8 @@ export interface AppSettings {
     proxy_chain_exit: string;
     /** "" until the first-start Beam offer is answered, then "done" or "dismissed". */
     beam_migration: "" | "done" | "dismissed";
+    /** The server last picked, restored on the next start. */
+    last_selection: SavedSelection | null;
 }
 
 /**
@@ -140,6 +142,14 @@ export interface RoutingRule {
 export interface CanvasPoint {
     x: number;
     y: number;
+}
+
+export interface SavedSelection {
+    domain: string;
+    mode: ProxyMode;
+    profile_id: string;
+    /** Fallback when the id is gone, e.g. the provider changed the link. */
+    profile_name: string;
 }
 
 /** One line of what a Beam migration carries across, or leaves behind. */

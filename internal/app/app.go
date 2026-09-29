@@ -13,7 +13,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -116,7 +115,7 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.registerCloseHook()
 
 	a.core.OnLog(func(level, message string) {
-		a.appendLog(strings.ToUpper(level) + " " + message)
+		a.appendLog(withLevel(level, message))
 	})
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)

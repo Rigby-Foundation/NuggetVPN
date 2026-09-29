@@ -68,6 +68,8 @@ interface SettingsViewProps {
   /** Present only when a Beam installation was found. */
   beamPreview: BeamPreview | null;
   onMigrateFromBeam: () => Promise<BeamMigrationReport>;
+  /** Changes when the sidebar's Settings is clicked while already here. */
+  homeSignal: number;
 }
 
 type SectionId =
@@ -151,6 +153,7 @@ function SettingsView({
   onRegenerateHWID,
   beamPreview,
   onMigrateFromBeam,
+  homeSignal,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
   // Which way the last move went, so coming back animates in reverse.
@@ -160,6 +163,17 @@ function SettingsView({
     setDirection(id === null ? "back" : "forward");
     setOpenId(id);
   };
+
+  // Back to the categories when Settings is clicked from inside a section.
+  // The first render is skipped: arriving at Settings is not a request to
+  // leave a section.
+  const firstHomeSignal = React.useRef(homeSignal);
+  React.useEffect(() => {
+    if (homeSignal !== firstHomeSignal.current) {
+      setDirection("back");
+      setOpenId(null);
+    }
+  }, [homeSignal]);
   const { prefs: appearance, activeCustom } = useAppearance();
   const [newChainId, setNewChainId] = React.useState("");
 

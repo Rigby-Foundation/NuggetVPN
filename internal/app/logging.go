@@ -2,7 +2,9 @@ package app
 
 import (
 	"os"
-	
+	"regexp"
+	"strings"
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
@@ -33,6 +35,29 @@ func (a *App) appendLog(lines ...string) {
 		a.logFile = file
 	}
 	for _, line := range lines {
-		_, _ = a.logFile.WriteString(line + "\n")
+		_, _ = a.logFile.WriteString(StripANSI(line) + "\n")
 	}
+}
+
+// ansiSequence matches the colour codes sing-box writes (SGR: ESC [ ... m).
+var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// StripANSI removes terminal colour codes.
+//
+// The core colours its log for a terminal. The UI renders those colours, so
+// the live stream keeps them; the log file is read in text editors and
+// attached to bug reports, where they are only noise.
+func StripANSI(line string) string {
+	return ansiSequence.ReplaceAllString(line, "")
+}
+
+// withLevel prefixes a core log line with its level, unless the core's own
+// formatter already led with it — which it does, so the prefix used to print
+// every level twice: "INFO INFO[0000] ...".
+func withLevel(level, message string) string {
+	upper := strings.ToUpper(strings.TrimSpace(level))
+	if upper == "" || strings.HasPrefix(StripANSI(message), upper) {
+		return message
+	}
+	return upper + " " + message
 }

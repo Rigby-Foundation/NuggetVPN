@@ -150,6 +150,9 @@
 [class*="theme-light-"] {
     color-scheme: light;
 
+    /* Lightness for coloured log text; the hue comes from the core's codes. */
+    --log-l: 36%;
+
     --ui-h: 286.375;
     --ui-c: 0.001;
     --ui-bg-l: 1;
@@ -214,6 +217,8 @@
 .dark,
 [class*="theme-dark-"] {
     color-scheme: dark;
+
+    --log-l: 72%;
 
     --ui-h: 286.033;
     --ui-c: 0.006;

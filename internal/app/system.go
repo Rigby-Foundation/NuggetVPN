@@ -174,8 +174,14 @@ func (a *App) ToggleMaximiseWindow() {
 
 // ShowWindow reveals and focuses the main window.
 func (a *App) ShowWindow() {
-	if a.window != nil {
-		a.window.Show()
-		a.window.Focus()
+	if a.window == nil {
+		return
 	}
+	// A window minimised to the taskbar is shown already; it needs restoring,
+	// or a second launch would appear to do nothing.
+	if a.window.IsMinimised() {
+		a.window.UnMinimise()
+	}
+	a.window.Show()
+	a.window.Focus()
 }

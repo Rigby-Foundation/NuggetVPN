@@ -177,12 +177,15 @@ func (c *Client) RefreshSubscriptions(
 		}
 
 		filtered := make([]models.Profile, 0, len(result)+len(fresh))
+		var previous []models.Profile
 		for _, profile := range result {
 			if strings.TrimSpace(profile.SourceDomain) != sourceDomain {
 				filtered = append(filtered, profile)
+			} else {
+				previous = append(previous, profile)
 			}
 		}
-		result = append(filtered, fresh...)
+		result = append(filtered, KeepIdentities(previous, fresh)...)
 		summary.Refreshed++
 	}
 
@@ -224,6 +227,49 @@ func decodeSubscriptionBody(raw string) string {
 		return string(decoded)
 	}
 	return trimmed
+}
+
+// KeepIdentities gives refreshed profiles the ids and usage totals of the
+// ones they replace.
+//
+// A refresh used to mint new ids for every server, and the app refreshes on
+// every start — so anything that refers to a profile by id lost it on
+// restart: the selected server fell back to automatic, proxy-chain hops
+// pointed at nothing, and traffic totals reset. A server is matched by its
+// link first, which is exact, and then by name, which survives a provider
+// rotating credentials or ports under the same entry.
+func KeepIdentities(previous, fresh []models.Profile) []models.Profile {
+	byLink := map[string]models.Profile{}
+	byName := map[string]models.Profile{}
+	for _, profile := range previous {
+		byLink[strings.TrimSpace(profile.ConfigLink)] = profile
+		byName[strings.TrimSpace(profile.Name)] = profile
+	}
+
+	taken := map[string]bool{}
+	match := func(index map[string]models.Profile, key string) (models.Profile, bool) {
+		old, found := index[strings.TrimSpace(key)]
+		if !found || taken[old.ID] {
+			return models.Profile{}, false
+		}
+		taken[old.ID] = true
+		return old, true
+	}
+
+	kept := make([]models.Profile, len(fresh))
+	for i, profile := range fresh {
+		old, found := match(byLink, profile.ConfigLink)
+		if !found {
+			old, found = match(byName, profile.Name)
+		}
+		if found {
+			profile.ID = old.ID
+			profile.TotalUp = old.TotalUp
+			profile.TotalDown = old.TotalDown
+		}
+		kept[i] = profile
+	}
+	return kept
 }
 
 func buildProfiles(links []string, sourceDomain, subURL string) []models.Profile {

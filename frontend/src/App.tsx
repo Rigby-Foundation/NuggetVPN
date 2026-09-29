@@ -22,8 +22,9 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useConnection } from "@/hooks/use-connection";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLogs } from "@/hooks/use-logs";
-import { LOCAL, profileDomain, useProfiles } from "@/hooks/use-profiles";
+import { LOCAL, profileDomain, reconcileSelection, useProfiles } from "@/hooks/use-profiles";
 import { useTraffic } from "@/hooks/use-traffic";
+import { stripAnsi } from "@/lib/ansi";
 import { cn } from "@/lib/utils";
 import {
     AppSettings,
@@ -72,6 +73,7 @@ const PENDING_SETTINGS: AppSettings = {
     proxy_chain: [],
     proxy_chain_exit: "",
     beam_migration: "",
+    last_selection: null,
 };
 
 const IP_RECHECK_MS = 5 * 60 * 1000;
@@ -170,6 +172,9 @@ function App() {
     // dependency, so changing the log-line limit re-ran the whole sequence,
     // subscriptions and all.
     const startedRef = useRef(false);
+    // Until the saved selection is restored, the empty initial one must not be
+    // saved over it.
+    const selectionRestoredRef = useRef(false);
     useEffect(() => {
         if (startedRef.current) {
             return;
@@ -178,6 +183,7 @@ function App() {
 
         const start = async () => {
             appendLog(["NuggetVPN started."]);
+            let saved: AppSettings["last_selection"] = null;
 
             try {
                 setPlatform(await invoke<string>("get_current_platform"));
@@ -188,6 +194,7 @@ function App() {
             try {
                 const stored = await invoke<AppSettings>("get_settings");
                 setSettings(stored);
+                saved = stored.last_selection;
 
                 if (!stored.auth_server && !stored.skip_auth) {
                     setShowOnboarding(true);
@@ -206,10 +213,29 @@ function App() {
             }
 
             try {
-                await loadProfiles();
+                const loaded = await loadProfiles();
+                // Back to the server picked last time. By id, or by name when
+                // the provider has since changed that server's link.
+                if (saved) {
+                    const byId = loaded.find((profile) => profile.id === saved!.profile_id);
+                    const byName = loaded.find(
+                        (profile) =>
+                            profileDomain(profile) === saved!.domain &&
+                            profile.name === saved!.profile_name
+                    );
+                    const match = byId ?? byName;
+                    setSelection(
+                        reconcileSelection(loaded, {
+                            domain: saved.domain,
+                            mode: saved.mode,
+                            profileId: match?.id ?? "",
+                        })
+                    );
+                }
             } catch (error) {
                 appendLog([`Could not load profiles: ${errorMessage(error)}`]);
             }
+            selectionRestoredRef.current = true;
 
             // After profiles, because the offer only prompts when there are
             // none yet: someone already set up here does not need it.
@@ -238,6 +264,31 @@ function App() {
 
         void start();
     }, [appendLog, loadProfiles, refreshAll, saveSettings]);
+
+    // ---- remembering the selection -----------------------------------------
+    useEffect(() => {
+        if (!selectionRestoredRef.current || !selection.domain) {
+            return;
+        }
+        const profile = profiles.find((item) => item.id === selection.profileId);
+        const next = {
+            domain: selection.domain,
+            mode: selection.mode,
+            profile_id: selection.profileId,
+            profile_name: profile?.name ?? "",
+        };
+        const current = settingsRef.current.last_selection;
+        if (
+            current &&
+            current.domain === next.domain &&
+            current.mode === next.mode &&
+            current.profile_id === next.profile_id &&
+            current.profile_name === next.profile_name
+        ) {
+            return;
+        }
+        patchSettings({ last_selection: next });
+    }, [selection, profiles, patchSettings]);
 
     // ---- Beam migration ---------------------------------------------------
     const migrateFromBeam = useCallback(async () => {
@@ -455,7 +506,8 @@ function App() {
             if (!path) {
                 return;
             }
-            await writeTextFile(path, logs.join("\n"));
+            // Colour codes are for the live view; a text file gets plain text.
+            await writeTextFile(path, logs.map(stripAnsi).join("\n"));
             toast.success("Logs exported.");
         } catch (error) {
             toast.error(`Export failed: ${errorMessage(error)}`);
@@ -490,7 +542,16 @@ function App() {
         [profiles, setSelection]
     );
 
-    const changeTab = (tab: string) => startTransition(() => setActiveTab(tab));
+    // Clicking Settings while already in it goes back to its category list,
+    // the way a second tap on a tab returns to its top level.
+    const [settingsHome, setSettingsHome] = useState(0);
+    const changeTab = (tab: string) => {
+        if (tab === "settings" && activeTab === "settings") {
+            setSettingsHome((count) => count + 1);
+            return;
+        }
+        startTransition(() => setActiveTab(tab));
+    };
     const isMac = platform === "macos";
 
     return (
@@ -595,6 +656,7 @@ function App() {
 
                                 {activeTab === "settings" && (
                                     <SettingsView
+                                        homeSignal={settingsHome}
                                         theme={theme}
                                         setTheme={setTheme}
                                         appSettings={settings}

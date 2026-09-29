@@ -90,6 +90,21 @@ type AppSettings struct {
 	// from Beam, so it is asked once: "" (not yet asked), BeamMigrationDone
 	// or BeamMigrationDismissed. Settings still offers it either way.
 	BeamMigration string `json:"beam_migration"`
+
+	// LastSelection is the server the user last picked, so reopening the app
+	// lands on it rather than on the first subscription. Nil until one is
+	// chosen.
+	LastSelection *Selection `json:"last_selection"`
+}
+
+// Selection is which configuration and server the user is pointed at.
+type Selection struct {
+	Domain    string `json:"domain"`
+	Mode      string `json:"mode"`
+	ProfileID string `json:"profile_id"`
+	// ProfileName is the fallback when the id is gone: a subscription that
+	// changed a server's link keeps its name far more often than not.
+	ProfileName string `json:"profile_name"`
 }
 
 // Answers to the Beam migration offer.

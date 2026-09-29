@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Download, Trash2 } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { LOG_LIMITS } from "@/hooks/use-logs";
+import { parseAnsi, stripAnsi } from "@/lib/ansi";
 
 interface LogsViewProps {
     logs: string[];
@@ -20,12 +21,38 @@ interface LogsViewProps {
     onClear: () => void;
 }
 
-/** Tints the line by its sing-box level prefix. */
+/** The line's base colour, by its level; the core's own colours sit on top. */
 function toneFor(line: string): string {
-    if (/^(ERROR|FATAL|PANIC)\b/.test(line)) return "text-status-error";
-    if (/^WARN/.test(line)) return "text-status-connecting";
+    const plain = stripAnsi(line);
+    if (/^(ERROR|FATAL|PANIC)/.test(plain)) return "text-status-error";
+    if (/^WARN/.test(plain)) return "text-status-connecting";
     return "text-muted-foreground";
 }
+
+/**
+ * One log line, with the core's colour codes rendered rather than printed.
+ * Memoised: new lines arrive constantly, and the thousands already on screen
+ * should not be parsed again each time.
+ */
+const LogLine = memo(function LogLine({ line }: { line: string }) {
+    return (
+        <li className={`py-0.5 break-words ${toneFor(line)}`}>
+            {parseAnsi(line).map((segment, index) =>
+                segment.color || segment.bold ? (
+                    <span
+                        key={index}
+                        style={{ color: segment.color }}
+                        className={segment.bold ? "font-semibold" : undefined}
+                    >
+                        {segment.text}
+                    </span>
+                ) : (
+                    segment.text
+                )
+            )}
+        </li>
+    );
+});
 
 function LogsView({
     logs,
@@ -99,12 +126,7 @@ function LogsView({
                 ) : (
                     <ol className="font-mono text-xs leading-relaxed">
                         {logs.map((line, index) => (
-                            <li
-                                key={`${index}-${line}`}
-                                className={`py-0.5 break-words ${toneFor(line)}`}
-                            >
-                                {line}
-                            </li>
+                            <LogLine key={`${index}-${line}`} line={line} />
                         ))}
                     </ol>
                 )}

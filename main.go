@@ -88,6 +88,9 @@ func runCoreService() error {
 func runGUI() {
 	service := app.New(version)
 
+	// Set once the window exists; the second-instance callback needs it.
+	var window *application.WebviewWindow
+
 	wailsApp := application.New(application.Options{
 		Name:        "NuggetVPN",
 		Description: "Modern, lightweight VPN client with an embedded sing-box core",
@@ -103,9 +106,21 @@ func runGUI() {
 			// window closes.
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
+		// One copy at a time. Two would each try to own the tunnel and the
+		// privileged core, and fight over profiles.json. Launching again
+		// instead brings the running copy to the front — which is also how a
+		// window closed to the tray, or hidden completely, is reopened.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: storage.Identifier,
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				if window != nil {
+					service.ShowWindow()
+				}
+			},
+		},
 	})
 
-	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+	window = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      app.WindowName,
 		Title:     "NuggetVPN",
 		Width:     1100,
