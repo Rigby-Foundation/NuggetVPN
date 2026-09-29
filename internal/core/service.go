@@ -321,6 +321,11 @@ func (s *Service) handle(request Request) Response {
 		response.Running = ok
 		response.Up, response.Down = up, down
 
+	case CmdRuleHits:
+		hits, ok := s.instance.RuleHits()
+		response.Running = ok
+		response.Hits = hits
+
 	case CmdShutdown:
 		response.Running = false
 

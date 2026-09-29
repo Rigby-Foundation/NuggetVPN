@@ -1,7 +1,7 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
-import { appWindow, errorMessage, invoke, save, writeTextFile } from "@/lib/backend";
+import { appWindow, errorMessage, eventPayload, EVENTS, invoke, listen, save, writeTextFile } from "@/lib/backend";
 
 import AddModal from "@/components/AddModal";
 import { BeamMigrationDialog } from "@/components/BeamMigration";
@@ -80,6 +80,10 @@ const PENDING_SETTINGS: AppSettings = {
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],
+    default_server: "",
+    routing_servers: [],
+    routing_setups: [],
+    active_routing_setup: "",
     geo_files: {},
 };
 
@@ -150,6 +154,16 @@ function App() {
         setSettings(stored);
         return stored;
     }, []);
+
+    // Settings changed from outside the window — a routing setup picked in
+    // the tray — arrive already saved.
+    useEffect(
+        () =>
+            listen(EVENTS.settings, (data) => {
+                setSettings(eventPayload<AppSettings>(data));
+            }),
+        []
+    );
 
     // settingsRef mirrors the latest settings so updateSetting can build the
     // next value without depending on `settings` and being rebuilt on every
@@ -755,6 +769,9 @@ function App() {
                                     <RoutingView
                                         settings={settings}
                                         onChange={patchSettings}
+                                        onReplace={setSettings}
+                                        profiles={profiles}
+                                        connected={connection.isConnected}
                                     />
                                 )}
 

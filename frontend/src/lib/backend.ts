@@ -51,6 +51,10 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_geo_codes: { method: "GetGeoCodes", args: ["kind"] },
     export_routing: { method: "ExportRouting", args: [] },
     import_routing: { method: "ImportRouting", args: [] },
+    switch_routing_setup: { method: "SwitchRoutingSetup", args: ["id"] },
+    get_rule_hits: { method: "GetRuleHits", args: [] },
+    get_rule_lists: { method: "GetRuleLists", args: [] },
+    update_rule_lists: { method: "UpdateRuleLists", args: [] },
 
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
 
@@ -130,6 +134,8 @@ export const EVENTS = {
     log: "vpn-log",
     state: "vpn-state",
     traffic: "vpn-traffic",
+    /** Settings changed outside the window, such as from the tray. */
+    settings: "settings-changed",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */

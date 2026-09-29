@@ -278,6 +278,7 @@ func (c *Client) readLoop(conn net.Conn) {
 			Message string `json:"message"`
 			Up      int64  `json:"up"`
 			Down    int64  `json:"down"`
+			Hits    []int  `json:"hits"`
 		}
 		if err := json.Unmarshal(line, &envelope); err != nil {
 			continue
@@ -302,6 +303,7 @@ func (c *Client) readLoop(conn net.Conn) {
 				Version: envelope.Version,
 				Up:      envelope.Up,
 				Down:    envelope.Down,
+				Hits:    envelope.Hits,
 			}
 			close(waiter)
 		}
@@ -419,6 +421,18 @@ func (c *Client) Stats() (up, down int64, ok bool) {
 		return 0, 0, false
 	}
 	return response.Up, response.Down, response.Running
+}
+
+// RuleHits reads the open connections per route rule; see Instance.RuleHits.
+func (c *Client) RuleHits() ([]int, bool) {
+	if !c.Connected() {
+		return nil, false
+	}
+	response, err := c.request(Request{Cmd: CmdRuleHits})
+	if err != nil || !response.Running {
+		return nil, false
+	}
+	return response.Hits, true
 }
 
 // Shutdown stops the tunnel and asks the privileged service to exit. Called

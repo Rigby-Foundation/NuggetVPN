@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Download, FileUp, Globe2, Landmark, Link2, Loader2, RefreshCw, StickyNote, Trash2, Upload } from "lucide-react";
+import { Download, FileUp, Globe2, Landmark, Link2, Loader2, RefreshCw, Server, StickyNote, Trash2, Upload } from "lucide-react";
 import {
     Background,
     BackgroundVariant,
@@ -17,8 +17,23 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { ACTION_META, GeoCodesContext, NODE_TYPES, SOURCE_META } from "@/components/routing/nodes";
+import {
+    ACTION_META,
+    GeoCodesContext,
+    kindMeta,
+    NODE_TYPES,
+    RuleListsContext,
+    RulePatch,
+} from "@/components/routing/nodes";
+import { PresetList, PresetPlacement, PresetRule } from "@/components/routing/presets";
+import { SetupSwitcher } from "@/components/routing/setups";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, useT } from "@/lib/i18n";
@@ -28,26 +43,44 @@ import {
     CanvasPoint,
     FlowImport,
     GeoKind,
+    Profile,
     RoutingAction,
+    RoutingKind,
     RoutingRule,
-    RoutingSource,
+    RuleListStatus,
 } from "@/types";
 
-const SOURCE_KINDS: RoutingSource[] = [
+const SOURCE_KINDS: RoutingKind[] = [
     "apps",
     "domains",
     "domain_regex",
     "ip",
     "port",
     "protocol",
+    "network",
     "geosite",
     "geoip",
+    "ruleset",
+    "logical",
 ];
-const ACTIONS: RoutingAction[] = ["proxy", "direct", "block"];
+const ACTIONS: RoutingAction[] = ["proxy", "direct", "block", "drop"];
 
 /** The catch-all source node has a fixed id; destinations are keyed by action. */
 const DEFAULT_NODE = "default";
 const actionNodeId = (action: RoutingAction) => `action:${action}`;
+/** A server destination is keyed by the profile it sends traffic through. */
+const SERVER_PREFIX = "server:";
+const serverNodeId = (profileId: string) => `${SERVER_PREFIX}${profileId}`;
+
+/** The node a rule's edge ends at: a server of its own, or its action. */
+function targetOf(action: RoutingAction, server: string | undefined) {
+    return action === "proxy" && server ? serverNodeId(server) : actionNodeId(action);
+}
+
+/** How often live connection counts are read while connected. */
+const HITS_INTERVAL_MS = 2000;
+/** GetRuleHits' key for traffic no rule matched; see app.DefaultRuleHits. */
+const DEFAULT_HITS = "__default";
 
 /**
  * Where nodes land when the saved layout has nothing for them.
@@ -71,6 +104,10 @@ function fallbackPosition(id: string, index: number): CanvasPoint {
     if (id.startsWith("action:")) {
         const slot = Math.max(0, ACTIONS.indexOf(id.slice("action:".length) as RoutingAction));
         return { x: COLUMN_GAP, y: slot * ACTION_GAP };
+    }
+    if (id.startsWith(SERVER_PREFIX)) {
+        // Below the fixed destinations, in the order they were added.
+        return { x: COLUMN_GAP, y: (ACTIONS.length + index) * ACTION_GAP };
     }
     return { x: 0, y: 200 + index * SOURCE_GAP };
 }
@@ -106,14 +143,36 @@ function nextSourcePosition(
 interface RoutingViewProps {
     settings: AppSettings;
     onChange: (patch: Partial<AppSettings>) => void;
+    /** Takes settings the backend already saved, such as after a setup switch. */
+    onReplace: (settings: AppSettings) => void;
+    profiles: Profile[];
+    connected: boolean;
 }
 
-interface CanvasProps extends RoutingViewProps {
+interface CanvasProps {
+    settings: AppSettings;
+    onChange: (patch: Partial<AppSettings>) => void;
+    profiles: Profile[];
+    /** Open connections by rule id; null while disconnected. */
+    hits: Record<string, number> | null;
     /** Set by the canvas so the palette outside it can move the viewport. */
     onReady: (focus: (point: CanvasPoint) => void) => void;
 }
 
-function RoutingCanvas({ settings, onChange, onReady }: CanvasProps) {
+/** The server destinations on the canvas: those placed, plus any a rule uses. */
+function serverIds(settings: AppSettings): string[] {
+    const ids = [...(settings.routing_servers ?? [])];
+    const add = (id: string | undefined) => {
+        if (id && !ids.includes(id)) ids.push(id);
+    };
+    (settings.routing_rules ?? []).forEach((rule) => {
+        if (rule.action === "proxy") add(rule.server);
+    });
+    if (settings.default_action === "proxy") add(settings.default_server);
+    return ids;
+}
+
+function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasProps) {
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
     const { setCenter, getZoom } = useReactFlow();
@@ -183,34 +242,68 @@ function RoutingCanvas({ settings, onChange, onReady }: CanvasProps) {
         [onChange]
     );
 
+    const servers = useMemo(() => serverIds(settings), [settings]);
+    const serversRef = useRef(servers);
+    serversRef.current = servers;
+    const settingsRef = useRef(settings);
+    settingsRef.current = settings;
+
+    // Taking a server off the canvas sends what went through it back to the
+    // connected server, rather than leaving rules pointing at nothing.
+    const removeServer = useCallback(
+        (profileId: string) => {
+            const current = settingsRef.current;
+            const layoutWithout = { ...layoutRef.current };
+            delete layoutWithout[serverNodeId(profileId)];
+            onChange({
+                routing_servers: serversRef.current.filter((id) => id !== profileId),
+                routing_rules: rulesRef.current.map((rule) =>
+                    rule.server === profileId ? { ...rule, server: "" } : rule
+                ),
+                default_server: current.default_server === profileId ? "" : current.default_server,
+                routing_layout: layoutWithout,
+            });
+        },
+        [onChange]
+    );
+
     const inboundCounts = useMemo(() => {
-        const counts: Record<string, number> = { proxy: 0, direct: 0, block: 0 };
+        const counts: Record<string, number> = {};
         rules.forEach((rule) => {
-            counts[rule.action] = (counts[rule.action] ?? 0) + 1;
+            const target = targetOf(rule.action, rule.server);
+            counts[target] = (counts[target] ?? 0) + 1;
         });
-        counts[settings.default_action] = (counts[settings.default_action] ?? 0) + 1;
+        const target = targetOf(settings.default_action, settings.default_server);
+        counts[target] = (counts[target] ?? 0) + 1;
         return counts;
-    }, [rules, settings.default_action]);
+    }, [rules, settings.default_action, settings.default_server]);
 
     const derivedNodes = useMemo<Node[]>(() => {
         const positioned = (id: string, index: number) =>
             layout[id] ?? fallbackPosition(id, index);
+        const hitsFor = (id: string) => (hits ? hits[id] ?? 0 : undefined);
 
         return [
             {
                 id: DEFAULT_NODE,
                 type: "catchall",
                 position: positioned(DEFAULT_NODE, 0),
-                data: {},
+                data: { hits: hitsFor(DEFAULT_HITS) },
             },
             ...rules.map((rule, index) => ({
                 id: rule.id,
-                type: "source",
+                type: rule.kind === "logical" ? "logical" : "source",
                 position: positioned(rule.id, index),
                 data: {
                     kind: rule.kind,
                     values: rule.values ?? [],
-                    onChange: (values: string[]) => updateRule(rule.id, { values }),
+                    mode: rule.mode ?? "and",
+                    conditions: rule.conditions ?? [],
+                    action: rule.action,
+                    invert: !!rule.invert,
+                    dns: rule.dns ?? "",
+                    hits: hitsFor(rule.id),
+                    onChange: (patch: RulePatch) => updateRule(rule.id, patch),
                     onDelete: () => removeRule(rule.id),
                 },
             })),
@@ -218,8 +311,22 @@ function RoutingCanvas({ settings, onChange, onReady }: CanvasProps) {
                 id: actionNodeId(action),
                 type: "action",
                 position: positioned(actionNodeId(action), 0),
-                data: { action, inbound: inboundCounts[action] ?? 0 },
+                data: { action, inbound: inboundCounts[actionNodeId(action)] ?? 0 },
             })),
+            ...servers.map((profileId, index) => {
+                const profile = profiles.find((item) => item.id === profileId);
+                return {
+                    id: serverNodeId(profileId),
+                    type: "server",
+                    position: positioned(serverNodeId(profileId), index),
+                    data: {
+                        name: profile?.name,
+                        protocol: profile?.protocol,
+                        inbound: inboundCounts[serverNodeId(profileId)] ?? 0,
+                        onDelete: () => removeServer(profileId),
+                    },
+                };
+            }),
             ...comments.map((comment, index) => ({
                 id: comment.id,
                 type: "comment",
@@ -231,37 +338,61 @@ function RoutingCanvas({ settings, onChange, onReady }: CanvasProps) {
                 },
             })),
         ];
-    }, [rules, layout, inboundCounts, updateRule, removeRule, comments, updateComment, removeComment]);
+    }, [rules, layout, inboundCounts, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
-        const dashed = (stroke: string) => ({
+        // An edge carrying connections right now is drawn heavier, so the
+        // routes in use stand out from the ones merely configured.
+        const dashed = (stroke: string, active: boolean) => ({
             stroke,
-            strokeWidth: 1.5,
+            strokeWidth: active ? 2.5 : 1.5,
             strokeDasharray: "5 5",
         });
+        const active = (id: string) => (hits?.[id] ?? 0) > 0;
 
         return [
             ...rules.map((rule) => ({
                 id: `edge:${rule.id}`,
                 source: rule.id,
-                target: actionNodeId(rule.action),
+                target: targetOf(rule.action, rule.server),
                 animated: true,
-                style: dashed(SOURCE_META[rule.kind].accent),
+                style: dashed(kindMeta(rule.kind).accent, active(rule.id)),
             })),
             {
                 id: "edge:default",
                 source: DEFAULT_NODE,
-                target: actionNodeId(settings.default_action),
+                target: targetOf(settings.default_action, settings.default_server),
                 animated: true,
-                style: dashed("var(--routing-default)"),
+                style: dashed("var(--routing-default)", active(DEFAULT_HITS)),
             },
         ];
-    }, [rules, settings.default_action]);
+    }, [rules, settings.default_action, settings.default_server, hits]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(derivedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(derivedEdges);
 
-    useEffect(() => setNodes(derivedNodes), [derivedNodes, setNodes]);
+    // Nodes are rebuilt whenever settings change and, while connected, every
+    // time the live counts arrive. What React Flow tracks itself — a drag in
+    // progress, the selection, measured sizes — carries over, or a node being
+    // dragged would jump back every two seconds.
+    useEffect(
+        () =>
+            setNodes((current) => {
+                const previous = new Map(current.map((node) => [node.id, node]));
+                return derivedNodes.map((node) => {
+                    const before = previous.get(node.id);
+                    if (!before) return node;
+                    return {
+                        ...node,
+                        position: before.dragging ? before.position : node.position,
+                        dragging: before.dragging,
+                        selected: before.selected,
+                        measured: before.measured,
+                    };
+                });
+            }),
+        [derivedNodes, setNodes]
+    );
     useEffect(() => setEdges(derivedEdges), [derivedEdges, setEdges]);
 
     /** Persist a node position once the drag ends, not on every frame. */
@@ -290,17 +421,23 @@ function RoutingCanvas({ settings, onChange, onReady }: CanvasProps) {
     /** Dragging an edge onto a destination is how a rule is re-pointed. */
     const onConnect = useCallback(
         (connection: Connection) => {
-            const action = ACTIONS.find(
-                (candidate) => actionNodeId(candidate) === connection.target
-            );
-            if (!action || !connection.source) {
+            if (!connection.source || !connection.target) {
+                return;
+            }
+            let action = ACTIONS.find((candidate) => actionNodeId(candidate) === connection.target);
+            let server = "";
+            if (connection.target.startsWith(SERVER_PREFIX)) {
+                action = "proxy";
+                server = connection.target.slice(SERVER_PREFIX.length);
+            }
+            if (!action) {
                 return;
             }
             if (connection.source === DEFAULT_NODE) {
-                onChange({ default_action: action });
+                onChange({ default_action: action, default_server: server });
                 return;
             }
-            updateRule(connection.source, { action });
+            updateRule(connection.source, { action, server });
         },
         [onChange, updateRule]
     );
@@ -338,22 +475,31 @@ function Palette({
     onAddSource,
     onAddNote,
     onSetDefault,
+    onAddServer,
+    onAddPreset,
+    profiles,
+    placedServers,
     geoPanel,
 }: {
     defaultAction: RoutingAction;
-    onAddSource: (kind: RoutingSource) => void;
+    onAddSource: (kind: RoutingKind) => void;
     onAddNote: () => void;
     onSetDefault: (action: RoutingAction) => void;
+    onAddServer: (profileId: string) => void;
+    onAddPreset: (rules: PresetRule[], placement: PresetPlacement) => void;
+    profiles: Profile[];
+    placedServers: string[];
     geoPanel: React.ReactNode;
 }) {
     const t = useT();
+    const available = profiles.filter((profile) => !placedServers.includes(profile.id));
     return (
         <aside className="w-56 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
             <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
                 {t("routing.sources")}
             </p>
             {SOURCE_KINDS.map((kind) => {
-                const meta = SOURCE_META[kind];
+                const meta = kindMeta(kind);
                 return (
                     <button
                         key={kind}
@@ -395,6 +541,33 @@ function Palette({
                     </button>
                 );
             })}
+
+            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
+                {t("routing.destinations")}
+            </p>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        disabled={available.length === 0}
+                        title={available.length === 0 ? t("routing.server.none") : t("routing.server.addHint")}
+                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start disabled:opacity-50 disabled:hover:bg-transparent"
+                    >
+                        <Server size={15} style={{ color: "var(--status-connected)" }} aria-hidden="true" />
+                        <span className="truncate">{t("routing.server.add")}</span>
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="left" className="w-64 max-h-80 overflow-y-auto">
+                    {available.map((profile) => (
+                        <DropdownMenuItem key={profile.id} className="text-xs gap-2" onClick={() => onAddServer(profile.id)}>
+                            <span className="truncate">{profile.name}</span>
+                            <span className="ms-auto shrink-0 text-muted-foreground">{profile.protocol}</span>
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <PresetList onAdd={onAddPreset} />
 
             <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
                 {t("routing.canvas")}
@@ -629,9 +802,65 @@ function GeoButton({
     );
 }
 
-function RoutingView({ settings, onChange }: RoutingViewProps) {
+function RoutingView({ settings, onChange, onReplace, profiles, connected }: RoutingViewProps) {
     const t = useT();
     const rules = settings.routing_rules ?? [];
+
+    // Live connection counts, while connected and on screen.
+    const [hits, setHits] = useState<Record<string, number> | null>(null);
+    useEffect(() => {
+        if (!connected) {
+            setHits(null);
+            return;
+        }
+        let cancelled = false;
+        const read = () =>
+            invoke<Record<string, number>>("get_rule_hits")
+                .then((next) => {
+                    if (!cancelled) setHits(next ?? {});
+                })
+                .catch(() => undefined);
+        void read();
+        const timer = window.setInterval(read, HITS_INTERVAL_MS);
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [connected]);
+
+    // What is known about each rule list, reloaded when the URLs change.
+    const [lists, setLists] = useState<Record<string, RuleListStatus>>({});
+    const [updatingLists, setUpdatingLists] = useState(false);
+    const listSignature = JSON.stringify(
+        rules.flatMap((rule) => [
+            ...(rule.kind === "ruleset" ? rule.values ?? [] : []),
+            ...(rule.conditions ?? []).filter((condition) => condition.kind === "ruleset").flatMap((condition) => condition.values ?? []),
+        ])
+    );
+    const storeLists = (statuses: RuleListStatus[] | null) =>
+        setLists(Object.fromEntries((statuses ?? []).map((status) => [status.url, status])));
+    useEffect(() => {
+        // Read after the save carrying the new URLs has landed.
+        const timer = window.setTimeout(() => {
+            invoke<RuleListStatus[]>("get_rule_lists").then(storeLists).catch(() => undefined);
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [listSignature]);
+    const updateLists = useCallback(async () => {
+        setUpdatingLists(true);
+        try {
+            storeLists(await invoke<RuleListStatus[]>("update_rule_lists"));
+            toast.success(t("routing.list.updated"), { id: "rule-lists" });
+        } catch (error) {
+            toast.error(errorMessage(error), { id: "rule-lists" });
+        } finally {
+            setUpdatingLists(false);
+        }
+    }, [t]);
+    const listsContext = useMemo(
+        () => ({ lists, updating: updatingLists, update: () => void updateLists() }),
+        [lists, updatingLists, updateLists]
+    );
     const defaultLabel = t(ACTION_META[settings.default_action]?.label ?? "routing.action.proxy");
 
     // Codes from the user's own geo files, for suggestions in the nodes.
@@ -672,6 +901,8 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
         const previous: Partial<AppSettings> = {
             routing_rules: settings.routing_rules,
             default_action: settings.default_action,
+            default_server: settings.default_server,
+            routing_servers: settings.routing_servers,
             routing_layout: settings.routing_layout,
             routing_comments: settings.routing_comments,
         };
@@ -681,6 +912,8 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
             onChange({
                 routing_rules: result.settings.routing_rules,
                 default_action: result.settings.default_action,
+                default_server: result.settings.default_server,
+                routing_servers: result.settings.routing_servers,
                 routing_layout: result.settings.routing_layout,
                 routing_comments: result.settings.routing_comments,
             });
@@ -729,13 +962,27 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
     }, [onChange, settings.routing_comments, settings.routing_layout]);
 
     const addSource = useCallback(
-        (kind: RoutingSource) => {
+        (kind: RoutingKind) => {
             const id = `${kind}-${Date.now().toString(36)}`;
             const layout = settings.routing_layout ?? {};
             const position = nextSourcePosition(rules, layout);
+            const rule: RoutingRule =
+                kind === "logical"
+                    ? {
+                          id,
+                          kind,
+                          values: [],
+                          mode: "and",
+                          conditions: [
+                              { kind: "apps", values: [] },
+                              { kind: "network", values: [] },
+                          ],
+                          action: "proxy",
+                      }
+                    : { id, kind, values: [], action: "proxy" };
 
             onChange({
-                routing_rules: [...rules, { id, kind, values: [], action: "proxy" }],
+                routing_rules: [...rules, rule],
                 routing_layout: { ...layout, [id]: position },
             });
             // Once the node exists, not during this render.
@@ -744,11 +991,49 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
         [onChange, rules, settings.routing_layout]
     );
 
+    const placedServers = useMemo(() => serverIds(settings), [settings]);
+
+    const addServer = useCallback(
+        (profileId: string) => {
+            const layout = settings.routing_layout ?? {};
+            const id = serverNodeId(profileId);
+            const position = fallbackPosition(id, placedServers.length);
+            onChange({
+                routing_servers: [...placedServers, profileId],
+                routing_layout: { ...layout, [id]: position },
+            });
+            setTimeout(() => focusRef.current?.(position), 60);
+        },
+        [onChange, placedServers, settings.routing_layout]
+    );
+
+    const addPreset = useCallback(
+        (preset: PresetRule[], placement: PresetPlacement) => {
+            const layout = { ...(settings.routing_layout ?? {}) };
+            const stamp = Date.now().toString(36);
+            const added = preset.map((rule, index) => ({ ...rule, id: `${rule.kind}-${stamp}${index}` }));
+            let position = nextSourcePosition(rules, layout);
+            added.forEach((rule) => {
+                layout[rule.id] = position;
+                position = { x: position.x, y: position.y + SOURCE_GAP };
+            });
+            onChange({
+                routing_rules: placement === "first" ? [...added, ...rules] : [...rules, ...added],
+                routing_layout: layout,
+            });
+            const first = layout[added[0]?.id];
+            if (first) setTimeout(() => focusRef.current?.(first), 60);
+            toast.success(t("routing.preset.added"), { id: "routing-preset" });
+        },
+        [onChange, rules, settings.routing_layout, t]
+    );
+
     return (
         <div className="enter-stagger absolute inset-0 flex flex-col">
             <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3 shrink-0">
                 <div className="min-w-0">
-                    <h1 className="text-base font-semibold tracking-tight">{t("nav.routing")}</h1>
+                    <h1 className="sr-only">{t("nav.routing")}</h1>
+                    <SetupSwitcher settings={settings} onReplace={onReplace} />
                     <p className="text-xs text-muted-foreground mt-0.5">
                         {rules.length === 0
                             ? t("routing.summaryNone", { action: defaultLabel })
@@ -790,20 +1075,28 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
                     are drawn. It is not mirrored in right-to-left layouts. */}
                 <div className="flex-1 min-w-0 rounded-xl border overflow-hidden" dir="ltr">
                     <GeoCodesContext.Provider value={geoCodes}>
-                        <ReactFlowProvider>
-                            <RoutingCanvas
-                                settings={settings}
-                                onChange={onChange}
-                                onReady={handleReady}
-                            />
-                        </ReactFlowProvider>
+                        <RuleListsContext.Provider value={listsContext}>
+                            <ReactFlowProvider>
+                                <RoutingCanvas
+                                    settings={settings}
+                                    onChange={onChange}
+                                    profiles={profiles}
+                                    hits={hits}
+                                    onReady={handleReady}
+                                />
+                            </ReactFlowProvider>
+                        </RuleListsContext.Provider>
                     </GeoCodesContext.Provider>
                 </div>
                 <Palette
                     defaultAction={settings.default_action}
                     onAddSource={addSource}
                     onAddNote={addNote}
-                    onSetDefault={(action) => onChange({ default_action: action })}
+                    onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
+                    onAddServer={addServer}
+                    onAddPreset={addPreset}
+                    profiles={profiles}
+                    placedServers={placedServers}
                     geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
                 />
             </div>

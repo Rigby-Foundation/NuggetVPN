@@ -30,6 +30,8 @@ const (
 	CmdStatus   = "status"
 	CmdStats    = "stats"
 	CmdShutdown = "shutdown"
+	// CmdRuleHits asks how many open connections each route rule matched.
+	CmdRuleHits = "rule_hits"
 )
 
 // Event names pushed from the core service to the GUI.
@@ -59,6 +61,8 @@ type Response struct {
 	Version string `json:"version,omitempty"`
 	Up      int64  `json:"up,omitempty"`
 	Down    int64  `json:"down,omitempty"`
+	// Hits answers CmdRuleHits; see Instance.RuleHits.
+	Hits []int `json:"hits,omitempty"`
 }
 
 // Event is an unsolicited message from the core service.

@@ -39,6 +39,9 @@ const (
 	stateEventName = "vpn-state"
 	// trafficEventName carries a byte-counter sample once a second.
 	trafficEventName = "vpn-traffic"
+	// settingsEventName carries settings changed from outside the window,
+	// such as a routing setup picked from the tray.
+	settingsEventName = "settings-changed"
 
 	// usagePersistInterval is how often accumulated bytes are written to
 	// profiles.json. Every sample would mean a disk write per second.
@@ -53,9 +56,12 @@ type App struct {
 	app    *application.App
 	window *application.WebviewWindow
 	// tray is built during ServiceStartup, from icon.
-	tray     *application.SystemTray
-	trayMenu trayMenu
-	icon     []byte
+	tray *application.SystemTray
+	// trayLanguage is the UI's language, for the tray menu; trayMu guards it
+	// and serialises rebuilding the menu.
+	trayMu       sync.Mutex
+	trayLanguage string
+	icon         []byte
 	// quitting tells the window-close hook to stop swallowing the close.
 	quitting bool
 
@@ -81,6 +87,10 @@ type App struct {
 
 	logMu   sync.Mutex
 	logFile *os.File
+
+	// ruleOwners maps the running config's route rules, by index, to the
+	// routing rule each came from; see sbconfig.Result.RuleOwners.
+	ruleOwners []string
 }
 
 // New loads persisted state and prepares the core client. icon is the tray

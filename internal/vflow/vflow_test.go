@@ -33,7 +33,8 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if flow.Version != Version || flow.Format != Format {
+	// Nothing here needs version 2, so older builds can still read it.
+	if flow.Version != 1 || flow.Format != Format {
 		t.Errorf("header %s v%d", flow.Format, flow.Version)
 	}
 
@@ -102,5 +103,33 @@ func TestMissingGeo(t *testing.T) {
 	missing := MissingGeo(settings, flow)
 	if len(missing) != 1 || missing["geoip"] != "https://example.org/geoip.dat" {
 		t.Errorf("only the file not already in use should be offered: %v", missing)
+	}
+}
+
+// A flow using anything version 1 cannot hold is marked version 2, so an
+// older build refuses it instead of silently dropping those parts.
+func TestNewFeaturesNeedVersion2(t *testing.T) {
+	for name, mutate := range map[string]func(*models.AppSettings){
+		"drop":       func(s *models.AppSettings) { s.RoutingRules[0].Action = models.ActionDrop },
+		"invert":     func(s *models.AppSettings) { s.RoutingRules[0].Invert = true },
+		"server":     func(s *models.AppSettings) { s.RoutingRules[0].Server = "abc" },
+		"dns":        func(s *models.AppSettings) { s.RoutingRules[0].DNS = "1.1.1.1" },
+		"network":    func(s *models.AppSettings) { s.RoutingRules[0].Kind = models.SourceNetwork },
+		"default":    func(s *models.AppSettings) { s.DefaultAction = models.ActionDrop },
+		"serverNode": func(s *models.AppSettings) { s.RoutingServers = []string{"abc"} },
+	} {
+		settings := sample()
+		mutate(&settings)
+		data, err := Encode(settings)
+		if err != nil {
+			t.Fatal(err)
+		}
+		flow, err := Decode(data)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if flow.Version != 2 {
+			t.Errorf("%s: written as version %d", name, flow.Version)
+		}
 	}
 }

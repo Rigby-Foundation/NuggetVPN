@@ -206,8 +206,10 @@ func geoRuleSets(settings models.AppSettings) (local map[string]string, custom m
 
 	wanted := map[string][]string{}
 	for _, rule := range settings.UsableRules() {
-		if rule.Kind == models.SourceGeoIP || rule.Kind == models.SourceGeoSite {
-			wanted[rule.Kind] = append(wanted[rule.Kind], rule.CleanValues()...)
+		for _, matcher := range rule.Matchers() {
+			if matcher.Kind == models.SourceGeoIP || matcher.Kind == models.SourceGeoSite {
+				wanted[matcher.Kind] = append(wanted[matcher.Kind], matcher.Values...)
+			}
 		}
 	}
 

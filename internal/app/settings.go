@@ -43,10 +43,25 @@ func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, err
 	}
 
 	a.mu.Lock()
+	setupsChanged := setupsSignature(a.settings) != setupsSignature(settings)
 	a.settings = settings
 	a.mu.Unlock()
 
+	// The tray lists the routing setups; rebuilt only when they change, not
+	// on every node dragged across the canvas.
+	if setupsChanged {
+		a.refreshTrayMenu()
+	}
 	return settings, storage.SaveSettings(settings)
+}
+
+// setupsSignature is what the tray shows of the routing setups.
+func setupsSignature(settings models.AppSettings) string {
+	signature := settings.ActiveRoutingSetup
+	for _, setup := range settings.RoutingSetups {
+		signature += "\x00" + setup.ID + "\x01" + setup.Name
+	}
+	return signature
 }
 
 // RegenerateHWID issues a new subscription device id and saves it.

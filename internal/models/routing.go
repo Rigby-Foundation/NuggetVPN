@@ -2,6 +2,7 @@ package models
 
 import (
 	"net/netip"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,7 +30,29 @@ const (
 	SourceProtocol    = "protocol"
 	SourceGeoSite     = "geosite"
 	SourceGeoIP       = "geoip"
+	// SourceNetwork matches the transport: "tcp" or "udp".
+	SourceNetwork = "network"
+	// SourceRuleSet matches a rule list downloaded from a URL.
+	SourceRuleSet = "ruleset"
+	// SourceLogical combines conditions: all of them, or any of them.
+	SourceLogical = "logical"
 )
+
+// Networks a network rule may match.
+const (
+	NetworkTCP = "tcp"
+	NetworkUDP = "udp"
+)
+
+// How a logical rule combines its conditions.
+const (
+	LogicalAnd = "and"
+	LogicalOr  = "or"
+)
+
+// maxConditions bounds a logical rule. The UI builds them by hand; a hundred
+// is far beyond anything readable.
+const maxConditions = 100
 
 // Protocols the core can identify by sniffing a connection.
 var sniffableProtocols = []string{
@@ -45,7 +68,12 @@ func SniffableProtocols() []string {
 const (
 	ActionProxy  = "proxy"
 	ActionDirect = "direct"
-	ActionBlock  = "block"
+	// ActionBlock refuses the connection, so the app learns at once and
+	// gives up or falls back.
+	ActionBlock = "block"
+	// ActionDrop discards the connection without answering. The app waits
+	// until it times out, which slows down trackers that retry on refusal.
+	ActionDrop = "drop"
 )
 
 // RoutingComment is a note on the routing canvas.
@@ -71,17 +99,92 @@ type RoutingRule struct {
 	// depending on Kind.
 	Values []string `json:"values"`
 	Action string   `json:"action"`
+
+	// Invert matches everything the entries do not: "every app except
+	// these".
+	Invert bool `json:"invert,omitempty"`
+	// Server sends proxied traffic through this profile rather than the
+	// connected one. Empty means the connected server. Only meaningful when
+	// Action is ActionProxy; a profile that no longer exists falls back to
+	// the connected server.
+	Server string `json:"server,omitempty"`
+	// DNS resolves the domains this rule matches with this server, instead
+	// of the default resolver. See ParseDNSServer for what it accepts.
+	DNS string `json:"dns,omitempty"`
+
+	// Mode and Conditions are for SourceLogical: the conditions all have to
+	// match (LogicalAnd) or any one of them (LogicalOr). Values is unused.
+	Mode       string             `json:"mode,omitempty"`
+	Conditions []RoutingCondition `json:"conditions,omitempty"`
+}
+
+// RoutingCondition is one part of a logical rule: a matcher with no
+// destination of its own.
+type RoutingCondition struct {
+	Kind   string   `json:"kind"`
+	Values []string `json:"values"`
+	Invert bool     `json:"invert,omitempty"`
 }
 
 // ValidSourceKind reports whether kind is one this build understands.
 func ValidSourceKind(kind string) bool {
+	return validMatcherKind(kind) || kind == SourceLogical
+}
+
+// validMatcherKind reports whether kind matches on its own values, which is
+// every kind but a logical one. Only these can be a logical rule's condition:
+// the UI has no way to show a combination inside a combination.
+func validMatcherKind(kind string) bool {
 	switch kind {
 	case SourceApps, SourceDomains, SourceIP,
 		SourceDomainRegex, SourcePort, SourceProtocol,
-		SourceGeoSite, SourceGeoIP:
+		SourceGeoSite, SourceGeoIP, SourceNetwork, SourceRuleSet:
 		return true
 	}
 	return false
+}
+
+// Matcher returns the rule as a single condition. For a logical rule it is
+// meaningless; use Conditions.
+func (r RoutingRule) Matcher() RoutingCondition {
+	return RoutingCondition{Kind: r.Kind, Values: r.Values, Invert: r.Invert}
+}
+
+// UsableConditions returns the conditions of a logical rule that would match
+// anything, cleaned.
+func (r RoutingRule) UsableConditions() []RoutingCondition {
+	result := make([]RoutingCondition, 0, len(r.Conditions))
+	for _, condition := range r.Conditions {
+		if !validMatcherKind(condition.Kind) {
+			continue
+		}
+		values := condition.CleanValues()
+		if len(values) == 0 {
+			continue
+		}
+		condition.Values = values
+		result = append(result, condition)
+	}
+	return result
+}
+
+// Domains reports whether the matcher is about domain names, which is what
+// decides whether a per-rule DNS server has anything to resolve.
+func (c RoutingCondition) Domains() bool {
+	switch c.Kind {
+	case SourceDomains, SourceDomainRegex, SourceGeoSite, SourceRuleSet:
+		return true
+	}
+	return false
+}
+
+// ValidRuleSetURL accepts an http(s) address of a rule list.
+func ValidRuleSetURL(value string) bool {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return parsed.Scheme == "https" || parsed.Scheme == "http"
 }
 
 // ValidPortValue accepts a single port or an inclusive range, "8000-8080".
@@ -145,30 +248,39 @@ func validGeoToken(value string, site bool) bool {
 // ValidAction reports whether action is a destination this build understands.
 func ValidAction(action string) bool {
 	switch action {
-	case ActionProxy, ActionDirect, ActionBlock:
+	case ActionProxy, ActionDirect, ActionBlock, ActionDrop:
 		return true
 	}
 	return false
 }
 
+// CleanValues returns the rule's usable entries. A logical rule has none of
+// its own.
+func (r RoutingRule) CleanValues() []string {
+	if r.Kind == SourceLogical {
+		return nil
+	}
+	return r.Matcher().CleanValues()
+}
+
 // CleanValues trims the rule's entries and drops the ones that cannot match
 // anything, so a half-typed row in the UI never reaches the config generator.
-func (r RoutingRule) CleanValues() []string {
-	result := make([]string, 0, len(r.Values))
-	seen := make(map[string]bool, len(r.Values))
+func (c RoutingCondition) CleanValues() []string {
+	result := make([]string, 0, len(c.Values))
+	seen := make(map[string]bool, len(c.Values))
 
-	for _, value := range r.Values {
+	for _, value := range c.Values {
 		trimmed := strings.TrimSpace(value)
 		if trimmed == "" {
 			continue
 		}
 		// Geo tokens and protocols are case-insensitive names; normalising
 		// here means "US" and "us" are the same rule rather than two.
-		switch r.Kind {
-		case SourceGeoSite, SourceGeoIP, SourceProtocol:
+		switch c.Kind {
+		case SourceGeoSite, SourceGeoIP, SourceProtocol, SourceNetwork:
 			trimmed = strings.ToLower(trimmed)
 		}
-		if seen[trimmed] || !r.validValue(trimmed) {
+		if seen[trimmed] || !c.validValue(trimmed) {
 			continue
 		}
 		seen[trimmed] = true
@@ -180,8 +292,8 @@ func (r RoutingRule) CleanValues() []string {
 // validValue rejects an entry the core would refuse. A bad entry has to be
 // dropped rather than passed along: the core fails the whole configuration
 // over one malformed matcher, which would take every other rule down with it.
-func (r RoutingRule) validValue(value string) bool {
-	switch r.Kind {
+func (c RoutingCondition) validValue(value string) bool {
+	switch c.Kind {
 	case SourceIP:
 		return validPrefix(value)
 	case SourcePort:
@@ -195,6 +307,10 @@ func (r RoutingRule) validValue(value string) bool {
 	case SourceDomainRegex:
 		_, err := regexp.Compile(value)
 		return err == nil
+	case SourceNetwork:
+		return value == NetworkTCP || value == NetworkUDP
+	case SourceRuleSet:
+		return ValidRuleSetURL(value)
 	default:
 		return true
 	}
@@ -202,7 +318,49 @@ func (r RoutingRule) validValue(value string) bool {
 
 // Usable reports whether the rule would produce a sing-box rule.
 func (r RoutingRule) Usable() bool {
-	return ValidSourceKind(r.Kind) && ValidAction(r.Action) && len(r.CleanValues()) > 0
+	if !ValidSourceKind(r.Kind) || !ValidAction(r.Action) {
+		return false
+	}
+	if r.Kind == SourceLogical {
+		return len(r.UsableConditions()) > 0
+	}
+	return len(r.CleanValues()) > 0
+}
+
+// Matchers returns what the rule matches on, as conditions: its own entries,
+// or a logical rule's parts.
+func (r RoutingRule) Matchers() []RoutingCondition {
+	if r.Kind == SourceLogical {
+		return r.UsableConditions()
+	}
+	matcher := r.Matcher()
+	matcher.Values = matcher.CleanValues()
+	return []RoutingCondition{matcher}
+}
+
+// MatchesDomains reports whether a per-rule DNS server would have anything to
+// resolve: the rule matches on domains, and nothing inverts that. "Every
+// domain except these" is not a list of names to send anywhere.
+func (r RoutingRule) MatchesDomains() bool {
+	if r.Invert {
+		return false
+	}
+	matchers := r.Matchers()
+	if len(matchers) == 0 {
+		return false
+	}
+	// A logical rule only has a domain list to hand the resolver when its
+	// domain conditions are required (all of) or are its only conditions.
+	domains := 0
+	for _, matcher := range matchers {
+		if matcher.Domains() && !matcher.Invert {
+			domains++
+		}
+	}
+	if r.Kind != SourceLogical || r.Mode == LogicalAnd {
+		return domains > 0
+	}
+	return domains == len(matchers)
 }
 
 // validPrefix accepts both a bare address and a CIDR block, which is what the
@@ -247,9 +405,49 @@ func (s *AppSettings) normalizeRouting() {
 		if rule.Values == nil {
 			rule.Values = []string{}
 		}
+		rule.Server = strings.TrimSpace(rule.Server)
+		if rule.Action != ActionProxy {
+			rule.Server = ""
+		}
+		rule.DNS = strings.TrimSpace(rule.DNS)
+		if rule.Kind == SourceLogical {
+			if rule.Mode != LogicalOr {
+				rule.Mode = LogicalAnd
+			}
+			conditions := make([]RoutingCondition, 0, len(rule.Conditions))
+			for _, condition := range rule.Conditions {
+				if !validMatcherKind(condition.Kind) || len(conditions) == maxConditions {
+					continue
+				}
+				if condition.Values == nil {
+					condition.Values = []string{}
+				}
+				conditions = append(conditions, condition)
+			}
+			rule.Conditions = conditions
+		} else {
+			rule.Mode = ""
+			rule.Conditions = nil
+		}
 		kept = append(kept, rule)
 	}
 	s.RoutingRules = kept
+
+	s.DefaultServer = strings.TrimSpace(s.DefaultServer)
+	if s.DefaultAction != ActionProxy {
+		s.DefaultServer = ""
+	}
+	servers := make([]string, 0, len(s.RoutingServers))
+	seenServers := map[string]bool{}
+	for _, id := range s.RoutingServers {
+		id = strings.TrimSpace(id)
+		if id == "" || seenServers[id] {
+			continue
+		}
+		seenServers[id] = true
+		servers = append(servers, id)
+	}
+	s.RoutingServers = servers
 
 	comments := make([]RoutingComment, 0, len(s.RoutingComments))
 	for _, comment := range s.RoutingComments {

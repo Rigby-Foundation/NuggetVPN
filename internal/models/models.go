@@ -78,6 +78,20 @@ type AppSettings struct {
 	// RoutingComments are notes placed on the canvas. They change nothing
 	// about routing; their positions are in RoutingLayout, by id.
 	RoutingComments []RoutingComment `json:"routing_comments"`
+	// DefaultServer is the profile unmatched traffic goes through when
+	// DefaultAction is ActionProxy; empty means the connected server.
+	DefaultServer string `json:"default_server"`
+	// RoutingServers are the server destinations placed on the canvas, by
+	// profile id. A rule points at one through RoutingRule.Server; this list
+	// keeps a destination on the canvas while nothing is wired to it yet.
+	RoutingServers []string `json:"routing_servers"`
+
+	// RoutingSetups are the saved routing graphs the user switches between.
+	// The active one is edited in the fields above, and written back into
+	// its entry here when another is switched to — so its entry here can be
+	// out of date, and the fields above are the truth for it.
+	RoutingSetups      []RoutingSetup `json:"routing_setups"`
+	ActiveRoutingSetup string         `json:"active_routing_setup"`
 
 	// Superseded by RoutingRules; kept so an upgrade can migrate them and so a
 	// downgrade does not lose the user's old configuration.
@@ -219,6 +233,7 @@ func (s *AppSettings) Normalize() {
 		s.CloseAction = CloseToTray
 	}
 	s.normalizeRouting()
+	s.normalizeSetups()
 	s.normalizeIdentity()
 }
 

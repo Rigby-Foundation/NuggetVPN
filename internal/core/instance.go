@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/trafficcontrol"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
@@ -64,6 +65,33 @@ func (i *Instance) Stats() (up, down int64, ok bool) {
 	}
 	up, down = i.traffic.Total()
 	return up, down, true
+}
+
+// RuleHits counts the open connections by the route rule that matched them:
+// one slot per rule in config order, then a last slot for connections no
+// rule matched.
+func (i *Instance) RuleHits() ([]int, bool) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.instance == nil || i.traffic == nil {
+		return nil, false
+	}
+	rules := i.instance.Router().Rules()
+	index := make(map[adapter.Rule]int, len(rules))
+	for position, rule := range rules {
+		index[rule] = position
+	}
+	hits := make([]int, len(rules)+1)
+	for _, connection := range i.traffic.Connections() {
+		if connection.Rule == nil {
+			hits[len(rules)]++
+			continue
+		}
+		if position, ok := index[connection.Rule]; ok {
+			hits[position]++
+		}
+	}
+	return hits, true
 }
 
 // Start parses the config, builds a sing-box instance and starts it. Any

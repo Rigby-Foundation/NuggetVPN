@@ -34,7 +34,13 @@ import (
 const Format = "nuggetvpn.vflow"
 
 // Version is the newest version this build writes and reads.
-const Version = 1
+//
+// Version 2 added combined rules, inverted rules, TCP/UDP and rule-list
+// sources, the "drop" destination, per-rule servers and per-rule DNS. A flow
+// that uses none of them is still written as version 1, so older builds can
+// keep reading it; one that does is refused by them rather than loaded with
+// those parts silently ignored.
+const Version = 2
 
 // Extension is the file extension, with its dot.
 const Extension = ".vflow"
@@ -49,6 +55,11 @@ type Flow struct {
 	Format        string                  `json:"format"`
 	Version       int                     `json:"version"`
 	DefaultAction string                  `json:"default_action"`
+	// DefaultServer and Servers name servers by their id on the machine the
+	// flow was made on. Elsewhere those ids mean nothing, and the traffic
+	// goes through the connected server until the destination is re-pointed.
+	DefaultServer string                  `json:"default_server,omitempty"`
+	Servers       []string                `json:"servers,omitempty"`
 	Rules         []models.RoutingRule    `json:"rules"`
 	Comments      []models.RoutingComment `json:"comments"`
 	Layout        map[string]models.Point `json:"layout"`
@@ -62,8 +73,10 @@ var ErrNotFlow = errors.New("not a .vflow file")
 func Encode(settings models.AppSettings) ([]byte, error) {
 	flow := Flow{
 		Format:        Format,
-		Version:       Version,
+		Version:       requiredVersion(settings),
 		DefaultAction: settings.DefaultAction,
+		DefaultServer: settings.DefaultServer,
+		Servers:       settings.RoutingServers,
 		Rules:         settings.RoutingRules,
 		Comments:      settings.RoutingComments,
 		Layout:        settings.RoutingLayout,
@@ -86,6 +99,21 @@ func Encode(settings models.AppSettings) ([]byte, error) {
 		flow.Layout = map[string]models.Point{}
 	}
 	return json.MarshalIndent(flow, "", "  ")
+}
+
+// requiredVersion is the oldest version that can hold the routing.
+func requiredVersion(settings models.AppSettings) int {
+	if settings.DefaultAction == models.ActionDrop || settings.DefaultServer != "" || len(settings.RoutingServers) > 0 {
+		return 2
+	}
+	for _, rule := range settings.RoutingRules {
+		switch {
+		case rule.Kind == models.SourceLogical, rule.Kind == models.SourceNetwork, rule.Kind == models.SourceRuleSet,
+			rule.Action == models.ActionDrop, rule.Invert, rule.Server != "", rule.DNS != "":
+			return 2
+		}
+	}
+	return 1
 }
 
 // Decode reads a flow, refusing other files and newer versions by name.
@@ -115,6 +143,8 @@ func Apply(settings models.AppSettings, flow Flow) models.AppSettings {
 		settings.RoutingRules = []models.RoutingRule{}
 	}
 	settings.DefaultAction = flow.DefaultAction
+	settings.DefaultServer = flow.DefaultServer
+	settings.RoutingServers = flow.Servers
 	settings.RoutingComments = flow.Comments
 	settings.RoutingLayout = flow.Layout
 	settings.Normalize()

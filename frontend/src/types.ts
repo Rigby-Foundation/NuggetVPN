@@ -45,6 +45,16 @@ export interface AppSettings {
     routing_layout: Record<string, CanvasPoint>;
     /** Notes on the canvas; their positions are in routing_layout. */
     routing_comments: RoutingComment[];
+    /** Profile id unmatched proxied traffic goes through; "" is the connected server. */
+    default_server: string;
+    /** Server destinations placed on the canvas, by profile id. */
+    routing_servers: string[] | null;
+    /**
+     * Saved routing setups. The active one is edited in the fields above;
+     * its entry here is refreshed by Go on every save.
+     */
+    routing_setups: RoutingSetup[] | null;
+    active_routing_setup: string;
     /** The user's own geoip.dat / geosite.dat, by kind. */
     geo_files: Partial<Record<GeoKind, GeoFile>>;
     /** Superseded by routing_rules; read only by the one-time migration. */
@@ -137,16 +147,62 @@ export type RoutingSource =
     | "port"
     | "protocol"
     | "geosite"
-    | "geoip";
+    | "geoip"
+    | "network"
+    | "ruleset";
+
+/** A rule's kind: a single matcher, or a combination of them. */
+export type RoutingKind = RoutingSource | "logical";
 
 /** Where a routing rule sends what it matches. */
-export type RoutingAction = "proxy" | "direct" | "block";
+export type RoutingAction = "proxy" | "direct" | "block" | "drop";
+
+export interface RoutingCondition {
+    kind: RoutingSource;
+    values: string[];
+    invert?: boolean;
+}
 
 export interface RoutingRule {
     id: string;
-    kind: RoutingSource;
+    kind: RoutingKind;
     values: string[];
     action: RoutingAction;
+    /** Match everything the entries do not. */
+    invert?: boolean;
+    /** Profile id for a proxied rule; "" or absent is the connected server. */
+    server?: string;
+    /** A resolver for the rule's domains; see models.ParseDNSServer. */
+    dns?: string;
+    /** For "logical": all conditions ("and") or any ("or"). */
+    mode?: "and" | "or";
+    conditions?: RoutingCondition[];
+}
+
+export interface RoutingGraph {
+    rules: RoutingRule[];
+    default_action: RoutingAction;
+    default_server?: string;
+    layout: Record<string, CanvasPoint>;
+    comments: RoutingComment[];
+    servers?: string[] | null;
+}
+
+export interface RoutingSetup {
+    id: string;
+    /** "" for the first setup, shown under a translated default name. */
+    name: string;
+    graph: RoutingGraph;
+}
+
+/** A rule list from a URL, as the backend knows it. */
+export interface RuleListStatus {
+    url: string;
+    /** Downloaded by the core itself; its size is not known here. */
+    native: boolean;
+    entries: number;
+    updated_at: number;
+    error?: string;
 }
 
 export interface CanvasPoint {

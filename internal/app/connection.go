@@ -395,6 +395,13 @@ func (a *App) startProfile(
 		a.appendLog("WARN " + warning)
 	}
 
+	// Rule lists the core cannot read itself, converted; refreshed when
+	// they are a day old.
+	lists, listWarnings := a.prepareRuleLists(settings, false)
+	for _, warning := range listWarnings {
+		a.appendLog("WARN " + warning)
+	}
+
 	result, err := sbconfig.Build(sbconfig.Request{
 		Profile:       profile,
 		Profiles:      profiles,
@@ -403,10 +410,17 @@ func (a *App) startProfile(
 		CacheFilePath: filepath.Join(storage.RuntimeDir(), "cache.db"),
 		LocalRuleSets: localSets,
 		CustomGeo:     customGeo,
+		RuleLists:     lists,
 	})
 	if err != nil {
 		return err
 	}
+	for _, warning := range result.Warnings {
+		a.appendLog("WARN " + warning)
+	}
+	a.mu.Lock()
+	a.ruleOwners = result.RuleOwners
+	a.mu.Unlock()
 
 	// Mirror the config to disk purely so users can inspect what ran.
 	_ = os.WriteFile(storage.CoreConfigPath(), result.JSON, 0o600)

@@ -49,6 +49,11 @@ type Request struct {
 	// than fetched from the built-in sets: the two use different codes, and
 	// quietly mixing them would route by a list the user never chose.
 	CustomGeo map[string]bool
+
+	// RuleLists are the rule lists from URLs that the app downloaded and
+	// converted, by URL. A list the core reads natively (.srs, .json) is
+	// fetched by the core and needs no entry.
+	RuleLists map[string]RuleList
 }
 
 // Result is a generated configuration plus the details the caller reports back
@@ -58,6 +63,11 @@ type Result struct {
 	Verbatim   bool
 	ChainHops  int
 	SplitRules int
+	// RuleOwners maps each route rule, by index, to the id of the user rule
+	// that produced it; "" for the rules the app adds itself.
+	RuleOwners []string
+	// Warnings are parts of the routing that could not be applied.
+	Warnings []string
 }
 
 // Build produces the sing-box configuration for a profile.
@@ -101,24 +111,31 @@ func Build(request Request) (Result, error) {
 		outbounds = append(outbounds, exit)
 	}
 
+	// Rules and the default can send traffic through servers other than the
+	// connected one; each gets an outbound of its own.
+	outboundFor, serverWarnings := appendRuleServers(&outbounds, &endpoints, request, settings, chainTags)
+
 	outbounds = append(outbounds, map[string]any{"type": "direct", "tag": DirectTag})
 
 	splitTunnel := settings.SplitTunnelling()
 	serverDomains := proxyServerDomains(outbounds, endpoints)
 	geo := geoSources{local: request.LocalRuleSets, custom: request.CustomGeo}
-	routeRules, splitRuleCount := buildRouteRules(settings, serverDomains, geo)
+	plan := newRoutePlan(settings, geo, request.RuleLists, outboundFor)
+	plan.warnings = append(plan.warnings, serverWarnings...)
+	routeRules, owners, splitRuleCount := plan.buildRouteRules(serverDomains)
+	dns := plan.buildDNS(splitTunnel, serverDomains)
 
 	config := map[string]any{
 		"log": map[string]any{
 			"level":     "info",
 			"timestamp": true,
 		},
-		"dns":      buildDNS(settings, splitTunnel, serverDomains),
+		"dns":      dns,
 		"inbounds": buildInbounds(settings, request.MixedPort),
 		"outbounds": func() []map[string]any {
 			return outbounds
 		}(),
-		"route": buildRouteSection(settings, routeRules, geo),
+		"route": plan.buildRouteSection(routeRules),
 	}
 	if len(endpoints) > 0 {
 		config["endpoints"] = endpoints
@@ -131,7 +148,13 @@ func Build(request Request) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to encode sing-box config: %w", err)
 	}
-	return Result{JSON: encoded, ChainHops: len(chainTags), SplitRules: splitRuleCount}, nil
+	return Result{
+		JSON:       encoded,
+		ChainHops:  len(chainTags),
+		SplitRules: splitRuleCount,
+		RuleOwners: owners,
+		Warnings:   plan.warnings,
+	}, nil
 }
 
 // appendChain materialises the proxy chain, returning the tags in dial order.
@@ -237,7 +260,8 @@ func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any 
 // asks for one, so the mechanism is bypassed exactly when it would matter.
 // Sending queries through the proxy keeps them off the local network just the
 // same, and `reverse_mapping` still recovers the domain for logs and rules.
-func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []string) map[string]any {
+func (p *routePlan) buildDNS(splitTunnel bool, serverDomains []string) map[string]any {
+	settings := p.settings
 	servers := []map[string]any{
 		{"type": "udp", "tag": dnsProxyTag, "server": settings.DNS, "server_port": 53, "detour": ExitTag},
 		// No detour: this is the bootstrap used to resolve the proxy's own
@@ -268,27 +292,169 @@ func buildDNS(settings models.AppSettings, splitTunnel bool, serverDomains []str
 		"reverse_mapping": true,
 	}
 
-	if splitTunnel {
-		// Domains the graph sends through the tunnel must also be resolved
-		// through it, or the exit dials an address the local resolver picked.
-		if exact, suffixes := proxiedDomains(settings); len(exact)+len(suffixes) > 0 {
-			rule := map[string]any{"server": dnsProxyTag}
-			if len(exact) > 0 {
-				rule["domain"] = exact
-			}
-			if len(suffixes) > 0 {
-				rule["domain_suffix"] = suffixes
-			}
-			rules = append(rules, rule)
+	// Where a name is resolved when no rule says otherwise: locally in split
+	// mode, otherwise at the far end of wherever unmatched traffic goes.
+	viaTags := map[string]string{ExitTag: dnsProxyTag}
+	via := func(outbound string) string {
+		if tag, ok := viaTags[outbound]; ok {
+			return tag
 		}
-		dns["final"] = dnsDirectTag
-	} else {
-		dns["final"] = dnsProxyTag
+		tag := "dns-via-" + outbound
+		servers = append(servers, map[string]any{
+			"type": "udp", "tag": tag, "server": settings.DNS, "server_port": 53, "detour": outbound,
+		})
+		viaTags[outbound] = tag
+		return tag
 	}
+	final := dnsDirectTag
+	if !splitTunnel {
+		final = via(p.finalOutbound())
+	}
+
+	// A rule's own resolver, where it names one; otherwise a proxied rule's
+	// names resolve at the far end of the server it goes through, or the exit
+	// dials an address a resolver elsewhere picked — for a CDN, one near the
+	// wrong country.
+	custom := map[string]string{}
+	for _, rule := range settings.UsableRules() {
+		if rule.Action == models.ActionBlock || rule.Action == models.ActionDrop {
+			continue
+		}
+		outbound := DirectTag
+		if rule.Action == models.ActionProxy {
+			outbound = p.proxyOutbound(rule.Server)
+		}
+
+		server := ""
+		if rule.DNS != "" {
+			parsed, ok := models.ParseDNSServer(rule.DNS)
+			if !ok {
+				p.warnings = append(p.warnings, fmt.Sprintf("DNS server %q in a routing rule is not an address this app understands; the rule uses the default resolver", rule.DNS))
+			} else {
+				key := rule.DNS + "|" + outbound
+				if tag, seen := custom[key]; seen {
+					server = tag
+				} else {
+					server = fmt.Sprintf("dns-rule-%d", len(custom)+1)
+					custom[key] = server
+					servers = append(servers, dnsServer(server, parsed, outbound))
+				}
+			}
+		}
+		if server == "" && rule.Action == models.ActionProxy {
+			server = via(outbound)
+		}
+		if server == "" || server == final {
+			continue
+		}
+
+		matcher, ok := p.domainMatcher(rule)
+		if !ok {
+			continue
+		}
+		matcher["server"] = server
+		rules = append(rules, matcher)
+	}
+	dns["final"] = final
 
 	dns["servers"] = servers
 	dns["rules"] = rules
 	return dns
+}
+
+// dnsServer declares a resolver a rule named. Its queries leave the way the
+// rule's traffic does: through the rule's server, or straight out for a
+// direct rule. A resolver named by hostname is looked up with the bootstrap
+// resolver, which never depends on the tunnel.
+func dnsServer(tag string, parsed models.DNSServer, outbound string) map[string]any {
+	if parsed.Type == "local" {
+		return map[string]any{"type": "local", "tag": tag}
+	}
+	server := map[string]any{
+		"type":        parsed.Type,
+		"tag":         tag,
+		"server":      parsed.Server,
+		"server_port": parsed.Port,
+	}
+	if parsed.Path != "" {
+		server["path"] = parsed.Path
+	}
+	if outbound != DirectTag {
+		server["detour"] = outbound
+	}
+	if net.ParseIP(parsed.Server) == nil {
+		server["domain_resolver"] = dnsDirectTag
+	}
+	return server
+}
+
+// appendRuleServers adds an outbound for every server the graph sends traffic
+// through other than the connected one, and maps each profile id to the tag
+// traffic for it should use. Those servers are reached through the same proxy
+// chain as the connected one.
+//
+// A server that cannot be used — deleted, or a profile holding a complete
+// config of its own — is left out with a warning, and its traffic falls back
+// to the connected server rather than failing the connection.
+func appendRuleServers(
+	outbounds *[]map[string]any,
+	endpoints *[]map[string]any,
+	request Request,
+	settings models.AppSettings,
+	chainTags []string,
+) (map[string]string, []string) {
+	outboundFor := map[string]string{request.Profile.ID: ExitTag}
+	var warnings []string
+
+	wanted := []string{}
+	if settings.DefaultAction == models.ActionProxy && settings.DefaultServer != "" {
+		wanted = append(wanted, settings.DefaultServer)
+	}
+	for _, rule := range settings.UsableRules() {
+		if rule.Action == models.ActionProxy && rule.Server != "" {
+			wanted = append(wanted, rule.Server)
+		}
+	}
+
+	byID := make(map[string]models.Profile, len(request.Profiles))
+	for _, profile := range request.Profiles {
+		byID[profile.ID] = profile
+	}
+
+	for _, id := range wanted {
+		if _, done := outboundFor[id]; done {
+			continue
+		}
+		profile, ok := byID[id]
+		if !ok {
+			warnings = append(warnings, "a routing rule points at a server that no longer exists; its traffic goes through the connected server")
+			outboundFor[id] = ExitTag
+			continue
+		}
+		if _, full := link.FullConfig(profile.ConfigLink); full {
+			warnings = append(warnings, fmt.Sprintf("%s is a complete sing-box config and cannot be a routing destination; its traffic goes through the connected server", profile.Name))
+			outboundFor[id] = ExitTag
+			continue
+		}
+		outbound, err := link.ParseOutbound(profile.ConfigLink, settings)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("%s cannot be a routing destination (%v); its traffic goes through the connected server", profile.Name, err))
+			outboundFor[id] = ExitTag
+			continue
+		}
+		tag := fmt.Sprintf("server-%d", len(outboundFor))
+		outbound["tag"] = tag
+		if len(chainTags) > 0 {
+			outbound["detour"] = chainTags[len(chainTags)-1]
+		}
+		if outbound.IsEndpoint() {
+			*endpoints = append(*endpoints, stripProbeFields(outbound))
+		} else {
+			*outbounds = append(*outbounds, outbound)
+		}
+		outboundFor[id] = tag
+	}
+	return outboundFor, warnings
 }
 
 func buildExperimental(request Request) map[string]any {
