@@ -16,6 +16,7 @@ import ConfigurationView from "@/components/views/ConfigurationView";
 import LogsView from "@/components/views/LogsView";
 import ProxiesView from "@/components/views/ProxiesView";
 import RoutingView from "@/components/views/RoutingView";
+import ConnectionsView from "@/components/views/ConnectionsView";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -834,6 +835,14 @@ function App() {
                                         onReplace={setSettings}
                                         profiles={profiles}
                                         connected={connection.isConnected}
+                                    />
+                                )}
+
+                                {activeTab === "connections" && (
+                                    <ConnectionsView
+                                        connected={connection.isConnected}
+                                        rules={settings.routing_rules ?? []}
+                                        profiles={profiles}
                                     />
                                 )}
 

@@ -68,6 +68,10 @@ type Result struct {
 	RuleOwners []string
 	// Warnings are parts of the routing that could not be applied.
 	Warnings []string
+	// ServerFor maps each outbound tag that leaves through a server to that
+	// server's profile id, so a connection can be shown with the server it
+	// actually went through.
+	ServerFor map[string]string
 }
 
 // Build produces the sing-box configuration for a profile.
@@ -151,7 +155,22 @@ func Build(request Request) (Result, error) {
 		SplitRules: splitRuleCount,
 		RuleOwners: owners,
 		Warnings:   plan.warnings,
+		ServerFor:  invert(outboundFor, request.Profile.ID),
 	}, nil
+}
+
+// invert turns profile id → tag into tag → profile id. A server that could
+// not be used falls back to the exit tag too, so the exit is set explicitly:
+// traffic through it goes through the connected server.
+func invert(outboundFor map[string]string, connected string) map[string]string {
+	result := map[string]string{}
+	for id, tag := range outboundFor {
+		if tag != ExitTag {
+			result[tag] = id
+		}
+	}
+	result[ExitTag] = connected
+	return result
 }
 
 // buildLog configures the core's log. With logging off the core does not

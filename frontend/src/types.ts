@@ -197,6 +197,24 @@ export interface RoutingSetup {
     graph: RoutingGraph;
 }
 
+/** An open connection; see app.LiveConnection. */
+export interface LiveConnection {
+    id: string;
+    network: string;
+    protocol?: string;
+    host?: string;
+    destination: string;
+    app?: string;
+    app_path?: string;
+    /** Routing rule id; "__default" for everything else, "" for built-in routes. */
+    rule: string;
+    route: "proxy" | "direct";
+    server?: string;
+    upload: number;
+    download: number;
+    started: number;
+}
+
 /** A rule list from a URL, as the backend knows it. */
 export interface RuleListStatus {
     url: string;

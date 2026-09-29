@@ -1,4 +1,4 @@
-import { FileText, Power, Server, Settings, Signal, Waypoints } from "lucide-react";
+import { Activity, FileText, Power, Server, Settings, Signal, Waypoints } from "lucide-react";
 
 import {
     Sidebar,
@@ -31,6 +31,7 @@ const TABS = [
     { id: "configuration", label: "nav.configuration", icon: Server },
     { id: "proxies", label: "nav.proxies", icon: Signal },
     { id: "routing", label: "nav.routing", icon: Waypoints },
+    { id: "connections", label: "nav.connections", icon: Activity },
     { id: "logs", label: "nav.logs", icon: FileText },
 ] as const satisfies readonly { id: string; label: MessageKey; icon: unknown }[];
 

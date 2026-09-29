@@ -32,6 +32,10 @@ const (
 	CmdShutdown = "shutdown"
 	// CmdRuleHits asks how many open connections each route rule matched.
 	CmdRuleHits = "rule_hits"
+	// CmdConnections lists the open connections.
+	CmdConnections = "connections"
+	// CmdCloseConnection closes one connection, or all with an empty ID.
+	CmdCloseConnection = "close_connection"
 )
 
 // Event names pushed from the core service to the GUI.
@@ -50,6 +54,8 @@ type Request struct {
 	Config json.RawMessage `json:"config,omitempty"`
 	// Token authenticates a CmdHello and is ignored on every other command.
 	Token string `json:"token,omitempty"`
+	// ConnectionID names the connection CmdCloseConnection closes.
+	ConnectionID string `json:"connection_id,omitempty"`
 }
 
 // Response answers exactly one Request.
@@ -63,6 +69,28 @@ type Response struct {
 	Down    int64  `json:"down,omitempty"`
 	// Hits answers CmdRuleHits; see Instance.RuleHits.
 	Hits []int `json:"hits,omitempty"`
+	// Connections answers CmdConnections.
+	Connections []ConnectionInfo `json:"connections,omitempty"`
+}
+
+// ConnectionInfo is one open connection, as the core tracks it.
+type ConnectionInfo struct {
+	ID string `json:"id"`
+	// Network is "tcp" or "udp"; Protocol is what sniffing found ("tls", "quic").
+	Network  string `json:"network"`
+	Protocol string `json:"protocol,omitempty"`
+	// Host is the domain when one is known; Destination is the address dialed.
+	Host        string `json:"host,omitempty"`
+	Destination string `json:"destination"`
+	// Process is the path of the program that opened it, when known.
+	Process string `json:"process,omitempty"`
+	// Rule is the index of the route rule that matched, or -1 for none.
+	Rule     int    `json:"rule"`
+	Outbound string `json:"outbound"`
+	Upload   int64  `json:"upload"`
+	Download int64  `json:"download"`
+	// Started is when it opened, in unix milliseconds.
+	Started int64 `json:"started"`
 }
 
 // Event is an unsolicited message from the core service.

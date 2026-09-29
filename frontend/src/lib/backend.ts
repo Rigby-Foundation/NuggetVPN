@@ -55,6 +55,9 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_rule_hits: { method: "GetRuleHits", args: [] },
     get_rule_lists: { method: "GetRuleLists", args: [] },
     update_rule_lists: { method: "UpdateRuleLists", args: [] },
+    get_connections: { method: "GetConnections", args: [] },
+    close_connection: { method: "CloseConnection", args: ["id"] },
+    close_all_connections: { method: "CloseAllConnections", args: [] },
 
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
 

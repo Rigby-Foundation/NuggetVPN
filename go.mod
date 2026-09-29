@@ -3,10 +3,12 @@ module github.com/Rigby-Foundation/NuggetVPN
 go 1.25.5
 
 require (
+	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/sagernet/sing v0.9.5-0.20260917164122-8fc5da509c10
 	github.com/sagernet/sing-box v1.14.0
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
+	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
@@ -49,7 +51,6 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
-	github.com/gofrs/uuid/v5 v5.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/certificate-transparency-go v1.3.2 // indirect
@@ -174,7 +175,6 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.37.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/term v0.45.0 // indirect

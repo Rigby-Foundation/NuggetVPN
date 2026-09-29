@@ -3,7 +3,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
+
+	"github.com/gofrs/uuid/v5"
 
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"
@@ -92,6 +95,74 @@ func (i *Instance) RuleHits() ([]int, bool) {
 		}
 	}
 	return hits, true
+}
+
+// Connections lists the open connections, newest last.
+func (i *Instance) Connections() ([]ConnectionInfo, bool) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.instance == nil || i.traffic == nil {
+		return nil, false
+	}
+	rules := i.instance.Router().Rules()
+	index := make(map[adapter.Rule]int, len(rules))
+	for position, rule := range rules {
+		index[rule] = position
+	}
+
+	open := i.traffic.Connections()
+	result := make([]ConnectionInfo, 0, len(open))
+	for _, connection := range open {
+		metadata := connection.Metadata
+		info := ConnectionInfo{
+			ID:          connection.ID.String(),
+			Network:     metadata.Network,
+			Protocol:    metadata.Protocol,
+			Host:        metadata.Domain,
+			Destination: metadata.Destination.String(),
+			Rule:        -1,
+			Outbound:    connection.Outbound,
+			Upload:      connection.Upload.Load(),
+			Download:    connection.Download.Load(),
+			Started:     connection.CreatedAt.UnixMilli(),
+		}
+		if info.Host == "" && metadata.Destination.IsFqdn() {
+			info.Host = metadata.Destination.Fqdn
+		}
+		if owner := metadata.ProcessInfo; owner != nil && len(owner.ProcessPaths) > 0 {
+			info.Process = owner.ProcessPaths[0]
+		}
+		if connection.Rule != nil {
+			if position, ok := index[connection.Rule]; ok {
+				info.Rule = position
+			}
+		}
+		result = append(result, info)
+	}
+	sort.Slice(result, func(a, b int) bool { return result[a].Started < result[b].Started })
+	return result, true
+}
+
+// CloseConnection closes one open connection by id, or all of them when id
+// is empty. A connection that has already closed is not an error.
+func (i *Instance) CloseConnection(id string) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.instance == nil || i.traffic == nil {
+		return nil
+	}
+	if id == "" {
+		i.traffic.CloseAllConnections()
+		return nil
+	}
+	parsed, err := uuid.FromString(id)
+	if err != nil {
+		return fmt.Errorf("not a connection id: %q", id)
+	}
+	if tracker := i.traffic.Connection(parsed); tracker != nil {
+		return tracker.Close()
+	}
+	return nil
 }
 
 // Start parses the config, builds a sing-box instance and starts it. Any

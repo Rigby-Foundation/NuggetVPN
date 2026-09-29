@@ -326,6 +326,16 @@ func (s *Service) handle(request Request) Response {
 		response.Running = ok
 		response.Hits = hits
 
+	case CmdConnections:
+		connections, ok := s.instance.Connections()
+		response.Running = ok
+		response.Connections = connections
+
+	case CmdCloseConnection:
+		if err := s.instance.CloseConnection(request.ConnectionID); err != nil {
+			response.OK, response.Error = false, err.Error()
+		}
+
 	case CmdShutdown:
 		response.Running = false
 

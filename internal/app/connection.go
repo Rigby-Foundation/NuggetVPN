@@ -420,6 +420,7 @@ func (a *App) startProfile(
 	}
 	a.mu.Lock()
 	a.ruleOwners = result.RuleOwners
+	a.serverFor = result.ServerFor
 	a.mu.Unlock()
 
 	// Mirror the config to disk purely so users can inspect what ran.

@@ -325,3 +325,30 @@ func TestServicePushesStats(t *testing.T) {
 		t.Fatal("the core never pushed a stats event")
 	}
 }
+
+// TestServiceListsAndClosesConnections covers the connections screen's
+// commands against a running core: listing works with nothing open, closing
+// everything is harmless, and a malformed id is refused rather than ignored.
+func TestServiceListsAndClosesConnections(t *testing.T) {
+	client := startTestService(t)
+
+	if _, ok := client.Connections(); ok {
+		t.Fatal("no connections can be listed before the core runs")
+	}
+	if err := client.Start(testConfig(t)); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	connections, ok := client.Connections()
+	if !ok {
+		t.Fatal("listing connections failed on a running core")
+	}
+	if len(connections) != 0 {
+		t.Fatalf("nothing has connected, yet %d connections are open", len(connections))
+	}
+	if err := client.CloseConnection(""); err != nil {
+		t.Fatalf("closing all: %v", err)
+	}
+	if err := client.CloseConnection("not-a-uuid"); err == nil {
+		t.Fatal("a malformed connection id should be an error")
+	}
+}

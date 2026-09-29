@@ -279,6 +279,8 @@ func (c *Client) readLoop(conn net.Conn) {
 			Up      int64  `json:"up"`
 			Down    int64  `json:"down"`
 			Hits    []int  `json:"hits"`
+
+			Connections []ConnectionInfo `json:"connections"`
 		}
 		if err := json.Unmarshal(line, &envelope); err != nil {
 			continue
@@ -304,6 +306,8 @@ func (c *Client) readLoop(conn net.Conn) {
 				Up:      envelope.Up,
 				Down:    envelope.Down,
 				Hits:    envelope.Hits,
+
+				Connections: envelope.Connections,
 			}
 			close(waiter)
 		}
@@ -433,6 +437,27 @@ func (c *Client) RuleHits() ([]int, bool) {
 		return nil, false
 	}
 	return response.Hits, true
+}
+
+// Connections lists the open connections; see Instance.Connections.
+func (c *Client) Connections() ([]ConnectionInfo, bool) {
+	if !c.Connected() {
+		return nil, false
+	}
+	response, err := c.request(Request{Cmd: CmdConnections})
+	if err != nil || !response.Running {
+		return nil, false
+	}
+	return response.Connections, true
+}
+
+// CloseConnection closes one open connection, or every one when id is empty.
+func (c *Client) CloseConnection(id string) error {
+	if !c.Connected() {
+		return nil
+	}
+	_, err := c.request(Request{Cmd: CmdCloseConnection, ConnectionID: id})
+	return err
 }
 
 // Shutdown stops the tunnel and asks the privileged service to exit. Called

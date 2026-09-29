@@ -95,6 +95,9 @@ type App struct {
 	// ruleOwners maps the running config's route rules, by index, to the
 	// routing rule each came from; see sbconfig.Result.RuleOwners.
 	ruleOwners []string
+	// serverFor maps the running config's outbound tags to server profile
+	// ids; see sbconfig.Result.ServerFor.
+	serverFor map[string]string
 }
 
 // New loads persisted state and prepares the core client. icon is the tray
