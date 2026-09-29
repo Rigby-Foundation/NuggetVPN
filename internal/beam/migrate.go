@@ -44,6 +44,17 @@ type Preview struct {
 	// Theme is the NuggetVPN preset matching Beam's theme, or empty. It lives
 	// in the renderer rather than in settings.json, so the UI applies it.
 	Theme string `json:"theme"`
+	// Appearance holds the font, corner and transition choices, mapped onto
+	// this app's option ids; like the theme, the UI applies them.
+	Appearance Appearance `json:"appearance"`
+}
+
+// Appearance is Beam's look, in this app's option ids. An empty field means
+// Beam's choice had no equivalent, and the current one is kept.
+type Appearance struct {
+	Font   string `json:"font"`
+	Radius string `json:"radius"`
+	Motion string `json:"motion"`
 }
 
 // NewPreview summarises data for the offer dialog.
@@ -65,6 +76,7 @@ func NewPreview(data *Data) Preview {
 	// out what would be carried; nothing is saved.
 	_, preview.Carried, preview.Skipped = ApplySettings(models.DefaultSettings(), data.Settings)
 	preview.Theme, _ = themeFor(data.Settings)
+	preview.Appearance = appearanceFor(data.Settings)
 	if data.Settings != nil && preview.Theme == "" && strings.TrimSpace(data.Settings.Appearance.Theme) != "" {
 		preview.Skipped = append(preview.Skipped, Item{
 			Label:  "Theme",
@@ -277,6 +289,37 @@ var themeAliases = map[string]string{
 	"mocha": "mocha",
 }
 
+// Font, corner and transition ids. Beam's are "rubik", "medium" and "slide"
+// in a real settings file; the aliases cover the other names its picker shows.
+var (
+	fontAliases = map[string]string{
+		"rubik": "rubik", "manrope": "manrope", "geologica": "geologica", "onest": "onest",
+		"system": "system",
+	}
+	radiusAliases = map[string]string{
+		"small": "small", "medium": "medium", "large": "large",
+		"round": "round", "rounded": "round", "full": "round",
+	}
+	motionAliases = map[string]string{
+		"slide": "slide", "bottom": "rise", "up": "rise", "rise": "rise",
+		"fade": "fade", "none": "none", "off": "none",
+	}
+)
+
+func appearanceFor(beam *Settings) Appearance {
+	if beam == nil {
+		return Appearance{}
+	}
+	lookup := func(aliases map[string]string, value string) string {
+		return aliases[strings.ToLower(strings.TrimSpace(value))]
+	}
+	return Appearance{
+		Font:   lookup(fontAliases, beam.Appearance.Font),
+		Radius: lookup(radiusAliases, beam.Appearance.Radius),
+		Motion: lookup(motionAliases, beam.Appearance.Animation),
+	}
+}
+
 func themeFor(beam *Settings) (string, bool) {
 	if beam == nil {
 		return "", false
@@ -323,11 +366,12 @@ type Selection struct {
 
 // Result is the state after a migration, ready to be saved.
 type Result struct {
-	Profiles  []models.Profile
-	Settings  models.AppSettings
-	Outcomes  []Outcome
-	Selection *Selection
-	Theme     string
+	Profiles   []models.Profile
+	Settings   models.AppSettings
+	Outcomes   []Outcome
+	Selection  *Selection
+	Theme      string
+	Appearance Appearance
 }
 
 // Migrate carries data onto the current profiles and settings.
@@ -353,6 +397,7 @@ func Migrate(
 
 	result := Result{Settings: next, Outcomes: []Outcome{}}
 	result.Theme, _ = themeFor(data.Settings)
+	result.Appearance = appearanceFor(data.Settings)
 
 	existing := append([]models.Profile(nil), profiles...)
 	var added []models.Profile

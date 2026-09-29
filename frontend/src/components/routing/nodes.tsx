@@ -194,6 +194,43 @@ export interface SourceNodeData {
     [key: string]: unknown;
 }
 
+/**
+ * The protocols not yet in a rule, as chips to click.
+ *
+ * Protocols are a closed set — the ones the core can detect by sniffing — so
+ * there is nothing to type. This used to be a text field with a <datalist>,
+ * which every engine draws as a native popup that ignores the app's styling
+ * entirely, and which still let you type something the backend would reject.
+ */
+function ProtocolChips({
+    values,
+    onChange,
+}: {
+    values: string[];
+    onChange: (values: string[]) => void;
+}) {
+    const remaining = SNIFFABLE_PROTOCOLS.filter((protocol) => !values.includes(protocol));
+    if (remaining.length === 0) {
+        return null;
+    }
+    return (
+        <div className="flex flex-wrap gap-1 pt-1.5">
+            {remaining.map((protocol) => (
+                <button
+                    key={protocol}
+                    type="button"
+                    onClick={() => onChange([...values, protocol])}
+                    aria-label={`Add ${protocol}`}
+                    className="nodrag flex items-center gap-0.5 rounded-md border border-dashed px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-solid hover:bg-muted hover:text-foreground"
+                >
+                    <Plus size={10} aria-hidden="true" />
+                    {protocol}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 /** A traffic source: a list of entries plus an output port. */
 export function SourceNode({ data, selected }: NodeProps) {
     const { kind, values, onChange, onDelete } = data as SourceNodeData;
@@ -253,38 +290,31 @@ export function SourceNode({ data, selected }: NodeProps) {
                     ))
                 )}
 
-                <div className="flex items-center gap-1.5 pt-1">
-                    {/* Protocols are a closed set the core can detect, so the
-                        list is offered rather than left to be guessed at and
-                        rejected later. */}
-                    <Input
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        onKeyDown={onKeyDown}
-                        onBlur={commit}
-                        placeholder={meta.placeholder}
-                        aria-label={`Add to ${meta.label}`}
-                        list={kind === "protocol" ? "sniffable-protocols" : undefined}
-                        className="h-7 text-[11px] font-mono nodrag"
-                    />
-                    {kind === "protocol" ? (
-                        <datalist id="sniffable-protocols">
-                            {SNIFFABLE_PROTOCOLS.map((protocol) => (
-                                <option key={protocol} value={protocol} />
-                            ))}
-                        </datalist>
-                    ) : null}
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={commit}
-                        aria-label={`Add to ${meta.label}`}
-                        className="h-7 w-7 shrink-0"
-                    >
-                        <Plus size={13} aria-hidden="true" />
-                    </Button>
-                </div>
+                {kind === "protocol" ? (
+                    <ProtocolChips values={values} onChange={onChange} />
+                ) : (
+                    <div className="flex items-center gap-1.5 pt-1">
+                        <Input
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={onKeyDown}
+                            onBlur={commit}
+                            placeholder={meta.placeholder}
+                            aria-label={`Add to ${meta.label}`}
+                            className="h-7 text-[11px] font-mono nodrag"
+                        />
+                        <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={commit}
+                            aria-label={`Add to ${meta.label}`}
+                            className="h-7 w-7 shrink-0"
+                        >
+                            <Plus size={13} aria-hidden="true" />
+                        </Button>
+                    </div>
+                )}
             </div>
 
             <Handle

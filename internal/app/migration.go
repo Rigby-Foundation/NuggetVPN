@@ -25,11 +25,12 @@ type BeamOffer struct {
 
 // BeamMigrationReport is the state after importing, for the UI to adopt.
 type BeamMigrationReport struct {
-	Profiles  []models.Profile   `json:"profiles"`
-	Settings  models.AppSettings `json:"settings"`
-	Outcomes  []beam.Outcome     `json:"outcomes"`
-	Selection *beam.Selection    `json:"selection"`
-	Theme     string             `json:"theme"`
+	Profiles   []models.Profile   `json:"profiles"`
+	Settings   models.AppSettings `json:"settings"`
+	Outcomes   []beam.Outcome     `json:"outcomes"`
+	Selection  *beam.Selection    `json:"selection"`
+	Theme      string             `json:"theme"`
+	Appearance beam.Appearance    `json:"appearance"`
 }
 
 // GetBeamOffer looks for a Beam installation. It only reads.
@@ -72,11 +73,12 @@ func (a *App) MigrateFromBeam() (BeamMigrationReport, error) {
 		return BeamMigrationReport{}, err
 	}
 	return BeamMigrationReport{
-		Profiles:  a.replaceProfiles(result.Profiles),
-		Settings:  saved,
-		Outcomes:  result.Outcomes,
-		Selection: result.Selection,
-		Theme:     result.Theme,
+		Profiles:   a.replaceProfiles(result.Profiles),
+		Settings:   saved,
+		Outcomes:   result.Outcomes,
+		Selection:  result.Selection,
+		Theme:      result.Theme,
+		Appearance: result.Appearance,
 	}, nil
 }
 

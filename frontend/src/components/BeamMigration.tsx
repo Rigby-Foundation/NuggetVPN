@@ -11,6 +11,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/format";
+import { FONTS, MOTIONS, RADII } from "@/lib/appearance";
 import { THEME_PRESETS } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { BeamItem, BeamMigrationReport, BeamOutcome, BeamPreview, BeamSubscription } from "@/types";
@@ -33,19 +34,19 @@ interface PanelProps {
     closeLabel?: string;
 }
 
-function expiry(seconds: number): string | null {
+function expiry(seconds: number): { text: string; expired: boolean } | null {
     if (!seconds) return null;
     const date = new Date(seconds * 1000);
-    const days = Math.round((date.getTime() - Date.now()) / 86_400_000);
+    const expired = date.getTime() < Date.now();
     const when = date.toLocaleDateString();
-    if (days < 0) return `expired ${when}`;
-    return `until ${when}`;
+    return { text: expired ? `expired ${when}` : `until ${when}`, expired };
 }
 
 function SubscriptionRow({ subscription }: { subscription: BeamSubscription }) {
+    const expires = subscription.host ? expiry(subscription.expires_at) : null;
     const facts = [
         subscription.host ? subscription.provider || subscription.host : "Added by hand",
-        subscription.host ? expiry(subscription.expires_at) : `${subscription.cached_nodes} servers`,
+        subscription.host ? null : `${subscription.cached_nodes} servers`,
         subscription.data_limit > 0
             ? `${formatBytes(subscription.data_used)} of ${formatBytes(subscription.data_limit)}`
             : null,
@@ -62,6 +63,15 @@ function SubscriptionRow({ subscription }: { subscription: BeamSubscription }) {
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {facts.join(" · ")}
+                    {expires ? (
+                        // An expired subscription usually serves placeholder
+                        // entries instead of servers, so importing it will not
+                        // produce anything that connects until it is renewed.
+                        <span className={expires.expired ? "text-destructive" : undefined}>
+                            {" · "}
+                            {expires.text}
+                        </span>
+                    ) : null}
                 </span>
             </span>
         </li>
@@ -126,9 +136,18 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
     const [error, setError] = useState("");
 
     const theme = THEME_PRESETS.find((preset) => preset.id === preview.theme);
+    const { font, radius, motion } = preview.appearance ?? { font: "", radius: "", motion: "" };
+    const label = (options: { id: string; label: string }[], id: string) =>
+        options.find((option) => option.id === id)?.label;
+    const look = [
+        ["Theme", theme?.label],
+        ["Font", label(FONTS, font)],
+        ["Corners", label(RADII, radius)],
+        ["Page transition", label(MOTIONS, motion)],
+    ].filter((entry): entry is [string, string] => Boolean(entry[1]));
     const carried: BeamItem[] = [
         ...preview.carried,
-        ...(theme ? [{ label: "Theme", detail: theme.label }] : []),
+        ...look.map(([itemLabel, detail]) => ({ label: itemLabel, detail })),
     ];
 
     const run = async () => {

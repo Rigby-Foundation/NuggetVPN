@@ -29,19 +29,35 @@
     font-display: swap;
 }
 
+/* Every scrollbar in the app, not only the ones that opt in: an element that
+   forgot the class used to get the platform's grey bar with arrow buttons, in
+   the middle of an otherwise themed window. */
+::-webkit-scrollbar,
 .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
 }
 
+::-webkit-scrollbar-button {
+    display: none;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+::-webkit-scrollbar-track,
 .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }
 
+::-webkit-scrollbar-thumb,
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background: color-mix(in oklch, var(--foreground) 15%, transparent);
     border-radius: 3px;
 }
 
+::-webkit-scrollbar-thumb:hover,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: color-mix(in oklch, var(--foreground) 28%, transparent);
 }
@@ -100,7 +116,8 @@
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
 
-    --font-sans: 'Google Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    /* --app-font is the font picked in Appearance, set on <html> at runtime. */
+    --font-sans: var(--app-font, 'Google Sans'), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Unbounded', 'Google Sans', ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', monospace;
 }
@@ -121,9 +138,17 @@
  * file set the knobs; they only spell a token out when it genuinely does not
  * follow from them.
  */
+/* Radius is page-wide, not per theme, so it stays out of the scopable block
+   below; Appearance overrides it inline on <html>. */
 :root {
-    color-scheme: light;
     --radius: 0.625rem;
+}
+
+/* The light block also matches a theme-light- class so a light theme can be
+   scoped to one element, as the custom theme editor does for its preview. */
+:root,
+[class*="theme-light-"] {
+    color-scheme: light;
 
     --ui-h: 286.375;
     --ui-c: 0.001;
@@ -572,4 +597,96 @@
     --brand-l: 0.79;
     --brand-c: 0.1;
     --brand-h: 65;
+}
+
+/* ---------------------------------------------------------------------------
+ * Page transitions.
+ *
+ * The content area is a React <ViewTransition name="app-content">, so a tab
+ * change is a browser view transition. Appearance picks the animation by
+ * setting data-motion on <html>; without one this is the browser's cross-fade.
+ * ------------------------------------------------------------------------ */
+::view-transition-old(app-content),
+::view-transition-new(app-content) {
+    animation-duration: 200ms;
+}
+
+:root[data-motion="slide"]::view-transition-old(app-content) {
+    animation: 140ms ease-in both nugget-fade-out;
+}
+:root[data-motion="slide"]::view-transition-new(app-content) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-right;
+}
+
+:root[data-motion="rise"]::view-transition-old(app-content) {
+    animation: 140ms ease-in both nugget-fade-out;
+}
+:root[data-motion="rise"]::view-transition-new(app-content) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-below;
+}
+
+:root[data-motion="none"]::view-transition-group(app-content),
+:root[data-motion="none"]::view-transition-old(app-content),
+:root[data-motion="none"]::view-transition-new(app-content) {
+    animation: none;
+}
+
+/* Someone who has asked the system for less motion gets the fade, whatever is
+   picked here: movement is the part that causes trouble, not the change. */
+@media (prefers-reduced-motion: reduce) {
+    :root[data-motion="slide"]::view-transition-new(app-content),
+    :root[data-motion="rise"]::view-transition-new(app-content) {
+        animation: 200ms ease-out both nugget-fade-in;
+    }
+}
+
+@keyframes nugget-fade-out {
+    to { opacity: 0; }
+}
+@keyframes nugget-fade-in {
+    from { opacity: 0; }
+}
+@keyframes nugget-in-from-right {
+    from { opacity: 0; transform: translateX(28px); }
+}
+@keyframes nugget-in-from-below {
+    from { opacity: 0; transform: translateY(20px); }
+}
+
+/* ---------------------------------------------------------------------------
+ * Theme editor sliders.
+ *
+ * A range input is drawn inline rather than as a popup, but its default look
+ * is the platform's. The track is painted by the editor (a hue wheel, a tint
+ * ramp) through --track, so the slider shows what dragging it will do.
+ * ------------------------------------------------------------------------ */
+.knob-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: var(--track, var(--muted));
+    border: 1px solid var(--border);
+    outline: none;
+    cursor: pointer;
+}
+.knob-slider:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 45%, transparent);
+}
+.knob-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 999px;
+    background: var(--thumb, var(--foreground));
+    border: 2px solid var(--background);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.knob-slider::-moz-range-thumb {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 999px;
+    background: var(--thumb, var(--foreground));
+    border: 2px solid var(--background);
 }

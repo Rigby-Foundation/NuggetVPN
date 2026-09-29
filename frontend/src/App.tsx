@@ -7,6 +7,7 @@ import { appWindow, errorMessage, invoke, save, writeTextFile } from "@/lib/back
 
 import AddModal from "@/components/AddModal";
 import { BeamMigrationDialog } from "@/components/BeamMigration";
+import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
@@ -96,6 +97,7 @@ function guessPlatform(): string {
 
 function App() {
     const { theme, setTheme } = useTheme();
+    const appearance = useAppearance();
     const isMobile = useIsMobile();
 
     const {
@@ -247,6 +249,10 @@ function App() {
         if (report.theme) {
             setTheme(report.theme);
         }
+        // Empty means Beam's choice had no equivalent here; keep the current.
+        if (report.appearance.font) appearance.setFont(report.appearance.font);
+        if (report.appearance.radius) appearance.setRadius(report.appearance.radius);
+        if (report.appearance.motion) appearance.setMotion(report.appearance.motion);
         if (report.selection) {
             const { domain, profile_id } = report.selection;
             setSelection({
@@ -258,7 +264,7 @@ function App() {
         const total = report.outcomes.reduce((sum, outcome) => sum + outcome.profiles, 0);
         appendLog([`Imported ${total} servers from Beam.`]);
         return report;
-    }, [appendLog, setProfiles, setSelection, setTheme]);
+    }, [appearance, appendLog, setProfiles, setSelection, setTheme]);
 
     const closeBeam = useCallback(() => {
         setShowBeam(false);

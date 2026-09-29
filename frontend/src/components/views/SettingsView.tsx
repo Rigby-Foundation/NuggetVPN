@@ -21,6 +21,13 @@ import PageShell from "@/components/layout/PageShell";
 import SubscriptionIdentity from "@/components/views/SubscriptionIdentity";
 import ThemePicker from "@/components/settings/theme-picker";
 import { BeamMigrationPanel } from "@/components/BeamMigration";
+import { useAppearance } from "@/components/appearance-provider";
+import {
+  FontPicker,
+  MotionPicker,
+  RadiusPicker,
+} from "@/components/settings/appearance-options";
+import { FONTS } from "@/lib/appearance";
 import {
   SettingsField,
   SettingsGroup,
@@ -146,6 +153,7 @@ function SettingsView({
   onMigrateFromBeam,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
+  const { prefs: appearance, activeCustom } = useAppearance();
   const [newChainId, setNewChainId] = React.useState("");
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
@@ -176,7 +184,9 @@ function SettingsView({
     switch (section.id) {
       case "appearance": {
         const preset = THEME_PRESETS.find((item) => item.id === theme);
-        return preset ? preset.label : "Follows the system";
+        const themeName = activeCustom?.name ?? preset?.label ?? "System theme";
+        const font = FONTS.find((item) => item.id === appearance.font)?.label;
+        return [themeName, font].filter(Boolean).join(" · ");
       }
       case "connection":
         return `MTU ${appSettings.mtu} · DNS ${appSettings.dns || "not set"}`;
@@ -218,12 +228,32 @@ function SettingsView({
     switch (id) {
       case "appearance":
         return (
-          <SettingsGroup
-            title="Theme"
-            description="Applies straight away and is remembered for next time."
-          >
-            <ThemePicker theme={theme} setTheme={setTheme} />
-          </SettingsGroup>
+          <>
+            <SettingsGroup
+              title="Theme"
+              description="Applies straight away and is remembered for next time."
+            >
+              <ThemePicker theme={theme} setTheme={setTheme} />
+            </SettingsGroup>
+
+            <SettingsGroup title="Font" description="Used for all text in the app.">
+              <FontPicker />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title="Corners"
+              description="How rounded buttons, cards and fields are."
+            >
+              <RadiusPicker />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title="Page transition"
+              description="How the view animates when you switch tabs. If your system asks for reduced motion, movement becomes a fade."
+            >
+              <MotionPicker />
+            </SettingsGroup>
+          </>
         );
 
       case "connection":

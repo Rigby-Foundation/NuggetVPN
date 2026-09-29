@@ -451,6 +451,22 @@ func TestThemeMapping(t *testing.T) {
 	}
 }
 
+func TestAppearanceMapping(t *testing.T) {
+	settings := &Settings{}
+	settings.Appearance.Font = "Rubik"
+	settings.Appearance.Radius = "full"
+	settings.Appearance.Animation = "bottom"
+	got := appearanceFor(settings)
+	if got != (Appearance{Font: "rubik", Radius: "round", Motion: "rise"}) {
+		t.Errorf("mapped to %+v", got)
+	}
+
+	settings.Appearance.Font = "Comic Sans"
+	if got := appearanceFor(settings); got.Font != "" {
+		t.Errorf("an unknown font should map to nothing, got %q", got.Font)
+	}
+}
+
 func TestPreviewNeverExposesTheURL(t *testing.T) {
 	secret := "https://sub.example.com/very-secret-token"
 	dir := writeBeamDir(t, settingsJSON, "", map[string][]byte{

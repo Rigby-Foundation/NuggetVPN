@@ -80,7 +80,10 @@ type Settings struct {
 		PrimaryDNS string `json:"PrimaryDNS"`
 	} `json:"Connection"`
 	Appearance struct {
-		Theme string `json:"Theme"`
+		Theme     string `json:"Theme"`
+		Font      string `json:"Font"`
+		Radius    string `json:"Radius"`
+		Animation string `json:"Animation"`
 	} `json:"Appearance"`
 	SplitTunnel struct {
 		Enabled bool              `json:"enabled"`

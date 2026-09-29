@@ -1,5 +1,13 @@
-import { Check, Laptop } from "lucide-react";
+import { useState } from "react";
+import { Check, Laptop, Pencil, Plus } from "lucide-react";
 
+import { useAppearance } from "@/components/appearance-provider";
+import ThemeEditor from "@/components/settings/theme-editor";
+import {
+    customThemeSwatch,
+    CustomTheme,
+    newCustomTheme,
+} from "@/lib/appearance";
 import { THEME_PRESETS, type ThemePreset } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
@@ -113,9 +121,29 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
     );
 }
 
+/** A custom theme shown the way a preset is, from its own numbers. */
+function asPreset(theme: CustomTheme): ThemePreset {
+    return {
+        id: theme.id,
+        label: theme.name,
+        hint: theme.mode === "dark" ? "Custom, dark" : "Custom, light",
+        mode: theme.mode,
+        className: "",
+        swatch: customThemeSwatch(theme),
+    };
+}
+
 function ThemePicker({ theme, setTheme }: Props) {
     const light = THEME_PRESETS.filter((preset) => preset.mode === "light");
     const dark = THEME_PRESETS.filter((preset) => preset.mode === "dark");
+    const { prefs, activeCustom, showCustomTheme, saveCustomTheme, deleteCustomTheme } =
+        useAppearance();
+    const [editing, setEditing] = useState<{ theme: CustomTheme; isNew: boolean } | null>(null);
+
+    // A new theme starts from whichever mode is on screen, so the first thing
+    // the preview shows is close to what the user is looking at already.
+    const currentlyDark = document.documentElement.classList.contains("dark") ||
+        [...document.documentElement.classList].some((name) => name.startsWith("theme-dark-"));
 
     return (
         <div className="space-y-5">
@@ -173,6 +201,59 @@ function ThemePicker({ theme, setTheme }: Props) {
                     />
                 ))}
             </Group>
+
+            <Group title="Custom">
+                {prefs.customThemes.map((custom) => (
+                    // The edit control sits beside the option, not inside it:
+                    // a button inside a button is invalid and would steal the
+                    // click that selects the theme.
+                    <div key={custom.id} className="relative">
+                        <PresetOption
+                            preset={asPreset(custom)}
+                            active={activeCustom?.id === custom.id}
+                            onSelect={() => showCustomTheme(custom)}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setEditing({ theme: custom, isNew: false })}
+                            aria-label={`Edit ${custom.name}`}
+                            className="absolute left-3.5 top-3.5 grid h-6 w-6 place-items-center rounded-md bg-black/35 text-white backdrop-blur-sm transition-colors hover:bg-black/55"
+                        >
+                            <Pencil size={11} aria-hidden="true" />
+                        </button>
+                    </div>
+                ))}
+                <button
+                    type="button"
+                    onClick={() =>
+                        setEditing({ theme: newCustomTheme(currentlyDark ? "dark" : "light"), isNew: true })
+                    }
+                    className="flex flex-col rounded-xl border-2 border-transparent p-2 text-left hover:border-border"
+                >
+                    <span className="grid h-14 w-full place-items-center rounded-lg border-2 border-dashed text-muted-foreground">
+                        <Plus size={18} aria-hidden="true" />
+                    </span>
+                    <span className="mt-2 px-0.5 text-xs font-medium">New theme</span>
+                    <span className="block px-0.5 text-[11px] text-muted-foreground">Pick your own colours</span>
+                </button>
+            </Group>
+
+            <ThemeEditor
+                theme={editing?.theme ?? null}
+                isNew={editing?.isNew ?? false}
+                onClose={() => setEditing(null)}
+                onSave={(custom) => {
+                    saveCustomTheme(custom);
+                    if (editing?.isNew) {
+                        showCustomTheme(custom);
+                    }
+                    setEditing(null);
+                }}
+                onDelete={(id) => {
+                    deleteCustomTheme(id);
+                    setEditing(null);
+                }}
+            />
         </div>
     );
 }

@@ -166,6 +166,14 @@ export interface BeamPreview {
     skipped: BeamItem[];
     /** The matching preset id, or empty. */
     theme: string;
+    appearance: BeamAppearance;
+}
+
+/** Beam's font, corners and transition in this app's ids; empty = no match. */
+export interface BeamAppearance {
+    font: string;
+    radius: string;
+    motion: string;
 }
 
 export interface BeamOffer {
@@ -189,4 +197,5 @@ export interface BeamMigrationReport {
     outcomes: BeamOutcome[];
     selection: { domain: string; profile_id: string } | null;
     theme: string;
+    appearance: BeamAppearance;
 }
