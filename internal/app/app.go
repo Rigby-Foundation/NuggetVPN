@@ -116,6 +116,11 @@ type App struct {
 
 	// notifier shows system notifications; nil in tests.
 	notifier *notifications.NotificationService
+
+	// version is the running version; latest the newest release, once
+	// CheckForUpdate has looked.
+	version string
+	latest  *release
 }
 
 // New loads persisted state and prepares the core client. icon is the tray
@@ -137,6 +142,7 @@ func New(version string, icon []byte, notifier *notifications.NotificationServic
 		icon:   icon,
 
 		notifier: notifier,
+		version:  version,
 	}
 	service.settings.Normalize()
 	service.settings.LaunchAtStartup = autostart.Enabled()

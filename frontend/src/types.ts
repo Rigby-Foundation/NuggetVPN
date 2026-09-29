@@ -99,6 +99,8 @@ export interface AppSettings {
     /** Null means never chosen; the backend treats that as on. */
     clipboard_offer: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
+    update_check: boolean | null;
+    /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;
 }
@@ -244,6 +246,19 @@ export interface LiveConnection {
     upload: number;
     download: number;
     started: number;
+}
+
+/** The newest release against the running version; see app.UpdateInfo. */
+export interface UpdateInfo {
+    current: string;
+    latest: string;
+    available: boolean;
+    notes: string;
+    page_url: string;
+    asset?: string;
+    asset_size?: number;
+    installable: boolean;
+    checked_at: number;
 }
 
 /** A rule list from a URL, as the backend knows it. */

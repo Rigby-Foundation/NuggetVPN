@@ -37,6 +37,7 @@ import {
     IpInfo,
     Profile,
     ProfilePing,
+    UpdateInfo,
 } from "@/types";
 
 import "./App.css";
@@ -86,6 +87,7 @@ const PENDING_SETTINGS: AppSettings = {
     fastest_server: false,
     notifications: null,
     clipboard_offer: null,
+    update_check: null,
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],
@@ -173,6 +175,54 @@ function App() {
             }),
         []
     );
+
+    // Opening a settings section from elsewhere, such as the update toast.
+    const [settingsOpen, setSettingsOpen] = useState<{ id: string; n: number }>();
+    const openSettingsSection = useCallback((id: string) => {
+        setActiveTab("settings");
+        setSettingsOpen((current) => ({ id, n: (current?.n ?? 0) + 1 }));
+    }, []);
+
+    // A new release, checked at start and then once a day, announced once per
+    // version.
+    const updateCheck = settings !== PENDING_SETTINGS && settings.update_check !== false;
+    const announcedRef = useRef("");
+    useEffect(() => {
+        if (!updateCheck) return;
+        const check = async () => {
+            try {
+                const info = await invoke<UpdateInfo>("check_for_update");
+                if (!info.available || announcedRef.current === info.latest) return;
+                announcedRef.current = info.latest;
+                toast(
+                    (shown) => (
+                        <span className="flex items-center gap-3 text-sm">
+                            {t("updates.toast", { version: info.latest })}
+                            <button
+                                type="button"
+                                className="font-medium text-primary"
+                                onClick={() => {
+                                    toast.dismiss(shown.id);
+                                    openSettingsSection("updates");
+                                }}
+                            >
+                                {t("updates.view")}
+                            </button>
+                        </span>
+                    ),
+                    { id: "update", duration: 15000 }
+                );
+            } catch {
+                // Offline, or GitHub unreachable: try again tomorrow.
+            }
+        };
+        const first = window.setTimeout(check, 5000);
+        const daily = window.setInterval(check, 24 * 60 * 60 * 1000);
+        return () => {
+            window.clearTimeout(first);
+            window.clearInterval(daily);
+        };
+    }, [updateCheck, openSettingsSection, t]);
 
     // Links offered for import: a nuggetvpn:// link the app was opened with,
     // or one found on the clipboard. Both open the Add dialog filled in;
@@ -960,6 +1010,7 @@ function App() {
                                 {activeTab === "settings" && (
                                     <SettingsView
                                         homeSignal={settingsHome}
+                                        openSignal={settingsOpen}
                                         theme={theme}
                                         setTheme={setTheme}
                                         appSettings={settings}

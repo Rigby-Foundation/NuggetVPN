@@ -164,6 +164,9 @@ type AppSettings struct {
 	// found on the clipboard when the window comes forward. A pointer so
 	// older settings default to on.
 	ClipboardOffer *bool `json:"clipboard_offer"`
+	// UpdateCheck looks for a new release at start and once a day. A
+	// pointer so older settings default to on.
+	UpdateCheck *bool `json:"update_check"`
 	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
 	// Off means never automatically, for every subscription — a refresh by
 	// hand still works. A pointer so older settings default to on.
@@ -268,6 +271,10 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.GeoFiles == nil {
 		s.GeoFiles = map[string]GeoFile{}
+	}
+	if s.UpdateCheck == nil {
+		enabled := true
+		s.UpdateCheck = &enabled
 	}
 	if s.ClipboardOffer == nil {
 		enabled := true

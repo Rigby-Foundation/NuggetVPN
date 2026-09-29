@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  CircleArrowUp,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -27,6 +28,7 @@ import SubscriptionIdentity from "@/components/views/SubscriptionIdentity";
 import ThemePicker from "@/components/settings/theme-picker";
 import { BeamMigrationPanel } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
+import { UpdatesPanel } from "@/components/settings/updates";
 import {
   FontPicker,
   MotionPicker,
@@ -77,6 +79,8 @@ interface SettingsViewProps {
   onMigrateFromBeam: () => Promise<BeamMigrationReport>;
   /** Changes when the sidebar's Settings is clicked while already here. */
   homeSignal: number;
+  /** Opens a section from elsewhere: bump n to open id again. */
+  openSignal?: { id: string; n: number };
 }
 
 type SectionId =
@@ -89,7 +93,8 @@ type SectionId =
   | "subscriptions"
   | "privacy"
   | "sync"
-  | "beam";
+  | "beam"
+  | "updates";
 
 interface Section {
   id: SectionId;
@@ -190,6 +195,12 @@ const SECTIONS: Section[] = [
     title: "settings.beam",
     blurb: "settings.beam.blurb",
   },
+  {
+    id: "updates",
+    icon: CircleArrowUp,
+    title: "settings.updates",
+    blurb: "settings.updates.blurb",
+  },
 ];
 
 function SettingsView({
@@ -205,6 +216,7 @@ function SettingsView({
   beamPreview,
   onMigrateFromBeam,
   homeSignal,
+  openSignal,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
   // Which way the last move went, so coming back animates in reverse.
@@ -225,6 +237,12 @@ function SettingsView({
       setOpenId(null);
     }
   }, [homeSignal]);
+  React.useEffect(() => {
+    if (openSignal && SECTIONS.some((section) => section.id === openSignal.id)) {
+      setDirection("forward");
+      setOpenId(openSignal.id as SectionId);
+    }
+  }, [openSignal]);
   const { prefs: appearance, activeCustom } = useAppearance();
   const { t, choice, setChoice, language } = useI18n();
   const languageName = (id: string) => LANGUAGES.find((item) => item.id === id)?.label ?? id;
@@ -834,6 +852,9 @@ function SettingsView({
             />
           </SettingsGroup>
         );
+
+      case "updates":
+        return <UpdatesPanel appSettings={appSettings} onSettingsChange={onSettingsChange} />;
 
       case "sync":
         return (

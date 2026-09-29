@@ -62,6 +62,9 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
 
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
     take_pending_link: { method: "TakePendingLink", args: [] },
+    get_version: { method: "GetVersion", args: [] },
+    check_for_update: { method: "CheckForUpdate", args: [] },
+    install_update: { method: "InstallUpdate", args: [] },
     read_clipboard_link: { method: "ReadClipboardLink", args: [] },
 
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
@@ -144,6 +147,7 @@ export const EVENTS = {
     settings: "settings-changed",
     /** A nuggetvpn:// link to offer in the Add dialog. */
     importLink: "import-link",
+    updateProgress: "update-progress",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */
