@@ -173,6 +173,11 @@ func measureICMP(host string, timeout time.Duration) *uint64 {
 		return nil
 	}
 
+	// On Windows this answers without starting a process; see icmp_windows.go.
+	if result, ok := nativeICMP(address, timeout); ok {
+		return result
+	}
+
 	var args []string
 	switch runtime.GOOS {
 	case "windows":
@@ -192,8 +197,11 @@ func measureICMP(host string, timeout time.Duration) *uint64 {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout+2*time.Second)
 	defer cancel()
 
+	command := exec.CommandContext(ctx, "ping", args...)
+	hideConsole(command)
+
 	start := time.Now()
-	if err := exec.CommandContext(ctx, "ping", args...).Run(); err != nil {
+	if err := command.Run(); err != nil {
 		return nil
 	}
 	elapsed := uint64(time.Since(start).Milliseconds())
