@@ -36,7 +36,7 @@ var appIcon []byte
 
 // version is stamped into the core service handshake so the GUI can detect a
 // service left behind by an older build.
-var version = "1.0.0"
+var version = "2.0.0"
 
 func main() {
 	for _, arg := range os.Args[1:] {
