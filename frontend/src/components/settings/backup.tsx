@@ -89,7 +89,8 @@ export function BackupPanel() {
 
     return (
         <>
-            <SettingsGroup description={t("backup.description")}>
+            <SettingsGroup>
+                <p className="text-xs leading-relaxed text-muted-foreground">{t("backup.description")}</p>
                 <SettingsField
                     label={t("backup.export")}
                     description={t("backup.export.description")}
