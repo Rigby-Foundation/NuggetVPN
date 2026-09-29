@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   ArrowLeft,
+  Archive,
   CheckCircle2,
   CircleArrowUp,
   ChevronDown,
@@ -29,6 +30,7 @@ import ThemePicker from "@/components/settings/theme-picker";
 import { BeamMigrationPanel } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import { UpdatesPanel } from "@/components/settings/updates";
+import { BackupPanel } from "@/components/settings/backup";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
 import {
@@ -96,6 +98,7 @@ type SectionId =
   | "privacy"
   | "sync"
   | "beam"
+  | "backup"
   | "updates";
 
 interface Section {
@@ -196,6 +199,12 @@ const SECTIONS: Section[] = [
     icon: PackageOpen,
     title: "settings.beam",
     blurb: "settings.beam.blurb",
+  },
+  {
+    id: "backup",
+    icon: Archive,
+    title: "settings.backup",
+    blurb: "settings.backup.blurb",
   },
   {
     id: "updates",
@@ -877,6 +886,9 @@ function SettingsView({
 
       case "updates":
         return <UpdatesPanel appSettings={appSettings} onSettingsChange={onSettingsChange} />;
+
+      case "backup":
+        return <BackupPanel />;
 
       case "sync":
         return (

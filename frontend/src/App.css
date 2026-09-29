@@ -931,3 +931,41 @@
     --p-fg: #d8f0ee;
     --p-accent: #2dd4bf; --p-on-accent: #0d1a1a;
 }
+
+/* A custom theme's background picture. The layer sits behind everything and
+   overshoots the window, so a blurred edge never shows; the wash over it is
+   the theme's own background colour. With a picture on, the page, cards and
+   sidebar become see-through by --backdrop-panel. Popovers and dialogs keep
+   their solid colour, so what floats on top is always readable. */
+#app-backdrop {
+    position: fixed;
+    inset: -48px;
+    z-index: -1;
+    pointer-events: none;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#app-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h));
+    opacity: var(--backdrop-dim, 0.35);
+}
+
+:root[data-backdrop] {
+    --background: oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h) / var(--backdrop-panel, 0.65));
+    --card: oklch(var(--ui-card-l) var(--ui-c) var(--ui-h) / min(1, calc(var(--backdrop-panel, 0.65) + 0.1)));
+    --sidebar: oklch(var(--ui-card-l) var(--ui-c) var(--ui-h) / var(--backdrop-panel, 0.65));
+}
+
+:root[data-backdrop] body {
+    background: transparent;
+}
+
+:root[data-backdrop] [data-slot="dialog-content"],
+:root[data-backdrop] [data-slot="sheet-content"] {
+    background-color: oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h));
+}

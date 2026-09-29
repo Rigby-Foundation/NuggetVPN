@@ -65,6 +65,54 @@ const DEFAULT_FONT: Record<Script, string> = {
     arab: "vazirmatn",
 };
 
+/**
+ * A font the user added, from a file. Stored in the backend's data folder
+ * and loaded from /user-files/fonts/; listed here so the choice can be
+ * applied at start, before the backend answers.
+ */
+export interface UserFont {
+    id: string;
+    name: string;
+    url: string;
+}
+
+/** Prefix for the id of a user font among the font options. */
+export const USER_FONT_PREFIX = "user:";
+
+const USER_FONT_URL = /^\/user-files\/fonts\/[a-f0-9]{16}\.(ttf|otf|woff2?)$/;
+
+let userFontOptions: FontOption[] = [];
+
+/**
+ * Makes the user's fonts available: an @font-face for each, and an entry
+ * among the font options. Which scripts a file covers cannot be known ahead,
+ * so a user font is offered for every language; the fallback stack draws any
+ * letter it lacks.
+ */
+export function setUserFonts(fonts: UserFont[]) {
+    const valid = fonts.filter((font) => USER_FONT_URL.test(font.url) && /^[a-f0-9]{16}$/.test(font.id));
+    userFontOptions = valid.map((font) => ({
+        id: USER_FONT_PREFIX + font.id,
+        label: font.name || font.id,
+        family: `'User ${font.id}'`,
+        scripts: "all" as const,
+    }));
+    let style = document.getElementById("user-fonts") as HTMLStyleElement | null;
+    if (!style) {
+        style = document.createElement("style");
+        style.id = "user-fonts";
+        document.head.appendChild(style);
+    }
+    style.textContent = valid
+        .map((font) => `@font-face { font-family: 'User ${font.id}'; src: url("${font.url}"); font-display: swap; }`)
+        .join("\n");
+}
+
+/** Every font on offer: the bundled ones and the user's. */
+export function allFonts(): FontOption[] {
+    return [...FONTS, ...userFontOptions];
+}
+
 /** Whether a font fully covers a script. */
 export function covers(font: FontOption, script: Script): boolean {
     return font.scripts === "all" || font.scripts.includes(script);
@@ -72,7 +120,7 @@ export function covers(font: FontOption, script: Script): boolean {
 
 /** The fonts offered for a script: only the ones that cover it completely. */
 export function fontsFor(script: Script): FontOption[] {
-    return FONTS.filter((font) => covers(font, script));
+    return allFonts().filter((font) => covers(font, script));
 }
 
 /**
@@ -81,7 +129,7 @@ export function fontsFor(script: Script): FontOption[] {
  * back to a language it covers restores it.
  */
 export function effectiveFont(chosen: string, script: Script): FontOption {
-    const font = FONTS.find((option) => option.id === chosen);
+    const font = allFonts().find((option) => option.id === chosen);
     if (font && covers(font, script)) {
         return font;
     }
@@ -91,7 +139,7 @@ export function effectiveFont(chosen: string, script: Script): FontOption {
 /** A font's name as shown: its own name, or the translated "System". */
 export function fontLabel(t: Translate, id: string): string {
     if (id === "system") return t("appearance.font.system");
-    return FONTS.find((font) => font.id === id)?.label ?? id;
+    return allFonts().find((font) => font.id === id)?.label ?? id;
 }
 
 export interface RadiusOption {
@@ -141,6 +189,50 @@ export interface CustomTheme {
     background: { h: number; c: number; l: number };
     /** The accent: hue and vividness (chroma). */
     accent: { h: number; c: number };
+    /** A picture behind the app, with its effects; none when absent. */
+    image?: ThemeImage;
+}
+
+/**
+ * A custom theme's background picture and what is done to it. The effects
+ * are CSS filters on the picture, a wash of the theme's own background
+ * colour over it, and how much of the picture the app's panels let through.
+ */
+export interface ThemeImage {
+    /** /user-files/backgrounds/<file>, from the backend. */
+    url: string;
+    /** Blur radius, px: 0–40. */
+    blur: number;
+    /** 0.3–1.5; 1 leaves it as it is. */
+    brightness: number;
+    /** 0–2; 0 is black and white, 1 as it is. */
+    saturate: number;
+    /** How much of the theme's background colour is washed over it: 0–0.9. */
+    dim: number;
+    /** How opaque the app's panels are over it: 0.2 (glassy) to 1 (solid). */
+    panel: number;
+}
+
+export const THEME_IMAGE_LIMITS = {
+    blur: { min: 0, max: 40, step: 1, fallback: 12 },
+    brightness: { min: 0.3, max: 1.5, step: 0.05, fallback: 0.9 },
+    saturate: { min: 0, max: 2, step: 0.05, fallback: 1 },
+    dim: { min: 0, max: 0.9, step: 0.05, fallback: 0.35 },
+    panel: { min: 0.2, max: 1, step: 0.05, fallback: 0.65 },
+} as const;
+
+const BACKGROUND_URL = /^\/user-files\/backgrounds\/[a-f0-9]{16}\.(png|jpg|webp|gif)$/;
+
+/** A new picture's effects: blurred and darkened enough for text to read. */
+export function defaultThemeImage(url: string): ThemeImage {
+    return {
+        url,
+        blur: THEME_IMAGE_LIMITS.blur.fallback,
+        brightness: THEME_IMAGE_LIMITS.brightness.fallback,
+        saturate: THEME_IMAGE_LIMITS.saturate.fallback,
+        dim: THEME_IMAGE_LIMITS.dim.fallback,
+        panel: THEME_IMAGE_LIMITS.panel.fallback,
+    };
 }
 
 /** Prefix for a stored custom theme's id. */
@@ -236,6 +328,8 @@ export interface AppearancePrefs {
     customThemes: CustomTheme[];
     /** Which custom theme a custom-dark or custom-light theme id shows. */
     activeCustom: string;
+    /** The fonts the user added; see UserFont. */
+    userFonts: UserFont[];
 }
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
@@ -244,6 +338,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     motion: "fade",
     customThemes: [],
     activeCustom: "",
+    userFonts: [],
 };
 
 const STORAGE_KEY = "nugget.appearance";
@@ -273,6 +368,25 @@ function sanitizeTheme(raw: unknown): CustomTheme | null {
             h: clamp(value.accent?.h, 0, 360, 70),
             c: clamp(value.accent?.c, 0, 0.25, 0.15),
         },
+        image: sanitizeImage(value.image),
+    };
+}
+
+function sanitizeImage(raw: unknown): ThemeImage | undefined {
+    if (!raw || typeof raw !== "object") return undefined;
+    const value = raw as Partial<ThemeImage>;
+    if (typeof value.url !== "string" || !BACKGROUND_URL.test(value.url)) return undefined;
+    const limit = (key: keyof typeof THEME_IMAGE_LIMITS) => {
+        const { min, max, fallback } = THEME_IMAGE_LIMITS[key];
+        return clamp(value[key], min, max, fallback);
+    };
+    return {
+        url: value.url,
+        blur: limit("blur"),
+        brightness: limit("brightness"),
+        saturate: limit("saturate"),
+        dim: limit("dim"),
+        panel: limit("panel"),
     };
 }
 
@@ -285,8 +399,21 @@ export function loadAppearance(): AppearancePrefs {
         const customThemes: CustomTheme[] = Array.isArray(raw.customThemes)
             ? (raw.customThemes.map(sanitizeTheme).filter(Boolean) as CustomTheme[])
             : [];
+        const userFonts: UserFont[] = Array.isArray(raw.userFonts)
+            ? raw.userFonts.filter(
+                  (font: unknown): font is UserFont =>
+                      !!font &&
+                      typeof (font as UserFont).id === "string" &&
+                      typeof (font as UserFont).url === "string" &&
+                      typeof (font as UserFont).name === "string"
+              )
+            : [];
+        // Before picking the font: a user font is only a valid choice once
+        // it is registered.
+        setUserFonts(userFonts);
         return {
-            font: pick(FONTS, raw.font, DEFAULT_APPEARANCE.font),
+            userFonts,
+            font: pick(allFonts(), raw.font, DEFAULT_APPEARANCE.font),
             radius: pick(RADII, raw.radius, DEFAULT_APPEARANCE.radius),
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
             customThemes,
@@ -341,8 +468,40 @@ export function applyCustomTheme(theme: CustomTheme | undefined) {
     for (const name of KNOB_NAMES) {
         root.style.removeProperty(name);
     }
+    applyBackdrop(theme?.image);
     if (!theme) return;
     for (const [name, value] of Object.entries(customThemeKnobs(theme))) {
         root.style.setProperty(name, value);
     }
+}
+
+/**
+ * Puts a theme's picture behind the app, or takes it away.
+ *
+ * The picture is a fixed layer at the back of the page with the effects as
+ * CSS filters. data-backdrop on <html> makes the page, cards and sidebar
+ * see-through by --backdrop-panel (see App.css); menus and dialogs stay
+ * solid, so they are always readable.
+ */
+export function applyBackdrop(image: ThemeImage | undefined) {
+    const root = document.documentElement;
+    let layer = document.getElementById("app-backdrop");
+    if (!image || !BACKGROUND_URL.test(image.url)) {
+        layer?.remove();
+        delete root.dataset.backdrop;
+        root.style.removeProperty("--backdrop-panel");
+        root.style.removeProperty("--backdrop-dim");
+        return;
+    }
+    if (!layer) {
+        layer = document.createElement("div");
+        layer.id = "app-backdrop";
+        layer.setAttribute("aria-hidden", "true");
+        document.body.prepend(layer);
+    }
+    layer.style.backgroundImage = `url("${image.url}")`;
+    layer.style.filter = `blur(${image.blur}px) brightness(${image.brightness}) saturate(${image.saturate})`;
+    root.dataset.backdrop = "";
+    root.style.setProperty("--backdrop-panel", String(image.panel));
+    root.style.setProperty("--backdrop-dim", String(image.dim));
 }

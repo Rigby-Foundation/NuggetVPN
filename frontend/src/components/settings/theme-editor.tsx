@@ -1,5 +1,5 @@
 import { CSSProperties, useEffect, useState } from "react";
-import { Moon, Sun, Trash2 } from "lucide-react";
+import { ImagePlus, Loader2, Moon, Sun, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,12 @@ import {
     customClass,
     customThemeKnobs,
     CustomTheme,
+    defaultThemeImage,
+    THEME_IMAGE_LIMITS,
+    ThemeImage,
 } from "@/lib/appearance";
+import { UserFile } from "@/types";
+import { errorMessage, invoke } from "@/lib/backend";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -84,14 +89,39 @@ function Slider({
 /** A small slice of the real UI, drawn in the theme being edited. */
 function Preview({ theme }: { theme: CustomTheme }) {
     const t = useT();
+    const image = theme.image;
     // The class re-declares every token on this element, from the knobs set
     // inline beside it, so real components render in the edited theme without
-    // touching the rest of the window.
+    // touching the rest of the window. With a picture, the page and card
+    // colours take the panel opacity, as they do across the app.
+    const glass = image
+        ? {
+              "--background": `oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h) / ${image.panel})`,
+              "--card": `oklch(var(--ui-card-l) var(--ui-c) var(--ui-h) / ${Math.min(1, image.panel + 0.1)})`,
+          }
+        : {};
     return (
         <div
-            className={cn(customClass(theme), "rounded-xl border bg-background p-3 text-foreground")}
-            style={customThemeKnobs(theme) as CSSProperties}
+            className={cn(customClass(theme), "relative isolate overflow-hidden rounded-xl border bg-background p-3 text-foreground")}
+            style={{ ...customThemeKnobs(theme), ...glass } as CSSProperties}
         >
+            {image ? (
+                <>
+                    <div
+                        aria-hidden="true"
+                        className="absolute -inset-6 -z-10 bg-cover bg-center"
+                        style={{
+                            backgroundImage: `url("${image.url}")`,
+                            filter: `blur(${image.blur / 2}px) brightness(${image.brightness}) saturate(${image.saturate})`,
+                        }}
+                    />
+                    <div
+                        aria-hidden="true"
+                        className="absolute inset-0 -z-10"
+                        style={{ background: "oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h))", opacity: image.dim }}
+                    />
+                </>
+            ) : null}
             <div className="space-y-3 rounded-lg border bg-card p-3 text-card-foreground">
                 <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -167,6 +197,8 @@ export default function ThemeEditor({
     const t = useT();
     const [draft, setDraft] = useState<CustomTheme | null>(theme);
     useEffect(() => setDraft(theme), [theme]);
+    const [picking, setPicking] = useState(false);
+    const [imageError, setImageError] = useState("");
 
     if (!draft) {
         return null;
@@ -177,6 +209,21 @@ export default function ThemeEditor({
         set({ background: { ...draft.background, ...patch } });
     const setAccent = (patch: Partial<CustomTheme["accent"]>) =>
         set({ accent: { ...draft.accent, ...patch } });
+    const setImage = (patch: Partial<ThemeImage>) =>
+        draft.image && set({ image: { ...draft.image, ...patch } });
+
+    const pickImage = async () => {
+        setPicking(true);
+        setImageError("");
+        try {
+            const file = await invoke<UserFile | null>("import_user_file", { kind: "backgrounds" });
+            if (file) set({ image: draft.image ? { ...draft.image, url: file.url } : defaultThemeImage(file.url) });
+        } catch (error) {
+            setImageError(errorMessage(error));
+        } finally {
+            setPicking(false);
+        }
+    };
 
     // Switching mode moves the page lightness into the new mode's range,
     // mirrored, so "quite dark" becomes "quite light" rather than jumping.
@@ -279,6 +326,61 @@ export default function ThemeEditor({
                                 onChange={(value) => setAccent({ c: value })}
                             />
                         </section>
+
+                        <section className="space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-xs font-medium text-muted-foreground">{t("editor.image")}</h4>
+                                <div className="flex items-center gap-1">
+                                    <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => void pickImage()} disabled={picking}>
+                                        {picking ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} aria-hidden="true" />}
+                                        {t(draft.image ? "editor.image.change" : "editor.image.choose")}
+                                    </Button>
+                                    {draft.image ? (
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7"
+                                            onClick={() => set({ image: undefined })}
+                                            aria-label={t("editor.image.remove")}
+                                        >
+                                            <Trash2 size={12} aria-hidden="true" />
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            </div>
+                            {imageError ? <p className="text-[11px] text-status-error">{imageError}</p> : null}
+                            {draft.image ? (
+                                <>
+                                    {(
+                                        [
+                                            ["blur", "editor.image.blur", (value: number) => `${value}px`],
+                                            ["brightness", "editor.image.brightness", (value: number) => percent(value)],
+                                            ["saturate", "editor.image.saturation", (value: number) => percent(value)],
+                                            ["dim", "editor.image.dim", (value: number) => percent(value)],
+                                            ["panel", "editor.image.panel", (value: number) => percent(value)],
+                                        ] as const
+                                    ).map(([key, label, format]) => {
+                                        const limit = THEME_IMAGE_LIMITS[key];
+                                        return (
+                                            <Slider
+                                                key={key}
+                                                label={t(label)}
+                                                value={draft.image![key]}
+                                                min={limit.min}
+                                                max={limit.max}
+                                                step={limit.step}
+                                                format={format}
+                                                track="linear-gradient(to right, var(--muted), var(--primary))"
+                                                thumb="var(--primary)"
+                                                onChange={(value) => setImage({ [key]: value })}
+                                            />
+                                        );
+                                    })}
+                                </>
+                            ) : (
+                                <p className="text-[11px] text-muted-foreground">{t("editor.image.hint")}</p>
+                            )}
+                        </section>
                     </div>
 
                     <div className="space-y-2">
@@ -298,7 +400,7 @@ export default function ThemeEditor({
                             className="gap-1.5 text-destructive hover:text-destructive"
                             onClick={() => onDelete(draft.id)}
                         >
-                            <Trash2 size={14} /> Delete
+                            <Trash2 size={14} /> {t("configuration.bulk.deleteAction")}
                         </Button>
                     )}
                     <div className="flex gap-2">

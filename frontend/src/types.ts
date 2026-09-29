@@ -263,6 +263,14 @@ export interface UpdateInfo {
     checked_at: number;
 }
 
+/** A font or background the user added; see app.UserFile. */
+export interface UserFile {
+    id: string;
+    name: string;
+    url: string;
+    kind: "fonts" | "backgrounds";
+}
+
 /** A rule list from a URL, as the backend knows it. */
 export interface RuleListStatus {
     url: string;

@@ -3,6 +3,7 @@ import {
     ReactNode,
     useCallback,
     useContext,
+    useEffect,
     useLayoutEffect,
     useMemo,
     useState,
@@ -17,9 +18,14 @@ import {
     CUSTOM_THEME_CLASSES,
     CUSTOM_THEME_IDS,
     CustomTheme,
+    DEFAULT_APPEARANCE,
     loadAppearance,
     saveAppearance,
+    setUserFonts,
+    UserFont,
+    USER_FONT_PREFIX,
 } from "@/lib/appearance";
+import { invoke } from "@/lib/backend";
 import { currentLanguage, scriptOf, useI18n } from "@/lib/i18n";
 import { THEME_CLASSES, THEME_IDS } from "@/lib/themes";
 
@@ -35,6 +41,9 @@ interface AppearanceContext {
     /** Adds the theme, or replaces the one with the same id. */
     saveCustomTheme: (theme: CustomTheme) => void;
     deleteCustomTheme: (id: string) => void;
+    /** Adds a font the backend stored, and chooses it. */
+    addUserFont: (font: UserFont) => void;
+    removeUserFont: (id: string) => void;
 }
 
 const Context = createContext<AppearanceContext | null>(null);
@@ -77,6 +86,22 @@ function Appearance({ children }: { children: ReactNode }) {
         setPrefs((current) => ({ ...current, ...patch }));
     }, []);
 
+    // The backend's folder is the truth about user fonts: a backup restored,
+    // or a file removed by hand, shows here once the app starts.
+    useEffect(() => {
+        invoke<UserFont[]>("list_user_files", { kind: "fonts" })
+            .then((fonts) => {
+                if (!Array.isArray(fonts)) return;
+                setUserFonts(fonts);
+                setPrefs((current) => {
+                    const ids = new Set(fonts.map((font) => USER_FONT_PREFIX + font.id));
+                    const font = current.font.startsWith(USER_FONT_PREFIX) && !ids.has(current.font) ? DEFAULT_APPEARANCE.font : current.font;
+                    return { ...current, userFonts: fonts, font };
+                });
+            })
+            .catch(() => undefined);
+    }, []);
+
     const showCustomTheme = useCallback(
         (custom: CustomTheme) => {
             update({ activeCustom: custom.id });
@@ -108,6 +133,25 @@ function Appearance({ children }: { children: ReactNode }) {
                 if (activeCustom?.id === custom.id) {
                     setTheme(CUSTOM_THEME_IDS[custom.mode]);
                 }
+            },
+            addUserFont: (font) => {
+                setPrefs((current) => {
+                    const userFonts = [...current.userFonts.filter((item) => item.id !== font.id), font];
+                    setUserFonts(userFonts);
+                    return { ...current, userFonts, font: USER_FONT_PREFIX + font.id };
+                });
+            },
+            removeUserFont: (id) => {
+                void invoke("remove_user_file", { kind: "fonts", id }).catch(() => undefined);
+                setPrefs((current) => {
+                    const userFonts = current.userFonts.filter((item) => item.id !== id);
+                    setUserFonts(userFonts);
+                    return {
+                        ...current,
+                        userFonts,
+                        font: current.font === USER_FONT_PREFIX + id ? DEFAULT_APPEARANCE.font : current.font,
+                    };
+                });
             },
             deleteCustomTheme: (id) => {
                 if (activeCustom?.id === id) {

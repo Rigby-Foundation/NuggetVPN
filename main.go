@@ -114,7 +114,7 @@ func runGUI() {
 			application.NewService(notifier),
 		},
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
+			Handler: app.UserFilesHandler(application.AssetFileServerFS(assets)),
 		},
 		Mac: application.MacOptions{
 			// The tray keeps the app (and the tunnel) alive after the last
