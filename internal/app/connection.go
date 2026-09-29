@@ -388,12 +388,21 @@ func (a *App) startProfile(
 	profiles []models.Profile,
 	settings models.AppSettings,
 ) error {
+	// Rule-sets from the user's own geoip.dat / geosite.dat, if any. What
+	// they lack is reported, not fatal: the rest of the routing still works.
+	localSets, customGeo, geoWarnings := geoRuleSets(settings)
+	for _, warning := range geoWarnings {
+		a.appendLog("WARN " + warning)
+	}
+
 	result, err := sbconfig.Build(sbconfig.Request{
 		Profile:       profile,
 		Profiles:      profiles,
 		Settings:      settings,
 		MixedPort:     MixedPort,
 		CacheFilePath: filepath.Join(storage.RuntimeDir(), "cache.db"),
+		LocalRuleSets: localSets,
+		CustomGeo:     customGeo,
 	})
 	if err != nil {
 		return err

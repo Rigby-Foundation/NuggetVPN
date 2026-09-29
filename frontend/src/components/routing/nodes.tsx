@@ -1,4 +1,4 @@
-import { KeyboardEvent, useMemo, useState } from "react";
+import { createContext, KeyboardEvent, useContext, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
     Ban,
@@ -8,6 +8,7 @@ import {
     Radio,
     Regex,
     Search,
+    StickyNote,
     Globe,
     MonitorSmartphone,
     MoreHorizontal,
@@ -351,6 +352,127 @@ function ValueList({ values, onChange }: { values: string[]; onChange: (values: 
     );
 }
 
+/**
+ * The codes in the user's own geoip.dat / geosite.dat, by kind. Provided by
+ * the routing view; empty when the built-in rule-sets are in use.
+ */
+export const GeoCodesContext = createContext<Partial<Record<string, string[]>>>({});
+
+/**
+ * Codes from the user's file that match what is being typed.
+ *
+ * A custom file's codes are whatever its author chose — "ru-blocked",
+ * "category-ads-all" — so the node offers them rather than leaving them to be
+ * guessed. Picking one keeps focus in the input: the input commits on blur,
+ * and a click that blurred it first would add the half-typed text as well.
+ */
+function GeoSuggestions({
+    kind,
+    draft,
+    values,
+    onPick,
+}: {
+    kind: string;
+    draft: string;
+    values: string[];
+    onPick: (code: string) => void;
+}) {
+    const codes = useContext(GeoCodesContext)[kind];
+    if (!codes || codes.length === 0) {
+        return null;
+    }
+    const needle = draft.trim().toLowerCase().split("@")[0];
+    if (!needle) {
+        return (
+            <p className="pt-1 text-[10px] text-muted-foreground">
+                {codes.length.toLocaleString()} codes in your {kind}.dat — start typing
+            </p>
+        );
+    }
+    // Closest first: the code itself, then codes starting with it, then codes
+    // with a segment starting with it ("ads" -> "category-ads"), then any
+    // code merely containing it ("goodreads"). Shorter wins a tie.
+    const rank = (code: string) =>
+        code === needle ? 0
+        : code.startsWith(needle) ? 1
+        : code.split(/[-_@!]/).some((segment) => segment.startsWith(needle)) ? 2
+        : 3;
+    const matches = codes
+        .filter((code) => code.includes(needle) && !values.includes(code))
+        .sort((a, b) => rank(a) - rank(b) || a.length - b.length)
+        .slice(0, 8);
+    if (matches.length === 0) {
+        return <p className="pt-1 text-[10px] text-muted-foreground">Not in your {kind}.dat</p>;
+    }
+    return (
+        <div className="flex flex-wrap gap-1 pt-1.5">
+            {matches.map((code) => (
+                <button
+                    key={code}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onPick(code)}
+                    className="nodrag rounded-md border border-dashed px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground hover:border-solid hover:bg-muted hover:text-foreground"
+                >
+                    {code}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+export interface CommentNodeData {
+    text: string;
+    onChange: (text: string) => void;
+    onDelete: () => void;
+    [key: string]: unknown;
+}
+
+/**
+ * A note on the canvas. It routes nothing; it is there to say why a rule
+ * exists, for whoever reads the graph next — including its author later.
+ * It saves when it loses focus rather than on every keystroke.
+ */
+export function CommentNode({ data, selected }: NodeProps) {
+    const { text, onChange, onDelete } = data as CommentNodeData;
+    const [draft, setDraft] = useState(text);
+    useEffect(() => setDraft(text), [text]);
+
+    return (
+        <div
+            className={cn(
+                "w-60 rounded-xl border border-dashed bg-card/85 shadow-sm backdrop-blur-sm",
+                selected ? "ring-2 ring-ring/50" : ""
+            )}
+        >
+            <div className="flex items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
+                <StickyNote size={13} aria-hidden="true" />
+                <span className="flex-1 text-[10px] font-medium uppercase tracking-wider">Note</span>
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    aria-label="Remove note"
+                    className="rounded p-1 hover:bg-destructive/10 hover:text-destructive"
+                >
+                    <Trash2 size={12} aria-hidden="true" />
+                </button>
+            </div>
+            <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={() => {
+                    if (draft !== text) onChange(draft);
+                }}
+                placeholder="Write a note…"
+                aria-label="Note"
+                maxLength={2000}
+                rows={3}
+                className="nodrag nowheel mt-1 block min-h-16 w-full resize-none bg-transparent px-3 pb-3 text-xs leading-relaxed outline-none [field-sizing:content] placeholder:text-muted-foreground/60"
+            />
+        </div>
+    );
+}
+
 /** A traffic source: a list of entries plus an output port. */
 export function SourceNode({ data, selected }: NodeProps) {
     const { kind, values, onChange, onDelete } = data as SourceNodeData;
@@ -418,6 +540,17 @@ export function SourceNode({ data, selected }: NodeProps) {
                         </Button>
                     </div>
                 )}
+                {kind === "geosite" || kind === "geoip" ? (
+                    <GeoSuggestions
+                        kind={kind}
+                        draft={draft}
+                        values={values}
+                        onPick={(code) => {
+                            if (!values.includes(code)) onChange([...values, code]);
+                            setDraft("");
+                        }}
+                    />
+                ) : null}
             </div>
 
             <Handle
@@ -508,6 +641,7 @@ export function ActionNode({ data, selected }: NodeProps) {
 
 export const NODE_TYPES = {
     source: SourceNode,
+    comment: CommentNode,
     catchall: CatchAllNode,
     action: ActionNode,
 };

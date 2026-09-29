@@ -48,6 +48,15 @@ const (
 	ActionBlock  = "block"
 )
 
+// RoutingComment is a note on the routing canvas.
+type RoutingComment struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+// maxCommentLength bounds a note, in characters.
+const maxCommentLength = 2000
+
 // Point is a node position on the routing canvas.
 type Point struct {
 	X float64 `json:"x"`
@@ -112,7 +121,11 @@ func ValidProtocol(value string) bool {
 
 // validGeoToken accepts the category and country names used by rule-sets.
 // They become part of a URL, so anything else is refused rather than fetched.
-func validGeoToken(value string) bool {
+//
+// site allows the two extra characters geosite.dat codes use: "geolocation-!cn",
+// and "google@cn" for the entries carrying an attribute. Country codes have
+// neither.
+func validGeoToken(value string, site bool) bool {
 	if value == "" || len(value) > 64 {
 		return false
 	}
@@ -121,6 +134,7 @@ func validGeoToken(value string) bool {
 		case char >= 'a' && char <= 'z',
 			char >= '0' && char <= '9',
 			char == '-', char == '_':
+		case site && (char == '!' || char == '@'):
 		default:
 			return false
 		}
@@ -174,8 +188,10 @@ func (r RoutingRule) validValue(value string) bool {
 		return ValidPortValue(value)
 	case SourceProtocol:
 		return ValidProtocol(value)
-	case SourceGeoSite, SourceGeoIP:
-		return validGeoToken(value)
+	case SourceGeoSite:
+		return validGeoToken(value, true)
+	case SourceGeoIP:
+		return validGeoToken(value, false)
 	case SourceDomainRegex:
 		_, err := regexp.Compile(value)
 		return err == nil
@@ -234,6 +250,18 @@ func (s *AppSettings) normalizeRouting() {
 		kept = append(kept, rule)
 	}
 	s.RoutingRules = kept
+
+	comments := make([]RoutingComment, 0, len(s.RoutingComments))
+	for _, comment := range s.RoutingComments {
+		if strings.TrimSpace(comment.ID) == "" {
+			continue
+		}
+		if runes := []rune(comment.Text); len(runes) > maxCommentLength {
+			comment.Text = string(runes[:maxCommentLength])
+		}
+		comments = append(comments, comment)
+	}
+	s.RoutingComments = comments
 }
 
 // migrateLegacyRouting turns the pre-graph settings into equivalent rules, so

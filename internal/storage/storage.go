@@ -87,6 +87,17 @@ func RuntimeDir() string {
 	}
 }
 
+// GeoDir holds the user's own geoip.dat and geosite.dat, as <kind>.dat.
+// They are copied in rather than referred to where they were picked, so
+// moving or deleting the original does not break routing.
+func GeoDir() string { return filepath.Join(DataDir(), "geo") }
+
+// GeoFilePath is where the file of one kind lives.
+func GeoFilePath(kind string) string { return filepath.Join(GeoDir(), kind+".dat") }
+
+// RuleSetDir holds the rule-sets generated from those files at connect time.
+func RuleSetDir() string { return filepath.Join(RuntimeDir(), "rulesets") }
+
 // ProfilesPath is the profiles.json location.
 func ProfilesPath() string { return filepath.Join(DataDir(), "profiles.json") }
 
@@ -127,7 +138,7 @@ func ControlTokenPath() string { return filepath.Join(RuntimeDir(), "core.token"
 
 // EnsureDirs creates every directory the app writes to.
 func EnsureDirs() error {
-	for _, dir := range []string{DataDir(), LogDir(), RuntimeDir()} {
+	for _, dir := range []string{DataDir(), LogDir(), RuntimeDir(), GeoDir(), RuleSetDir()} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

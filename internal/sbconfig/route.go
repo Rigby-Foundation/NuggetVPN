@@ -33,7 +33,7 @@ var connectivityCheckDomains = []string{"msftconnecttest.com", "msftncsi.com"}
 // Order matters: sing-box takes the first matching rule, so the graph is
 // emitted top to bottom and whatever matches nothing falls through to
 // route.final.
-func buildRouteRules(settings models.AppSettings, serverDomains []string) ([]map[string]any, int) {
+func buildRouteRules(settings models.AppSettings, serverDomains []string, geo geoSources) ([]map[string]any, int) {
 	rules := []map[string]any{
 		// Anything still reaching port 53 is DNS. The TUN captures it through
 		// dns_mode as well; this covers the local mixed proxy.
@@ -141,11 +141,17 @@ func buildRouteRules(settings models.AppSettings, serverDomains []string) ([]map
 			// declared in route.rule_set by ruleSets below.
 			tags := make([]string, 0, len(values))
 			for _, value := range values {
-				tags = append(tags, ruleSetTag(rule.Kind, value))
+				// A value with no set to point at is left out: a rule naming
+				// an undeclared tag stops the core from starting at all.
+				if _, ok := geo.resolve(rule.Kind, value); ok {
+					tags = append(tags, RuleSetTag(rule.Kind, value))
+				}
 			}
-			rules = append(rules, withAction(map[string]any{
-				"rule_set": tags,
-			}, rule.Action))
+			if len(tags) > 0 {
+				rules = append(rules, withAction(map[string]any{
+					"rule_set": tags,
+				}, rule.Action))
+			}
 		}
 		matched += len(values)
 	}
@@ -264,9 +270,50 @@ const (
 	ruleSetUpdateInterval = "168h"
 )
 
-// ruleSetTag names the set a geo value refers to.
-func ruleSetTag(kind, value string) string {
+// RuleSetTag names the set a geo value refers to.
+func RuleSetTag(kind, value string) string {
 	return kind + "-" + value
+}
+
+// geoSources decides where each geo value's rule-set comes from.
+type geoSources struct {
+	local  map[string]string
+	custom map[string]bool
+}
+
+// resolve returns the rule-set declaration for a geo value, or false when
+// there is none to use.
+func (g geoSources) resolve(kind, value string) (map[string]any, bool) {
+	tag := RuleSetTag(kind, value)
+	if path, ok := g.local[tag]; ok {
+		return map[string]any{
+			"type":   "local",
+			"tag":    tag,
+			"format": "source",
+			"path":   path,
+		}, true
+	}
+	if g.custom[kind] {
+		return nil, false
+	}
+	// The built-in sets are plain codes. An @attribute or ! only means
+	// something in a .dat file, so such a value has no built-in set.
+	if strings.ContainsAny(value, "@!") {
+		return nil, false
+	}
+
+	template := geoIPURL
+	if kind == models.SourceGeoSite {
+		template = geoSiteURL
+	}
+	return map[string]any{
+		"type":            "remote",
+		"tag":             tag,
+		"format":          "binary",
+		"url":             fmt.Sprintf(template, value),
+		"download_detour": ExitTag,
+		"update_interval": ruleSetUpdateInterval,
+	}, true
 }
 
 // ruleSets declares every rule-set the graph refers to.
@@ -274,35 +321,21 @@ func ruleSetTag(kind, value string) string {
 // They download through the tunnel rather than directly: someone who needs
 // geo-based routing is often somewhere that GitHub is unreachable from, and
 // the proxy does not depend on the sets to come up.
-func ruleSets(settings models.AppSettings) []map[string]any {
+func ruleSets(settings models.AppSettings, geo geoSources) []map[string]any {
 	seen := map[string]bool{}
 	var sets []map[string]any
 
 	for _, rule := range settings.UsableRules() {
-		var template string
-		switch rule.Kind {
-		case models.SourceGeoSite:
-			template = geoSiteURL
-		case models.SourceGeoIP:
-			template = geoIPURL
-		default:
+		if rule.Kind != models.SourceGeoSite && rule.Kind != models.SourceGeoIP {
 			continue
 		}
-
 		for _, value := range rule.CleanValues() {
-			tag := ruleSetTag(rule.Kind, value)
-			if seen[tag] {
+			set, ok := geo.resolve(rule.Kind, value)
+			if !ok || seen[set["tag"].(string)] {
 				continue
 			}
-			seen[tag] = true
-			sets = append(sets, map[string]any{
-				"type":            "remote",
-				"tag":             tag,
-				"format":          "binary",
-				"url":             fmt.Sprintf(template, value),
-				"download_detour": ExitTag,
-				"update_interval": ruleSetUpdateInterval,
-			})
+			seen[set["tag"].(string)] = true
+			sets = append(sets, set)
 		}
 	}
 	return sets
@@ -330,14 +363,14 @@ func splitPorts(values []string) (single []uint16, ranges []string) {
 // buildRouteSection assembles the route block, including any rule-sets the graph
 // refers to. The sets are only declared when something actually uses one, so a
 // configuration without geo rules makes no network requests for them.
-func buildRouteSection(settings models.AppSettings, rules []map[string]any) map[string]any {
+func buildRouteSection(settings models.AppSettings, rules []map[string]any, geo geoSources) map[string]any {
 	route := map[string]any{
 		"rules":                   rules,
 		"final":                   finalOutbound(settings),
 		"auto_detect_interface":   true,
 		"default_domain_resolver": map[string]any{"server": dnsDirectTag},
 	}
-	if sets := ruleSets(settings); len(sets) > 0 {
+	if sets := ruleSets(settings, geo); len(sets) > 0 {
 		route["rule_set"] = sets
 	}
 	return route

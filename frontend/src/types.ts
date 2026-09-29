@@ -43,6 +43,10 @@ export interface AppSettings {
     default_action: RoutingAction;
     /** Canvas positions, keyed by node id, so the graph survives a restart. */
     routing_layout: Record<string, CanvasPoint>;
+    /** Notes on the canvas; their positions are in routing_layout. */
+    routing_comments: RoutingComment[];
+    /** The user's own geoip.dat / geosite.dat, by kind. */
+    geo_files: Partial<Record<GeoKind, GeoFile>>;
     /** Superseded by routing_rules; read only by the one-time migration. */
     routing_mode: "all" | "apps" | "domains" | "apps_domains";
     routing_apps: string[];
@@ -148,6 +152,31 @@ export interface RoutingRule {
 export interface CanvasPoint {
     x: number;
     y: number;
+}
+
+export interface RoutingComment {
+    id: string;
+    text: string;
+}
+
+export type GeoKind = "geoip" | "geosite";
+
+export interface GeoFile {
+    /** "url" files can be downloaded again to update them. */
+    source: "file" | "url";
+    name: string;
+    url?: string;
+    codes: number;
+    updated_at: number;
+}
+
+/** The result of opening a .vflow. */
+export interface FlowImport {
+    /** False when the dialog was cancelled. */
+    imported: boolean;
+    settings: AppSettings;
+    /** Geo files the flow refers to that are not in use here, by URL. */
+    missing_geo: Partial<Record<GeoKind, string>> | null;
 }
 
 /** What closing the window does. */

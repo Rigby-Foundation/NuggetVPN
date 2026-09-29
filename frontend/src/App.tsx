@@ -78,6 +78,8 @@ const PENDING_SETTINGS: AppSettings = {
     auto_connect: false,
     subscription_auto_update: null,
     close_action: "tray",
+    routing_comments: [],
+    geo_files: {},
 };
 
 /** How often subscriptions refresh while the app runs, when that is on. */

@@ -40,6 +40,15 @@ type Request struct {
 	MixedPort int
 	// CacheFilePath persists the fake-IP mapping across restarts.
 	CacheFilePath string
+
+	// LocalRuleSets maps a geo rule-set tag (see RuleSetTag) to a source
+	// rule-set file written from the user's own geoip.dat or geosite.dat.
+	LocalRuleSets map[string]string
+	// CustomGeo marks the geo kinds ("geoip", "geosite") the user supplied a
+	// file for. For those, a code the file does not have is dropped rather
+	// than fetched from the built-in sets: the two use different codes, and
+	// quietly mixing them would route by a list the user never chose.
+	CustomGeo map[string]bool
 }
 
 // Result is a generated configuration plus the details the caller reports back
@@ -96,7 +105,8 @@ func Build(request Request) (Result, error) {
 
 	splitTunnel := settings.SplitTunnelling()
 	serverDomains := proxyServerDomains(outbounds, endpoints)
-	routeRules, splitRuleCount := buildRouteRules(settings, serverDomains)
+	geo := geoSources{local: request.LocalRuleSets, custom: request.CustomGeo}
+	routeRules, splitRuleCount := buildRouteRules(settings, serverDomains, geo)
 
 	config := map[string]any{
 		"log": map[string]any{
@@ -108,7 +118,7 @@ func Build(request Request) (Result, error) {
 		"outbounds": func() []map[string]any {
 			return outbounds
 		}(),
-		"route": buildRouteSection(settings, routeRules),
+		"route": buildRouteSection(settings, routeRules, geo),
 	}
 	if len(endpoints) > 0 {
 		config["endpoints"] = endpoints

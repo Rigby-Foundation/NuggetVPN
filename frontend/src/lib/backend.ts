@@ -45,6 +45,13 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     migrate_from_beam: { method: "MigrateFromBeam", args: [] },
     dismiss_beam_migration: { method: "DismissBeamMigration", args: [] },
 
+    import_geo_file: { method: "ImportGeoFile", args: [] },
+    download_geo_file: { method: "DownloadGeoFile", args: ["url"] },
+    remove_geo_file: { method: "RemoveGeoFile", args: ["kind"] },
+    get_geo_codes: { method: "GetGeoCodes", args: ["kind"] },
+    export_routing: { method: "ExportRouting", args: [] },
+    import_routing: { method: "ImportRouting", args: [] },
+
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },
     get_connection_state: { method: "GetConnectionState", args: [] },

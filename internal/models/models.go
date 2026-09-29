@@ -75,6 +75,9 @@ type AppSettings struct {
 	RoutingRules  []RoutingRule    `json:"routing_rules"`
 	DefaultAction string           `json:"default_action"`
 	RoutingLayout map[string]Point `json:"routing_layout"`
+	// RoutingComments are notes placed on the canvas. They change nothing
+	// about routing; their positions are in RoutingLayout, by id.
+	RoutingComments []RoutingComment `json:"routing_comments"`
 
 	// Superseded by RoutingRules; kept so an upgrade can migrate them and so a
 	// downgrade does not lose the user's old configuration.
@@ -111,6 +114,23 @@ type AppSettings struct {
 	// CloseAction is what closing the window does: CloseToTray,
 	// CloseHideCompletely or CloseQuit.
 	CloseAction string `json:"close_action"`
+
+	// GeoFiles are the user's own geoip.dat / geosite.dat, keyed by kind
+	// ("geoip", "geosite"). While one is present, geo rules of that kind use
+	// it instead of the built-in rule-sets. The files themselves live in
+	// storage.GeoDir; this records where each came from.
+	GeoFiles map[string]GeoFile `json:"geo_files"`
+}
+
+// GeoFile describes an imported geoip.dat or geosite.dat.
+type GeoFile struct {
+	// Source is "file" for one picked from disk, "url" for one downloaded;
+	// a URL can be downloaded again to update it.
+	Source    string `json:"source"`
+	Name      string `json:"name"`
+	URL       string `json:"url,omitempty"`
+	Codes     int    `json:"codes"`
+	UpdatedAt int64  `json:"updated_at"`
 }
 
 // What closing the window does.
@@ -184,6 +204,9 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.ProxyChain == nil {
 		s.ProxyChain = []string{}
+	}
+	if s.GeoFiles == nil {
+		s.GeoFiles = map[string]GeoFile{}
 	}
 	if s.SubscriptionAutoUpdate == nil {
 		enabled := true
