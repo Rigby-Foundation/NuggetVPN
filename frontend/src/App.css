@@ -631,11 +631,54 @@
     animation: none;
 }
 
+/* Settings: opening a section and going back. The same motion preference
+   applies, with a direction — forward comes in from the right (or below), back
+   from the left (or above) — so the two read as going in and coming out. The
+   classes come from the transition type SettingsView tags each move with. */
+::view-transition-old(.settings-forward),
+::view-transition-new(.settings-forward),
+::view-transition-old(.settings-back),
+::view-transition-new(.settings-back) {
+    animation-duration: 200ms;
+}
+
+:root[data-motion="slide"]::view-transition-old(.settings-forward),
+:root[data-motion="slide"]::view-transition-old(.settings-back),
+:root[data-motion="rise"]::view-transition-old(.settings-forward),
+:root[data-motion="rise"]::view-transition-old(.settings-back) {
+    animation: 140ms ease-in both nugget-fade-out;
+}
+:root[data-motion="slide"]::view-transition-new(.settings-forward) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-right;
+}
+:root[data-motion="slide"]::view-transition-new(.settings-back) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-left;
+}
+:root[data-motion="rise"]::view-transition-new(.settings-forward) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-below;
+}
+:root[data-motion="rise"]::view-transition-new(.settings-back) {
+    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-above;
+}
+
+:root[data-motion="none"]::view-transition-group(.settings-forward),
+:root[data-motion="none"]::view-transition-old(.settings-forward),
+:root[data-motion="none"]::view-transition-new(.settings-forward),
+:root[data-motion="none"]::view-transition-group(.settings-back),
+:root[data-motion="none"]::view-transition-old(.settings-back),
+:root[data-motion="none"]::view-transition-new(.settings-back) {
+    animation: none;
+}
+
 /* Someone who has asked the system for less motion gets the fade, whatever is
    picked here: movement is the part that causes trouble, not the change. */
 @media (prefers-reduced-motion: reduce) {
     :root[data-motion="slide"]::view-transition-new(app-content),
-    :root[data-motion="rise"]::view-transition-new(app-content) {
+    :root[data-motion="rise"]::view-transition-new(app-content),
+    :root[data-motion="slide"]::view-transition-new(.settings-forward),
+    :root[data-motion="slide"]::view-transition-new(.settings-back),
+    :root[data-motion="rise"]::view-transition-new(.settings-forward),
+    :root[data-motion="rise"]::view-transition-new(.settings-back) {
         animation: 200ms ease-out both nugget-fade-in;
     }
 }
@@ -651,6 +694,12 @@
 }
 @keyframes nugget-in-from-below {
     from { opacity: 0; transform: translateY(20px); }
+}
+@keyframes nugget-in-from-left {
+    from { opacity: 0; transform: translateX(-28px); }
+}
+@keyframes nugget-in-from-above {
+    from { opacity: 0; transform: translateY(-20px); }
 }
 
 /* ---------------------------------------------------------------------------

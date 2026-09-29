@@ -1,4 +1,8 @@
 import * as React from "react";
+// @ts-expect-error - React experimental ViewTransition type not in stable defs.
+import { ViewTransition } from "react";
+// @ts-expect-error - React experimental addTransitionType not in stable defs.
+import { addTransitionType } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -139,6 +143,17 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/**
+ * View-transition classes per transition type. Only navigation animates:
+ * every other update in here — a switch flipped, a theme picked — maps to
+ * "none", so it never slides the page.
+ */
+const SETTINGS_TRANSITIONS = {
+  "settings-forward": "settings-forward",
+  "settings-back": "settings-back",
+  default: "none",
+};
+
 function SettingsView({
   theme,
   setTheme,
@@ -153,6 +168,18 @@ function SettingsView({
   onMigrateFromBeam,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
+
+  /**
+   * Opening a section and going back are page changes, so they animate the
+   * way switching sidebar tabs does: as a view transition, tagged with the
+   * direction so going back slides the other way. See SETTINGS_TRANSITIONS.
+   */
+  const navigate = (id: SectionId | null) => {
+    React.startTransition(() => {
+      addTransitionType(id === null ? "settings-back" : "settings-forward");
+      setOpenId(id);
+    });
+  };
   const { prefs: appearance, activeCustom } = useAppearance();
   const [newChainId, setNewChainId] = React.useState("");
 
@@ -614,43 +641,47 @@ function SettingsView({
   const open = SECTIONS.find((section) => section.id === openId);
 
   return (
-    <PageShell
-      fill
-      title={open ? open.title : "Settings"}
-      description={open ? open.blurb : "Client preferences and tunnel behaviour."}
-      actions={
-        open ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setOpenId(null)}
-          >
-            <ArrowLeft size={14} /> Settings
-          </Button>
-        ) : undefined
-      }
-    >
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          {open ? (
-            <div className="space-y-4 pr-1">{detail(open.id)}</div>
-          ) : (
-            <div className="space-y-2 pr-1">
-              {SECTIONS.filter((section) => section.id !== "beam" || beamPreview).map((section) => (
-                <SettingsRow
-                  key={section.id}
-                  icon={section.icon}
-                  title={section.title}
-                  subtitle={subtitleFor(section)}
-                  onClick={() => setOpenId(section.id)}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </div>
-    </PageShell>
+    // The boundary wraps the whole page, header included, so the title and
+    // back button move with the content instead of changing in place above it.
+    <ViewTransition update={SETTINGS_TRANSITIONS}>
+      <PageShell
+        fill
+        title={open ? open.title : "Settings"}
+        description={open ? open.blurb : "Client preferences and tunnel behaviour."}
+        actions={
+          open ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate(null)}
+            >
+              <ArrowLeft size={14} /> Settings
+            </Button>
+          ) : undefined
+        }
+      >
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea key={openId ?? "list"} className="h-full">
+            {open ? (
+              <div className="space-y-4 pr-1">{detail(open.id)}</div>
+            ) : (
+              <div className="space-y-2 pr-1">
+                {SECTIONS.filter((section) => section.id !== "beam" || beamPreview).map((section) => (
+                  <SettingsRow
+                    key={section.id}
+                    icon={section.icon}
+                    title={section.title}
+                    subtitle={subtitleFor(section)}
+                    onClick={() => navigate(section.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      </PageShell>
+    </ViewTransition>
   );
 }
 
