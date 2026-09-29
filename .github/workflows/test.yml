@@ -119,11 +119,30 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Build
+        if: runner.os != 'macOS'
         run: wails3 task build
+
+      # A bare Mach-O is not something anyone can run: macOS needs the bundle
+      # for its Info.plist, its icon and its signature. `package` depends on
+      # `build`, so this still fails on a compile error.
+      - name: Package .app
+        if: runner.os == 'macOS'
+        run: wails3 task package
+
+      # upload-artifact zips without preserving the executable bit, and that
+      # also breaks the ad-hoc signature `package` applies — leaving a bundle
+      # macOS refuses to launch. ditto is the one that keeps a bundle intact.
+      - name: Archive .app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent bin/NuggetVPN.app bin/NuggetVPN-macos.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: nuggetvpn-${{ matrix.name }}
-          path: bin/*
+          # The zip carries the bundle; uploading the directory as well would
+          # ship the broken copy next to the good one.
+          path: |
+            bin/*
+            !bin/NuggetVPN.app
           if-no-files-found: error
