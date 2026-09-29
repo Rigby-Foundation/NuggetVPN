@@ -85,6 +85,7 @@ const PENDING_SETTINGS: AppSettings = {
     kill_switch: false,
     fastest_server: false,
     notifications: null,
+    clipboard_offer: null,
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],
@@ -172,6 +173,69 @@ function App() {
             }),
         []
     );
+
+    // Links offered for import: a nuggetvpn:// link the app was opened with,
+    // or one found on the clipboard. Both open the Add dialog filled in;
+    // nothing is imported without the user confirming it there.
+    const [offeredLink, setOfferedLink] = useState("");
+    const openWithLink = useCallback((link: string) => {
+        setOfferedLink(link);
+        setIsModalOpen(true);
+    }, []);
+    useEffect(() => {
+        const unlisten = listen(EVENTS.importLink, (data) => openWithLink(eventPayload<string>(data)));
+        invoke<string>("take_pending_link")
+            .then((link) => {
+                if (link) openWithLink(link);
+            })
+            .catch(() => undefined);
+        return unlisten;
+    }, [openWithLink]);
+
+    const profilesRef = useRef(profiles);
+    profilesRef.current = profiles;
+    const offeredRef = useRef(new Set<string>());
+    useEffect(() => {
+        if (settings.clipboard_offer === false) return;
+        const check = async () => {
+            let link = "";
+            try {
+                link = await invoke<string>("read_clipboard_link");
+            } catch {
+                return;
+            }
+            // Once per link, and not for what is already added.
+            if (!link || offeredRef.current.has(link)) return;
+            offeredRef.current.add(link);
+            const known = profilesRef.current.some(
+                (profile) => profile.config_link === link || profile.subscription_url === link
+            );
+            if (known) return;
+            toast(
+                (shown) => (
+                    <span className="flex items-center gap-3 text-sm">
+                        <span className="min-w-0">
+                            <span className="block">{t("clipboard.found")}</span>
+                            <span className="block max-w-56 truncate font-mono text-[11px] text-muted-foreground">{link}</span>
+                        </span>
+                        <button
+                            type="button"
+                            className="shrink-0 font-medium text-primary"
+                            onClick={() => {
+                                toast.dismiss(shown.id);
+                                openWithLink(link);
+                            }}
+                        >
+                            {t("clipboard.add")}
+                        </button>
+                    </span>
+                ),
+                { id: "clipboard-link", duration: 10000 }
+            );
+        };
+        window.addEventListener("focus", check);
+        return () => window.removeEventListener("focus", check);
+    }, [settings.clipboard_offer, openWithLink, t]);
 
     // A subscription about to run out — of days or of data — is worth one
     // warning per session, not one per refresh.
@@ -636,16 +700,18 @@ function App() {
 
     // A subscription's address, or a single profile's share link: what it
     // takes to add the same thing on another device.
+    const linkOf = useCallback(
+        (source: ConfigSource) => {
+            const members = profilesOf(source);
+            return source.kind === "subscription"
+                ? members.find((profile) => profile.subscription_url)?.subscription_url ?? ""
+                : members[0]?.config_link ?? "";
+        },
+        [profilesOf]
+    );
     const handleCopySources = useCallback(
         async (list: ConfigSource[]) => {
-            const links = list
-                .map((source) => {
-                    const members = profilesOf(source);
-                    return source.kind === "subscription"
-                        ? members.find((profile) => profile.subscription_url)?.subscription_url ?? ""
-                        : members[0]?.config_link ?? "";
-                })
-                .filter(Boolean);
+            const links = list.map(linkOf).filter(Boolean);
             if (links.length === 0) {
                 toast.error(t("configuration.bulk.nothingToCopy"), { id: "copy-links" });
                 return;
@@ -657,7 +723,7 @@ function App() {
                 toast.error(errorMessage(error), { id: "copy-links" });
             }
         },
-        [profilesOf, t]
+        [linkOf, t]
     );
 
     // Proxies screen actions.
@@ -802,7 +868,11 @@ function App() {
             />
             <AddModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                initialLink={offeredLink}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setOfferedLink("");
+                }}
                 onSaveProfile={handleAddProfile}
                 onImportSubscription={handleImportSubscription}
             />
@@ -1025,6 +1095,7 @@ function App() {
                                         onDeleteSources={handleDeleteSources}
                                         onRefreshSources={handleRefreshSources}
                                         onCopySources={handleCopySources}
+                                        linkOf={linkOf}
                                         onAdd={() => setIsModalOpen(true)}
                                     />
                                 )}

@@ -87,6 +87,10 @@ type App struct {
 	pendingDown   uint64
 	lastPersisted time.Time
 
+	// pendingLink is a nuggetvpn:// link received before the window could
+	// take it; see TakePendingLink.
+	pendingLink string
+
 	logMu   sync.Mutex
 	logFile *os.File
 	// loggingOn mirrors settings.LoggingOn, readable from any goroutine
@@ -162,6 +166,10 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)
 	a.prepareNotifications()
+	registerURLScheme()
+	// A link the app was started with, on the platforms that pass it as an
+	// argument.
+	a.receiveLinks(os.Args[1:]...)
 	return nil
 }
 

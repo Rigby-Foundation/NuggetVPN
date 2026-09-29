@@ -1,7 +1,8 @@
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckSquare, Copy, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, CheckSquare, Copy, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
+import { ShareDialog } from "@/components/qr";
 import { SubscriptionUsage } from "@/components/subscription-usage";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,8 @@ interface ConfigurationViewProps {
     onDeleteSources: (sources: ConfigSource[]) => Promise<void>;
     onRefreshSources: (sources: ConfigSource[]) => Promise<void>;
     onCopySources: (sources: ConfigSource[]) => Promise<void>;
+    /** The link that adds the same thing elsewhere; "" when there is none. */
+    linkOf: (source: ConfigSource) => string;
     onAdd: () => void;
 }
 
@@ -58,6 +61,7 @@ function ConfigurationView({
     onDeleteSources,
     onRefreshSources,
     onCopySources,
+    linkOf,
     onAdd,
 }: ConfigurationViewProps) {
     const t = useT();
@@ -74,6 +78,7 @@ function ConfigurationView({
     const [picked, setPicked] = useState<Set<string>>(new Set());
     const anchorRef = useRef<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [sharing, setSharing] = useState<ConfigSource | null>(null);
     const [busy, setBusy] = useState(false);
 
     // Sources that disappear (deleted, refreshed away) leave the selection.
@@ -236,6 +241,22 @@ function ConfigurationView({
                                         <RefreshCw size={16} className="shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />
                                     ) : null}
 
+                                    {!selecting && linkOf(source) ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={t("share.button", { name: source.label })}
+                                            title={t("share.button", { name: source.label })}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setSharing(source);
+                                            }}
+                                            className="shrink-0"
+                                        >
+                                            <QrCode size={16} aria-hidden="true" />
+                                        </Button>
+                                    ) : null}
+
                                     {!selecting && source.kind === "subscription" ? (
                                         <Button
                                             variant="ghost"
@@ -330,6 +351,10 @@ function ConfigurationView({
                         </Button>
                     </div>
                 </div>
+            ) : null}
+
+            {sharing ? (
+                <ShareDialog title={sharing.label} link={linkOf(sharing)} onClose={() => setSharing(null)} />
             ) : null}
 
             {confirmDelete ? (

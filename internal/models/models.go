@@ -160,6 +160,10 @@ type AppSettings struct {
 	// Notifications shows a system notification when the connection drops
 	// and when it comes back. A pointer so older settings default to on.
 	Notifications *bool `json:"notifications"`
+	// ClipboardOffer offers to import a share link or subscription address
+	// found on the clipboard when the window comes forward. A pointer so
+	// older settings default to on.
+	ClipboardOffer *bool `json:"clipboard_offer"`
 	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
 	// Off means never automatically, for every subscription — a refresh by
 	// hand still works. A pointer so older settings default to on.
@@ -264,6 +268,10 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.GeoFiles == nil {
 		s.GeoFiles = map[string]GeoFile{}
+	}
+	if s.ClipboardOffer == nil {
+		enabled := true
+		s.ClipboardOffer = &enabled
 	}
 	if s.Notifications == nil {
 		enabled := true

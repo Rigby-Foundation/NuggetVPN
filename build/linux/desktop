@@ -8,6 +8,7 @@ Terminal=false
 Type=Application
 Icon=NuggetVPN
 Categories=Utility;
+MimeType=x-scheme-handler/nuggetvpn;
 StartupWMClass=NuggetVPN
 
  

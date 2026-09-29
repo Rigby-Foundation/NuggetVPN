@@ -26,5 +26,16 @@
 		<string>true</string>
 		<key>NSHumanReadableCopyright</key>
 		<string>(c) 2026, Rigby Foundation</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>org.rigbyfoundation.nuggetvpn</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>nuggetvpn</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>

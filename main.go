@@ -19,6 +19,7 @@ import (
 	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/app"
@@ -126,12 +127,18 @@ func runGUI() {
 		// window closed to the tray, or hidden completely, is reopened.
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: storage.Identifier,
-			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				if window != nil {
 					service.ShowWindow()
 				}
+				app.ReceiveLaunchArgs(service, data.Args)
 			},
 		},
+	})
+
+	// macOS opens nuggetvpn:// links through an event rather than arguments.
+	wailsApp.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
+		app.ReceiveLaunchArgs(service, []string{event.Context().URL()})
 	})
 
 	window = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{

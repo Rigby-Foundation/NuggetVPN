@@ -61,6 +61,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     close_all_connections: { method: "CloseAllConnections", args: [] },
 
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
+    take_pending_link: { method: "TakePendingLink", args: [] },
+    read_clipboard_link: { method: "ReadClipboardLink", args: [] },
 
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },
@@ -140,6 +142,8 @@ export const EVENTS = {
     traffic: "vpn-traffic",
     /** Settings changed outside the window, such as from the tray. */
     settings: "settings-changed",
+    /** A nuggetvpn:// link to offer in the Add dialog. */
+    importLink: "import-link",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */

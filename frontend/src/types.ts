@@ -97,6 +97,8 @@ export interface AppSettings {
     /** Null means never chosen; the backend treats that as on. */
     notifications: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
+    clipboard_offer: boolean | null;
+    /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;
 }

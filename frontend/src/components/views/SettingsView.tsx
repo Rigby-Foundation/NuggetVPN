@@ -445,6 +445,17 @@ function SettingsView({
                 }
               />
               <SettingsField
+                label={t("behaviour.clipboard")}
+                description={t("behaviour.clipboard.description")}
+                control={
+                  <Switch
+                    checked={appSettings.clipboard_offer !== false}
+                    onCheckedChange={(checked) => onSettingsChange("clipboard_offer", checked)}
+                    aria-label={t("behaviour.clipboard")}
+                  />
+                }
+              />
+              <SettingsField
                 label={t("behaviour.notifications")}
                 description={t("behaviour.notifications.description")}
                 control={

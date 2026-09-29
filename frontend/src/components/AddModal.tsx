@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ClipboardEvent, useEffect, useRef, useState } from "react";
+import { Loader2, QrCode } from "lucide-react";
+
+import { decodeQrImage } from "@/components/qr";
 
 import {
   Dialog,
@@ -19,6 +21,8 @@ interface AddModalProps {
   onClose: () => void;
   onSaveProfile: (name: string, link: string) => Promise<void>;
   onImportSubscription: (url: string) => Promise<void>;
+  /** A link to start with: from a nuggetvpn:// link or the clipboard. */
+  initialLink?: string;
 }
 
 function AddModal({
@@ -26,12 +30,43 @@ function AddModal({
   onClose,
   onSaveProfile,
   onImportSubscription,
+  initialLink,
 }: AddModalProps) {
   const t = useT();
   const [name, setName] = useState("");
   const [inputLink, setInputLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && initialLink) setInputLink(initialLink);
+  }, [isOpen, initialLink]);
+
+  /** Fills the link from a QR code in an image: picked, dropped or pasted. */
+  const scan = async (image: Blob) => {
+    setScanning(true);
+    setErrorMsg("");
+    try {
+      const text = await decodeQrImage(image);
+      if (text) setInputLink(text);
+      else setErrorMsg(t("add.qrNone"));
+    } catch {
+      setErrorMsg(t("add.qrNone"));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Pasting a screenshot anywhere in the dialog scans it.
+  const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const image = [...event.clipboardData.items].find((item) => item.type.startsWith("image/"))?.getAsFile();
+    if (image) {
+      event.preventDefault();
+      void scan(image);
+    }
+  };
 
   const isSubscription = /^https?:\/\//i.test(inputLink.trim());
 
@@ -68,14 +103,37 @@ function AddModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onPaste={onPaste}>
         <DialogHeader>
           <DialogTitle>{t("add.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="config-link">{t("add.linkLabel")}</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="config-link">{t("add.linkLabel")}</Label>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={scanning}
+                title={t("add.qrHint")}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
+              >
+                {scanning ? <Loader2 size={12} className="animate-spin" /> : <QrCode size={12} aria-hidden="true" />}
+                {t("add.qr")}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void scan(file);
+                }}
+              />
+            </div>
             <Textarea
               id="config-link"
               value={inputLink}
