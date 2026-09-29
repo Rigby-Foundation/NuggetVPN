@@ -758,3 +758,176 @@
     background: var(--thumb, var(--foreground));
     border: 2px solid var(--background);
 }
+
+/* ---------------------------------------------------------------------------
+ * Palette themes.
+ *
+ * Named palettes (Dracula, Gruvbox, Catppuccin…) are defined in their
+ * projects' own hex values, not the lightness steps the presets above are
+ * built from, so they get their own mechanism. A palette class — the
+ * theme-dark-p- or theme-light-p- prefix — sets a few --p-* colours, and this
+ * one rule maps them onto every token. Muted text and borders are derived
+ * from the text and page colours unless a palette names its own.
+ *
+ *   --p-bg       the page             --p-fg        text
+ *   --p-sidebar  the sidebar          --p-muted     secondary text (optional)
+ *   --p-card     cards and popovers   --p-border    lines (optional)
+ *   --p-lift     hover, muted fills   --p-accent    the accent
+ *                                     --p-on-accent text on the accent
+ * ------------------------------------------------------------------------ */
+[class*="theme-dark-p-"],
+[class*="theme-light-p-"] {
+    --background: var(--p-bg);
+    --foreground: var(--p-fg);
+    --card: var(--p-card);
+    --card-foreground: var(--p-fg);
+    --popover: var(--p-card);
+    --popover-foreground: var(--p-fg);
+    --secondary: var(--p-lift);
+    --secondary-foreground: var(--p-fg);
+    --muted: var(--p-lift);
+    --muted-foreground: var(--p-muted, color-mix(in oklab, var(--p-fg) 64%, var(--p-bg)));
+    --accent: var(--p-lift);
+    --accent-foreground: var(--p-fg);
+    --border: var(--p-border, color-mix(in oklab, var(--p-fg) 14%, transparent));
+    --input: var(--p-border, color-mix(in oklab, var(--p-fg) 16%, transparent));
+    --primary: var(--p-accent);
+    --primary-foreground: var(--p-on-accent);
+    --ring: var(--p-accent);
+    --status-connected: var(--p-accent);
+    --status-connecting: var(--p-accent);
+    --status-idle: var(--p-muted, color-mix(in oklab, var(--p-fg) 55%, var(--p-bg)));
+    --sidebar: var(--p-sidebar, var(--p-bg));
+    --sidebar-foreground: var(--p-fg);
+    --sidebar-primary: var(--p-accent);
+    --sidebar-primary-foreground: var(--p-on-accent);
+    --sidebar-accent: var(--p-lift);
+    --sidebar-accent-foreground: var(--p-fg);
+    --sidebar-border: var(--p-border, color-mix(in oklab, var(--p-fg) 14%, transparent));
+    --sidebar-ring: var(--p-accent);
+}
+
+/* Light ------------------------------------------------------------------ */
+
+/* Sakura: blossom pink on near-white. */
+.theme-light-p-sakura {
+    --p-bg: #fff7f9; --p-sidebar: #fdeef2; --p-card: #ffffff; --p-lift: #fbe4eb;
+    --p-fg: #3b2a30; --p-muted: #86646f;
+    --p-accent: #c2336a; --p-on-accent: #ffffff;
+}
+
+/* Mint: a cool green-white with a teal-green accent. */
+.theme-light-p-mint {
+    --p-bg: #f4fbf8; --p-sidebar: #e9f6f0; --p-card: #ffffff; --p-lift: #dcefe6;
+    --p-fg: #1f3a31; --p-muted: #56756a;
+    --p-accent: #0f7a5f; --p-on-accent: #ffffff;
+}
+
+/* High contrast, light: black on white, strong borders, a dark accent that
+   clears 7:1 against the page. */
+.theme-light-p-contrast {
+    --p-bg: #ffffff; --p-sidebar: #ffffff; --p-card: #ffffff; --p-lift: #e8e8e8;
+    --p-fg: #000000; --p-muted: #2b2b2b; --p-border: rgb(0 0 0 / 55%);
+    --p-accent: #7a3f00; --p-on-accent: #ffffff;
+}
+
+/* Solarized Light (Ethan Schoonover), in its own colours: base3 page, base2
+   surfaces, base02 text, base01 secondary text. The accent is its yellow, not
+   its blue: no Solarized colour on that blue reaches 4.5:1 for button text,
+   while base03 on yellow does. */
+.theme-light-p-solarized {
+    --p-bg: #fdf6e3; --p-sidebar: #eee8d5; --p-card: #eee8d5; --p-lift: #e4dcc4;
+    --p-fg: #073642; --p-muted: #586e75; --p-border: rgb(88 110 117 / 22%);
+    --p-accent: #b58900; --p-on-accent: #002b36;
+}
+
+/* Catppuccin Latte: base, mantle, surface0, text, subtext0, mauve. */
+.theme-light-p-latte {
+    --p-bg: #eff1f5; --p-sidebar: #e6e9ef; --p-card: #e6e9ef; --p-lift: #ccd0da;
+    --p-fg: #4c4f69; --p-muted: #5c5f77;
+    --p-accent: #8839ef; --p-on-accent: #eff1f5;
+}
+
+/* Dark ------------------------------------------------------------------- */
+
+/* Dracula: background, current line, foreground, purple. */
+.theme-dark-p-dracula {
+    --p-bg: #282a36; --p-sidebar: #21222c; --p-card: #2f3140; --p-lift: #44475a;
+    --p-fg: #f8f8f2;
+    --p-accent: #bd93f9; --p-on-accent: #282a36;
+}
+
+/* Gruvbox dark: bg, bg0_h, bg0_s, bg1, fg, gray, yellow. */
+.theme-dark-p-gruvbox {
+    --p-bg: #282828; --p-sidebar: #1d2021; --p-card: #32302f; --p-lift: #3c3836;
+    --p-fg: #ebdbb2; --p-muted: #a89984;
+    --p-accent: #fabd2f; --p-on-accent: #282828;
+}
+
+/* Tokyo Night: bg, bg_dark, bg_highlight, fg, fg_dark, blue. */
+.theme-dark-p-tokyo {
+    --p-bg: #1a1b26; --p-sidebar: #16161e; --p-card: #1f2335; --p-lift: #292e42;
+    --p-fg: #c0caf5; --p-muted: #a9b1d6;
+    --p-accent: #7aa2f7; --p-on-accent: #1a1b26;
+}
+
+/* Catppuccin Mocha, Macchiato and Frappé: base, mantle, surface0, surface1,
+   text, subtext0, mauve. */
+.theme-dark-p-ctp-mocha {
+    --p-bg: #1e1e2e; --p-sidebar: #181825; --p-card: #313244; --p-lift: #45475a;
+    --p-fg: #cdd6f4; --p-muted: #a6adc8;
+    --p-accent: #cba6f7; --p-on-accent: #1e1e2e;
+}
+.theme-dark-p-ctp-macchiato {
+    --p-bg: #24273a; --p-sidebar: #1e2030; --p-card: #363a4f; --p-lift: #494d64;
+    --p-fg: #cad3f5; --p-muted: #a5adcb;
+    --p-accent: #c6a0f6; --p-on-accent: #24273a;
+}
+.theme-dark-p-ctp-frappe {
+    --p-bg: #303446; --p-sidebar: #292c3c; --p-card: #414559; --p-lift: #51576d;
+    --p-fg: #c6d0f5; --p-muted: #a5adce;
+    --p-accent: #ca9ee6; --p-on-accent: #303446;
+}
+
+/* Rosé Pine: base, surface, overlay, text, subtle, rose. */
+.theme-dark-p-rose-pine {
+    --p-bg: #191724; --p-sidebar: #1f1d2e; --p-card: #1f1d2e; --p-lift: #26233a;
+    --p-fg: #e0def4; --p-muted: #908caa;
+    --p-accent: #ebbcba; --p-on-accent: #191724;
+}
+
+/* Everforest dark, medium: bg0, bg_dim, bg1, bg2, fg, grey2, green. */
+.theme-dark-p-everforest {
+    --p-bg: #2d353b; --p-sidebar: #232a2e; --p-card: #343f44; --p-lift: #3d484d;
+    --p-fg: #d3c6aa; --p-muted: #9da9a0;
+    --p-accent: #a7c080; --p-on-accent: #2d353b;
+}
+
+/* Ember: charcoal warmed by coals, with a glowing orange-red. */
+.theme-dark-p-ember {
+    --p-bg: #1a1210; --p-sidebar: #150e0c; --p-card: #241915; --p-lift: #33231d;
+    --p-fg: #f5e6df;
+    --p-accent: #ff6b3d; --p-on-accent: #1a1210;
+}
+
+/* Crimson: near-black wine with a deep red. Dark text on the accent — white
+   on this red falls short of 4.5:1. */
+.theme-dark-p-crimson {
+    --p-bg: #170c10; --p-sidebar: #12090c; --p-card: #221217; --p-lift: #321a21;
+    --p-fg: #f6e4e8;
+    --p-accent: #e8364f; --p-on-accent: #170c10;
+}
+
+/* Ocean: deep-water blue with a sea-spray cyan. */
+.theme-dark-p-ocean {
+    --p-bg: #0b1a26; --p-sidebar: #081520; --p-card: #102434; --p-lift: #173246;
+    --p-fg: #d9ecf5;
+    --p-accent: #3fb6d9; --p-on-accent: #0b1a26;
+}
+
+/* Teal: green-blue ground with a bright teal. */
+.theme-dark-p-teal {
+    --p-bg: #0d1a1a; --p-sidebar: #0a1515; --p-card: #132525; --p-lift: #1b3434;
+    --p-fg: #d8f0ee;
+    --p-accent: #2dd4bf; --p-on-accent: #0d1a1a;
+}

@@ -145,8 +145,13 @@ function ThemePicker({ theme, setTheme }: Props) {
         hint: t(preset.hint),
         swatch: preset.swatch,
     });
-    const light = THEME_PRESETS.filter((preset) => preset.mode === "light");
-    const dark = THEME_PRESETS.filter((preset) => preset.mode === "dark");
+    const own = THEME_PRESETS.filter((preset) => !preset.family);
+    const light = own.filter((preset) => preset.mode === "light");
+    const dark = own.filter((preset) => preset.mode === "dark");
+    // The community palettes, light ones first.
+    const palettes = THEME_PRESETS.filter((preset) => preset.family === "palette").sort(
+        (a, b) => Number(a.mode === "dark") - Number(b.mode === "dark")
+    );
     const { prefs, activeCustom, showCustomTheme, saveCustomTheme, deleteCustomTheme } =
         useAppearance();
     const [editing, setEditing] = useState<{ theme: CustomTheme; isNew: boolean } | null>(null);
@@ -204,6 +209,17 @@ function ThemePicker({ theme, setTheme }: Props) {
 
             <Group title={t("picker.dark")}>
                 {dark.map((preset) => (
+                    <PresetOption
+                        key={preset.id}
+                        preset={translated(preset)}
+                        active={theme === preset.id}
+                        onSelect={() => setTheme(preset.id)}
+                    />
+                ))}
+            </Group>
+
+            <Group title={t("picker.palettes")}>
+                {palettes.map((preset) => (
                     <PresetOption
                         key={preset.id}
                         preset={translated(preset)}

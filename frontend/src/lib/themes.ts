@@ -18,8 +18,14 @@ export interface ThemePreset {
     label: MessageKey;
     /** Why this one exists, shown under the name. */
     hint: MessageKey;
-    /** Which group it belongs to in the picker. */
+    /** Whether the theme is light or dark. */
     mode: "light" | "dark";
+    /**
+     * "palette" for the well-known community palettes (Dracula, Catppuccin…),
+     * which the picker groups on their own rather than mixing them into the
+     * light and dark lists.
+     */
+    family?: "palette";
     /** The class next-themes applies for this preset. */
     className: string;
     swatch: {
@@ -212,6 +218,152 @@ export const THEME_PRESETS: ThemePreset[] = [
             surface: "oklch(0.29 0.03 55)",
             accent: "oklch(0.79 0.1 65)",
         },
+    },
+    {
+        id: "sakura",
+        label: "theme.sakura",
+        hint: "theme.sakura.hint",
+        mode: "light",
+        className: "theme-light-p-sakura",
+        swatch: { background: "#fff7f9", surface: "#fbe4eb", accent: "#c2336a" },
+    },
+    {
+        id: "mint",
+        label: "theme.mint",
+        hint: "theme.mint.hint",
+        mode: "light",
+        className: "theme-light-p-mint",
+        swatch: { background: "#f4fbf8", surface: "#dcefe6", accent: "#0f7a5f" },
+    },
+    {
+        id: "contrast-light",
+        label: "theme.contrast-light",
+        hint: "theme.contrast-light.hint",
+        mode: "light",
+        className: "theme-light-p-contrast",
+        swatch: { background: "#ffffff", surface: "#e8e8e8", accent: "#7a3f00" },
+    },
+    {
+        id: "ember",
+        label: "theme.ember",
+        hint: "theme.ember.hint",
+        mode: "dark",
+        className: "theme-dark-p-ember",
+        swatch: { background: "#1a1210", surface: "#33231d", accent: "#ff6b3d" },
+    },
+    {
+        id: "crimson",
+        label: "theme.crimson",
+        hint: "theme.crimson.hint",
+        mode: "dark",
+        className: "theme-dark-p-crimson",
+        swatch: { background: "#170c10", surface: "#321a21", accent: "#e8364f" },
+    },
+    {
+        id: "ocean",
+        label: "theme.ocean",
+        hint: "theme.ocean.hint",
+        mode: "dark",
+        className: "theme-dark-p-ocean",
+        swatch: { background: "#0b1a26", surface: "#173246", accent: "#3fb6d9" },
+    },
+    {
+        id: "teal",
+        label: "theme.teal",
+        hint: "theme.teal.hint",
+        mode: "dark",
+        className: "theme-dark-p-teal",
+        swatch: { background: "#0d1a1a", surface: "#1b3434", accent: "#2dd4bf" },
+    },
+    {
+        id: "solarized-light",
+        label: "theme.solarized-light",
+        hint: "theme.solarized-light.hint",
+        mode: "light",
+        family: "palette",
+        className: "theme-light-p-solarized",
+        swatch: { background: "#fdf6e3", surface: "#e4dcc4", accent: "#b58900" },
+    },
+    {
+        id: "ctp-latte",
+        label: "theme.ctp-latte",
+        hint: "theme.ctp-latte.hint",
+        mode: "light",
+        family: "palette",
+        className: "theme-light-p-latte",
+        swatch: { background: "#eff1f5", surface: "#ccd0da", accent: "#8839ef" },
+    },
+    {
+        id: "ctp-frappe",
+        label: "theme.ctp-frappe",
+        hint: "theme.ctp-frappe.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-ctp-frappe",
+        swatch: { background: "#303446", surface: "#51576d", accent: "#ca9ee6" },
+    },
+    {
+        id: "ctp-macchiato",
+        label: "theme.ctp-macchiato",
+        hint: "theme.ctp-macchiato.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-ctp-macchiato",
+        swatch: { background: "#24273a", surface: "#494d64", accent: "#c6a0f6" },
+    },
+    {
+        id: "ctp-mocha",
+        label: "theme.ctp-mocha",
+        hint: "theme.ctp-mocha.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-ctp-mocha",
+        swatch: { background: "#1e1e2e", surface: "#45475a", accent: "#cba6f7" },
+    },
+    {
+        id: "dracula",
+        label: "theme.dracula",
+        hint: "theme.dracula.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-dracula",
+        swatch: { background: "#282a36", surface: "#44475a", accent: "#bd93f9" },
+    },
+    {
+        id: "gruvbox",
+        label: "theme.gruvbox",
+        hint: "theme.gruvbox.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-gruvbox",
+        swatch: { background: "#282828", surface: "#3c3836", accent: "#fabd2f" },
+    },
+    {
+        id: "tokyo-night",
+        label: "theme.tokyo-night",
+        hint: "theme.tokyo-night.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-tokyo",
+        swatch: { background: "#1a1b26", surface: "#292e42", accent: "#7aa2f7" },
+    },
+    {
+        id: "rose-pine",
+        label: "theme.rose-pine",
+        hint: "theme.rose-pine.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-rose-pine",
+        swatch: { background: "#191724", surface: "#26233a", accent: "#ebbcba" },
+    },
+    {
+        id: "everforest",
+        label: "theme.everforest",
+        hint: "theme.everforest.hint",
+        mode: "dark",
+        family: "palette",
+        className: "theme-dark-p-everforest",
+        swatch: { background: "#2d353b", surface: "#3d484d", accent: "#a7c080" },
     },
 ];
 
