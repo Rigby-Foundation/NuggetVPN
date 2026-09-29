@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -31,6 +32,10 @@ const (
 
 	hotkeyID = 1
 )
+
+// errHotkeyAlreadyRegistered is ERROR_HOTKEY_ALREADY_REGISTERED: another app
+// holds the combination.
+var errHotkeyAlreadyRegistered = windows.Errno(1409)
 
 type winMessage struct {
 	hwnd    uintptr
@@ -87,11 +92,14 @@ func (a *App) registerHotkey(spec string) error {
 		defer runtime.UnlockOSThread()
 		ok, _, callErr := procRegisterHotKey.Call(0, hotkeyID, modifiers, uintptr(vk))
 		if ok == 0 {
-			started <- fmt.Errorf("%s is already used by another app", spec)
+			if errors.Is(callErr, errHotkeyAlreadyRegistered) {
+				started <- fmt.Errorf("%s is already used by another app", spec)
+			} else {
+				started <- fmt.Errorf("could not register %s: %w", spec, callErr)
+			}
 			return
 		}
 		defer procUnregisterHotKey.Call(0, hotkeyID)
-		_ = callErr
 		threadID <- windows.GetCurrentThreadId()
 		started <- nil
 
