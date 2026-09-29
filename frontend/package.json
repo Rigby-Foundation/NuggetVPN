@@ -13,8 +13,11 @@
   "dependencies": {
     "@fontsource-variable/geologica": "^5.3.0",
     "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource-variable/noto-sans-jp": "^5.3.0",
+    "@fontsource-variable/noto-sans-sc": "^5.3.0",
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource-variable/rubik": "^5.3.0",
+    "@fontsource-variable/vazirmatn": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",

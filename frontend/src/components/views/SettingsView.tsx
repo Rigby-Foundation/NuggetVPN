@@ -32,8 +32,8 @@ import {
   MotionPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
-import { fontLabel } from "@/lib/appearance";
-import { LANGUAGES, LanguageChoice, MessageKey, useI18n } from "@/lib/i18n";
+import { effectiveFont, fontLabel } from "@/lib/appearance";
+import { LANGUAGES, LanguageChoice, MessageKey, scriptOf, useI18n } from "@/lib/i18n";
 import {
   SettingsField,
   SettingsGroup,
@@ -263,7 +263,9 @@ function SettingsView({
           : preset
             ? t(preset.label)
             : t("settings.appearance.systemTheme");
-        return [themeName, fontLabel(t, appearance.font)].filter(Boolean).join(" · ");
+        return [themeName, fontLabel(t, effectiveFont(appearance.font, scriptOf(language)).id)]
+          .filter(Boolean)
+          .join(" · ");
       }
       case "language": {
         return choice === "system"

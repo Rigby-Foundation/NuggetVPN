@@ -11,8 +11,14 @@ import "@fontsource-variable/rubik";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/geologica";
 import "@fontsource-variable/onest";
+// Full coverage for the non-Latin, non-Cyrillic scripts the UI is shown in.
+// The CJK fonts are sliced by unicode-range, so a page only ever loads the
+// few slices its characters fall in.
+import "@fontsource-variable/noto-sans-sc";
+import "@fontsource-variable/noto-sans-jp";
+import "@fontsource-variable/vazirmatn";
 
-import type { MessageKey, Translate } from "@/lib/i18n";
+import type { MessageKey, Script, Translate } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -24,17 +30,63 @@ export interface FontOption {
     label: string;
     /** Goes into --app-font; the stack in App.css supplies the fallbacks. */
     family: string;
+    /**
+     * The scripts the font covers completely — every letter, not most of
+     * them. Read from each font package's own subset list, not assumed.
+     * The picker offers a font only for languages written in one of these.
+     */
+    scripts: readonly Script[] | "all";
 }
 
 /** All self-hosted: a VPN client fetching fonts from Google would be a leak. */
 export const FONTS: FontOption[] = [
-    { id: "google-sans", label: "Google Sans", family: "'Google Sans'" },
-    { id: "rubik", label: "Rubik", family: "'Rubik Variable'" },
-    { id: "manrope", label: "Manrope", family: "'Manrope Variable'" },
-    { id: "geologica", label: "Geologica", family: "'Geologica Variable'" },
-    { id: "onest", label: "Onest", family: "'Onest Variable'" },
-    { id: "system", label: "", family: "system-ui" },
+    { id: "google-sans", label: "Google Sans", family: "'Google Sans'", scripts: ["latin"] },
+    { id: "rubik", label: "Rubik", family: "'Rubik Variable'", scripts: ["latin", "cyrillic", "arab"] },
+    { id: "manrope", label: "Manrope", family: "'Manrope Variable'", scripts: ["latin", "cyrillic"] },
+    { id: "geologica", label: "Geologica", family: "'Geologica Variable'", scripts: ["latin", "cyrillic"] },
+    { id: "onest", label: "Onest", family: "'Onest Variable'", scripts: ["latin", "cyrillic"] },
+    { id: "noto-sans-sc", label: "Noto Sans SC", family: "'Noto Sans SC Variable'", scripts: ["latin", "cyrillic", "hans"] },
+    { id: "noto-sans-jp", label: "Noto Sans JP", family: "'Noto Sans JP Variable'", scripts: ["latin", "cyrillic", "jpan"] },
+    { id: "vazirmatn", label: "Vazirmatn", family: "'Vazirmatn Variable'", scripts: ["latin", "arab"] },
+    // The system UI font: whatever the OS draws its own interface with, which
+    // covers the OS's language by definition.
+    { id: "system", label: "", family: "system-ui", scripts: "all" },
 ];
+
+/**
+ * The font each script falls back to when the chosen one does not cover it.
+ * Every script the UI can be shown in needs an entry here.
+ */
+const DEFAULT_FONT: Record<Script, string> = {
+    latin: "google-sans",
+    cyrillic: "onest",
+    hans: "noto-sans-sc",
+    jpan: "noto-sans-jp",
+    arab: "vazirmatn",
+};
+
+/** Whether a font fully covers a script. */
+export function covers(font: FontOption, script: Script): boolean {
+    return font.scripts === "all" || font.scripts.includes(script);
+}
+
+/** The fonts offered for a script: only the ones that cover it completely. */
+export function fontsFor(script: Script): FontOption[] {
+    return FONTS.filter((font) => covers(font, script));
+}
+
+/**
+ * The font actually used: the chosen one if it covers the language, or the
+ * script's default if it does not. The choice itself is kept, so switching
+ * back to a language it covers restores it.
+ */
+export function effectiveFont(chosen: string, script: Script): FontOption {
+    const font = FONTS.find((option) => option.id === chosen);
+    if (font && covers(font, script)) {
+        return font;
+    }
+    return FONTS.find((option) => option.id === DEFAULT_FONT[script]) ?? FONTS[FONTS.length - 1];
+}
 
 /** A font's name as shown: its own name, or the translated "System". */
 export function fontLabel(t: Translate, id: string): string {
@@ -268,9 +320,9 @@ export function activeCustomTheme(prefs: AppearancePrefs, theme: string | null |
 }
 
 /** Writes font, radius and motion onto <html>. */
-export function applyAppearance(prefs: AppearancePrefs) {
+export function applyAppearance(prefs: AppearancePrefs, script: Script) {
     const root = document.documentElement;
-    const font = FONTS.find((option) => option.id === prefs.font) ?? FONTS[0];
+    const font = effectiveFont(prefs.font, script);
     const radius = RADII.find((option) => option.id === prefs.radius) ?? RADII[1];
     root.style.setProperty("--app-font", font.family);
     root.style.setProperty("--radius", radius.value);

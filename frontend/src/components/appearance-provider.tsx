@@ -20,6 +20,7 @@ import {
     loadAppearance,
     saveAppearance,
 } from "@/lib/appearance";
+import { currentLanguage, scriptOf, useI18n } from "@/lib/i18n";
 import { THEME_CLASSES, THEME_IDS } from "@/lib/themes";
 
 interface AppearanceContext {
@@ -55,11 +56,14 @@ export const PROVIDER_CLASSES: Record<string, string> = { ...THEME_CLASSES, ...C
 function Appearance({ children }: { children: ReactNode }) {
     const { theme, setTheme } = useTheme();
     const [prefs, setPrefs] = useState(loadAppearance);
+    // The font follows the language as well as the choice: switching to a
+    // language the chosen font does not cover changes the font in use.
+    const script = scriptOf(useI18n().language);
 
     useLayoutEffect(() => {
-        applyAppearance(prefs);
+        applyAppearance(prefs, script);
         saveAppearance(prefs);
-    }, [prefs]);
+    }, [prefs, script]);
 
     const activeCustom = activeCustomTheme(prefs, theme);
 
@@ -153,7 +157,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
  */
 export function bootAppearance() {
     const prefs = loadAppearance();
-    applyAppearance(prefs);
+    applyAppearance(prefs, scriptOf(currentLanguage()));
     try {
         const stored = localStorage.getItem("theme") ?? "system";
         const resolved =

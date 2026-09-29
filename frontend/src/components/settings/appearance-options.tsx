@@ -2,8 +2,8 @@ import { ReactNode } from "react";
 import { ArrowRight, ArrowUp, Blend, Minus, type LucideIcon } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
-import { FONTS, fontLabel, MOTIONS, RADII } from "@/lib/appearance";
-import { useI18n, useT } from "@/lib/i18n";
+import { effectiveFont, fontLabel, fontsFor, MOTIONS, RADII } from "@/lib/appearance";
+import { scriptOf, useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,12 +55,16 @@ const sampleFont = (family: string) => `${family}, ui-sans-serif, system-ui, san
 
 export function FontPicker() {
     const { prefs, setFont } = useAppearance();
-    const { t } = useI18n();
+    const { t, language } = useI18n();
     const sample = t("appearance.fontSample");
+    // Only fonts that draw every letter of this language are offered, so none
+    // of them can quietly fall back to another font mid-word.
+    const script = scriptOf(language);
+    const current = effectiveFont(prefs.font, script).id;
     return (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {FONTS.map((font) => (
-                <ChoiceCard key={font.id} active={prefs.font === font.id} onSelect={() => setFont(font.id)}>
+            {fontsFor(script).map((font) => (
+                <ChoiceCard key={font.id} active={current === font.id} onSelect={() => setFont(font.id)}>
                     <span className="text-lg font-semibold leading-tight" style={{ fontFamily: sampleFont(font.family) }}>
                         Aa {sample}
                     </span>

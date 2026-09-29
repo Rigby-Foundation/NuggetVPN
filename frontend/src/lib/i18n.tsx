@@ -27,15 +27,36 @@ export type Message = string | Plural;
 export type MessageKey = keyof typeof en;
 export type Messages = Record<MessageKey, Message>;
 
+/**
+ * The writing systems the UI can be shown in. A font lists the ones it fully
+ * covers; see FONTS in lib/appearance.ts. Chinese and Japanese are separate
+ * even though they share characters: the same character is drawn differently
+ * in each, so a Chinese font does not cover Japanese.
+ */
+export type Script = "latin" | "cyrillic" | "hans" | "jpan" | "arab";
+
+/**
+ * Every language the UI offers. `tag` goes on <html lang>, which is also how
+ * the browser picks regional glyphs when it falls back to a system font —
+ * zh-CN, not bare zh, so Chinese gets Simplified Chinese shapes.
+ *
+ * Adding a language means an entry here, its locale file, and — if its
+ * script is new — fonts that cover it in lib/appearance.ts.
+ */
 export const LANGUAGES = [
-    { id: "en", label: "English" },
-    { id: "ru", label: "Русский" },
-    { id: "uk", label: "Українська" },
-    { id: "zh", label: "中文" },
-    { id: "ja", label: "日本語" },
-] as const;
+    { id: "en", label: "English", tag: "en", script: "latin" },
+    { id: "ru", label: "Русский", tag: "ru", script: "cyrillic" },
+    { id: "uk", label: "Українська", tag: "uk", script: "cyrillic" },
+    { id: "zh", label: "中文", tag: "zh-CN", script: "hans" },
+    { id: "ja", label: "日本語", tag: "ja", script: "jpan" },
+] as const satisfies readonly { id: string; label: string; tag: string; script: Script }[];
 
 export type Language = (typeof LANGUAGES)[number]["id"];
+
+/** The script a language is written in. */
+export function scriptOf(language: Language): Script {
+    return LANGUAGES.find((item) => item.id === language)?.script ?? "latin";
+}
 /** What the user picked: a language, or whatever the system uses. */
 export type LanguageChoice = Language | "system";
 
@@ -52,6 +73,12 @@ export function systemLanguage(): Language {
         }
     }
     return "en";
+}
+
+/** The language the UI will show, read before React renders. */
+export function currentLanguage(): Language {
+    const choice = loadChoice();
+    return choice === "system" ? systemLanguage() : choice;
 }
 
 function loadChoice(): LanguageChoice {
@@ -131,7 +158,7 @@ export function I18nProvider({
     }, []);
 
     useEffect(() => {
-        document.documentElement.lang = language;
+        document.documentElement.lang = LANGUAGES.find((item) => item.id === language)?.tag ?? language;
         onLanguage?.(language);
     }, [language, onLanguage]);
 
