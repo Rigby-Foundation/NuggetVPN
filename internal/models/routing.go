@@ -85,10 +85,13 @@ type RoutingComment struct {
 // maxCommentLength bounds a note, in characters.
 const maxCommentLength = 2000
 
-// Point is a node position on the routing canvas.
+// Point is a node's place on the routing canvas, and its size once the user
+// has resized it. A zero size means the node's natural size.
 type Point struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width,omitempty"`
+	Height float64 `json:"height,omitempty"`
 }
 
 // RoutingRule is one source-to-destination edge in the graph.

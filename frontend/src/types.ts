@@ -210,6 +210,9 @@ export interface RuleListStatus {
 export interface CanvasPoint {
     x: number;
     y: number;
+    /** Set once the node has been resized; absent means its natural size. */
+    width?: number;
+    height?: number;
 }
 
 export interface RoutingComment {

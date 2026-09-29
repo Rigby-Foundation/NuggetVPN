@@ -1,11 +1,12 @@
-import { KeyboardEvent, ReactNode } from "react";
+import { KeyboardEvent, MouseEvent, ReactNode } from "react";
 
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface SelectableCardProps {
     selected?: boolean;
-    onSelect: () => void;
+    /** Receives the event, so a list can read Ctrl and Shift for multi-select. */
+    onSelect: (event: MouseEvent<HTMLDivElement> | KeyboardEvent<HTMLDivElement>) => void;
     /** Announced to screen readers; the visible label is usually truncated. */
     label: string;
     children: ReactNode;
@@ -33,7 +34,7 @@ function SelectableCard({
         }
         // Space scrolls the page otherwise, which is jarring inside a list.
         event.preventDefault();
-        onSelect();
+        onSelect(event);
     };
 
     return (

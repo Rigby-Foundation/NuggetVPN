@@ -1,5 +1,5 @@
 import { createContext, KeyboardEvent, useContext, useEffect, useMemo, useState } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import {
     ArrowDownUp,
     Ban,
@@ -15,6 +15,7 @@ import {
     Regex,
     Search,
     Server,
+    Shrink,
     StickyNote,
     Globe,
     MonitorSmartphone,
@@ -199,6 +200,32 @@ export function validDnsAddress(value: string): boolean {
 }
 
 /** Shared chrome: an accent bar, an icon, a title and a subtitle. */
+/** What every node gets from the canvas to be resizable. */
+export interface BoxData {
+    /** True once the user has resized the node. */
+    sized?: boolean;
+    onResize?: (box: { x: number; y: number; width: number; height: number }) => void;
+    onResetSize?: () => void;
+}
+
+/**
+ * The resize frame, drawn while the node is selected. Resizing from the left
+ * or top moves the node as well, which onResizeEnd reports along with the size.
+ */
+function Resizer({ box, selected, accent, minWidth }: { box?: BoxData; selected?: boolean; accent: string; minWidth: number }) {
+    if (!box?.onResize) return null;
+    return (
+        <NodeResizer
+            isVisible={!!selected}
+            minWidth={minWidth}
+            minHeight={90}
+            color={accent}
+            handleStyle={{ width: 9, height: 9, borderRadius: 3 }}
+            onResizeEnd={(_, params) => box.onResize?.(params)}
+        />
+    );
+}
+
 function NodeShell({
     accent,
     icon: Icon,
@@ -208,6 +235,7 @@ function NodeShell({
     onDelete,
     hits,
     wide,
+    box,
     children,
 }: {
     accent: string;
@@ -219,13 +247,18 @@ function NodeShell({
     /** Connections the rule is carrying now; undefined while disconnected. */
     hits?: number;
     wide?: boolean;
+    box?: BoxData;
     children?: React.ReactNode;
 }) {
     const t = useT();
     return (
+        <>
+        <Resizer box={box} selected={selected} accent={accent} minWidth={wide ? 260 : 200} />
         <div
             className={cn(
-                wide ? "w-80" : "w-64",
+                // A resized node fills the box React Flow gives it, and its
+                // body scrolls when the box is shorter than the content.
+                box?.sized ? "flex h-full w-full flex-col" : wide ? "w-80" : "w-64",
                 "rounded-xl border bg-card/95 backdrop-blur-sm shadow-lg overflow-hidden",
                 "transition-shadow",
                 selected ? "ring-2 ring-offset-2 ring-offset-background" : ""
@@ -235,9 +268,9 @@ function NodeShell({
                 ...(selected ? ({ ["--tw-ring-color" as string]: accent } as object) : {}),
             }}
         >
-            <div className="h-0.5 w-full" style={{ background: accent }} />
+            <div className="h-0.5 w-full shrink-0" style={{ background: accent }} />
 
-            <div className="flex items-start gap-2.5 px-3.5 pt-3 pb-2.5">
+            <div className="flex shrink-0 items-start gap-2.5 px-3.5 pt-3 pb-2.5">
                 <span
                     className="mt-0.5 shrink-0"
                     style={{ color: accent }}
@@ -254,6 +287,17 @@ function NodeShell({
                     </span>
                 </span>
                 {hits !== undefined ? <HitsBadge count={hits} accent={accent} /> : null}
+                {box?.sized && box.onResetSize ? (
+                    <button
+                        type="button"
+                        onClick={box.onResetSize}
+                        aria-label={t("routing.resetSize")}
+                        title={t("routing.resetSize")}
+                        className="nodrag shrink-0 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    >
+                        <Shrink size={13} aria-hidden="true" />
+                    </button>
+                ) : null}
                 {onDelete ? (
                     <button
                         type="button"
@@ -266,8 +310,13 @@ function NodeShell({
                 ) : null}
             </div>
 
-            {children}
+            {box?.sized ? (
+                <div className="nowheel min-h-0 flex-1 overflow-y-auto">{children}</div>
+            ) : (
+                children
+            )}
         </div>
+        </>
     );
 }
 
@@ -772,20 +821,36 @@ export interface CommentNodeData {
  */
 export function CommentNode({ data, selected }: NodeProps) {
     const { text, onChange, onDelete } = data as CommentNodeData;
+    const box = data as BoxData;
     const t = useT();
     const [draft, setDraft] = useState(text);
     useEffect(() => setDraft(text), [text]);
 
     return (
+        <>
+        <Resizer box={box} selected={selected} accent="var(--muted-foreground)" minWidth={160} />
         <div
             className={cn(
-                "w-60 rounded-xl border border-dashed bg-card/85 shadow-sm backdrop-blur-sm",
+                // Resized, the text area takes whatever height the box has.
+                box.sized ? "flex h-full w-full flex-col" : "w-60",
+                "rounded-xl border border-dashed bg-card/85 shadow-sm backdrop-blur-sm",
                 selected ? "ring-2 ring-ring/50" : ""
             )}
         >
-            <div className="flex items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
                 <StickyNote size={13} aria-hidden="true" />
                 <span className="flex-1 text-xs font-medium">{t("routing.note")}</span>
+                {box.sized && box.onResetSize ? (
+                    <button
+                        type="button"
+                        onClick={box.onResetSize}
+                        aria-label={t("routing.resetSize")}
+                        title={t("routing.resetSize")}
+                        className="rounded p-1 hover:bg-muted hover:text-foreground"
+                    >
+                        <Shrink size={12} aria-hidden="true" />
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={onDelete}
@@ -805,9 +870,13 @@ export function CommentNode({ data, selected }: NodeProps) {
                 aria-label={t("routing.note")}
                 maxLength={2000}
                 rows={3}
-                className="nodrag nowheel mt-1 block min-h-16 w-full resize-none bg-transparent px-3 pb-3 text-xs leading-relaxed outline-none [field-sizing:content] placeholder:text-muted-foreground/60"
+                className={cn(
+                    "nodrag nowheel mt-1 block w-full resize-none bg-transparent px-3 pb-3 text-xs leading-relaxed outline-none placeholder:text-muted-foreground/60",
+                    box.sized ? "min-h-0 flex-1" : "min-h-16 [field-sizing:content]"
+                )}
             />
         </div>
+        </>
     );
 }
 
@@ -845,6 +914,7 @@ export function SourceNode({ data, selected }: NodeProps) {
             title={t(meta.label)}
             subtitle={invert ? t("routing.invert.hint") : t(meta.hint)}
             selected={selected}
+            box={data as BoxData}
             onDelete={onDelete}
             hits={hits}
         >
@@ -902,6 +972,7 @@ export function LogicalNode({ data, selected }: NodeProps) {
             title={t(LOGICAL_META.label)}
             subtitle={invert ? t("routing.invert.hint") : t(LOGICAL_META.hint)}
             selected={selected}
+            box={data as BoxData}
             onDelete={onDelete}
             hits={hits}
             wide
@@ -1027,6 +1098,7 @@ export function CatchAllNode({ data, selected }: NodeProps) {
             title={t("routing.catchAll")}
             subtitle={t("routing.catchAll.hint")}
             selected={selected}
+            box={data as BoxData}
             hits={hits}
         >
             <div className="px-3.5 pb-3">
@@ -1078,6 +1150,7 @@ export function ActionNode({ data, selected }: NodeProps) {
             title={t(meta.label)}
             subtitle={t(meta.hint)}
             selected={selected}
+            box={data as BoxData}
         >
             <InboundSummary accent={meta.accent} status={t(meta.status)} inbound={inbound} />
             <Handle
@@ -1113,6 +1186,7 @@ export function ServerNode({ data, selected }: NodeProps) {
             title={name ?? t("routing.server.gone")}
             subtitle={name ? t("routing.server.hint", { protocol: protocol ?? "" }) : t("routing.server.missing")}
             selected={selected}
+            box={data as BoxData}
             onDelete={onDelete}
         >
             <InboundSummary accent={accent} status={t("routing.server.status")} inbound={inbound} />

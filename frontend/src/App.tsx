@@ -506,27 +506,36 @@ function App() {
         [appendLog, importSubscription]
     );
 
-    const handleDeleteSource = useCallback(
-        async (source: ConfigSource) => {
-            const domain =
-                source.kind === "subscription" ? source.domain.trim() || LOCAL : LOCAL;
-            const ids =
-                source.kind === "profile"
-                    ? [source.profileId]
-                    : profiles
-                          .filter((profile) => profileDomain(profile) === domain)
-                          .map((profile) => profile.id);
+    /** The profiles a configuration source stands for. */
+    const profilesOf = useCallback(
+        (source: ConfigSource) => {
+            if (source.kind === "profile") {
+                return profiles.filter((profile) => profile.id === source.profileId);
+            }
+            const domain = source.domain.trim() || LOCAL;
+            return profiles.filter((profile) => profileDomain(profile) === domain);
+        },
+        [profiles]
+    );
+
+    // One call for any number of sources: deleting them one by one would
+    // save the profile list once per source.
+    const handleDeleteSources = useCallback(
+        async (list: ConfigSource[]) => {
+            const ids = list.flatMap((source) => profilesOf(source).map((profile) => profile.id));
             if (ids.length === 0) {
                 return;
             }
 
             try {
                 const remaining = await deleteIds(ids);
-                appendLog([
-                    source.kind === "profile"
-                        ? `Profile "${source.label}" deleted.`
-                        : `Configuration "${domain}" deleted.`,
-                ]);
+                appendLog(
+                    list.map((source) =>
+                        source.kind === "profile"
+                            ? `Profile "${source.label}" deleted.`
+                            : `Configuration "${source.domain.trim() || LOCAL}" deleted.`
+                    )
+                );
 
                 // A chain hop that no longer exists would fail the next connect
                 // with a confusing error, so prune it here.
@@ -541,19 +550,16 @@ function App() {
                 toast.error(t("toast.deleteFailed", { error: errorMessage(error) }));
             }
         },
-        [appendLog, deleteIds, profiles, saveSettings, settings, t]
+        [appendLog, deleteIds, profilesOf, saveSettings, settings, t]
+    );
+    const handleDeleteSource = useCallback(
+        (source: ConfigSource) => handleDeleteSources([source]),
+        [handleDeleteSources]
     );
 
-    const handleRefreshSource = useCallback(
-        async (source: ConfigSource) => {
-            if (source.kind !== "subscription") {
-                return;
-            }
-            const domain = source.domain.trim();
-            if (!domain || domain === LOCAL) {
-                return;
-            }
-
+    /** Refreshes one subscription; reports whether it worked. */
+    const refreshOne = useCallback(
+        async (domain: string, quiet: boolean) => {
             setRefreshingDomain(domain);
             try {
                 const summary = await refreshDomain(domain);
@@ -561,18 +567,73 @@ function App() {
                     `${domain}: ${summary.refreshed} updated, ${summary.failed} failed, ` +
                         `${summary.skipped} skipped.`,
                 ]);
-                toast.success(t("toast.refreshed", { name: domain }), { id: `refresh-${domain}` });
+                if (!quiet) toast.success(t("toast.refreshed", { name: domain }), { id: `refresh-${domain}` });
+                return true;
             } catch (error) {
                 const message = errorMessage(error);
                 appendLog([`Refresh failed for ${domain}: ${message}`]);
                 toast.error(t("toast.refreshFailed", { name: domain, error: message.slice(0, 200) }), {
                     id: `refresh-${domain}`,
                 });
+                return false;
             } finally {
                 setRefreshingDomain("");
             }
         },
         [appendLog, refreshDomain, t]
+    );
+
+    // One after another: they write the same profile list, and the card
+    // being refreshed shows its spinner in turn.
+    const handleRefreshSources = useCallback(
+        async (list: ConfigSource[]) => {
+            const domains = list
+                .filter((source) => source.kind === "subscription")
+                .map((source) => source.domain.trim())
+                .filter((domain) => domain && domain !== LOCAL);
+            if (domains.length === 1) {
+                await refreshOne(domains[0], false);
+                return;
+            }
+            let refreshed = 0;
+            for (const domain of domains) {
+                if (await refreshOne(domain, true)) refreshed++;
+            }
+            if (refreshed > 0) {
+                toast.success(t("configuration.bulk.refreshed", { count: refreshed }), { id: "refresh-bulk" });
+            }
+        },
+        [refreshOne, t]
+    );
+    const handleRefreshSource = useCallback(
+        (source: ConfigSource) => handleRefreshSources([source]),
+        [handleRefreshSources]
+    );
+
+    // A subscription's address, or a single profile's share link: what it
+    // takes to add the same thing on another device.
+    const handleCopySources = useCallback(
+        async (list: ConfigSource[]) => {
+            const links = list
+                .map((source) => {
+                    const members = profilesOf(source);
+                    return source.kind === "subscription"
+                        ? members.find((profile) => profile.subscription_url)?.subscription_url ?? ""
+                        : members[0]?.config_link ?? "";
+                })
+                .filter(Boolean);
+            if (links.length === 0) {
+                toast.error(t("configuration.bulk.nothingToCopy"), { id: "copy-links" });
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(links.join("\n"));
+                toast.success(t("configuration.bulk.copied", { count: links.length }), { id: "copy-links" });
+            } catch (error) {
+                toast.error(errorMessage(error), { id: "copy-links" });
+            }
+        },
+        [profilesOf, t]
     );
 
     const handleDumpLogs = useCallback(async () => {
@@ -852,6 +913,9 @@ function App() {
                                         onSelectSource={(source) => selectSource(source, true)}
                                         onDeleteSource={handleDeleteSource}
                                         onRefreshSource={handleRefreshSource}
+                                        onDeleteSources={handleDeleteSources}
+                                        onRefreshSources={handleRefreshSources}
+                                        onCopySources={handleCopySources}
                                         onAdd={() => setIsModalOpen(true)}
                                     />
                                 )}

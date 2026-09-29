@@ -278,9 +278,39 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
         return counts;
     }, [rules, settings.default_action, settings.default_server]);
 
+    /** Saves a node's new size, and its position, which moves when resized from the left or top. */
+    const resizeNode = useCallback(
+        (id: string, box: { x: number; y: number; width: number; height: number }) => {
+            onChange({
+                routing_layout: {
+                    ...layoutRef.current,
+                    [id]: {
+                        x: box.x,
+                        y: box.y,
+                        width: Math.round(box.width),
+                        height: Math.round(box.height),
+                    },
+                },
+            });
+        },
+        [onChange]
+    );
+
+    /** Back to the node's natural size, keeping where it is. */
+    const resetNodeSize = useCallback(
+        (id: string) => {
+            const point = layoutRef.current[id];
+            if (!point) return;
+            onChange({ routing_layout: { ...layoutRef.current, [id]: { x: point.x, y: point.y } } });
+        },
+        [onChange]
+    );
+
     const derivedNodes = useMemo<Node[]>(() => {
-        const positioned = (id: string, index: number) =>
-            layout[id] ?? fallbackPosition(id, index);
+        const positioned = (id: string, index: number) => {
+            const point = layout[id] ?? fallbackPosition(id, index);
+            return { x: point.x, y: point.y };
+        };
         const hitsFor = (id: string) => (hits ? hits[id] ?? 0 : undefined);
 
         return [
@@ -337,8 +367,22 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                     onDelete: () => removeComment(comment.id),
                 },
             })),
-        ];
-    }, [rules, layout, inboundCounts, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits]);
+        ].map((node): Node => {
+            // Every node can be resized; a resized one keeps its size.
+            const box = layout[node.id];
+            const sized = !!box?.width && !!box?.height;
+            return {
+                ...node,
+                ...(sized ? { width: box.width, height: box.height } : {}),
+                data: {
+                    ...node.data,
+                    sized,
+                    onResize: (next: { x: number; y: number; width: number; height: number }) => resizeNode(node.id, next),
+                    onResetSize: () => resetNodeSize(node.id),
+                },
+            };
+        });
+    }, [rules, layout, inboundCounts, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
         // An edge carrying connections right now is drawn heavier, so the
@@ -382,10 +426,15 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                 return derivedNodes.map((node) => {
                     const before = previous.get(node.id);
                     if (!before) return node;
+                    // Mid-resize, the size React Flow is drawing wins over
+                    // the saved one, which only updates when the resize ends.
+                    const resizing = !!before.resizing;
                     return {
                         ...node,
-                        position: before.dragging ? before.position : node.position,
+                        position: before.dragging || resizing ? before.position : node.position,
+                        ...(resizing ? { width: before.width, height: before.height } : {}),
                         dragging: before.dragging,
+                        resizing: before.resizing,
                         selected: before.selected,
                         measured: before.measured,
                     };
@@ -411,7 +460,8 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                 if (change.type !== "position" || !change.position) {
                     return;
                 }
-                next[change.id] = { x: change.position.x, y: change.position.y };
+                // Moving keeps a resized node's size.
+                next[change.id] = { ...next[change.id], x: change.position.x, y: change.position.y };
             });
             onChange({ routing_layout: next });
         },
