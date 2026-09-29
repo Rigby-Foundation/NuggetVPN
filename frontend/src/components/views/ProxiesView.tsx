@@ -89,7 +89,7 @@ function ProxiesView({
             }
         >
             {isSubscription ? (
-                <div className="space-y-2">
+                <div className="enter-stagger space-y-2">
                     <SelectableCard
                         selected={selectedProxyMode === "auto"}
                         onSelect={onSelectAuto}
@@ -137,7 +137,7 @@ function ProxiesView({
                             No servers in this subscription yet. Try refreshing it.
                         </p>
                     ) : (
-                        <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
+                        <div className="enter-stagger grid gap-2 grid-cols-1 lg:grid-cols-2">
                             {domainProfiles.map((profile) => {
                                 const ping = profilePings[profile.id];
                                 const selected =

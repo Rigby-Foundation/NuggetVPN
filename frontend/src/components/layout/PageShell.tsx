@@ -44,9 +44,11 @@ function PageShell({
         </header>
     );
 
+    // enter-stagger: the header and each top-level block animate in one after
+    // another when the page opens. See "Entrance animations" in App.css.
     if (fill) {
         return (
-            <div className={cn("absolute inset-0 flex flex-col px-6 py-5", className)}>
+            <div className={cn("enter-stagger absolute inset-0 flex flex-col px-6 py-5", className)}>
                 {header}
                 {children}
             </div>
@@ -56,7 +58,7 @@ function PageShell({
     return (
         <div className="absolute inset-0 overflow-hidden">
             <ScrollArea className="h-full">
-                <div className={cn("px-6 py-5", className)}>
+                <div className={cn("enter-stagger px-6 py-5", className)}>
                     {header}
                     {children}
                 </div>

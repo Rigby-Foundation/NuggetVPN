@@ -1,6 +1,4 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
-// @ts-expect-error - React experimental ViewTransition type not in stable defs.
-import { ViewTransition } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 import { appWindow, errorMessage, invoke, save, writeTextFile } from "@/lib/backend";
@@ -582,7 +580,6 @@ function App() {
                             onAddProfile={() => setIsModalOpen(true)}
                         />
 
-                        <ViewTransition name="app-content">
                             <div className="flex-1 relative overflow-hidden">
                                 {activeTab === "connection" && (
                                     <ConnectionView
@@ -717,7 +714,6 @@ function App() {
                                     />
                                 )}
                             </div>
-                        </ViewTransition>
                     </div>
                 </SidebarInset>
             </SidebarProvider>

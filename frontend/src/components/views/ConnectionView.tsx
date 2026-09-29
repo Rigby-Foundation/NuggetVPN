@@ -127,7 +127,7 @@ function ConnectionView({
     const action = state.status === "connected" ? "Disconnect" : "Connect";
 
     return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 py-6 overflow-y-auto">
+        <div className="enter-stagger absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 py-6 overflow-y-auto">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span
                     className={cn("h-2 w-2 rounded-full", presentation.dot)}
@@ -221,7 +221,12 @@ function ConnectionView({
             </div>
 
             {state.status === "connected" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full max-w-2xl">
+                // Fourth in the page's sequence: after the status line, the
+                // button and the hint.
+                <div
+                    className="enter-stagger grid grid-cols-2 sm:grid-cols-4 gap-2 w-full max-w-2xl"
+                    style={{ ["--enter-offset" as string]: 3 }}
+                >
                     <Stat
                         icon={<ArrowUp size={16} />}
                         label="Upload"

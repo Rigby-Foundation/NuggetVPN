@@ -600,106 +600,113 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Page transitions.
+ * Entrance animations.
  *
- * The content area is a React <ViewTransition name="app-content">, so a tab
- * change is a browser view transition. Appearance picks the animation by
- * setting data-motion on <html>; without one this is the browser's cross-fade.
+ * Pages animate item by item as they mount, rather than as one picture. The
+ * direct children of an .enter-stagger container come in one after another;
+ * a page's header is the first item, so it leads. This replaced view
+ * transitions, which can only move snapshots of the whole old and new page.
+ *
+ * Nothing here runs on updates: a CSS animation plays when its element is
+ * inserted, so a page animates when it is opened, and a switch flipped on it
+ * moves nothing. The one exception is deliberate — choosing a different
+ * transition in Appearance changes the animation, so the page replays it,
+ * which is the preview.
+ *
+ * Appearance picks the motion with data-motion on <html>. data-enter-dir=
+ * "back" on an ancestor reverses the direction, for leaving a settings
+ * section.
  * ------------------------------------------------------------------------ */
-::view-transition-old(app-content),
-::view-transition-new(app-content) {
-    animation-duration: 200ms;
+:root {
+    --enter-name: nugget-fade-in;
+    --enter-duration: 300ms;
+    --enter-step: 35ms;
+}
+:root[data-motion="slide"] {
+    --enter-name: nugget-in-from-right;
+}
+:root[data-motion="slide"] [data-enter-dir="back"] {
+    --enter-name: nugget-in-from-left;
+}
+:root[data-motion="rise"] {
+    --enter-name: nugget-in-from-below;
+}
+:root[data-motion="rise"] [data-enter-dir="back"] {
+    --enter-name: nugget-in-from-above;
+}
+:root[data-motion="fade"] {
+    --enter-duration: 240ms;
 }
 
-:root[data-motion="slide"]::view-transition-old(app-content) {
-    animation: 140ms ease-in both nugget-fade-out;
-}
-:root[data-motion="slide"]::view-transition-new(app-content) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-right;
-}
-
-:root[data-motion="rise"]::view-transition-old(app-content) {
-    animation: 140ms ease-in both nugget-fade-out;
-}
-:root[data-motion="rise"]::view-transition-new(app-content) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-below;
+/* "backwards", not "both": an element holding its final keyframe forever
+   keeps a transform animation attached, which quietly changes stacking and
+   fights hover effects like the connect button's scale. */
+.enter-stagger > * {
+    animation: var(--enter-name) var(--enter-duration) cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation-delay: calc((var(--enter-offset, 0) + var(--enter-i, 0)) * var(--enter-step));
 }
 
-:root[data-motion="none"]::view-transition-group(app-content),
-:root[data-motion="none"]::view-transition-old(app-content),
-:root[data-motion="none"]::view-transition-new(app-content) {
+/* A list nested in a staggered page starts after the page's header, and the
+   list itself stays still, as does any block holding one: moving both the
+   container and its rows would double every row's movement. A list that sits
+   later in its page sets --enter-offset inline to start in its place. */
+.enter-stagger .enter-stagger {
+    --enter-offset: 1;
+}
+/* One level deeper — the server grid under the "Automatic" card — starts
+   after that card rather than alongside it. */
+.enter-stagger .enter-stagger .enter-stagger {
+    --enter-offset: 2;
+}
+.enter-stagger > .enter-stagger,
+.enter-stagger > :has(.enter-stagger) {
     animation: none;
 }
 
-/* Settings: opening a section and going back. The same motion preference
-   applies, with a direction — forward comes in from the right (or below), back
-   from the left (or above) — so the two read as going in and coming out. The
-   classes come from the transition type SettingsView tags each move with. */
-::view-transition-old(.settings-forward),
-::view-transition-new(.settings-forward),
-::view-transition-old(.settings-back),
-::view-transition-new(.settings-back) {
-    animation-duration: 200ms;
-}
+/* Position in the sequence, capped so a long list does not keep arriving
+   for a second after the page has opened. The first is set explicitly: custom
+   properties inherit, so without it a nested list's first row took its parent
+   block's position and arrived together with the second. */
+.enter-stagger > :nth-child(1) { --enter-i: 0; }
+.enter-stagger > :nth-child(2) { --enter-i: 1; }
+.enter-stagger > :nth-child(3) { --enter-i: 2; }
+.enter-stagger > :nth-child(4) { --enter-i: 3; }
+.enter-stagger > :nth-child(5) { --enter-i: 4; }
+.enter-stagger > :nth-child(6) { --enter-i: 5; }
+.enter-stagger > :nth-child(7) { --enter-i: 6; }
+.enter-stagger > :nth-child(8) { --enter-i: 7; }
+.enter-stagger > :nth-child(9) { --enter-i: 8; }
+.enter-stagger > :nth-child(10) { --enter-i: 9; }
+.enter-stagger > :nth-child(n + 11) { --enter-i: 10; }
 
-:root[data-motion="slide"]::view-transition-old(.settings-forward),
-:root[data-motion="slide"]::view-transition-old(.settings-back),
-:root[data-motion="rise"]::view-transition-old(.settings-forward),
-:root[data-motion="rise"]::view-transition-old(.settings-back) {
-    animation: 140ms ease-in both nugget-fade-out;
-}
-:root[data-motion="slide"]::view-transition-new(.settings-forward) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-right;
-}
-:root[data-motion="slide"]::view-transition-new(.settings-back) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-left;
-}
-:root[data-motion="rise"]::view-transition-new(.settings-forward) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-below;
-}
-:root[data-motion="rise"]::view-transition-new(.settings-back) {
-    animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both nugget-in-from-above;
-}
-
-:root[data-motion="none"]::view-transition-group(.settings-forward),
-:root[data-motion="none"]::view-transition-old(.settings-forward),
-:root[data-motion="none"]::view-transition-new(.settings-forward),
-:root[data-motion="none"]::view-transition-group(.settings-back),
-:root[data-motion="none"]::view-transition-old(.settings-back),
-:root[data-motion="none"]::view-transition-new(.settings-back) {
+:root[data-motion="none"] .enter-stagger > * {
     animation: none;
 }
 
-/* Someone who has asked the system for less motion gets the fade, whatever is
-   picked here: movement is the part that causes trouble, not the change. */
+/* Someone who has asked the system for less motion gets a quick fade, all at
+   once: movement and a sequence are both the part that causes trouble. */
 @media (prefers-reduced-motion: reduce) {
-    :root[data-motion="slide"]::view-transition-new(app-content),
-    :root[data-motion="rise"]::view-transition-new(app-content),
-    :root[data-motion="slide"]::view-transition-new(.settings-forward),
-    :root[data-motion="slide"]::view-transition-new(.settings-back),
-    :root[data-motion="rise"]::view-transition-new(.settings-forward),
-    :root[data-motion="rise"]::view-transition-new(.settings-back) {
-        animation: 200ms ease-out both nugget-fade-in;
+    .enter-stagger > * {
+        animation-name: nugget-fade-in;
+        animation-duration: 160ms;
+        animation-delay: 0s;
     }
 }
 
-@keyframes nugget-fade-out {
-    to { opacity: 0; }
-}
 @keyframes nugget-fade-in {
     from { opacity: 0; }
 }
 @keyframes nugget-in-from-right {
-    from { opacity: 0; transform: translateX(28px); }
-}
-@keyframes nugget-in-from-below {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateX(18px); }
 }
 @keyframes nugget-in-from-left {
-    from { opacity: 0; transform: translateX(-28px); }
+    from { opacity: 0; transform: translateX(-18px); }
+}
+@keyframes nugget-in-from-below {
+    from { opacity: 0; transform: translateY(12px); }
 }
 @keyframes nugget-in-from-above {
-    from { opacity: 0; transform: translateY(-20px); }
+    from { opacity: 0; transform: translateY(-12px); }
 }
 
 /* ---------------------------------------------------------------------------

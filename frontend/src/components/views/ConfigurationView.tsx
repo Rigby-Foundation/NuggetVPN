@@ -58,7 +58,7 @@ function ConfigurationView({
                     </Button>
                 </div>
             ) : (
-                <div className="space-y-2">
+                <div className="enter-stagger space-y-2">
                     {sources.map((source) => {
                         const domain =
                             source.kind === "subscription"

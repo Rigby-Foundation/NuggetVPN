@@ -365,7 +365,7 @@ function RoutingView({ settings, onChange }: RoutingViewProps) {
     );
 
     return (
-        <div className="absolute inset-0 flex flex-col">
+        <div className="enter-stagger absolute inset-0 flex flex-col">
             <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3 shrink-0">
                 <div className="min-w-0">
                     <h1 className="text-base font-semibold tracking-tight">Routing</h1>
