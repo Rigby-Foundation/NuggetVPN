@@ -110,3 +110,19 @@ func (a *App) DeleteProfilesByIds(ids []string) ([]models.Profile, error) {
 	}
 	return a.replaceProfiles(kept), nil
 }
+
+// SetFavorites stars or unstars servers. Starred servers are listed first,
+// and a subscription refresh keeps the star on each.
+func (a *App) SetFavorites(ids []string, favorite bool) ([]models.Profile, error) {
+	profiles, _ := a.snapshot()
+	wanted := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	for index := range profiles {
+		if wanted[profiles[index].ID] {
+			profiles[index].Favorite = favorite
+		}
+	}
+	return a.replaceProfiles(profiles), nil
+}

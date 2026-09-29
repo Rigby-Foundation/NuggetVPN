@@ -35,6 +35,7 @@ import {
     BeamOffer,
     ConfigSource,
     IpInfo,
+    Profile,
     ProfilePing,
 } from "@/types";
 
@@ -659,6 +660,79 @@ function App() {
         [profilesOf, t]
     );
 
+    // Proxies screen actions.
+    const testProfiles = useCallback(
+        async (ids?: string[]) => {
+            if (!ids) {
+                await refreshPings();
+                return;
+            }
+            const domain = selection.domain.trim() || LOCAL;
+            setProfilePings((current) => {
+                const next = { ...current };
+                ids.forEach((id) => delete next[id]);
+                return next;
+            });
+            try {
+                const results = await invoke<ProfilePing[]>("probe_profiles_connectivity", {
+                    sourceDomain: domain,
+                    profileIds: ids,
+                    timeoutMs: 2500,
+                });
+                setProfilePings((current) => {
+                    const next = { ...current };
+                    ids.forEach((id) => (next[id] = null));
+                    results.forEach((result) => (next[result.id] = result.ping_ms ?? null));
+                    return next;
+                });
+            } catch (error) {
+                toast.error(errorMessage(error), { id: "test-profiles" });
+            }
+        },
+        [refreshPings, selection.domain]
+    );
+
+    const setFavorites = useCallback(
+        async (ids: string[], favorite: boolean) => {
+            try {
+                setProfiles(await invoke<Profile[]>("set_favorites", { ids, favorite }));
+            } catch (error) {
+                toast.error(errorMessage(error), { id: "favorites" });
+            }
+        },
+        [setProfiles]
+    );
+
+    // Added hops go after the existing ones, in list order; the connected
+    // exit cannot also be a hop.
+    const addToChain = useCallback(
+        async (ids: string[]) => {
+            const chain = [...settings.proxy_chain];
+            ids.forEach((id) => {
+                if (!chain.includes(id) && !(selection.mode === "manual" && selection.profileId === id)) chain.push(id);
+            });
+            await saveSettings({ ...settings, proxy_chain: chain, proxy_chain_enabled: true });
+            toast.success(t("proxies.bulk.chained", { count: chain.length }), { id: "chain" });
+        },
+        [saveSettings, selection.mode, selection.profileId, settings, t]
+    );
+
+    const deleteProfiles = useCallback(
+        async (ids: string[]) => {
+            try {
+                const remaining = await deleteIds(ids);
+                const alive = new Set(remaining.map((profile) => profile.id));
+                const chain = settings.proxy_chain.filter((id) => alive.has(id));
+                if (chain.length !== settings.proxy_chain.length) {
+                    await saveSettings({ ...settings, proxy_chain: chain });
+                }
+            } catch (error) {
+                toast.error(t("toast.deleteFailed", { error: errorMessage(error) }));
+            }
+        },
+        [deleteIds, saveSettings, settings, t]
+    );
+
     const handleDumpLogs = useCallback(async () => {
         try {
             const path = await save({ defaultPath: "nuggetvpn-logs.txt" });
@@ -932,6 +1006,10 @@ function App() {
                                                 void handleRefreshSource(source);
                                             }
                                         }}
+                                        onTest={testProfiles}
+                                        onSetFavorite={setFavorites}
+                                        onAddToChain={addToChain}
+                                        onDelete={deleteProfiles}
                                     />
                                 )}
 
