@@ -113,7 +113,7 @@ function PresetOption({
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div>
-            <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h4 className="mb-2 text-xs font-medium text-muted-foreground">
                 {title}
             </h4>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">{children}</div>

@@ -447,7 +447,7 @@ export function CommentNode({ data, selected }: NodeProps) {
         >
             <div className="flex items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
                 <StickyNote size={13} aria-hidden="true" />
-                <span className="flex-1 text-[10px] font-medium uppercase tracking-wider">Note</span>
+                <span className="flex-1 text-xs font-medium">Note</span>
                 <button
                     type="button"
                     onClick={onDelete}

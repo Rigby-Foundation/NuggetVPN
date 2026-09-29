@@ -42,7 +42,7 @@ export function SettingsRow({ icon: Icon, title, subtitle, badge, onClick }: Row
                 <span className="flex items-center gap-2">
                     <span className="truncate font-medium">{title}</span>
                     {badge ? (
-                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
                             {badge}
                         </span>
                     ) : null}

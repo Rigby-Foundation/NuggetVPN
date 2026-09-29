@@ -720,7 +720,7 @@ function SettingsView({
             {appSettings.auth_server ? (
               <>
                 <div className="rounded-xl bg-muted p-4">
-                  <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                     <CheckCircle2 size={12} className="text-status-connected" />
                     Connected to
                   </div>

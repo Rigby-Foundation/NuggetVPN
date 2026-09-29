@@ -44,7 +44,7 @@ function TopBar({
     return (
         <div className="drag-region h-16 border-b flex items-center justify-between gap-4 px-6 shrink-0">
             <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="text-xs font-medium text-muted-foreground">
                     Configuration
                 </span>
                 {sources.length === 0 ? (

@@ -210,7 +210,7 @@ export default function ThemeEditor({
                         <Segmented value={draft.mode} onChange={switchMode} />
 
                         <section className="space-y-2.5">
-                            <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <h4 className="text-xs font-medium text-muted-foreground">
                                 Background
                             </h4>
                             <Slider
@@ -249,7 +249,7 @@ export default function ThemeEditor({
                         </section>
 
                         <section className="space-y-2.5">
-                            <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <h4 className="text-xs font-medium text-muted-foreground">
                                 Accent
                             </h4>
                             <Slider
@@ -278,7 +278,7 @@ export default function ThemeEditor({
                     </div>
 
                     <div className="space-y-2">
-                        <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <h4 className="text-xs font-medium text-muted-foreground">
                             Preview
                         </h4>
                         <Preview theme={draft} />

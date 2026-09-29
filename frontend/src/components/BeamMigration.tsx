@@ -190,7 +190,7 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
         <div className="space-y-5">
             {preview.subscriptions.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <h4 className="text-xs font-medium text-muted-foreground">
                         Subscriptions
                     </h4>
                     <ul className="space-y-2">
@@ -208,7 +208,7 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
 
             {carried.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <h4 className="text-xs font-medium text-muted-foreground">
                         Comes across
                     </h4>
                     <ItemList items={carried} tone="carried" />
@@ -217,7 +217,7 @@ export function BeamMigrationPanel({ preview, onImport, onClose, closeLabel = "N
 
             {preview.skipped.length > 0 ? (
                 <section className="space-y-2">
-                    <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <h4 className="text-xs font-medium text-muted-foreground">
                         Stays behind
                     </h4>
                     <ItemList items={preview.skipped} tone="skipped" />

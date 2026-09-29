@@ -95,7 +95,7 @@ function Stat({ icon, label, value, hint }: StatProps) {
                 {icon}
             </span>
             <span className="min-w-0">
-                <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                     {label}
                 </span>
                 <span

@@ -347,7 +347,7 @@ function Palette({
 }) {
     return (
         <aside className="w-56 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
-            <p className="px-2 pt-1 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
                 Traffic sources
             </p>
             {SOURCE_KINDS.map((kind) => {
@@ -365,7 +365,7 @@ function Palette({
                 );
             })}
 
-            <p className="px-2 pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
                 Everything else
             </p>
             {ACTIONS.map((action) => {
@@ -394,7 +394,7 @@ function Palette({
                 );
             })}
 
-            <p className="px-2 pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
                 Canvas
             </p>
             <button
@@ -453,7 +453,7 @@ function GeoPanel({
 
     return (
         <>
-            <p className="px-2 pt-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
                 Geo data
             </p>
             <div className="space-y-2 px-1">
