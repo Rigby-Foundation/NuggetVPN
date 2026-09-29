@@ -234,6 +234,7 @@ function NodeShell({
     selected,
     onDelete,
     hits,
+    order,
     wide,
     box,
     children,
@@ -246,6 +247,8 @@ function NodeShell({
     onDelete?: () => void;
     /** Connections the rule is carrying now; undefined while disconnected. */
     hits?: number;
+    /** The rule's place in the order the core checks them. */
+    order?: number;
     wide?: boolean;
     box?: BoxData;
     children?: React.ReactNode;
@@ -280,6 +283,9 @@ function NodeShell({
                 </span>
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium leading-tight truncate">
+                        {order !== undefined ? (
+                            <span className="me-1.5 text-muted-foreground tabular-nums">{order}.</span>
+                        ) : null}
                         {title}
                     </span>
                     <span className="block text-[11px] text-muted-foreground truncate">
@@ -896,6 +902,7 @@ export interface SourceNodeData {
     invert: boolean;
     dns: string;
     hits?: number;
+    order?: number;
     onChange: (patch: RulePatch) => void;
     onDelete: () => void;
     [key: string]: unknown;
@@ -903,7 +910,7 @@ export interface SourceNodeData {
 
 /** A traffic source: a list of entries plus an output port. */
 export function SourceNode({ data, selected }: NodeProps) {
-    const { kind, values, action, invert, dns, hits, onChange, onDelete } = data as SourceNodeData;
+    const { kind, values, action, invert, dns, hits, order, onChange, onDelete } = data as SourceNodeData;
     const meta = SOURCE_META[kind];
     const t = useT();
 
@@ -917,6 +924,7 @@ export function SourceNode({ data, selected }: NodeProps) {
             box={data as BoxData}
             onDelete={onDelete}
             hits={hits}
+            order={order}
         >
             <div className="px-3.5 pb-3">
                 <EntryEditor kind={kind} values={values} onChange={(next) => onChange({ values: next })} />
@@ -944,6 +952,7 @@ export interface LogicalNodeData {
     invert: boolean;
     dns: string;
     hits?: number;
+    order?: number;
     onChange: (patch: RulePatch) => void;
     onDelete: () => void;
     [key: string]: unknown;
@@ -955,7 +964,7 @@ export interface LogicalNodeData {
  * whole rule too.
  */
 export function LogicalNode({ data, selected }: NodeProps) {
-    const { mode, conditions, action, invert, dns, hits, onChange, onDelete } = data as LogicalNodeData;
+    const { mode, conditions, action, invert, dns, hits, order, onChange, onDelete } = data as LogicalNodeData;
     const t = useT();
 
     const setCondition = (index: number, patch: Partial<RoutingCondition>) =>
@@ -975,6 +984,7 @@ export function LogicalNode({ data, selected }: NodeProps) {
             box={data as BoxData}
             onDelete={onDelete}
             hits={hits}
+            order={order}
             wide
         >
             <div className="px-3.5 pb-3 space-y-2">

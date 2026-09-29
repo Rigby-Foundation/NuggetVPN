@@ -25,6 +25,7 @@ import {
     RuleListsContext,
     RulePatch,
 } from "@/components/routing/nodes";
+import { RuleOrder } from "@/components/routing/order";
 import { PresetList, PresetPlacement, PresetRule } from "@/components/routing/presets";
 import { SetupSwitcher } from "@/components/routing/setups";
 import { Button } from "@/components/ui/button";
@@ -333,6 +334,7 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                     invert: !!rule.invert,
                     dns: rule.dns ?? "",
                     hits: hitsFor(rule.id),
+                    order: index + 1,
                     onChange: (patch: RulePatch) => updateRule(rule.id, patch),
                     onDelete: () => removeRule(rule.id),
                 },
@@ -530,6 +532,7 @@ function Palette({
     profiles,
     placedServers,
     geoPanel,
+    orderPanel,
 }: {
     defaultAction: RoutingAction;
     onAddSource: (kind: RoutingKind) => void;
@@ -540,11 +543,32 @@ function Palette({
     profiles: Profile[];
     placedServers: string[];
     geoPanel: React.ReactNode;
+    orderPanel: React.ReactNode;
 }) {
     const t = useT();
+    const [tab, setTab] = useState<"add" | "order">("add");
     const available = profiles.filter((profile) => !placedServers.includes(profile.id));
     return (
-        <aside className="w-56 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
+        <aside className="w-60 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
+            <div className="mb-2 grid grid-cols-2 gap-0.5 rounded-lg bg-muted/60 p-0.5" role="tablist">
+                {(["add", "order"] as const).map((option) => (
+                    <button
+                        key={option}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === option}
+                        onClick={() => setTab(option)}
+                        className={cn(
+                            "rounded-md py-1 text-xs transition-colors",
+                            tab === option ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        {t(option === "add" ? "routing.tab.add" : "routing.tab.order")}
+                    </button>
+                ))}
+            </div>
+            {tab === "order" ? orderPanel : (
+            <>
             <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
                 {t("routing.sources")}
             </p>
@@ -636,6 +660,8 @@ function Palette({
             <p className="px-2 pt-3 text-[11px] leading-relaxed text-muted-foreground">
                 {t("routing.dragHint")}
             </p>
+            </>
+            )}
         </aside>
     );
 }
@@ -1148,6 +1174,18 @@ function RoutingView({ settings, onChange, onReplace, profiles, connected }: Rou
                     profiles={profiles}
                     placedServers={placedServers}
                     geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
+                    orderPanel={
+                        <RuleOrder
+                            rules={rules}
+                            profiles={profiles}
+                            onReorder={(next) => onChange({ routing_rules: next })}
+                            onFocus={(id) => {
+                                const index = rules.findIndex((rule) => rule.id === id);
+                                const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
+                                focusRef.current?.(point);
+                            }}
+                        />
+                    }
                 />
             </div>
         </div>
