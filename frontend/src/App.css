@@ -1,7 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* The dark presets are dark themes, so `dark:` utilities have to match them
+   too — next-themes puts exactly one class on <html>, so a preset cannot also
+   carry `.dark`. Keep this list in step with THEME_PRESETS in lib/themes.ts. */
+@custom-variant dark (&:is(.dark *, .theme-oled *, .theme-slate *, .theme-contrast *));
 
 /* Fonts are self-hosted rather than pulled from fonts.googleapis.com at
    runtime. A desktop VPN client has to render before it has a network, and a
@@ -102,6 +105,7 @@
 }
 
 :root {
+    color-scheme: light;
     --radius: 0.625rem;
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
@@ -153,7 +157,13 @@
     --sidebar-ring: oklch(0.58 0.145 58);
 }
 
-.dark {
+/* Every dark preset starts from these tokens and then overrides the handful it
+   cares about, further down, so a preset never has to restate the whole set. */
+.dark,
+.theme-oled,
+.theme-slate,
+.theme-contrast {
+    color-scheme: dark;
     --background: oklch(0.141 0.005 285.823);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.21 0.006 285.885);
@@ -352,4 +362,82 @@
    draw their own chrome and want normal left alignment. */
 .react-flow__node {
     text-align: left;
+}
+
+/* Theme presets.
+   Each is applied alongside .dark or .light, so it only has to restate the
+   tokens it actually changes. They exist for different reasons, not just
+   different taste — see the notes on each. */
+
+/* True black. On an OLED panel a black pixel is switched off rather than lit,
+   so this is the one preset that measurably saves power, and on a frameless
+   window the background is most of what is on screen. The cards stay slightly
+   lifted, or the layout loses all its edges. */
+.theme-oled {
+    --background: oklch(0 0 0);
+    --card: oklch(0.145 0 0);
+    --popover: oklch(0.145 0 0);
+    --sidebar: oklch(0 0 0);
+    --secondary: oklch(0.2 0 0);
+    --muted: oklch(0.2 0 0);
+    --accent: oklch(0.235 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.235 0 0);
+    --border: oklch(1 0 0 / 14%);
+    --sidebar-border: oklch(1 0 0 / 14%);
+    --input: oklch(1 0 0 / 16%);
+}
+
+/* Higher contrast for readability: brighter secondary text and much more
+   visible borders. Muted foreground is the usual accessibility failure in a
+   dark theme, so it moves the most. */
+.theme-contrast {
+    --background: oklch(0 0 0);
+    --foreground: oklch(1 0 0);
+    --card: oklch(0.13 0 0);
+    --card-foreground: oklch(1 0 0);
+    --popover: oklch(0.13 0 0);
+    --popover-foreground: oklch(1 0 0);
+    --muted: oklch(0.22 0 0);
+    --muted-foreground: oklch(0.88 0 0);
+    --accent: oklch(0.28 0 0);
+    --accent-foreground: oklch(1 0 0);
+    --border: oklch(1 0 0 / 45%);
+    --sidebar-border: oklch(1 0 0 / 45%);
+    --input: oklch(1 0 0 / 50%);
+    --primary: oklch(0.86 0.16 80);
+    --primary-foreground: oklch(0.12 0.02 60);
+    --ring: oklch(0.9 0.15 85);
+    --sidebar: oklch(0 0 0);
+    --sidebar-primary: oklch(0.86 0.16 80);
+    --sidebar-primary-foreground: oklch(0.12 0.02 60);
+}
+
+/* A cool grey, for anyone who finds the default's warmth off. Same lightness
+   steps, shifted hue, so contrast is unchanged. */
+.theme-slate {
+    --background: oklch(0.17 0.02 255);
+    --card: oklch(0.23 0.02 255);
+    --popover: oklch(0.23 0.02 255);
+    --sidebar: oklch(0.23 0.02 255);
+    --secondary: oklch(0.29 0.02 255);
+    --muted: oklch(0.29 0.02 255);
+    --accent: oklch(0.31 0.025 255);
+    --muted-foreground: oklch(0.72 0.02 255);
+    --border: oklch(1 0 0 / 12%);
+    --sidebar-border: oklch(1 0 0 / 12%);
+}
+
+/* Warm paper, for a light theme that is not a white screen at night. */
+.theme-paper {
+    --background: oklch(0.975 0.008 85);
+    --card: oklch(0.995 0.005 85);
+    --popover: oklch(0.995 0.005 85);
+    --sidebar: oklch(0.96 0.01 85);
+    --secondary: oklch(0.945 0.012 85);
+    --muted: oklch(0.945 0.012 85);
+    --accent: oklch(0.93 0.015 85);
+    --border: oklch(0.88 0.015 85);
+    --sidebar-border: oklch(0.88 0.015 85);
+    --input: oklch(0.88 0.015 85);
 }
