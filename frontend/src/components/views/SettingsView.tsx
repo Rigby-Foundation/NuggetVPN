@@ -29,6 +29,8 @@ import ThemePicker from "@/components/settings/theme-picker";
 import { BeamMigrationPanel } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import { UpdatesPanel } from "@/components/settings/updates";
+import { ShortcutRecorder } from "@/components/settings/shortcut";
+import { invoke } from "@/lib/backend";
 import {
   FontPicker,
   MotionPicker,
@@ -247,6 +249,11 @@ function SettingsView({
   const { t, choice, setChoice, language } = useI18n();
   const languageName = (id: string) => LANGUAGES.find((item) => item.id === id)?.label ?? id;
   const [newChainId, setNewChainId] = React.useState("");
+  // Only offered where the system lets the app register one.
+  const [shortcutSupported, setShortcutSupported] = React.useState(false);
+  React.useEffect(() => {
+    invoke<boolean>("global_shortcut_supported").then(setShortcutSupported).catch(() => undefined);
+  }, []);
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
   const availableChainProfiles = profiles.filter(
@@ -427,6 +434,21 @@ function SettingsView({
                 }
               />
             </SettingsGroup>
+
+            {shortcutSupported ? (
+              <SettingsGroup title={t("shortcut.title")}>
+                <SettingsField
+                  label={t("shortcut.label")}
+                  description={t("shortcut.description")}
+                  control={
+                    <ShortcutRecorder
+                      value={appSettings.global_shortcut}
+                      onSaved={(spec) => onSettingsChange("global_shortcut", spec)}
+                    />
+                  }
+                />
+              </SettingsGroup>
+            ) : null}
 
             <SettingsGroup title={t("behaviour.connection")}>
               <SettingsField

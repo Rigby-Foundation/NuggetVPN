@@ -100,6 +100,8 @@ export interface AppSettings {
     clipboard_offer: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
     update_check: boolean | null;
+    /** "Ctrl+Alt+V"-style; "" for none. */
+    global_shortcut: string;
     /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;

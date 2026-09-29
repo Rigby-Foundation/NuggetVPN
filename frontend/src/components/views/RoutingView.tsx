@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Download, FileUp, Globe2, Landmark, Link2, Loader2, RefreshCw, Server, StickyNote, Trash2, Upload } from "lucide-react";
+import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Undo2, Upload } from "lucide-react";
 import {
     Background,
     BackgroundVariant,
@@ -878,8 +878,88 @@ function GeoButton({
     );
 }
 
-function RoutingView({ settings, onChange, onReplace, profiles, connected }: RoutingViewProps) {
+/** The settings that make up the routing graph: what undo puts back. */
+const GRAPH_KEYS = [
+    "routing_rules",
+    "routing_layout",
+    "routing_comments",
+    "default_action",
+    "default_server",
+    "routing_servers",
+] as const;
+type GraphSnapshot = Pick<AppSettings, (typeof GRAPH_KEYS)[number]>;
+/** How many steps back undo can go. */
+const HISTORY_LIMIT = 100;
+
+function RoutingView({ settings, onChange: save, onReplace, profiles, connected }: RoutingViewProps) {
     const t = useT();
+
+    // Undo and redo. Every change to the graph passes through onChange below,
+    // which records the graph as it was; undo puts it back. Changes to
+    // anything else — the geo files — are not steps.
+    const settingsNow = useRef(settings);
+    settingsNow.current = settings;
+    const history = useRef<{ past: GraphSnapshot[]; future: GraphSnapshot[] }>({ past: [], future: [] });
+    const [historySize, setHistorySize] = useState({ past: 0, future: 0 });
+    const syncHistory = () =>
+        setHistorySize({ past: history.current.past.length, future: history.current.future.length });
+    const snapshot = (): GraphSnapshot => {
+        const current = settingsNow.current;
+        return Object.fromEntries(GRAPH_KEYS.map((key) => [key, current[key]])) as GraphSnapshot;
+    };
+    const onChange = useCallback(
+        (patch: Partial<AppSettings>) => {
+            if (Object.keys(patch).some((key) => (GRAPH_KEYS as readonly string[]).includes(key))) {
+                history.current.past.push(snapshot());
+                if (history.current.past.length > HISTORY_LIMIT) history.current.past.shift();
+                history.current.future = [];
+                syncHistory();
+            }
+            save(patch);
+        },
+        // snapshot reads a ref.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [save]
+    );
+    const undo = useCallback(() => {
+        const previous = history.current.past.pop();
+        if (!previous) return;
+        history.current.future.push(snapshot());
+        syncHistory();
+        save(previous);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [save]);
+    const redo = useCallback(() => {
+        const next = history.current.future.pop();
+        if (!next) return;
+        history.current.past.push(snapshot());
+        syncHistory();
+        save(next);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [save]);
+    // Another setup is another graph; its history is not this one's.
+    useEffect(() => {
+        history.current = { past: [], future: [] };
+        syncHistory();
+    }, [settings.active_routing_setup]);
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            // Inside a text field the keys undo the typing, as everywhere.
+            if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]")) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            const key = event.key.toLowerCase();
+            if (key === "z" && !event.shiftKey) {
+                event.preventDefault();
+                undo();
+            } else if ((key === "z" && event.shiftKey) || key === "y") {
+                event.preventDefault();
+                redo();
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [undo, redo]);
     const rules = settings.routing_rules ?? [];
 
     // Live connection counts, while connected and on screen.
@@ -1117,6 +1197,28 @@ function RoutingView({ settings, onChange, onReplace, profiles, connected }: Rou
                     </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={undo}
+                        disabled={historySize.past === 0}
+                        aria-label={t("routing.undo")}
+                        title={t("routing.undo")}
+                    >
+                        <Undo2 size={15} aria-hidden="true" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={redo}
+                        disabled={historySize.future === 0}
+                        aria-label={t("routing.redo")}
+                        title={t("routing.redo")}
+                    >
+                        <Redo2 size={15} aria-hidden="true" />
+                    </Button>
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()}>
                         <Upload size={14} aria-hidden="true" /> {t("routing.import")}
                     </Button>

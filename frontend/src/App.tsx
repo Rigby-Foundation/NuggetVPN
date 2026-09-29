@@ -88,6 +88,7 @@ const PENDING_SETTINGS: AppSettings = {
     notifications: null,
     clipboard_offer: null,
     update_check: null,
+    global_shortcut: "",
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],

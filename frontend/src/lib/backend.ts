@@ -63,6 +63,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
     take_pending_link: { method: "TakePendingLink", args: [] },
     get_version: { method: "GetVersion", args: [] },
+    set_global_shortcut: { method: "SetGlobalShortcut", args: ["spec"] },
+    global_shortcut_supported: { method: "GlobalShortcutSupported", args: [] },
     check_for_update: { method: "CheckForUpdate", args: [] },
     install_update: { method: "InstallUpdate", args: [] },
     read_clipboard_link: { method: "ReadClipboardLink", args: [] },

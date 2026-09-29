@@ -173,6 +173,12 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.core.OnStats(a.handleCoreStats)
 	a.prepareNotifications()
 	registerURLScheme()
+	_, startup := a.snapshot()
+	if startup.GlobalShortcut != "" {
+		if err := a.registerHotkey(startup.GlobalShortcut); err != nil {
+			a.appendLog("WARN global shortcut: " + err.Error())
+		}
+	}
 	// A link the app was started with, on the platforms that pass it as an
 	// argument.
 	a.receiveLinks(os.Args[1:]...)

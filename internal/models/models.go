@@ -167,6 +167,9 @@ type AppSettings struct {
 	// UpdateCheck looks for a new release at start and once a day. A
 	// pointer so older settings default to on.
 	UpdateCheck *bool `json:"update_check"`
+	// GlobalShortcut connects and disconnects from anywhere, written as
+	// "Ctrl+Alt+V". Empty means none.
+	GlobalShortcut string `json:"global_shortcut"`
 	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
 	// Off means never automatically, for every subscription — a refresh by
 	// hand still works. A pointer so older settings default to on.
