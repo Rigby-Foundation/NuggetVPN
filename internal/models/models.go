@@ -53,7 +53,12 @@ type AppSettings struct {
 	// third party. A pointer so an existing settings.json that predates the
 	// setting is treated as "not chosen" and defaults to on, rather than
 	// silently switching the feature off on upgrade.
-	IPCheckEnabled    *bool   `json:"ip_check_enabled"`
+	IPCheckEnabled *bool `json:"ip_check_enabled"`
+	// LoggingEnabled keeps a log: the Logs screen, session.log and the
+	// core's own log. Nil until chosen, which means on in a development
+	// build and off in a release, where nobody asked for a record of what
+	// they connected to.
+	LoggingEnabled    *bool   `json:"logging_enabled"`
 	AuthServer        *string `json:"auth_server"`
 	AuthToken         *string `json:"auth_token"`
 	SkipAuth          bool    `json:"skip_auth"`
@@ -210,6 +215,10 @@ func (s *AppSettings) Normalize() {
 		enabled := true
 		s.IPCheckEnabled = &enabled
 	}
+	if s.LoggingEnabled == nil {
+		enabled := DevBuild
+		s.LoggingEnabled = &enabled
+	}
 	if s.RoutingApps == nil {
 		s.RoutingApps = []string{}
 	}
@@ -235,6 +244,14 @@ func (s *AppSettings) Normalize() {
 	s.normalizeRouting()
 	s.normalizeSetups()
 	s.normalizeIdentity()
+}
+
+// LoggingOn reports whether logs are kept; see LoggingEnabled.
+func (s AppSettings) LoggingOn() bool {
+	if s.LoggingEnabled == nil {
+		return DevBuild
+	}
+	return *s.LoggingEnabled
 }
 
 // IPCheckOn reports whether the public-address lookup may run.

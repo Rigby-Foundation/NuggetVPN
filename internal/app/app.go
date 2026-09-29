@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -87,6 +88,9 @@ type App struct {
 
 	logMu   sync.Mutex
 	logFile *os.File
+	// loggingOn mirrors settings.LoggingOn, readable from any goroutine
+	// without taking mu — log lines are written from inside locked sections.
+	loggingOn atomic.Bool
 
 	// ruleOwners maps the running config's route rules, by index, to the
 	// routing rule each came from; see sbconfig.Result.RuleOwners.
@@ -113,6 +117,7 @@ func New(version string, icon []byte) *App {
 	}
 	service.settings.Normalize()
 	service.settings.LaunchAtStartup = autostart.Enabled()
+	service.loggingOn.Store(service.settings.LoggingOn())
 	return service
 }
 

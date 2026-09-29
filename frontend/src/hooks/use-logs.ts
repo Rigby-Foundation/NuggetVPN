@@ -26,13 +26,20 @@ interface LogBatch {
  * different limit from the dropdown silently re-ran the whole boot sequence,
  * subscription refresh included.
  */
-export function useLogs() {
+export function useLogs(enabled: boolean) {
     const [logs, setLogs] = useState<string[]>([]);
+    // With logging off, lines the UI itself would add are dropped too, and
+    // what was on screen goes with the setting.
+    const enabledRef = useRef(enabled);
+    enabledRef.current = enabled;
+    useEffect(() => {
+        if (!enabled) setLogs([]);
+    }, [enabled]);
     const [limit, setLimit] = useState<string>(DEFAULT_LIMIT);
     const limitRef = useRef(Number(DEFAULT_LIMIT));
 
     const append = useCallback((lines: string[]) => {
-        if (lines.length === 0) {
+        if (lines.length === 0 || !enabledRef.current) {
             return;
         }
         setLogs((previous) => {

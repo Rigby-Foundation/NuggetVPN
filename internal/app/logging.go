@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"regexp"
 	"strings"
@@ -23,6 +24,10 @@ func (a *App) appendLog(lines ...string) {
 	if len(lines) == 0 {
 		return
 	}
+	// With logging off nothing is kept anywhere: not on screen, not on disk.
+	if !a.loggingOn.Load() {
+		return
+	}
 	a.emit(logEventName, LogBatch{Lines: lines})
 
 	a.logMu.Lock()
@@ -36,6 +41,22 @@ func (a *App) appendLog(lines ...string) {
 	}
 	for _, line := range lines {
 		_, _ = a.logFile.WriteString(StripANSI(line) + "\n")
+	}
+}
+
+// discardLogs closes the log file and deletes it. Called when logging is
+// switched off: someone turning logs off does not want the old ones left
+// behind either.
+func (a *App) discardLogs() {
+	a.logMu.Lock()
+	defer a.logMu.Unlock()
+	if a.logFile != nil {
+		_ = a.logFile.Close()
+		a.logFile = nil
+	}
+	if err := os.Remove(storage.LogPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		// Nothing to tell the user through: the log is what is off.
+		return
 	}
 }
 

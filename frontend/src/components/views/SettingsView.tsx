@@ -301,9 +301,10 @@ function SettingsView({
       case "subscriptions":
         return appSettings.subscription_user_agent || t("identity.defaultIdentity");
       case "privacy":
-        return appSettings.ip_check_enabled === false
-          ? t("privacy.summaryOff")
-          : t("privacy.summaryOn");
+        return [
+          appSettings.ip_check_enabled === false ? t("privacy.summaryOff") : t("privacy.summaryOn"),
+          appSettings.logging_enabled === false ? t("privacy.logsOff") : t("privacy.logsOn"),
+        ].join(" · ");
       case "sync":
         return appSettings.auth_server || t("status.idle");
       case "beam": {
@@ -757,6 +758,19 @@ function SettingsView({
                     onSettingsChange("ip_check_enabled", checked)
                   }
                   aria-label={t("privacy.ipCheck")}
+                />
+              }
+            />
+            <SettingsField
+              label={t("privacy.logs")}
+              description={t("privacy.logs.description")}
+              control={
+                <Switch
+                  checked={appSettings.logging_enabled !== false}
+                  onCheckedChange={(checked) =>
+                    onSettingsChange("logging_enabled", checked)
+                  }
+                  aria-label={t("privacy.logs")}
                 />
               }
             />

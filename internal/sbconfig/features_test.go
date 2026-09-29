@@ -251,3 +251,15 @@ func anyStrings(value any) []string {
 	}
 	return result
 }
+
+func TestLoggingOffDisablesTheCoreLog(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		result := buildFor(t, mainLink, func(settings *models.AppSettings) {
+			settings.LoggingEnabled = &enabled
+		})
+		options := mustParse(t, result.JSON)
+		if options.Log == nil || options.Log.Disabled == enabled {
+			t.Errorf("logging %v: core log %+v", enabled, options.Log)
+		}
+	}
+}

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Download, FileX2, Trash2 } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import { parseAnsi, stripAnsi } from "@/lib/ansi";
 import { useT } from "@/lib/i18n";
 
 interface LogsViewProps {
+    /** Whether logs are kept at all; see the Privacy settings. */
+    enabled: boolean;
+    onEnable: () => void;
     logs: string[];
     logLimit: string;
     onLogLimitChange: (value: string) => void;
@@ -56,6 +59,8 @@ const LogLine = memo(function LogLine({ line }: { line: string }) {
 });
 
 function LogsView({
+    enabled,
+    onEnable,
     logs,
     logLimit,
     onLogLimitChange,
@@ -85,6 +90,23 @@ function LogsView({
             container.scrollHeight - container.scrollTop - container.clientHeight;
         pinnedRef.current = distance < 40;
     };
+
+    if (!enabled) {
+        return (
+            <PageShell fill title={t("logs.title")} description={t("logs.off.description")}>
+                <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 rounded-lg border bg-card/40 p-6 text-center">
+                    <FileX2 className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium">{t("logs.off")}</p>
+                        <p className="max-w-sm text-xs text-muted-foreground">{t("logs.off.explain")}</p>
+                    </div>
+                    <Button size="sm" onClick={onEnable}>
+                        {t("logs.off.enable")}
+                    </Button>
+                </div>
+            </PageShell>
+        );
+    }
 
     return (
         <PageShell

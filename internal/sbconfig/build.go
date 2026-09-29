@@ -126,10 +126,7 @@ func Build(request Request) (Result, error) {
 	dns := plan.buildDNS(splitTunnel, serverDomains)
 
 	config := map[string]any{
-		"log": map[string]any{
-			"level":     "info",
-			"timestamp": true,
-		},
+		"log": buildLog(settings),
 		"dns":      dns,
 		"inbounds": buildInbounds(settings, request.MixedPort),
 		"outbounds": func() []map[string]any {
@@ -155,6 +152,19 @@ func Build(request Request) (Result, error) {
 		RuleOwners: owners,
 		Warnings:   plan.warnings,
 	}, nil
+}
+
+// buildLog configures the core's log. With logging off the core does not
+// produce one at all — cheaper than formatting every connection only for the
+// app to throw the line away, and nothing to leak if a line were ever kept.
+func buildLog(settings models.AppSettings) map[string]any {
+	if !settings.LoggingOn() {
+		return map[string]any{"disabled": true}
+	}
+	return map[string]any{
+		"level":     "info",
+		"timestamp": true,
+	}
 }
 
 // appendChain materialises the proxy chain, returning the tags in dial order.

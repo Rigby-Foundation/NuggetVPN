@@ -44,8 +44,14 @@ func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, err
 
 	a.mu.Lock()
 	setupsChanged := setupsSignature(a.settings) != setupsSignature(settings)
+	loggingStopped := a.settings.LoggingOn() && !settings.LoggingOn()
 	a.settings = settings
+	a.loggingOn.Store(settings.LoggingOn())
 	a.mu.Unlock()
+
+	if loggingStopped {
+		a.discardLogs()
+	}
 
 	// The tray lists the routing setups; rebuilt only when they change, not
 	// on every node dragged across the canvas.

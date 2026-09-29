@@ -22,6 +22,8 @@ export interface AppSettings {
     sni_spoof_value: string;
     /** Null means the user has never chosen; the backend treats that as on. */
     ip_check_enabled: boolean | null;
+    /** Keep logs: the Logs screen, session.log and the core's log. Go fills it in. */
+    logging_enabled: boolean | null;
     auth_server: string | null;
     auth_token: string | null;
     skip_auth: boolean;

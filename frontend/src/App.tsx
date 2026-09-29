@@ -54,6 +54,7 @@ const PENDING_SETTINGS: AppSettings = {
     sni_spoof_enabled: false,
     sni_spoof_value: "",
     ip_check_enabled: true,
+    logging_enabled: null,
     auth_server: null,
     auth_token: null,
     skip_auth: false,
@@ -133,9 +134,9 @@ function App() {
     const connectRef = useRef(connection.connect);
     connectRef.current = connection.connect;
     const traffic = useTraffic(connection.isConnected);
-    const { logs, limit: logLimit, changeLimit, append: appendLog, clear: clearLogs } = useLogs();
 
     const [settings, setSettings] = useState<AppSettings>(PENDING_SETTINGS);
+    const { logs, limit: logLimit, changeLimit, append: appendLog, clear: clearLogs } = useLogs(settings.logging_enabled !== false);
     const [activeTab, setActiveTab] = useState("connection");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -777,6 +778,8 @@ function App() {
 
                                 {activeTab === "logs" && (
                                     <LogsView
+                                        enabled={settings.logging_enabled !== false}
+                                        onEnable={() => updateSetting("logging_enabled", true)}
                                         logs={logs}
                                         logLimit={logLimit}
                                         onLogLimitChange={changeLimit}
