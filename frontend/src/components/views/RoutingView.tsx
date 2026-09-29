@@ -50,7 +50,11 @@ const actionNodeId = (action: RoutingAction) => `action:${action}`;
  * to right without being untangled first.
  */
 const COLUMN_GAP = 520;
-const SOURCE_GAP = 260;
+// Tall enough for a source node at its largest collapsed size — six entries,
+// "Show all", and the input. Nodes used to grow with every entry, so no gap
+// could fit them and a long list spilled over the node below it; now that a
+// long list collapses, one fixed gap does.
+const SOURCE_GAP = 380;
 const ACTION_GAP = 200;
 
 function fallbackPosition(id: string, index: number): CanvasPoint {

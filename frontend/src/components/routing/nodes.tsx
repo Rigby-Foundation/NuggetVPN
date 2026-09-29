@@ -1,4 +1,4 @@
-import { KeyboardEvent, useState } from "react";
+import { KeyboardEvent, useMemo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
     Ban,
@@ -7,6 +7,7 @@ import {
     Landmark,
     Radio,
     Regex,
+    Search,
     Globe,
     MonitorSmartphone,
     MoreHorizontal,
@@ -231,6 +232,125 @@ function ProtocolChips({
     );
 }
 
+/** Short lists show in full; longer ones collapse to this many rows. */
+const COLLAPSED_ROWS = 6;
+/** The most rows an expanded list draws at once; the filter narrows the rest. */
+const EXPANDED_ROWS = 100;
+
+function ValueRow({ value, onRemove }: { value: string; onRemove: () => void }) {
+    return (
+        <div className="group flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+            <span className="flex-1 min-w-0 truncate font-mono text-[11px]" title={value}>
+                {value}
+            </span>
+            <button
+                type="button"
+                onClick={onRemove}
+                aria-label={`Remove ${value}`}
+                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive"
+            >
+                <Trash2 size={12} aria-hidden="true" />
+            </button>
+        </div>
+    );
+}
+
+/**
+ * A rule's entries, drawn in bounded size.
+ *
+ * Every entry used to be its own row, so a rule holding a few thousand
+ * addresses put tens of thousands of elements into the canvas, and opening
+ * Routing took seconds while they were built and measured. A node is a
+ * summary on a map, not the place to read a thousand addresses one by one:
+ * a long list collapses to its first few, and expanding it gives a scrolling
+ * list with a filter, which is how you would look for one of them anyway.
+ */
+function ValueList({ values, onChange }: { values: string[]; onChange: (values: string[]) => void }) {
+    const [expanded, setExpanded] = useState(false);
+    const [filter, setFilter] = useState("");
+
+    const remove = (value: string) => onChange(values.filter((item) => item !== value));
+    const needle = filter.trim().toLowerCase();
+    const matches = useMemo(
+        () => (needle ? values.filter((value) => value.toLowerCase().includes(needle)) : values),
+        [values, needle]
+    );
+
+    if (values.length <= COLLAPSED_ROWS + 2) {
+        // Not worth collapsing two rows behind a button.
+        return (
+            <>
+                {values.map((value) => (
+                    <ValueRow key={value} value={value} onRemove={() => remove(value)} />
+                ))}
+            </>
+        );
+    }
+
+    if (!expanded) {
+        return (
+            <>
+                {values.slice(0, COLLAPSED_ROWS).map((value) => (
+                    <ValueRow key={value} value={value} onRemove={() => remove(value)} />
+                ))}
+                <button
+                    type="button"
+                    onClick={() => setExpanded(true)}
+                    className="nodrag w-full rounded-md py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                >
+                    Show all {values.length.toLocaleString()}
+                </button>
+            </>
+        );
+    }
+
+    const shown = matches.slice(0, EXPANDED_ROWS);
+    return (
+        <div className="space-y-1">
+            <div className="relative">
+                <Search
+                    size={11}
+                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                />
+                <Input
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                    placeholder={`Filter ${values.length.toLocaleString()} entries`}
+                    aria-label="Filter entries"
+                    className="nodrag h-7 pl-6 text-[11px] font-mono"
+                />
+            </div>
+            {/* nowheel: scrolling here scrolls the list, not the canvas. */}
+            <div className="nowheel nodrag max-h-60 space-y-1 overflow-y-auto pr-0.5">
+                {shown.map((value) => (
+                    <ValueRow key={value} value={value} onRemove={() => remove(value)} />
+                ))}
+                {shown.length === 0 ? (
+                    <p className="py-1.5 text-center text-[11px] text-muted-foreground">No entry matches.</p>
+                ) : null}
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>
+                    {matches.length > shown.length
+                        ? `${shown.length} of ${matches.length.toLocaleString()} shown — filter to narrow`
+                        : `${matches.length.toLocaleString()} ${needle ? "matching" : "entries"}`}
+                </span>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setExpanded(false);
+                        setFilter("");
+                    }}
+                    className="nodrag hover:text-foreground"
+                >
+                    Collapse
+                </button>
+            </div>
+        </div>
+    );
+}
+
 /** A traffic source: a list of entries plus an output port. */
 export function SourceNode({ data, selected }: NodeProps) {
     const { kind, values, onChange, onDelete } = data as SourceNodeData;
@@ -270,24 +390,7 @@ export function SourceNode({ data, selected }: NodeProps) {
                         Nothing listed yet — this rule does nothing.
                     </p>
                 ) : (
-                    values.map((value) => (
-                        <div
-                            key={value}
-                            className="group flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5"
-                        >
-                            <span className="flex-1 min-w-0 truncate font-mono text-[11px]" title={value}>
-                                {value}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => onChange(values.filter((item) => item !== value))}
-                                aria-label={`Remove ${value}`}
-                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive"
-                            >
-                                <Trash2 size={12} aria-hidden="true" />
-                            </button>
-                        </div>
-                    ))
+                    <ValueList values={values} onChange={onChange} />
                 )}
 
                 {kind === "protocol" ? (
