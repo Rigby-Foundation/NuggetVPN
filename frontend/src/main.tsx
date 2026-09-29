@@ -3,10 +3,12 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AppearanceProvider, bootAppearance } from "@/components/appearance-provider";
 import { invoke } from "@/lib/backend";
+import { blockBrowserMenu } from "@/lib/context-menu";
 import { I18nProvider, Language } from "@/lib/i18n";
 import "./App.css";
 
 bootAppearance();
+blockBrowserMenu();
 
 // The tray menu is Go's; it follows the UI's language through this call.
 const tellTray = (language: Language) => {
