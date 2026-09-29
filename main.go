@@ -16,12 +16,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/app"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
@@ -86,7 +89,15 @@ func runCoreService() error {
 }
 
 func runGUI() {
-	service := app.New(version)
+	service := app.New(version, appIcon)
+
+	// Started by the system at login: come up without a window, unless
+	// closing is set to quit — then there would be no tray icon to reopen it
+	// from, and an invisible app with no way in.
+	startHidden := false
+	if slices.Contains(os.Args[1:], autostart.Flag) {
+		startHidden = service.GetSettings().CloseAction != models.CloseQuit
+	}
 
 	// Set once the window exists; the second-instance callback needs it.
 	var window *application.WebviewWindow
@@ -128,6 +139,7 @@ func runGUI() {
 		MinWidth:  400,
 		MinHeight: 500,
 		URL:       "/",
+		Hidden:    startHidden,
 		// The UI draws its own title bar and rounded corners.
 		Frameless:        true,
 		BackgroundType:   application.BackgroundTypeTransparent,
@@ -138,50 +150,10 @@ func runGUI() {
 		},
 	})
 
-	// The service looks the window up and registers its own close hook during
-	// startup: closing the window hides it, the tray is how you get it back,
-	// and the tunnel keeps running in the meantime.
-	newSystemTray(wailsApp, window, service)
+	// The service looks the window up during startup and builds the tray and
+	// the close behaviour around it.
 
 	if err := wailsApp.Run(); err != nil {
 		log.Fatalf("failed to start NuggetVPN: %v", err)
 	}
-}
-
-// newSystemTray builds the tray icon and its menu.
-func newSystemTray(
-	wailsApp *application.App,
-	window *application.WebviewWindow,
-	service *app.App,
-) *application.SystemTray {
-	tray := wailsApp.SystemTray.New()
-	tray.SetLabel("NuggetVPN")
-	tray.SetTooltip("NuggetVPN")
-	tray.SetIcon(appIcon)
-
-	menu := wailsApp.NewMenu()
-	menu.Add("Open NuggetVPN").OnClick(func(*application.Context) {
-		window.Show()
-		window.Focus()
-	})
-	menu.AddSeparator()
-	menu.Add("Disconnect").OnClick(func(*application.Context) {
-		if _, err := service.Disconnect(); err != nil {
-			wailsApp.Logger.Error("tray disconnect failed", "error", err)
-		}
-	})
-	menu.AddSeparator()
-	menu.Add("Quit NuggetVPN").OnClick(func(*application.Context) {
-		// QuitApp marks the quit before exiting, so the close hook stops
-		// swallowing it.
-		service.QuitApp()
-	})
-	tray.SetMenu(menu)
-
-	// A left click should reveal the window rather than only open the menu.
-	tray.OnClick(func() {
-		window.Show()
-		window.Focus()
-	})
-	return tray
 }

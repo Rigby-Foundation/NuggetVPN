@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
@@ -11,7 +12,13 @@ import (
 
 // GetSettings returns the persisted settings.
 func (a *App) GetSettings() models.AppSettings {
-	_, settings := a.snapshot()
+	// The system owns this one, and it can be changed outside the app, so the
+	// known state is refreshed from it whenever settings are read.
+	enabled := autostart.Enabled()
+	a.mu.Lock()
+	a.settings.LaunchAtStartup = enabled
+	settings := a.settings
+	a.mu.Unlock()
 	return settings
 }
 
@@ -19,6 +26,21 @@ func (a *App) GetSettings() models.AppSettings {
 // here, once, rather than being duplicated in the renderer.
 func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, error) {
 	settings.Normalize()
+
+	// Only a change is applied, compared with the last state read from the
+	// system. Several saves come from inside the app with its own copy of the
+	// settings; comparing with the system instead would let one of those turn
+	// autostart back on after the user had switched it off in Task Manager.
+	// Applied first: if the system refuses, nothing is saved, and the switch
+	// does not claim something that did not happen.
+	a.mu.Lock()
+	previous := a.settings.LaunchAtStartup
+	a.mu.Unlock()
+	if settings.LaunchAtStartup != previous {
+		if err := autostart.Set(settings.LaunchAtStartup); err != nil {
+			return a.GetSettings(), err
+		}
+	}
 
 	a.mu.Lock()
 	a.settings = settings

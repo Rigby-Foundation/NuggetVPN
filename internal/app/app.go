@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -52,6 +52,9 @@ type App struct {
 	// app and window are resolved during ServiceStartup.
 	app    *application.App
 	window *application.WebviewWindow
+	// tray is built during ServiceStartup, from icon.
+	tray *application.SystemTray
+	icon []byte
 	// quitting tells the window-close hook to stop swallowing the close.
 	quitting bool
 
@@ -79,8 +82,9 @@ type App struct {
 	logFile *os.File
 }
 
-// New loads persisted state and prepares the core client.
-func New(version string) *App {
+// New loads persisted state and prepares the core client. icon is the tray
+// icon.
+func New(version string, icon []byte) *App {
 	_ = storage.EnsureDirs()
 
 	service := &App{
@@ -94,8 +98,10 @@ func New(version string) *App {
 		remote: remote.NewClient(),
 		http:   &http.Client{Timeout: 8 * time.Second},
 		state:  ConnectionState{Status: StatusIdle},
+		icon:   icon,
 	}
 	service.settings.Normalize()
+	service.settings.LaunchAtStartup = autostart.Enabled()
 	return service
 }
 
@@ -112,6 +118,7 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	if window, ok := a.app.Window.GetByName(WindowName); ok {
 		a.window, _ = window.(*application.WebviewWindow)
 	}
+	a.buildTray()
 	a.registerCloseHook()
 
 	a.core.OnLog(func(level, message string) {
@@ -120,21 +127,6 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)
 	return nil
-}
-
-// registerCloseHook makes the close button hide the window instead of exiting,
-// so the tunnel survives and the tray is how you get back.
-func (a *App) registerCloseHook() {
-	if a.window == nil {
-		return
-	}
-	a.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
-		if a.quitting {
-			return
-		}
-		event.Cancel()
-		a.window.Hide()
-	})
 }
 
 // ServiceShutdown stops the tunnel and the privileged service when the GUI

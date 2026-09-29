@@ -145,9 +145,7 @@ func (a *App) SelectApplications() ([]string, error) {
 // RequestClose implements the window close button: the window hides and the
 // tunnel keeps running, because the tray icon is how the user gets back.
 func (a *App) RequestClose() {
-	if a.window != nil {
-		a.window.Hide()
-	}
+	a.closeWindow()
 }
 
 // QuitApp exits the application, stopping the tunnel on the way out.
@@ -176,6 +174,10 @@ func (a *App) ToggleMaximiseWindow() {
 func (a *App) ShowWindow() {
 	if a.window == nil {
 		return
+	}
+	// Closed with "hide completely", the tray icon went too.
+	if a.tray != nil {
+		a.tray.Show()
 	}
 	// A window minimised to the taskbar is shown already; it needs restoring,
 	// or a second launch would appear to do nothing.

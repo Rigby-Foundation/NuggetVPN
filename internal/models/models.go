@@ -95,7 +95,34 @@ type AppSettings struct {
 	// lands on it rather than on the first subscription. Nil until one is
 	// chosen.
 	LastSelection *Selection `json:"last_selection"`
+
+	// Behaviour.
+	//
+	// LaunchAtStartup is not really stored: the system owns it, and it can be
+	// changed from outside the app, so it is read back from the system on
+	// every load and applied to it on save. See internal/autostart.
+	LaunchAtStartup bool `json:"launch_at_startup"`
+	// AutoConnect connects to the last server when the app starts.
+	AutoConnect bool `json:"auto_connect"`
+	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
+	// Off means never automatically, for every subscription — a refresh by
+	// hand still works. A pointer so older settings default to on.
+	SubscriptionAutoUpdate *bool `json:"subscription_auto_update"`
+	// CloseAction is what closing the window does: CloseToTray,
+	// CloseHideCompletely or CloseQuit.
+	CloseAction string `json:"close_action"`
 }
+
+// What closing the window does.
+const (
+	// CloseToTray hides the window; the tray icon brings it back.
+	CloseToTray = "tray"
+	// CloseHideCompletely hides the window and the tray icon too. The app
+	// keeps running, and launching it again brings the window back.
+	CloseHideCompletely = "hide"
+	// CloseQuit exits, disconnecting on the way out.
+	CloseQuit = "quit"
+)
 
 // Selection is which configuration and server the user is pointed at.
 type Selection struct {
@@ -157,6 +184,16 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.ProxyChain == nil {
 		s.ProxyChain = []string{}
+	}
+	if s.SubscriptionAutoUpdate == nil {
+		enabled := true
+		s.SubscriptionAutoUpdate = &enabled
+	}
+	switch s.CloseAction {
+	case CloseToTray, CloseHideCompletely, CloseQuit:
+	default:
+		// What closing has always done here.
+		s.CloseAction = CloseToTray
 	}
 	s.normalizeRouting()
 	s.normalizeIdentity()

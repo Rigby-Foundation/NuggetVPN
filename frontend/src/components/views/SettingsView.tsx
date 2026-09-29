@@ -5,6 +5,10 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  EyeOff,
+  Minimize2,
+  Power,
+  SlidersHorizontal,
   Fingerprint,
   PackageOpen,
   Palette,
@@ -34,7 +38,8 @@ import {
   SettingsRow,
 } from "@/components/settings/shell";
 
-import { AppSettings, BeamMigrationReport, BeamPreview, Profile } from "@/types";
+import { AppSettings, BeamMigrationReport, BeamPreview, CloseAction, Profile } from "@/types";
+import { cn } from "@/lib/utils";
 import { THEME_PRESETS } from "@/lib/themes";
 
 import { Button } from "@/components/ui/button";
@@ -74,6 +79,7 @@ interface SettingsViewProps {
 
 type SectionId =
   | "appearance"
+  | "behaviour"
   | "connection"
   | "tls"
   | "chain"
@@ -90,12 +96,49 @@ interface Section {
   blurb: string;
 }
 
+const CLOSE_OPTIONS: {
+  id: CloseAction;
+  icon: LucideIcon;
+  label: string;
+  summary: string;
+  description: string;
+}[] = [
+  {
+    id: "tray",
+    icon: Minimize2,
+    label: "Keep running in the tray",
+    summary: "closes to the tray",
+    description: "The window hides; the tray icon brings it back.",
+  },
+  {
+    id: "hide",
+    icon: EyeOff,
+    label: "Hide completely",
+    summary: "hides completely",
+    description:
+      "No window, no taskbar entry and no tray icon. To bring it back, launch NuggetVPN again — it opens the copy that is already running.",
+  },
+  {
+    id: "quit",
+    icon: Power,
+    label: "Quit",
+    summary: "quits on close",
+    description: "Closes the app and disconnects.",
+  },
+];
+
 const SECTIONS: Section[] = [
   {
     id: "appearance",
     icon: Palette,
     title: "Appearance",
     blurb: "Theme and colours",
+  },
+  {
+    id: "behaviour",
+    icon: SlidersHorizontal,
+    title: "Behaviour",
+    blurb: "Startup, updates, and closing the window",
   },
   {
     id: "connection",
@@ -209,6 +252,14 @@ function SettingsView({
         const font = FONTS.find((item) => item.id === appearance.font)?.label;
         return [themeName, font].filter(Boolean).join(" · ");
       }
+      case "behaviour": {
+        const parts = [
+          appSettings.launch_at_startup ? "Starts at login" : "",
+          appSettings.auto_connect ? "connects automatically" : "",
+          CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "",
+        ].filter(Boolean);
+        return parts.join(" · ");
+      }
       case "connection":
         return `MTU ${appSettings.mtu} · DNS ${appSettings.dns || "not set"}`;
       case "tls": {
@@ -273,6 +324,82 @@ function SettingsView({
               description="How the view animates when you switch tabs. If your system asks for reduced motion, movement becomes a fade."
             >
               <MotionPicker />
+            </SettingsGroup>
+          </>
+        );
+
+      case "behaviour":
+        return (
+          <>
+            <SettingsGroup title="Startup">
+              <SettingsField
+                label="Launch at system startup"
+                description="Starts NuggetVPN when you log in, without opening its window."
+                control={
+                  <Switch
+                    checked={appSettings.launch_at_startup}
+                    onCheckedChange={(checked) => onSettingsChange("launch_at_startup", checked)}
+                    aria-label="Launch at system startup"
+                  />
+                }
+              />
+              <SettingsField
+                label="Connect automatically"
+                description="Connects to the server you used last as soon as the app starts."
+                control={
+                  <Switch
+                    checked={appSettings.auto_connect}
+                    onCheckedChange={(checked) => onSettingsChange("auto_connect", checked)}
+                    aria-label="Connect automatically"
+                  />
+                }
+              />
+            </SettingsGroup>
+
+            <SettingsGroup title="Subscriptions">
+              <SettingsField
+                label="Update subscriptions automatically"
+                description="Refreshes every subscription when the app starts and every six hours. Off means never automatically — for all of them — though you can still refresh one by hand."
+                control={
+                  <Switch
+                    checked={appSettings.subscription_auto_update !== false}
+                    onCheckedChange={(checked) =>
+                      onSettingsChange("subscription_auto_update", checked)
+                    }
+                    aria-label="Update subscriptions automatically"
+                  />
+                }
+              />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title="Closing the window"
+              description="The VPN keeps running in the first two cases."
+            >
+              <div className="space-y-2" role="radiogroup" aria-label="Closing the window">
+                {CLOSE_OPTIONS.map((option) => {
+                  const active = appSettings.close_action === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => onSettingsChange("close_action", option.id)}
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-lg border-2 p-3 text-left transition-colors",
+                        active ? "border-primary bg-primary/5" : "border-transparent bg-muted/30 hover:border-border"
+                      )}
+                    >
+                      <option.icon size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span>
+                        <span className="block text-sm font-medium">{option.label}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{option.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </SettingsGroup>
           </>
         );

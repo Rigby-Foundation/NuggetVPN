@@ -54,6 +54,12 @@ export interface AppSettings {
     beam_migration: "" | "done" | "dismissed";
     /** The server last picked, restored on the next start. */
     last_selection: SavedSelection | null;
+    /** Read from the system on every load; see internal/autostart. */
+    launch_at_startup: boolean;
+    auto_connect: boolean;
+    /** Null means never chosen; the backend treats that as on. */
+    subscription_auto_update: boolean | null;
+    close_action: CloseAction;
 }
 
 /**
@@ -143,6 +149,9 @@ export interface CanvasPoint {
     x: number;
     y: number;
 }
+
+/** What closing the window does. */
+export type CloseAction = "tray" | "hide" | "quit";
 
 export interface SavedSelection {
     domain: string;

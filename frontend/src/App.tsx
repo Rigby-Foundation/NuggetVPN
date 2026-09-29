@@ -74,7 +74,14 @@ const PENDING_SETTINGS: AppSettings = {
     proxy_chain_exit: "",
     beam_migration: "",
     last_selection: null,
+    launch_at_startup: false,
+    auto_connect: false,
+    subscription_auto_update: null,
+    close_action: "tray",
 };
+
+/** How often subscriptions refresh while the app runs, when that is on. */
+const SUBSCRIPTION_REFRESH_MS = 6 * 60 * 60 * 1000;
 
 const IP_RECHECK_MS = 5 * 60 * 1000;
 
@@ -114,6 +121,9 @@ function App() {
         refreshAll,
     } = useProfiles();
     const connection = useConnection();
+    // Startup runs once, before connection settles into a stable identity.
+    const connectRef = useRef(connection.connect);
+    connectRef.current = connection.connect;
     const traffic = useTraffic(connection.isConnected);
     const { logs, limit: logLimit, changeLimit, append: appendLog, clear: clearLogs } = useLogs();
 
@@ -184,6 +194,8 @@ function App() {
         const start = async () => {
             appendLog(["NuggetVPN started."]);
             let saved: AppSettings["last_selection"] = null;
+            let autoConnect = false;
+            let autoUpdate = true;
 
             try {
                 setPlatform(await invoke<string>("get_current_platform"));
@@ -195,6 +207,8 @@ function App() {
                 const stored = await invoke<AppSettings>("get_settings");
                 setSettings(stored);
                 saved = stored.last_selection;
+                autoConnect = stored.auto_connect;
+                autoUpdate = stored.subscription_auto_update !== false;
 
                 if (!stored.auth_server && !stored.skip_auth) {
                     setShowOnboarding(true);
@@ -232,6 +246,24 @@ function App() {
                         })
                     );
                 }
+
+                // Before the subscription refresh, not after it: that can
+                // take as long as a provider takes to time out, and the point
+                // of connecting automatically is not waiting.
+                if (autoConnect && loaded.length > 0) {
+                    const target = reconcileSelection(loaded, {
+                        domain: saved?.domain ?? "",
+                        mode: saved?.mode ?? "auto",
+                        profileId:
+                            loaded.find((profile) => profile.id === saved?.profile_id)?.id ?? "",
+                    });
+                    appendLog(["Connecting automatically."]);
+                    void connectRef
+                        .current(target.domain, target.mode, target.profileId)
+                        .catch((error) =>
+                            appendLog([`Automatic connection failed: ${errorMessage(error)}`])
+                        );
+                }
             } catch (error) {
                 appendLog([`Could not load profiles: ${errorMessage(error)}`]);
             }
@@ -249,6 +281,11 @@ function App() {
                 // Only an offer; failing to look for Beam changes nothing.
             }
 
+            // Off means off: no refresh at start, none on a timer, for any
+            // subscription. Refreshing by hand still works.
+            if (!autoUpdate) {
+                return;
+            }
             try {
                 const summary = await refreshAll();
                 if (summary.refreshed || summary.failed || summary.skipped) {
@@ -264,6 +301,25 @@ function App() {
 
         void start();
     }, [appendLog, loadProfiles, refreshAll, saveSettings]);
+
+    // ---- periodic subscription refresh ---------------------------------------
+    useEffect(() => {
+        if (settings.subscription_auto_update === false) {
+            return;
+        }
+        const timer = setInterval(() => {
+            void refreshAll()
+                .then((summary) => {
+                    if (summary.refreshed || summary.failed) {
+                        appendLog([
+                            `Subscriptions refreshed: ${summary.refreshed} updated, ${summary.failed} failed.`,
+                        ]);
+                    }
+                })
+                .catch((error) => appendLog([`Subscription refresh failed: ${errorMessage(error)}`]));
+        }, SUBSCRIPTION_REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [settings.subscription_auto_update, refreshAll, appendLog]);
 
     // ---- remembering the selection -----------------------------------------
     useEffect(() => {
