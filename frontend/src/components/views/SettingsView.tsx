@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Eye,
   Fingerprint,
+  PackageOpen,
   Palette,
   Plus,
   RefreshCw,
@@ -19,13 +20,14 @@ import {
 import PageShell from "@/components/layout/PageShell";
 import SubscriptionIdentity from "@/components/views/SubscriptionIdentity";
 import ThemePicker from "@/components/settings/theme-picker";
+import { BeamMigrationPanel } from "@/components/BeamMigration";
 import {
   SettingsField,
   SettingsGroup,
   SettingsRow,
 } from "@/components/settings/shell";
 
-import { AppSettings, Profile } from "@/types";
+import { AppSettings, BeamMigrationReport, BeamPreview, Profile } from "@/types";
 import { THEME_PRESETS } from "@/lib/themes";
 
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,9 @@ interface SettingsViewProps {
   onConnectSync: () => void;
   onDisconnectSync: () => void;
   onRegenerateHWID: () => void;
+  /** Present only when a Beam installation was found. */
+  beamPreview: BeamPreview | null;
+  onMigrateFromBeam: () => Promise<BeamMigrationReport>;
 }
 
 type SectionId =
@@ -65,7 +70,8 @@ type SectionId =
   | "chain"
   | "subscriptions"
   | "privacy"
-  | "sync";
+  | "sync"
+  | "beam";
 
 interface Section {
   id: SectionId;
@@ -118,6 +124,12 @@ const SECTIONS: Section[] = [
     title: "Synchronisation",
     blurb: "Profiles across your devices",
   },
+  {
+    id: "beam",
+    icon: PackageOpen,
+    title: "Import from Beam",
+    blurb: "Subscriptions and settings from Beam",
+  },
 ];
 
 function SettingsView({
@@ -130,6 +142,8 @@ function SettingsView({
   onConnectSync,
   onDisconnectSync,
   onRegenerateHWID,
+  beamPreview,
+  onMigrateFromBeam,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
   const [newChainId, setNewChainId] = React.useState("");
@@ -190,6 +204,11 @@ function SettingsView({
           : "Address check on";
       case "sync":
         return appSettings.auth_server || "Not connected";
+      case "beam": {
+        if (appSettings.beam_migration === "done") return "Already imported; can be run again";
+        const count = beamPreview?.subscriptions.length ?? 0;
+        return `Found ${count} profile${count === 1 ? "" : "s"} on this computer`;
+      }
       default:
         return section.blurb;
     }
@@ -547,6 +566,16 @@ function SettingsView({
           </SettingsGroup>
         );
 
+      case "beam":
+        return beamPreview ? (
+          <SettingsGroup
+            title="Beam"
+            description="Beam's own files are only read, never changed, so this is safe to run again."
+          >
+            <BeamMigrationPanel preview={beamPreview} onImport={onMigrateFromBeam} />
+          </SettingsGroup>
+        ) : null;
+
       default:
         return null;
     }
@@ -578,7 +607,7 @@ function SettingsView({
             <div className="space-y-4 pr-1">{detail(open.id)}</div>
           ) : (
             <div className="space-y-2 pr-1">
-              {SECTIONS.map((section) => (
+              {SECTIONS.filter((section) => section.id !== "beam" || beamPreview).map((section) => (
                 <SettingsRow
                   key={section.id}
                   icon={section.icon}

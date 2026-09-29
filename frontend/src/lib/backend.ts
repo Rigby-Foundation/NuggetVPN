@@ -41,6 +41,10 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     save_settings: { method: "SaveSettings", args: ["settings"] },
     regenerate_hwid: { method: "RegenerateHWID", args: [] },
 
+    get_beam_offer: { method: "GetBeamOffer", args: [] },
+    migrate_from_beam: { method: "MigrateFromBeam", args: [] },
+    dismiss_beam_migration: { method: "DismissBeamMigration", args: [] },
+
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },
     get_connection_state: { method: "GetConnectionState", args: [] },

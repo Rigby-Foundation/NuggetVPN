@@ -50,6 +50,8 @@ export interface AppSettings {
     proxy_chain_enabled: boolean;
     proxy_chain: string[];
     proxy_chain_exit: string;
+    /** "" until the first-start Beam offer is answered, then "done" or "dismissed". */
+    beam_migration: "" | "done" | "dismissed";
 }
 
 /**
@@ -138,4 +140,53 @@ export interface RoutingRule {
 export interface CanvasPoint {
     x: number;
     y: number;
+}
+
+/** One line of what a Beam migration carries across, or leaves behind. */
+export interface BeamItem {
+    label: string;
+    detail: string;
+}
+
+/** A Beam profile, described without its subscription URL. */
+export interface BeamSubscription {
+    name: string;
+    provider: string;
+    /** Empty for servers added to Beam by hand. */
+    host: string;
+    cached_nodes: number;
+    expires_at: number;
+    data_used: number;
+    data_limit: number;
+}
+
+export interface BeamPreview {
+    subscriptions: BeamSubscription[];
+    carried: BeamItem[];
+    skipped: BeamItem[];
+    /** The matching preset id, or empty. */
+    theme: string;
+}
+
+export interface BeamOffer {
+    found: boolean;
+    /** Show the first-start dialog. */
+    prompt: boolean;
+    preview: BeamPreview | null;
+}
+
+export interface BeamOutcome {
+    name: string;
+    host: string;
+    profiles: number;
+    source: "fetched" | "cached" | "failed" | "local";
+    note?: string;
+}
+
+export interface BeamMigrationReport {
+    profiles: Profile[];
+    settings: AppSettings;
+    outcomes: BeamOutcome[];
+    selection: { domain: string; profile_id: string } | null;
+    theme: string;
 }
