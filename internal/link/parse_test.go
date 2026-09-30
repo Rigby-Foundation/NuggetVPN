@@ -116,8 +116,8 @@ func TestParseOutboundPerProtocol(t *testing.T) {
 			},
 		},
 		{
-			name: "trojan defaults to tls on 443",
-			link: "trojan://secret@example.com#T",
+			name:     "trojan defaults to tls on 443",
+			link:     "trojan://secret@example.com#T",
 			wantType: "trojan",
 			wantHost: "example.com",
 			wantPort: 443,

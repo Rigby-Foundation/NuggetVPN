@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
@@ -16,7 +16,6 @@ type IPInfo struct {
 	IP     string `json:"ip"`
 	Region string `json:"region"`
 }
-
 
 // ---------------------------------------------------------------------------
 // Misc

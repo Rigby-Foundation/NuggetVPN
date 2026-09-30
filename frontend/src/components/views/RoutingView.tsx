@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Undo2, Upload } from "lucide-react";
+import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload } from "lucide-react";
 import {
     Background,
     BackgroundVariant,
@@ -26,6 +26,7 @@ import {
     RulePatch,
 } from "@/components/routing/nodes";
 import { RuleOrder } from "@/components/routing/order";
+import { usePlugins } from "@/components/plugins/plugins-provider";
 import { PresetList, PresetPlacement, PresetRule } from "@/components/routing/presets";
 import { SetupSwitcher } from "@/components/routing/setups";
 import { Button } from "@/components/ui/button";
@@ -1052,7 +1053,13 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
         }
     }, [t]);
 
-    const importRouting = useCallback(async () => {
+    const { plugins } = usePlugins();
+    const pluginSetups = plugins
+        .filter((plugin) => plugin.enabled)
+        .flatMap((plugin) => plugin.routing.map((setup) => ({ plugin, setup })));
+
+    // A .vflow from a file, or one a plugin brings.
+    const importRouting = useCallback(async (load: () => Promise<FlowImport> = () => invoke<FlowImport>("import_routing")) => {
         // Kept so the import can be undone: it replaces the whole graph.
         const previous: Partial<AppSettings> = {
             routing_rules: settings.routing_rules,
@@ -1063,7 +1070,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             routing_comments: settings.routing_comments,
         };
         try {
-            const result = await invoke<FlowImport>("import_routing");
+            const result = await load();
             if (!result.imported) return;
             onChange({
                 routing_rules: result.settings.routing_rules,
@@ -1222,6 +1229,32 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()}>
                         <Upload size={14} aria-hidden="true" /> {t("routing.import")}
                     </Button>
+                    {pluginSetups.length > 0 ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="gap-1.5">
+                                    <Puzzle size={14} aria-hidden="true" /> {t("routing.fromPlugins")}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="max-w-72">
+                                {pluginSetups.map(({ plugin, setup }) => (
+                                    <DropdownMenuItem
+                                        key={plugin.id + setup.file}
+                                        className="flex-col items-start gap-0.5 text-xs"
+                                        onClick={() =>
+                                            void importRouting(() => invoke<FlowImport>("apply_plugin_routing", { id: plugin.id, file: setup.file }))
+                                        }
+                                    >
+                                        <span className="font-medium">{setup.name}</span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {setup.description ? `${setup.description} · ` : ""}
+                                            {plugin.name}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void exportRouting()}>
                         <Download size={14} aria-hidden="true" /> {t("routing.export")}
                     </Button>

@@ -5,14 +5,14 @@ import (
 	"sort"
 	"strings"
 	"time"
-	
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
-	"path/filepath"
 	"os"
+	"path/filepath"
 )
 
 type ConnectionState struct {
@@ -31,7 +31,6 @@ type ConnectionState struct {
 	// tunnel is back, or the user disconnects.
 	Blocked bool `json:"blocked,omitempty"`
 }
-
 
 // probeCandidates bounds how many servers get a TCP reachability check before
 // connecting; the ICMP sweep has already ranked them by then.

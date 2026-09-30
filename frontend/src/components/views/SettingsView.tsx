@@ -4,6 +4,7 @@ import {
   Archive,
   CheckCircle2,
   Cpu,
+  Puzzle,
   CircleArrowUp,
   ChevronDown,
   ChevronUp,
@@ -33,6 +34,8 @@ import { useAppearance } from "@/components/appearance-provider";
 import { UpdatesPanel } from "@/components/settings/updates";
 import { BackupPanel } from "@/components/settings/backup";
 import { CorePanel } from "@/components/settings/cores";
+import { PluginsPanel } from "@/components/settings/plugins";
+import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
 import {
@@ -102,6 +105,7 @@ type SectionId =
   | "beam"
   | "backup"
   | "core"
+  | "plugins"
   | "updates";
 
 interface Section {
@@ -210,6 +214,12 @@ const SECTIONS: Section[] = [
     blurb: "settings.core.blurb",
   },
   {
+    id: "plugins",
+    icon: Puzzle,
+    title: "settings.plugins",
+    blurb: "settings.plugins.blurb",
+  },
+  {
     id: "backup",
     icon: Archive,
     title: "settings.backup",
@@ -265,6 +275,7 @@ function SettingsView({
   }, [openSignal]);
   const { prefs: appearance, activeCustom } = useAppearance();
   const { t, choice, setChoice, language } = useI18n();
+  const { plugins } = usePlugins();
   const languageName = (id: string) => LANGUAGES.find((item) => item.id === id)?.label ?? id;
   const [newChainId, setNewChainId] = React.useState("");
   // Only offered where the system lets the app register one.
@@ -350,6 +361,10 @@ function SettingsView({
         ].join(" · ");
       case "sync":
         return appSettings.auth_server || t("status.idle");
+      case "plugins":
+        return plugins.length === 0
+          ? t("plugins.summary.none")
+          : t("plugins.summary", { on: plugins.filter((plugin) => plugin.enabled).length, all: plugins.length });
       case "core":
         return t(
           appSettings.core === "mihomo"
@@ -911,6 +926,9 @@ function SettingsView({
 
       case "core":
         return <CorePanel appSettings={appSettings} onSettingsChange={onSettingsChange} />;
+
+      case "plugins":
+        return <PluginsPanel />;
 
       case "sync":
         return (

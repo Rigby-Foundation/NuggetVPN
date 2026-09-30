@@ -21,13 +21,15 @@ import { subscriptionAlert } from "@/components/subscription-usage";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { PluginsProvider } from "@/components/plugins/plugins-provider";
 import { useConnection } from "@/hooks/use-connection";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLogs } from "@/hooks/use-logs";
 import { LOCAL, profileDomain, reconcileSelection, useProfiles } from "@/hooks/use-profiles";
 import { useTraffic } from "@/hooks/use-traffic";
 import { stripAnsi } from "@/lib/ansi";
-import { useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/lib/i18n";
+import type { HostActions } from "@/lib/plugin-host";
 import { cn } from "@/lib/utils";
 import {
     AppSettings,
@@ -646,6 +648,36 @@ function App() {
         [appendLog, importSubscription]
     );
 
+    // What plugins reach the app through; see lib/plugin-host. Read through a
+    // ref, so the host always sees the current state without re-rendering.
+    const { language } = useI18n();
+    const pluginState = useRef({ profiles, connection, selection, language, platform, addProfile, importSubscription, appendLog });
+    pluginState.current = { profiles, connection, selection, language, platform, addProfile, importSubscription, appendLog };
+    const pluginActions = useRef<HostActions>({
+        connect: async (serverId) => {
+            const { profiles: list, connection: current, selection: selected } = pluginState.current;
+            const target = serverId ? list.find((profile) => profile.id === serverId) : undefined;
+            if (target) {
+                await current.connect(profileDomain(target), "manual", target.id);
+            } else {
+                await current.connect(selected.domain, selected.mode, selected.profileId);
+            }
+        },
+        disconnect: () => pluginState.current.connection.disconnect(),
+        addServer: async (name, link) => {
+            await pluginState.current.addProfile(name, link);
+            pluginState.current.appendLog([`A plugin added "${name || link.slice(0, 40)}".`]);
+        },
+        addSubscription: async (url) => {
+            await pluginState.current.importSubscription(url);
+            pluginState.current.appendLog(["A plugin added a subscription."]);
+        },
+        profiles: () => pluginState.current.profiles,
+        state: () => pluginState.current.connection.state,
+        language: () => pluginState.current.language,
+        platform: () => pluginState.current.platform,
+    }).current;
+
     /** The profiles a configuration source stands for. */
     const profilesOf = useCallback(
         (source: ConfigSource) => {
@@ -906,6 +938,7 @@ function App() {
     const isMac = platform === "macos";
 
     return (
+        <PluginsProvider actions={pluginActions}>
         <main className="h-full overflow-hidden">
             <Toaster
                 position="top-center"
@@ -1157,6 +1190,7 @@ function App() {
                 </SidebarInset>
             </SidebarProvider>
         </main>
+        </PluginsProvider>
     );
 }
 

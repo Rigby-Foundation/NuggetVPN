@@ -153,7 +153,6 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-
 // withoutController drops any API a profile's own config asks for: this
 // process is privileged, and the service reads everything in-process.
 func withoutController(cfg *config.Config) {

@@ -2,7 +2,7 @@ package app
 
 import (
 	"time"
-	
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
@@ -15,7 +15,6 @@ type TrafficSample struct {
 	TotalUp   uint64 `json:"total_up"`
 	TotalDown uint64 `json:"total_down"`
 }
-
 
 // ---------------------------------------------------------------------------
 // Traffic

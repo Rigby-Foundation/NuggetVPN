@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="/plugins/_sdk/nugget.js"></script>
+<style>
+  /* The SDK sets the app's colours as variables, and keeps them current. */
+  html { background: transparent; color: var(--foreground); font: 13px/1.4 system-ui, sans-serif; }
+  body { margin: 0; padding: 12px 14px 14px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--status-idle); flex: none; }
+  .dot.connected { background: var(--status-connected); }
+  .dot.connecting { background: var(--status-connecting); }
+  .dot.error { background: var(--status-error); }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted-foreground); font-size: 12px; }
+  .server { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button { font: inherit; border: 0; border-radius: var(--radius, 8px); padding: 6px 14px; cursor: pointer;
+           background: var(--primary); color: var(--primary-foreground); }
+  button:disabled { opacity: .5; cursor: default; }
+  .traffic { margin-top: 10px; display: flex; gap: 18px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <span class="dot" id="dot"></span>
+    <div class="grow">
+      <div class="server" id="server">…</div>
+      <div class="muted" id="status"></div>
+    </div>
+    <button id="toggle" disabled>…</button>
+  </div>
+  <div class="traffic muted" id="traffic" hidden>
+    <span>↑ <span id="up">0 B</span>/s</span>
+    <span>↓ <span id="down">0 B</span>/s</span>
+  </div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  // Up, or on its way back up: the button stops it.
+  let active = false;
+
+  const bytes = (value) => {
+    const units = ["B", "KB", "MB", "GB"];
+    let index = 0;
+    while (value >= 1024 && index < units.length - 1) { value /= 1024; index++; }
+    return value.toFixed(index ? 1 : 0) + " " + units[index];
+  };
+
+  function show(state) {
+    active = state.status === "connected" || state.reconnecting || state.blocked;
+    $("dot").className = "dot " + state.status;
+    $("server").textContent = state.server || "No server";
+    $("status").textContent = state.reconnecting ? "Reconnecting…" : state.blocked ? "Kill switch is holding traffic" : state.status;
+    $("toggle").disabled = state.status === "connecting";
+    $("toggle").textContent = active ? "Disconnect" : "Connect";
+    $("traffic").hidden = state.status !== "connected";
+  }
+
+  nugget.call("vpn.status").then(show);
+  nugget.on("vpn.state", show);
+  nugget.on("vpn.traffic", (sample) => {
+    // Rates, in bytes a second; see app.TrafficSample.
+    $("up").textContent = bytes(sample.up_rate || 0);
+    $("down").textContent = bytes(sample.down_rate || 0);
+  });
+
+  $("toggle").addEventListener("click", async () => {
+    $("toggle").disabled = true;
+    try {
+      if (active) await nugget.call("vpn.disconnect");
+      else await nugget.call("vpn.connect");
+      // Remembered across restarts, in the plugin's own storage.
+      const count = ((await nugget.call("storage.get", { key: "clicks" })) || 0) + 1;
+      await nugget.call("storage.set", { key: "clicks", value: count });
+    } catch (error) {
+      nugget.call("ui.toast", { text: error.message, kind: "error" });
+    } finally {
+      $("toggle").disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

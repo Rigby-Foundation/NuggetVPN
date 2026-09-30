@@ -59,9 +59,9 @@ func featureRequest(t *testing.T) Request {
 	settings.Normalize()
 	return Request{
 		Profile: servers[0], Profiles: servers, Settings: settings,
-		Alternatives:     servers[:8],
-		MixedPort:        17890,
-		RuleLists:        map[string]sbconfig.RuleList{"https://lists.example/blocked.lst": {Path: listPath}},
+		Alternatives: servers[:8],
+		MixedPort:    17890,
+		RuleLists:    map[string]sbconfig.RuleList{"https://lists.example/blocked.lst": {Path: listPath}},
 	}
 }
 
@@ -137,4 +137,3 @@ secret: open
 		t.Errorf("the config's own rules should be kept: %v", rules)
 	}
 }
-

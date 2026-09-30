@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "id": "org.rigbyfoundation.glance",
+  "name": "Glance",
+  "version": "1.0.0",
+  "author": "Rigby Foundation",
+  "description": "An example plugin: a status card with a connect button, a theme, and a routing setup that blocks common trackers.",
+  "homepage": "https://github.com/Rigby-Foundation/NuggetVPN/blob/main/docs/plugins.md",
+  "icon": "icon.svg",
+  "themes": [
+    {
+      "id": "glance-night",
+      "name": "Glance Night",
+      "mode": "dark",
+      "background": { "h": 250, "c": 0.03, "l": 0.14 },
+      "accent": { "h": 190, "c": 0.13 }
+    }
+  ],
+  "routing": [
+    {
+      "name": "Block common trackers",
+      "description": "Everything through the VPN; a handful of ad and tracking domains blocked.",
+      "file": "routing/trackers.vflow"
+    }
+  ],
+  "panel": { "title": "At a glance", "file": "panel.html" },
+  "permissions": ["state", "control"]
+}

@@ -44,7 +44,8 @@ const (
 	EventState = "state"
 	// EventStats carries cumulative byte counters, pushed once a second while
 	// the tunnel is up so the GUI never has to poll.
-	EventStats = "stats")
+	EventStats = "stats"
+)
 
 // Request is one command from the GUI to the core service.
 type Request struct {

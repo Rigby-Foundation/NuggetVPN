@@ -52,9 +52,9 @@ type GeoRef struct {
 
 // Flow is the file's content.
 type Flow struct {
-	Format        string                  `json:"format"`
-	Version       int                     `json:"version"`
-	DefaultAction string                  `json:"default_action"`
+	Format        string `json:"format"`
+	Version       int    `json:"version"`
+	DefaultAction string `json:"default_action"`
 	// DefaultServer and Servers name servers by their id on the machine the
 	// flow was made on. Elsewhere those ids mean nothing, and the traffic
 	// goes through the connected server until the destination is re-pointed.

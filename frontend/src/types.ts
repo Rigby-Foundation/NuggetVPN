@@ -400,3 +400,52 @@ export interface BeamMigrationReport {
     theme: string;
     appearance: BeamAppearance;
 }
+
+/** A permission a plugin can hold; see internal/plugins. */
+export type PluginPermission =
+    | "state"
+    | "connections"
+    | "profiles"
+    | "control"
+    | "import"
+    | "routing"
+    | "notifications";
+
+/** An installed plugin; see app.PluginInfo. */
+export interface PluginInfo {
+    id: string;
+    name: string;
+    version: string;
+    author?: string;
+    description?: string;
+    homepage?: string;
+    icon?: string;
+    enabled: boolean;
+    permissions: PluginPermission[];
+    network: string[];
+    themes: PluginTheme[];
+    fonts: { id: string; name: string; url: string }[];
+    routing: { name: string; description?: string; file: string }[];
+    panel?: string;
+    panel_title?: string;
+    background?: string;
+}
+
+/** A theme a plugin brings, in the theme editor's shape. */
+export interface PluginTheme {
+    id: string;
+    name: string;
+    mode: "light" | "dark";
+    background: unknown;
+    accent: unknown;
+    image?: { url: string; blur: number; brightness: number; saturate: number; dim: number; panel: number };
+}
+
+/** A plugin file read but not installed; see app.PluginPreview. */
+export interface PluginPreview {
+    token: string;
+    plugin: PluginInfo;
+    installed?: string;
+    new_permissions: PluginPermission[];
+    has_script: boolean;
+}

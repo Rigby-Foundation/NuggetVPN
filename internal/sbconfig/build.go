@@ -23,7 +23,7 @@ const (
 	dnsDirectTag = "dns-direct"
 	dnsLocalTag  = "dns-local"
 
-	tunAddress  = "172.19.0.1/30"
+	tunAddress = "172.19.0.1/30"
 
 	// winboxPort is routed through the proxy even in split mode, matching the
 	// behaviour of the previous builds.
@@ -216,7 +216,7 @@ func Build(request Request) (Result, error) {
 	dns := plan.buildDNS(splitTunnel, serverDomains)
 
 	config := map[string]any{
-		"log": buildLog(settings),
+		"log":      buildLog(settings),
 		"dns":      dns,
 		"inbounds": buildInbounds(settings, request.MixedPort, request.Bypass),
 		"outbounds": func() []map[string]any {

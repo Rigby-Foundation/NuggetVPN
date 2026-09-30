@@ -45,6 +45,14 @@ nothing is shelled out to.
 - **Logs** streamed from the core. They are off by default in release
   builds.
 
+### Plugins
+
+Plugins can bring themes, fonts and routing setups, and add pages of their
+own. A plugin’s code runs in a sandbox, sealed off from the app and your
+files, and can only do what you allow when you install it. See
+[docs/plugins.md](docs/plugins.md) to write one, and
+[`examples/plugins/glance`](examples/plugins/glance) for an example.
+
 ### Everything else
 
 - **Themes**: over thirty presets, including Catppuccin, Dracula, Gruvbox,
@@ -230,6 +238,10 @@ go build -tags "$(make -s tags)" .
   routing format.
 - **`internal/beam/`**, **`internal/autostart/`**: Beam import and launch at
   login.
+- **`internal/plugins/`**: reading, installing and serving plugins, the
+  sandbox policy for their pages, and the SDK (`sdk/nugget.js`). The window
+  side is `frontend/src/lib/plugin-host.ts`.
+- **`cmd/nuggetplugin/`**: builds a `.nuggetplugin` from a folder.
 - **`internal/storage/`**, **`internal/models/`**: persistence and shared
   types.
 - **`third_party/`**: official sing-box and its sing-tun, vendored under

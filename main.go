@@ -27,6 +27,7 @@ import (
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
@@ -114,7 +115,9 @@ func runGUI() {
 			application.NewService(notifier),
 		},
 		Assets: application.AssetOptions{
-			Handler: app.UserFilesHandler(application.AssetFileServerFS(assets)),
+			Handler: app.PluginFiles(app.UserFilesHandler(application.AssetFileServerFS(assets))),
+			// Before the runtime endpoint: see plugins.GuardRuntime.
+			Middleware: plugins.GuardRuntime,
 		},
 		Mac: application.MacOptions{
 			// The tray keeps the app (and the tunnel) alive after the last

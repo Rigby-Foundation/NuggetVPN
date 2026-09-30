@@ -1,0 +1,20 @@
+{
+  "format": "nuggetvpn.vflow",
+  "version": 2,
+  "default_action": "proxy",
+  "rules": [
+    {
+      "id": "rule-trackers",
+      "kind": "domains",
+      "values": ["doubleclick.net", "googlesyndication.com", "google-analytics.com", "adservice.google.com", "scorecardresearch.com", "hotjar.com"],
+      "action": "block"
+    }
+  ],
+  "comments": [
+    { "id": "comment-trackers", "text": "From the Glance example plugin. Add your own domains to the rule, or remove it." }
+  ],
+  "layout": {
+    "rule-trackers": { "x": 60, "y": 140 },
+    "comment-trackers": { "x": 60, "y": 20 }
+  }
+}

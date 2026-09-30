@@ -81,7 +81,13 @@ export const USER_FONT_PREFIX = "user:";
 
 const USER_FONT_URL = /^\/user-files\/fonts\/[a-f0-9]{16}\.(ttf|otf|woff2?)$/;
 
+/** A file inside a plugin, as the backend serves it; see internal/plugins. */
+const PLUGIN_FILE = String.raw`\/plugins\/[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]\/[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*`;
+const PLUGIN_FONT_URL = new RegExp(`^${PLUGIN_FILE}\\.(ttf|otf|woff2?)$`, "i");
+const PLUGIN_FONT_ID = /^plugin-[a-z0-9._-]+-\d+$/;
+
 let userFontOptions: FontOption[] = [];
+let pluginFontOptions: FontOption[] = [];
 
 /**
  * Makes the user's fonts available: an @font-face for each, and an entry
@@ -108,9 +114,32 @@ export function setUserFonts(fonts: UserFont[]) {
         .join("\n");
 }
 
-/** Every font on offer: the bundled ones and the user's. */
+/**
+ * Makes the enabled plugins' fonts available, the way setUserFonts does the
+ * user's. Their ids start with "plugin-", so the two never collide.
+ */
+export function setPluginFonts(fonts: UserFont[]) {
+    const valid = fonts.filter((font) => PLUGIN_FONT_URL.test(font.url) && PLUGIN_FONT_ID.test(font.id));
+    pluginFontOptions = valid.map((font) => ({
+        id: USER_FONT_PREFIX + font.id,
+        label: font.name || font.id,
+        family: `'Plugin ${font.id}'`,
+        scripts: "all" as const,
+    }));
+    let style = document.getElementById("plugin-fonts") as HTMLStyleElement | null;
+    if (!style) {
+        style = document.createElement("style");
+        style.id = "plugin-fonts";
+        document.head.appendChild(style);
+    }
+    style.textContent = valid
+        .map((font) => `@font-face { font-family: 'Plugin ${font.id}'; src: url("${font.url}"); font-display: swap; }`)
+        .join("\n");
+}
+
+/** Every font on offer: the bundled ones, the user's and the plugins'. */
 export function allFonts(): FontOption[] {
-    return [...FONTS, ...userFontOptions];
+    return [...FONTS, ...userFontOptions, ...pluginFontOptions];
 }
 
 /** Whether a font fully covers a script. */
@@ -221,7 +250,10 @@ export const THEME_IMAGE_LIMITS = {
     panel: { min: 0.2, max: 1, step: 0.05, fallback: 0.65 },
 } as const;
 
-const BACKGROUND_URL = /^\/user-files\/backgrounds\/[a-f0-9]{16}\.(png|jpg|webp|gif)$/;
+const BACKGROUND_URL = new RegExp(
+    `^(\\/user-files\\/backgrounds\\/[a-f0-9]{16}\\.(png|jpg|webp|gif)|${PLUGIN_FILE}\\.(png|jpe?g|webp|gif))$`,
+    "i"
+);
 
 /** A new picture's effects: blurred and darkened enough for text to read. */
 export function defaultThemeImage(url: string): ThemeImage {
@@ -237,6 +269,9 @@ export function defaultThemeImage(url: string): ThemeImage {
 
 /** Prefix for a stored custom theme's id. */
 export const CUSTOM_PREFIX = "custom-";
+
+/** Prefix for a plugin's theme: plugin:<plugin id>:<theme id>. */
+export const PLUGIN_THEME_PREFIX = "plugin:";
 
 /**
  * The two theme ids next-themes knows custom themes by, one per mode.
@@ -330,6 +365,13 @@ export interface AppearancePrefs {
     activeCustom: string;
     /** The fonts the user added; see UserFont. */
     userFonts: UserFont[];
+    /**
+     * The enabled plugins' themes and fonts, as last loaded: kept here so a
+     * plugin's theme or font is on screen from the first frame, before the
+     * backend is asked which plugins there are.
+     */
+    pluginThemes: CustomTheme[];
+    pluginFonts: UserFont[];
 }
 
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
@@ -339,6 +381,8 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     customThemes: [],
     activeCustom: "",
     userFonts: [],
+    pluginThemes: [],
+    pluginFonts: [],
 };
 
 const STORAGE_KEY = "nugget.appearance";
@@ -348,11 +392,14 @@ function clamp(value: unknown, min: number, max: number, fallback: number): numb
     return Math.min(max, Math.max(min, number));
 }
 
-/** Rebuilds a stored theme field by field, so a hand-edited or old entry cannot break the page. */
-function sanitizeTheme(raw: unknown): CustomTheme | null {
+/**
+ * Rebuilds a theme field by field, so a hand-edited or old entry — or one a
+ * plugin wrote — cannot break the page. prefix is the id prefix it must have.
+ */
+export function sanitizeTheme(raw: unknown, prefix: string = CUSTOM_PREFIX): CustomTheme | null {
     if (!raw || typeof raw !== "object") return null;
     const value = raw as Partial<CustomTheme>;
-    if (typeof value.id !== "string" || !value.id.startsWith(CUSTOM_PREFIX)) return null;
+    if (typeof value.id !== "string" || !value.id.startsWith(prefix) || value.id.length > 200) return null;
     const mode = value.mode === "light" ? "light" : "dark";
     const range = BACKGROUND_LIGHTNESS[mode];
     return {
@@ -408,18 +455,33 @@ export function loadAppearance(): AppearancePrefs {
                       typeof (font as UserFont).name === "string"
               )
             : [];
+        const pluginThemes: CustomTheme[] = Array.isArray(raw.pluginThemes)
+            ? (raw.pluginThemes.map((theme: unknown) => sanitizeTheme(theme, PLUGIN_THEME_PREFIX)).filter(Boolean) as CustomTheme[])
+            : [];
+        const pluginFonts: UserFont[] = Array.isArray(raw.pluginFonts)
+            ? raw.pluginFonts.filter(
+                  (font: unknown): font is UserFont =>
+                      !!font &&
+                      typeof (font as UserFont).id === "string" &&
+                      typeof (font as UserFont).url === "string" &&
+                      typeof (font as UserFont).name === "string"
+              )
+            : [];
         // Before picking the font: a user font is only a valid choice once
         // it is registered.
         setUserFonts(userFonts);
+        setPluginFonts(pluginFonts);
         return {
             userFonts,
             font: pick(allFonts(), raw.font, DEFAULT_APPEARANCE.font),
             radius: pick(RADII, raw.radius, DEFAULT_APPEARANCE.radius),
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
             customThemes,
-            activeCustom: customThemes.some((theme) => theme.id === raw.activeCustom)
+            activeCustom: [...customThemes, ...pluginThemes].some((theme) => theme.id === raw.activeCustom)
                 ? raw.activeCustom
                 : "",
+            pluginThemes,
+            pluginFonts,
         };
     } catch {
         return DEFAULT_APPEARANCE;
@@ -443,7 +505,7 @@ const KNOB_NAMES = Object.keys(customThemeKnobs(newCustomTheme()));
 /** The custom theme on screen for a given next-themes id, if any. */
 export function activeCustomTheme(prefs: AppearancePrefs, theme: string | null | undefined) {
     if (!isCustomThemeId(theme ?? undefined)) return undefined;
-    return prefs.customThemes.find((item) => item.id === prefs.activeCustom);
+    return [...prefs.customThemes, ...prefs.pluginThemes].find((item) => item.id === prefs.activeCustom);
 }
 
 /** Writes font, radius and motion onto <html>. */

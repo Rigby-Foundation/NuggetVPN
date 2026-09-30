@@ -614,12 +614,12 @@ func splitPorts(values []string) (single []uint16, ranges []string) {
 // they go.
 func (p *routePlan) buildRouteSection(rules []map[string]any) map[string]any {
 	route := map[string]any{
-		"rules":                   rules,
-		"final":                   p.finalOutbound(),
-		"auto_detect_interface":   true,
+		"rules":                 rules,
+		"final":                 p.finalOutbound(),
+		"auto_detect_interface": true,
 		// Look up which program opened each connection, for the connections
 		// screen. Without it the core only does so when a rule names an app.
-		"find_process": true,
+		"find_process":            true,
 		"default_domain_resolver": map[string]any{"server": dnsDirectTag},
 	}
 	if len(p.sets) > 0 {

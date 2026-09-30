@@ -20,7 +20,9 @@ import {
     CustomTheme,
     DEFAULT_APPEARANCE,
     loadAppearance,
+    PLUGIN_THEME_PREFIX,
     saveAppearance,
+    setPluginFonts,
     setUserFonts,
     UserFont,
     USER_FONT_PREFIX,
@@ -44,6 +46,8 @@ interface AppearanceContext {
     /** Adds a font the backend stored, and chooses it. */
     addUserFont: (font: UserFont) => void;
     removeUserFont: (id: string) => void;
+    /** Replaces the themes and fonts the enabled plugins bring. */
+    setPluginContent: (themes: CustomTheme[], fonts: UserFont[]) => void;
 }
 
 const Context = createContext<AppearanceContext | null>(null);
@@ -150,6 +154,25 @@ function Appearance({ children }: { children: ReactNode }) {
                         ...current,
                         userFonts,
                         font: current.font === USER_FONT_PREFIX + id ? DEFAULT_APPEARANCE.font : current.font,
+                    };
+                });
+            },
+            setPluginContent: (themes, fonts) => {
+                setPluginFonts(fonts);
+                // The plugin theme on screen went with its plugin.
+                if (activeCustom?.id.startsWith(PLUGIN_THEME_PREFIX) && !themes.some((item) => item.id === activeCustom.id)) {
+                    setTheme("system");
+                }
+                setPrefs((current) => {
+                    const ids = new Set(fonts.map((font) => USER_FONT_PREFIX + font.id));
+                    const fontGone = current.font.startsWith(USER_FONT_PREFIX + "plugin-") && !ids.has(current.font);
+                    const activeGone = current.activeCustom.startsWith("plugin:") && !themes.some((item) => item.id === current.activeCustom);
+                    return {
+                        ...current,
+                        pluginThemes: themes,
+                        pluginFonts: fonts,
+                        font: fontGone ? DEFAULT_APPEARANCE.font : current.font,
+                        activeCustom: activeGone ? "" : current.activeCustom,
                     };
                 });
             },

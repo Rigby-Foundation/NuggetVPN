@@ -89,7 +89,11 @@ func (a *App) ImportRouting() (FlowImport, error) {
 	if len(data) > maxFlowSize {
 		return FlowImport{}, fmt.Errorf("that file is too large to be a .vflow")
 	}
+	return a.applyFlow(data)
+}
 
+// applyFlow replaces the routing with a .vflow file's.
+func (a *App) applyFlow(data []byte) (FlowImport, error) {
 	flow, err := vflow.Decode(data)
 	if err != nil {
 		if errors.Is(err, vflow.ErrNotFlow) {

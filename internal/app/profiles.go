@@ -3,9 +3,9 @@ package app
 import (
 	"fmt"
 	"strings"
-	
+
 	"github.com/google/uuid"
-	
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"

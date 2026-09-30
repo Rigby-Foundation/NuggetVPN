@@ -229,6 +229,19 @@ function ThemePicker({ theme, setTheme }: Props) {
                 ))}
             </Group>
 
+            {prefs.pluginThemes.length > 0 ? (
+                <Group title={t("picker.plugins")}>
+                    {prefs.pluginThemes.map((custom) => (
+                        <PresetOption
+                            key={custom.id}
+                            preset={asPreset(custom, t)}
+                            active={activeCustom?.id === custom.id}
+                            onSelect={() => showCustomTheme(custom)}
+                        />
+                    ))}
+                </Group>
+            ) : null}
+
             <Group title={t("picker.custom")}>
                 {prefs.customThemes.map((custom) => (
                     // The edit control sits beside the option, not inside it:

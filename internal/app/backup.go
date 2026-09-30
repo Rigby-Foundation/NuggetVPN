@@ -70,7 +70,7 @@ func (a *App) ExportBackup(ui string) (string, error) {
 	}
 	dialog := a.app.Dialog.SaveFile().
 		SetMessage("Save a backup").
-		SetFilename("NuggetVPN " + time.Now().Format("2006-01-02") + backupExtension).
+		SetFilename("NuggetVPN "+time.Now().Format("2006-01-02")+backupExtension).
 		CanCreateDirectories(true).
 		AddFilter("NuggetVPN backup", "*"+backupExtension)
 	if a.window != nil {

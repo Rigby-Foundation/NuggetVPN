@@ -48,11 +48,11 @@ func TestHWIDFormat(t *testing.T) {
 
 	rejected := []string{
 		"",
-		"tooshort9",                 // 9 characters
-		strings.Repeat("a", 65),     // one over
-		"has spaces here",           // space
+		"tooshort9",                  // 9 characters
+		strings.Repeat("a", 65),      // one over
+		"has spaces here",            // space
 		"underscores_are_not_listed", // underscore
-		"emoji-🔒-here",              // non-Latin
+		"emoji-🔒-here",               // non-Latin
 		"slash/es",
 	}
 	for _, value := range rejected {
