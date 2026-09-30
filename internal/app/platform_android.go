@@ -25,3 +25,13 @@ func systemPalette() string { return android.SystemPalette() }
 
 // setSystemBars colours the status and navigation bars on Android.
 func setSystemBars(color string, light bool) { android.SetSystemBars(color, light) }
+
+func installedApps() []InstalledApp {
+	apps := []InstalledApp{}
+	for _, app := range android.InstalledApps() {
+		apps = append(apps, InstalledApp{Package: app.Package, Label: app.Label, System: app.System})
+	}
+	return apps
+}
+
+func appIcon(packageName string) string { return android.AppIcon(packageName) }

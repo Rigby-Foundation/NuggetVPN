@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload } from "lucide-react";
+import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload, Plus } from "lucide-react";
 import {
     Background,
     BackgroundVariant,
@@ -27,6 +27,8 @@ import {
 } from "@/components/routing/nodes";
 import { RuleOrder } from "@/components/routing/order";
 import { usePlugins } from "@/components/plugins/plugins-provider";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { PresetList, PresetPlacement, PresetRule } from "@/components/routing/presets";
 import { SetupSwitcher } from "@/components/routing/setups";
 import { Button } from "@/components/ui/button";
@@ -177,7 +179,29 @@ function serverIds(settings: AppSettings): string[] {
 function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasProps) {
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
-    const { setCenter, getZoom } = useReactFlow();
+    const { setCenter, getZoom, fitView } = useReactFlow();
+
+    // The whole graph is fitted on first sight, and again whenever the canvas
+    // changes size — the window resized, or the phone layout replacing the
+    // side panel — until the user pans or zooms, after which their view is
+    // theirs.
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const userMovedRef = useRef(false);
+    useEffect(() => {
+        const element = wrapperRef.current;
+        if (!element || typeof ResizeObserver !== "function") return;
+        let frame = 0;
+        const observer = new ResizeObserver(() => {
+            if (userMovedRef.current) return;
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => void fitView({ padding: 0.15 }));
+        });
+        observer.observe(element);
+        return () => {
+            observer.disconnect();
+            cancelAnimationFrame(frame);
+        };
+    }, [fitView]);
 
     // The graph is derived from settings and edits are pushed back through
     // onChange. Keeping settings as the single source of truth is what lets the
@@ -496,10 +520,15 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
     );
 
     return (
+        <div ref={wrapperRef} className="h-full w-full">
         <ReactFlow
             nodes={nodes}
             edges={edges}
             nodeTypes={NODE_TYPES}
+            onMoveStart={(event) => {
+                // Only a gesture has an event; programmatic moves do not.
+                if (event) userMovedRef.current = true;
+            }}
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -513,6 +542,7 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
             <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
             <Controls showInteractive={false} />
         </ReactFlow>
+        </div>
     );
 }
 
@@ -534,6 +564,7 @@ function Palette({
     placedServers,
     geoPanel,
     orderPanel,
+    className,
 }: {
     defaultAction: RoutingAction;
     onAddSource: (kind: RoutingKind) => void;
@@ -545,12 +576,13 @@ function Palette({
     placedServers: string[];
     geoPanel: React.ReactNode;
     orderPanel: React.ReactNode;
+    className?: string;
 }) {
     const t = useT();
     const [tab, setTab] = useState<"add" | "order">("add");
     const available = profiles.filter((profile) => !placedServers.includes(profile.id));
     return (
-        <aside className="w-60 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto">
+        <aside className={cn("w-60 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto", className)}>
             <div className="mb-2 grid grid-cols-2 gap-0.5 rounded-lg bg-muted/60 p-0.5" role="tablist">
                 {(["add", "order"] as const).map((option) => (
                     <button
@@ -1054,6 +1086,8 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
     }, [t]);
 
     const { plugins } = usePlugins();
+    const isMobile = useIsMobile();
+    const [paletteOpen, setPaletteOpen] = useState(false);
     const pluginSetups = plugins
         .filter((plugin) => plugin.enabled)
         .flatMap((plugin) => plugin.routing.map((setup) => ({ plugin, setup })));
@@ -1193,7 +1227,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
 
     return (
         <div className="enter-stagger absolute inset-0 flex flex-col">
-            <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3 shrink-0">
+            <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-6 pt-5 pb-3 shrink-0">
                 <div className="min-w-0">
                     <h1 className="sr-only">{t("nav.routing")}</h1>
                     <SetupSwitcher settings={settings} onReplace={onReplace} />
@@ -1226,14 +1260,14 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                     >
                         <Redo2 size={15} aria-hidden="true" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()}>
-                        <Upload size={14} aria-hidden="true" /> {t("routing.import")}
+                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()} aria-label={t("routing.import")} title={t("routing.import")}>
+                        <Upload size={14} aria-hidden="true" /> <span className="hidden sm:inline">{t("routing.import")}</span>
                     </Button>
                     {pluginSetups.length > 0 ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="gap-1.5">
-                                    <Puzzle size={14} aria-hidden="true" /> {t("routing.fromPlugins")}
+                                <Button variant="ghost" size="sm" className="gap-1.5" aria-label={t("routing.fromPlugins")} title={t("routing.fromPlugins")}>
+                                    <Puzzle size={14} aria-hidden="true" /> <span className="hidden sm:inline">{t("routing.fromPlugins")}</span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="max-w-72">
@@ -1255,8 +1289,8 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : null}
-                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void exportRouting()}>
-                        <Download size={14} aria-hidden="true" /> {t("routing.export")}
+                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void exportRouting()} aria-label={t("routing.export")} title={t("routing.export")}>
+                        <Download size={14} aria-hidden="true" /> <span className="hidden sm:inline">{t("routing.export")}</span>
                     </Button>
                     {rules.length > 0 ? (
                         <Button variant="ghost" size="sm" onClick={() => onChange({ routing_rules: [] })}>
@@ -1280,11 +1314,11 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                 />
             ) : null}
 
-            <div className="flex-1 min-h-0 mx-4 mb-4 flex gap-3">
+            <div className="flex-1 min-h-0 mx-2 sm:mx-4 mb-2 sm:mb-4 flex gap-3">
                 {/* The graph reads left to right in every language: sources
                     on the left, destinations on the right, the way the edges
                     are drawn. It is not mirrored in right-to-left layouts. */}
-                <div className="flex-1 min-w-0 rounded-xl border overflow-hidden" dir="ltr">
+                <div className="relative flex-1 min-w-0 rounded-xl border overflow-hidden" dir="ltr">
                     <GeoCodesContext.Provider value={geoCodes}>
                         <RuleListsContext.Provider value={listsContext}>
                             <ReactFlowProvider>
@@ -1298,30 +1332,87 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                             </ReactFlowProvider>
                         </RuleListsContext.Provider>
                     </GeoCodesContext.Provider>
+                    {/* On a phone the palette is a sheet, opened from here. */}
+                    {isMobile ? (
+                        <Button
+                            size="sm"
+                            className="absolute bottom-7 end-3 z-10 h-10 gap-1.5 rounded-full px-4 shadow-lg"
+                            onClick={() => setPaletteOpen(true)}
+                        >
+                            <Plus size={16} aria-hidden="true" /> {t("routing.tab.add")}
+                        </Button>
+                    ) : null}
                 </div>
-                <Palette
-                    defaultAction={settings.default_action}
-                    onAddSource={addSource}
-                    onAddNote={addNote}
-                    onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
-                    onAddServer={addServer}
-                    onAddPreset={addPreset}
-                    profiles={profiles}
-                    placedServers={placedServers}
-                    geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
-                    orderPanel={
-                        <RuleOrder
-                            rules={rules}
-                            profiles={profiles}
-                            onReorder={(next) => onChange({ routing_rules: next })}
-                            onFocus={(id) => {
-                                const index = rules.findIndex((rule) => rule.id === id);
-                                const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
-                                focusRef.current?.(point);
-                            }}
-                        />
-                    }
-                />
+                {isMobile ? (
+                    <Sheet open={paletteOpen} onOpenChange={setPaletteOpen}>
+                        <SheetContent side="bottom" className="h-[75vh] rounded-t-2xl px-3 pb-4">
+                            <SheetHeader className="px-1 pb-0">
+                                <SheetTitle>{t("nav.routing")}</SheetTitle>
+                            </SheetHeader>
+                            <Palette
+                                className="w-full border-0 bg-transparent p-0"
+                                defaultAction={settings.default_action}
+                                onAddSource={(...args: Parameters<typeof addSource>) => {
+                                    addSource(...args);
+                                    setPaletteOpen(false);
+                                }}
+                                onAddNote={() => {
+                                    addNote();
+                                    setPaletteOpen(false);
+                                }}
+                                onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
+                                onAddServer={(id) => {
+                                    addServer(id);
+                                    setPaletteOpen(false);
+                                }}
+                                onAddPreset={(presetRules, placement) => {
+                                    addPreset(presetRules, placement);
+                                    setPaletteOpen(false);
+                                }}
+                                profiles={profiles}
+                                placedServers={placedServers}
+                                geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
+                                orderPanel={
+                                    <RuleOrder
+                                        rules={rules}
+                                        profiles={profiles}
+                                        onReorder={(next) => onChange({ routing_rules: next })}
+                                        onFocus={(id) => {
+                                            const index = rules.findIndex((rule) => rule.id === id);
+                                            const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
+                                            focusRef.current?.(point);
+                                            setPaletteOpen(false);
+                                        }}
+                                    />
+                                }
+                            />
+                        </SheetContent>
+                    </Sheet>
+                ) : (
+                    <Palette
+                        defaultAction={settings.default_action}
+                        onAddSource={addSource}
+                        onAddNote={addNote}
+                        onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
+                        onAddServer={addServer}
+                        onAddPreset={addPreset}
+                        profiles={profiles}
+                        placedServers={placedServers}
+                        geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
+                        orderPanel={
+                            <RuleOrder
+                                rules={rules}
+                                profiles={profiles}
+                                onReorder={(next) => onChange({ routing_rules: next })}
+                                onFocus={(id) => {
+                                    const index = rules.findIndex((rule) => rule.id === id);
+                                    const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
+                                    focusRef.current?.(point);
+                                }}
+                            />
+                        }
+                    />
+                )}
             </div>
         </div>
     );

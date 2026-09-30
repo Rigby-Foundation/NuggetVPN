@@ -335,6 +335,63 @@ public final class NuggetBridge {
     }
 
     // ------------------------------------------------------------------
+    // Installed apps, for routing rules
+    // ------------------------------------------------------------------
+
+    /**
+     * The apps that can use the network, as JSON: package, label, and
+     * whether it came with the system. Sorted by label.
+     */
+    public String installedApps(String ignored) {
+        JSONArray result = new JSONArray();
+        try {
+            PackageManager manager = context.getPackageManager();
+            java.util.List<android.content.pm.PackageInfo> packages =
+                    manager.getInstalledPackages(PackageManager.GET_PERMISSIONS);
+            java.util.List<JSONObject> apps = new java.util.ArrayList<>();
+            for (android.content.pm.PackageInfo info : packages) {
+                if (info.requestedPermissions == null || info.applicationInfo == null) continue;
+                boolean network = false;
+                for (String permission : info.requestedPermissions) {
+                    if ("android.permission.INTERNET".equals(permission)) {
+                        network = true;
+                        break;
+                    }
+                }
+                if (!network || info.packageName.equals(context.getPackageName())) continue;
+                JSONObject app = new JSONObject();
+                app.put("package", info.packageName);
+                app.put("label", String.valueOf(info.applicationInfo.loadLabel(manager)));
+                app.put("system", (info.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
+                apps.add(app);
+            }
+            apps.sort((a, b) -> a.optString("label").compareToIgnoreCase(b.optString("label")));
+            for (JSONObject app : apps) result.put(app);
+        } catch (Exception e) {
+            Log.e(TAG, "installedApps", e);
+        }
+        return result.toString();
+    }
+
+    /** An app's icon, as a PNG data URL; "" when it has none. */
+    public String appIcon(String packageName) {
+        try {
+            android.graphics.drawable.Drawable icon = context.getPackageManager().getApplicationIcon(packageName);
+            int size = 96;
+            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            icon.setBounds(0, 0, size, size);
+            icon.draw(canvas);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            bitmap.recycle();
+            return "data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Material You
     // ------------------------------------------------------------------
 

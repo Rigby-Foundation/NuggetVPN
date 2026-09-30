@@ -11,3 +11,7 @@ func (a *App) startPlatform() {}
 func systemPalette() string { return "" }
 
 func setSystemBars(string, bool) {}
+
+func installedApps() []InstalledApp { return []InstalledApp{} }
+
+func appIcon(string) string { return "" }

@@ -258,3 +258,29 @@ func SystemPalette() string {
 	}
 	return palette
 }
+
+// App is an installed app, for routing rules.
+type App struct {
+	Package string `json:"package"`
+	Label   string `json:"label"`
+	System  bool   `json:"system"`
+}
+
+// InstalledApps lists the apps that can use the network.
+func InstalledApps() []App {
+	answer, err := call("installedApps", "")
+	if err != nil {
+		return nil
+	}
+	var apps []App
+	if json.Unmarshal([]byte(answer), &apps) != nil {
+		return nil
+	}
+	return apps
+}
+
+// AppIcon is an app's icon as a PNG data URL, or "".
+func AppIcon(packageName string) string {
+	icon, _ := call("appIcon", packageName)
+	return icon
+}

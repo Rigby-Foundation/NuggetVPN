@@ -79,6 +79,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_wifi_state: { method: "GetWifiState", args: [] },
     get_system_palette: { method: "GetSystemPalette", args: [] },
     set_system_bars: { method: "SetSystemBars", args: ["color", "light"] },
+    list_installed_apps: { method: "ListInstalledApps", args: [] },
+    get_app_icon: { method: "GetAppIcon", args: ["packageName"] },
     list_plugins: { method: "ListPlugins", args: [] },
     pick_plugin: { method: "PickPlugin", args: [] },
     install_plugin: { method: "InstallPlugin", args: ["token"] },

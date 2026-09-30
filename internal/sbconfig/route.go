@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -235,6 +236,13 @@ func (p *routePlan) matcher(condition models.RoutingCondition) (map[string]any, 
 	var built map[string]any
 	switch condition.Kind {
 	case models.SourceApps:
+		// Android names apps by package (org.telegram.messenger), picked from
+		// the installed apps; the core learns a connection's package from the
+		// system.
+		if runtime.GOOS == "android" {
+			built = map[string]any{"package_name": values}
+			break
+		}
 		processPaths := extractProcessPaths(values)
 		processNames := mergeProcessNames(expandProcessNames(values), processPaths)
 		byName := map[string]any{"process_name": processNames}

@@ -30,6 +30,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppPicker, useAppLabels } from "@/components/routing/app-picker";
+import { isAndroid } from "@/lib/platform";
 import { MessageKey, useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { RoutingAction, RoutingCondition, RoutingKind, RoutingSource, RuleListStatus } from "@/types";
@@ -45,7 +47,8 @@ export const SOURCE_META: Record<
 > = {
     apps: {
         label: "routing.source.apps",
-        hint: "routing.source.apps.hint",
+        // On Android an app is its package, picked from the installed ones.
+        hint: isAndroid ? "routing.source.apps.hintAndroid" : "routing.source.apps.hint",
         icon: MonitorSmartphone,
         accent: "var(--routing-apps)",
         placeholder: "Firefox.exe",
@@ -624,6 +627,10 @@ function EntryEditor({
     const [draft, setDraft] = useState("");
     const listDetail = useListDetail();
     const lists = useContext(RuleListsContext);
+    // On Android, apps are picked from the installed ones, by package.
+    const pickApps = kind === "apps" && isAndroid;
+    const [picking, setPicking] = useState(false);
+    const appLabels = useAppLabels();
 
     const commit = () => {
         const value = draft.trim();
@@ -650,10 +657,27 @@ function EntryEditor({
             {values.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground py-1.5">{t("routing.emptyRule")}</p>
             ) : (
-                <ValueList values={values} onChange={onChange} detail={kind === "ruleset" ? listDetail : undefined} />
+                <ValueList
+                    values={values}
+                    onChange={onChange}
+                    detail={kind === "ruleset" ? listDetail : pickApps ? (value) => appLabels.get(value) : undefined}
+                />
             )}
 
-            {choices ? (
+            {pickApps ? (
+                <>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPicking(true)}
+                        className="nodrag mt-1 h-7 w-full gap-1.5 text-[11px]"
+                    >
+                        <Plus size={12} aria-hidden="true" /> {t("apps.choose")}
+                    </Button>
+                    <AppPicker open={picking} values={values} onClose={() => setPicking(false)} onChange={onChange} />
+                </>
+            ) : choices ? (
                 <ChoiceChips options={choices} values={values} onChange={onChange} />
             ) : (
                 <div className="flex items-center gap-1.5 pt-1">

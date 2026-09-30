@@ -26,3 +26,21 @@ func (a *App) SetSystemBars(color string, light bool) {
 		setSystemBars(color, light)
 	}
 }
+
+// InstalledApp is an app on the phone, for Applications rules.
+type InstalledApp struct {
+	Package string `json:"package"`
+	Label   string `json:"label"`
+	System  bool   `json:"system"`
+}
+
+// ListInstalledApps lists the apps that can use the network, where the
+// system says (Android). Empty elsewhere, where programs are named by file.
+func (a *App) ListInstalledApps() []InstalledApp {
+	return installedApps()
+}
+
+// GetAppIcon is an installed app's icon as a PNG data URL; "" when unknown.
+func (a *App) GetAppIcon(packageName string) string {
+	return appIcon(packageName)
+}
