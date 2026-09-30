@@ -1,6 +1,6 @@
 {
   "name": "nuggetvpn",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Modern, lightweight VPN client built with Wails and React, powered by an embedded sing-box core",
   "type": "module",
   "scripts": {
