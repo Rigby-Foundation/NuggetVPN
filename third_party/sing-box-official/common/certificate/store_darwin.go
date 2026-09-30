@@ -62,7 +62,7 @@ func newAppleAnchors(pemBytes []byte) (*appleAnchors, error) {
 		pointersSlice[index] = (*C.uint8_t)(unsafe.Pointer(&der[0]))
 		lensSlice[index] = C.size_t(len(der))
 	}
-	cfArray := C.box_certificate_anchors_from_der(pointersC, lensC, C.size_t(len(derBlocks)))
+	cfArray := C.nvpn_box_certificate_anchors_from_der(pointersC, lensC, C.size_t(len(derBlocks)))
 	if cfArray == nil {
 		return nil, E.New("parse certificate PEM")
 	}
@@ -105,7 +105,7 @@ func (a *appleAnchors) Release() {
 		return
 	}
 	if a.cfArray != nil {
-		C.box_certificate_release_anchors(a.cfArray)
+		C.nvpn_box_certificate_release_anchors(a.cfArray)
 	}
 }
 

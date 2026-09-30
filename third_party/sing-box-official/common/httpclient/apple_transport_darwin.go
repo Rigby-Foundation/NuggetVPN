@@ -71,8 +71,8 @@ func verifyApplePinnedCertificate(flatCertificateHashes []byte, flatPublicKeyHas
 	return boxTLS.VerifyPinnedCertificate(certificateHashes, publicKeyHashes, [][]byte{leafCertificate})
 }
 
-//export box_apple_http_verify_pinned_certificate
-func box_apple_http_verify_pinned_certificate(certificateHashValues *C.uint8_t, certificateHashValuesLen C.size_t, publicKeyHashValues *C.uint8_t, publicKeyHashValuesLen C.size_t, leafCert *C.uint8_t, leafCertLen C.size_t) *C.char {
+//export nvpn_box_apple_http_verify_pinned_certificate
+func nvpn_box_apple_http_verify_pinned_certificate(certificateHashValues *C.uint8_t, certificateHashValuesLen C.size_t, publicKeyHashValues *C.uint8_t, publicKeyHashValuesLen C.size_t, leafCert *C.uint8_t, leafCertLen C.size_t) *C.char {
 	flatCertificateHashes := C.GoBytes(unsafe.Pointer(certificateHashValues), C.int(certificateHashValuesLen))
 	flatPublicKeyHashes := C.GoBytes(unsafe.Pointer(publicKeyHashValues), C.int(publicKeyHashValuesLen))
 	leafCertificate := C.GoBytes(unsafe.Pointer(leafCert), C.int(leafCertLen))
@@ -106,7 +106,7 @@ type appleTransportShared struct {
 type appleTransport struct {
 	shared  *appleTransportShared
 	access  sync.Mutex
-	session *C.box_apple_http_session_t
+	session *C.nvpn_box_apple_http_session_t
 	closed  bool
 }
 
@@ -150,7 +150,7 @@ func newAppleTransport(ctx context.Context, logger logger.ContextLogger, rawDial
 		bridge.Close()
 		return nil, err
 	}
-	session := (*C.box_apple_http_session_t)(sessionRef)
+	session := (*C.nvpn_box_apple_http_session_t)(sessionRef)
 	releaseConfig = false
 	return &appleTransport{
 		shared:  shared,
@@ -255,7 +255,7 @@ func (s *appleTransportShared) release() error {
 	return nil
 }
 
-func (s *appleTransportShared) newSession() (*C.box_apple_http_session_t, error) {
+func (s *appleTransportShared) newSession() (*C.nvpn_box_apple_http_session_t, error) {
 	cProxyHost := C.CString("127.0.0.1")
 	defer C.free(unsafe.Pointer(cProxyHost))
 	cProxyUsername := C.CString(s.bridge.Username())
@@ -278,7 +278,7 @@ func (s *appleTransportShared) newSession() (*C.box_apple_http_session_t, error)
 		anchorsRef = anchors.Ref()
 		defer anchors.Release()
 	}
-	cConfig := C.box_apple_http_session_config_t{
+	cConfig := C.nvpn_box_apple_http_session_config_t{
 		proxy_host:                    cProxyHost,
 		proxy_port:                    C.int(s.bridge.Port()),
 		proxy_username:                cProxyUsername,
@@ -294,7 +294,7 @@ func (s *appleTransportShared) newSession() (*C.box_apple_http_session_t, error)
 		pinned_public_key_sha256_len:  C.size_t(len(s.config.pinnedPublicKeySHA256s)),
 	}
 	var cErr *C.char
-	session := C.box_apple_http_session_create(&cConfig, &cErr)
+	session := C.nvpn_box_apple_http_session_create(&cConfig, &cErr)
 	if session != nil {
 		return session, nil
 	}
@@ -370,7 +370,7 @@ func (t *appleTransport) RoundTrip(request *http.Request) (*http.Response, error
 		hasVerifyTime = true
 		verifyTimeUnixMilli = t.shared.timeFunc().UnixMilli()
 	}
-	cRequest := C.box_apple_http_request_t{
+	cRequest := C.nvpn_box_apple_http_request_t{
 		method:                  cMethod,
 		url:                     cURL,
 		header_keys:             (**C.char)(headerKeysPointer),
@@ -382,14 +382,14 @@ func (t *appleTransport) RoundTrip(request *http.Request) (*http.Response, error
 		verify_time_unix_millis: C.int64_t(verifyTimeUnixMilli),
 	}
 	var cErr *C.char
-	var task *C.box_apple_http_task_t
+	var task *C.nvpn_box_apple_http_task_t
 	t.access.Lock()
 	if t.session == nil {
 		t.access.Unlock()
 		return nil, net.ErrClosed
 	}
 	// Keep the session attached until NSURLSession has created the task.
-	task = C.box_apple_http_session_send_async(t.session, &cRequest, &cErr)
+	task = C.nvpn_box_apple_http_session_send_async(t.session, &cRequest, &cErr)
 	t.access.Unlock()
 	if task == nil {
 		return nil, appleCStringError(cErr, "create Apple HTTP request")
@@ -400,14 +400,14 @@ func (t *appleTransport) RoundTrip(request *http.Request) (*http.Response, error
 		defer close(cancelExit)
 		select {
 		case <-request.Context().Done():
-			C.box_apple_http_task_cancel(task)
+			C.nvpn_box_apple_http_task_cancel(task)
 		case <-cancelDone:
 		}
 	}()
-	cResponse := C.box_apple_http_task_wait(task, &cErr)
+	cResponse := C.nvpn_box_apple_http_task_wait(task, &cErr)
 	close(cancelDone)
 	<-cancelExit
-	C.box_apple_http_task_close(task)
+	C.nvpn_box_apple_http_task_close(task)
 	if cResponse == nil {
 		err := appleCStringError(cErr, "Apple HTTP request failed")
 		if request.Context().Err() != nil {
@@ -415,7 +415,7 @@ func (t *appleTransport) RoundTrip(request *http.Request) (*http.Response, error
 		}
 		return nil, err
 	}
-	defer C.box_apple_http_response_free(cResponse)
+	defer C.nvpn_box_apple_http_response_free(cResponse)
 	return parseAppleHTTPResponse(request, cResponse), nil
 }
 
@@ -434,13 +434,13 @@ func (t *appleTransport) CloseIdleConnections() {
 	t.access.Lock()
 	if t.closed {
 		t.access.Unlock()
-		C.box_apple_http_session_close(newSession)
+		C.nvpn_box_apple_http_session_close(newSession)
 		return
 	}
 	oldSession := t.session
 	t.session = newSession
 	t.access.Unlock()
-	C.box_apple_http_session_retire(oldSession)
+	C.nvpn_box_apple_http_session_retire(oldSession)
 }
 
 func (t *appleTransport) Close() error {
@@ -453,7 +453,7 @@ func (t *appleTransport) Close() error {
 	session := t.session
 	t.session = nil
 	t.access.Unlock()
-	C.box_apple_http_session_close(session)
+	C.nvpn_box_apple_http_session_close(session)
 	return t.shared.release()
 }
 
@@ -475,7 +475,7 @@ func flattenRequestHeaders(request *http.Request) ([]string, []string) {
 	return keys, values
 }
 
-func parseAppleHTTPResponse(request *http.Request, response *C.box_apple_http_response_t) *http.Response {
+func parseAppleHTTPResponse(request *http.Request, response *C.nvpn_box_apple_http_response_t) *http.Response {
 	headers := make(http.Header)
 	headerKeys := unsafe.Slice(response.header_keys, int(response.header_count))
 	headerValues := unsafe.Slice(response.header_values, int(response.header_count))

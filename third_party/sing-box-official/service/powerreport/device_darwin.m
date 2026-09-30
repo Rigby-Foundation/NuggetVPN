@@ -12,13 +12,13 @@
 #include <IOKit/ps/IOPowerSources.h>
 #endif
 
-int boxPowerLowPowerMode(void) {
+int nvpnBoxPowerLowPowerMode(void) {
 	@autoreleasepool {
 		return [[NSProcessInfo processInfo] isLowPowerModeEnabled] ? 1 : 0;
 	}
 }
 
-int boxPowerThermalState(void) {
+int nvpnBoxPowerThermalState(void) {
 	@autoreleasepool {
 		return (int) [[NSProcessInfo processInfo] thermalState];
 	}
@@ -26,7 +26,7 @@ int boxPowerThermalState(void) {
 
 #if TARGET_OS_IOS
 
-__attribute__((constructor)) static void boxPowerInitBatteryMonitoring(void) {
+__attribute__((constructor)) static void nvpnBoxPowerInitBatteryMonitoring(void) {
 	dispatch_async(dispatch_get_main_queue(), ^{
 		@autoreleasepool {
 			[UIDevice currentDevice].batteryMonitoringEnabled = YES;
@@ -34,7 +34,7 @@ __attribute__((constructor)) static void boxPowerInitBatteryMonitoring(void) {
 	});
 }
 
-int boxPowerSource(int *level) {
+int nvpnBoxPowerSource(int *level) {
 	@autoreleasepool {
 		*level = 0;
 		__block int source = 0;
@@ -68,14 +68,14 @@ int boxPowerSource(int *level) {
 
 #elif TARGET_OS_IPHONE
 
-int boxPowerSource(int *level) {
+int nvpnBoxPowerSource(int *level) {
 	*level = 0;
 	return 0;
 }
 
 #else
 
-int boxPowerSource(int *level) {
+int nvpnBoxPowerSource(int *level) {
 	*level = 0;
 	CFTypeRef info = IOPSCopyPowerSourcesInfo();
 	if (info == NULL) {

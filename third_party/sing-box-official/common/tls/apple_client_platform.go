@@ -81,7 +81,7 @@ func (c *appleClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) 
 	}
 
 	var errorPtr *C.char
-	client := C.box_apple_tls_client_create(
+	client := C.nvpn_box_apple_tls_client_create(
 		C.int(dupFD),
 		serverNamePtr,
 		alpnPtr,
@@ -106,35 +106,35 @@ func (c *appleClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) 
 		return nil, E.New("apple TLS: create connection")
 	}
 	if err = waitAppleTLSClientReady(ctx, client); err != nil {
-		C.box_apple_tls_client_cancel(client)
-		C.box_apple_tls_client_free(client)
+		C.nvpn_box_apple_tls_client_cancel(client)
+		C.nvpn_box_apple_tls_client_free(client)
 		return nil, err
 	}
 
-	var state C.box_apple_tls_state_t
-	stateOK := C.box_apple_tls_client_copy_state(client, &state, &errorPtr)
+	var state C.nvpn_box_apple_tls_state_t
+	stateOK := C.nvpn_box_apple_tls_client_copy_state(client, &state, &errorPtr)
 	if !bool(stateOK) {
-		C.box_apple_tls_client_cancel(client)
-		C.box_apple_tls_client_free(client)
+		C.nvpn_box_apple_tls_client_cancel(client)
+		C.nvpn_box_apple_tls_client_free(client)
 		if errorPtr != nil {
 			defer C.free(unsafe.Pointer(errorPtr))
 			return nil, E.New(C.GoString(errorPtr))
 		}
 		return nil, E.New("apple TLS: read metadata")
 	}
-	defer C.box_apple_tls_state_free(&state)
+	defer C.nvpn_box_apple_tls_state_free(&state)
 
 	connectionState, rawCerts, err := parseAppleTLSState(&state)
 	if err != nil {
-		C.box_apple_tls_client_cancel(client)
-		C.box_apple_tls_client_free(client)
+		C.nvpn_box_apple_tls_client_cancel(client)
+		C.nvpn_box_apple_tls_client_free(client)
 		return nil, err
 	}
 	if len(c.certificateSHA256) > 0 || len(c.certificatePublicKeySHA256) > 0 {
 		err = VerifyPinnedCertificate(c.certificateSHA256, c.certificatePublicKeySHA256, rawCerts)
 		if err != nil {
-			C.box_apple_tls_client_cancel(client)
-			C.box_apple_tls_client_free(client)
+			C.nvpn_box_apple_tls_client_cancel(client)
+			C.nvpn_box_apple_tls_client_free(client)
 			return nil, err
 		}
 	}
@@ -152,11 +152,11 @@ const (
 	appleTLSWriteChunkSize        = 32 * 1024
 )
 
-func waitAppleTLSClientReady(ctx context.Context, client *C.box_apple_tls_client_t) error {
+func waitAppleTLSClientReady(ctx context.Context, client *C.nvpn_box_apple_tls_client_t) error {
 	for {
 		err := ctx.Err()
 		if err != nil {
-			C.box_apple_tls_client_cancel(client)
+			C.nvpn_box_apple_tls_client_cancel(client)
 			return err
 		}
 
@@ -165,7 +165,7 @@ func waitAppleTLSClientReady(ctx context.Context, client *C.box_apple_tls_client
 		if loaded {
 			remaining := time.Until(deadline)
 			if remaining <= 0 {
-				C.box_apple_tls_client_cancel(client)
+				C.nvpn_box_apple_tls_client_cancel(client)
 				err = ctx.Err()
 				if err != nil {
 					return err
@@ -178,7 +178,7 @@ func waitAppleTLSClientReady(ctx context.Context, client *C.box_apple_tls_client
 		}
 
 		var errorPtr *C.char
-		waitResult := C.box_apple_tls_client_wait_ready(client, C.int(timeoutFromDuration(waitTimeout)), &errorPtr)
+		waitResult := C.nvpn_box_apple_tls_client_wait_ready(client, C.int(timeoutFromDuration(waitTimeout)), &errorPtr)
 		switch waitResult {
 		case 1:
 			return nil
@@ -198,7 +198,7 @@ func waitAppleTLSClientReady(ctx context.Context, client *C.box_apple_tls_client
 
 type appleTLSConn struct {
 	rawConn net.Conn
-	client  *C.box_apple_tls_client_t
+	client  *C.nvpn_box_apple_tls_client_t
 	state   tls.ConnectionState
 
 	readAccess     sync.Mutex
@@ -267,7 +267,7 @@ func (c *appleTLSConn) readIntoLocked(p []byte) (int, error) {
 
 	var eof C.bool
 	var errorPtr *C.char
-	n := C.box_apple_tls_client_read(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), C.int(timeoutMs), &eof, &errorPtr)
+	n := C.nvpn_box_apple_tls_client_read(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), C.int(timeoutMs), &eof, &errorPtr)
 	switch {
 	case n == -2:
 		c.markReadTimedOut()
@@ -313,14 +313,14 @@ func (c *appleTLSConn) Write(p []byte) (int, error) {
 	for written < len(p) {
 		timeoutMs, expired := deadlineTimeoutMs(deadline)
 		if expired {
-			C.box_apple_tls_client_cancel(client)
+			C.nvpn_box_apple_tls_client_cancel(client)
 			c.markWriteTimedOut()
 			return written, os.ErrDeadlineExceeded
 		}
 		chunkSize := min(len(p)-written, appleTLSWriteChunkSize)
 		chunk := p[written : written+chunkSize]
 		var errorPtr *C.char
-		n := C.box_apple_tls_client_write(client, unsafe.Pointer(&chunk[0]), C.size_t(len(chunk)), C.int(timeoutMs), &errorPtr)
+		n := C.nvpn_box_apple_tls_client_write(client, unsafe.Pointer(&chunk[0]), C.size_t(len(chunk)), C.int(timeoutMs), &errorPtr)
 		switch {
 		case n == -2:
 			c.markWriteTimedOut()
@@ -346,7 +346,7 @@ func (c *appleTLSConn) WriteBuffer(buffer *buf.Buffer) error {
 func (c *appleTLSConn) CreateReadWaiter() (N.ReadWaiter, bool) {
 	return &appleTLSReadWaiter{
 		conn:    c,
-		results: make(chan *C.box_apple_tls_read_result_t, 1),
+		results: make(chan *C.nvpn_box_apple_tls_read_result_t, 1),
 	}, true
 }
 
@@ -354,11 +354,11 @@ func (c *appleTLSConn) Close() error {
 	var closeErr error
 	c.closeOnce.Do(func() {
 		close(c.closed)
-		C.box_apple_tls_client_cancel(c.client)
+		C.nvpn_box_apple_tls_client_cancel(c.client)
 		closeErr = c.rawConn.Close()
 		c.ioAccess.Lock()
 		c.ioGroup.Wait()
-		C.box_apple_tls_client_free(c.client)
+		C.nvpn_box_apple_tls_client_free(c.client)
 		c.client = nil
 		c.ioAccess.Unlock()
 	})
@@ -468,7 +468,7 @@ func (c *appleTLSConn) isClosed() bool {
 	}
 }
 
-func (c *appleTLSConn) acquireClient() (*C.box_apple_tls_client_t, error) {
+func (c *appleTLSConn) acquireClient() (*C.nvpn_box_apple_tls_client_t, error) {
 	c.ioAccess.Lock()
 	defer c.ioAccess.Unlock()
 	if c.isClosed() {
@@ -500,7 +500,7 @@ func (c *appleTLSConn) errorFromPointer(errorPtr *C.char) error {
 type appleTLSReadWaiter struct {
 	conn    *appleTLSConn
 	options N.ReadWaitOptions
-	results chan *C.box_apple_tls_read_result_t
+	results chan *C.nvpn_box_apple_tls_read_result_t
 }
 
 var _ N.ReadWaiter = (*appleTLSReadWaiter)(nil)
@@ -508,7 +508,7 @@ var _ N.ReadWaiter = (*appleTLSReadWaiter)(nil)
 func (w *appleTLSReadWaiter) InitializeReadWaiter(options N.ReadWaitOptions) (needCopy bool) {
 	w.options = options
 	if w.results == nil {
-		w.results = make(chan *C.box_apple_tls_read_result_t, 1)
+		w.results = make(chan *C.nvpn_box_apple_tls_read_result_t, 1)
 	}
 	return false
 }
@@ -539,22 +539,22 @@ func (w *appleTLSReadWaiter) WaitReadBuffer() (*buf.Buffer, error) {
 	handle := cgo.NewHandle(w)
 	defer handle.Delete()
 	var errorPtr *C.char
-	if !bool(C.box_apple_tls_client_read_async(client, C.size_t(maximumLen), C.uintptr_t(handle), &errorPtr)) {
+	if !bool(C.nvpn_box_apple_tls_client_read_async(client, C.size_t(maximumLen), C.uintptr_t(handle), &errorPtr)) {
 		buffer.Release()
 		return nil, c.errorFromPointer(errorPtr)
 	}
 
-	var result *C.box_apple_tls_read_result_t
+	var result *C.nvpn_box_apple_tls_read_result_t
 	if timeoutMs >= 0 {
 		timer := time.NewTimer(time.Duration(timeoutMs) * time.Millisecond)
 		defer timer.Stop()
 		select {
 		case result = <-w.results:
 		case <-timer.C:
-			C.box_apple_tls_client_cancel(client)
+			C.nvpn_box_apple_tls_client_cancel(client)
 			result = <-w.results
 			if result != nil {
-				C.box_apple_tls_read_result_free(result)
+				C.nvpn_box_apple_tls_read_result_free(result)
 			}
 			buffer.Release()
 			c.markReadTimedOut()
@@ -566,12 +566,12 @@ func (w *appleTLSReadWaiter) WaitReadBuffer() (*buf.Buffer, error) {
 	return c.readWaitResultToBuffer(result, buffer, w.options)
 }
 
-func (c *appleTLSConn) readWaitResultToBuffer(result *C.box_apple_tls_read_result_t, buffer *buf.Buffer, options N.ReadWaitOptions) (*buf.Buffer, error) {
-	defer C.box_apple_tls_read_result_free(result)
+func (c *appleTLSConn) readWaitResultToBuffer(result *C.nvpn_box_apple_tls_read_result_t, buffer *buf.Buffer, options N.ReadWaitOptions) (*buf.Buffer, error) {
+	defer C.nvpn_box_apple_tls_read_result_free(result)
 	startLen := buffer.Len()
 	var eof C.bool
 	var errorPtr *C.char
-	n := C.box_apple_tls_read_result_copy(result, unsafe.Pointer(&buffer.FreeBytes()[0]), C.size_t(buffer.FreeLen()), &eof, &errorPtr)
+	n := C.nvpn_box_apple_tls_read_result_copy(result, unsafe.Pointer(&buffer.FreeBytes()[0]), C.size_t(buffer.FreeLen()), &eof, &errorPtr)
 	if n < 0 {
 		buffer.Release()
 		return nil, c.errorFromPointer(errorPtr)
@@ -592,18 +592,18 @@ func (c *appleTLSConn) readWaitResultToBuffer(result *C.box_apple_tls_read_resul
 	return buffer, nil
 }
 
-//export box_apple_tls_read_callback
-func box_apple_tls_read_callback(callbackHandle C.uintptr_t, result *C.box_apple_tls_read_result_t) {
+//export nvpn_box_apple_tls_read_callback
+func nvpn_box_apple_tls_read_callback(callbackHandle C.uintptr_t, result *C.nvpn_box_apple_tls_read_result_t) {
 	handle := cgo.Handle(callbackHandle)
 	waiter, ok := handle.Value().(*appleTLSReadWaiter)
 	if !ok {
-		C.box_apple_tls_read_result_free(result)
+		C.nvpn_box_apple_tls_read_result_free(result)
 		return
 	}
 	select {
 	case waiter.results <- result:
 	default:
-		C.box_apple_tls_read_result_free(result)
+		C.nvpn_box_apple_tls_read_result_free(result)
 	}
 }
 
@@ -621,7 +621,7 @@ func (c *appleTLSConn) ConnectionState() ConnectionState {
 	return c.state
 }
 
-func parseAppleTLSState(state *C.box_apple_tls_state_t) (tls.ConnectionState, [][]byte, error) {
+func parseAppleTLSState(state *C.nvpn_box_apple_tls_state_t) (tls.ConnectionState, [][]byte, error) {
 	rawCerts, peerCertificates, err := parseAppleCertChain(state.peer_cert_chain, state.peer_cert_chain_len)
 	if err != nil {
 		return tls.ConnectionState{}, nil, err

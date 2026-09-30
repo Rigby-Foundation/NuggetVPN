@@ -7,7 +7,7 @@ package oomkiller
 
 static dispatch_source_t memoryPressureSource;
 
-extern void goMemoryPressureCallback(unsigned long status);
+extern void nvpnGoMemoryPressureCallback(unsigned long status);
 
 static void startMemoryPressureMonitor() {
 	memoryPressureSource = dispatch_source_create(
@@ -18,7 +18,7 @@ static void startMemoryPressureMonitor() {
 	);
 	dispatch_source_set_event_handler(memoryPressureSource, ^{
 		unsigned long status = dispatch_source_get_data(memoryPressureSource);
-		goMemoryPressureCallback(status);
+		nvpnGoMemoryPressureCallback(status);
 	});
 	dispatch_activate(memoryPressureSource);
 }
@@ -83,8 +83,8 @@ func (s *Service) Close() error {
 	return nil
 }
 
-//export goMemoryPressureCallback
-func goMemoryPressureCallback(status C.ulong) {
+//export nvpnGoMemoryPressureCallback
+func nvpnGoMemoryPressureCallback(status C.ulong) {
 	globalAccess.Lock()
 	services := make([]*Service, len(globalServices))
 	copy(services, globalServices)

@@ -1,7 +1,7 @@
 #pragma once
 
-int boxPowerLowPowerMode(void);
+int nvpnBoxPowerLowPowerMode(void);
 
-int boxPowerThermalState(void);
+int nvpnBoxPowerThermalState(void);
 
-int boxPowerSource(int *level);
+int nvpnBoxPowerSource(int *level);

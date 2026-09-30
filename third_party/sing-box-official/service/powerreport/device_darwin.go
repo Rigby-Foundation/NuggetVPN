@@ -12,10 +12,10 @@ import "C"
 func readDeviceState() (deviceState, bool) {
 	var batteryLevel C.int
 	state := deviceState{
-		LowPowerMode: C.boxPowerLowPowerMode() != 0,
-		ThermalState: thermalStateName(int(C.boxPowerThermalState())),
+		LowPowerMode: C.nvpnBoxPowerLowPowerMode() != 0,
+		ThermalState: thermalStateName(int(C.nvpnBoxPowerThermalState())),
 	}
-	switch C.boxPowerSource(&batteryLevel) {
+	switch C.nvpnBoxPowerSource(&batteryLevel) {
 	case 1:
 		state.PowerSource = "battery"
 	case 2:

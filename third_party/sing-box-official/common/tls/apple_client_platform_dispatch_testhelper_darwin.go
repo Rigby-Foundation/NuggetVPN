@@ -26,7 +26,7 @@ func appleTLSCopyDispatchDataForTest(first, second []byte, buffer []byte) (int, 
 		bufferPtr = unsafe.Pointer(&buffer[0])
 	}
 	var errPtr *C.char
-	n := C.box_apple_tls_copy_dispatch_data_for_test(
+	n := C.nvpn_box_apple_tls_copy_dispatch_data_for_test(
 		firstPtr,
 		C.size_t(len(first)),
 		secondPtr,

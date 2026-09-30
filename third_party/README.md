@@ -12,6 +12,13 @@ sing-box **v1.15.0-alpha.9**, with every import of
 `github.com/Rigby-Foundation/NuggetVPN/third_party/sing-box-official`, and
 of `github.com/sagernet/sing-tun` to `.../third_party/sing-tun-official`.
 
+The macOS C and Objective-C code (`common/tls`, `common/httpclient`,
+`common/certificate`, `service/powerreport`, `service/oomkiller`) has its
+global symbols renamed with an `nvpn` prefix (`box_apple_` to
+`nvpn_box_apple_`, `BoxAppleHTTPSession` to `NVPNBoxAppleHTTPSession`,
+`box_certificate_`, `boxPower`, `goMemoryPressureCallback` likewise): C has
+one namespace per binary, and the fork defines the same ones.
+
 Removed, because they cannot share a process with the fork or are not used:
 
 - `protocol/tailscale`, `include/tailscale.go`, `service/derp` — Tailscale
@@ -28,7 +35,8 @@ module path of its own: its API differs from the version the fork needs.
 
 ## Updating
 
-Copy the new release over, repeat the import rewrite and the removals
-above, and run `go build ./... && go test ./internal/...`. A protobuf
+Copy the new release over, repeat the import rewrite, the symbol renames
+and the removals above, and run `go build ./... && go test ./internal/...`. A protobuf
 "namespace conflict" panic at start means another package both copies
-register has been linked in.
+register has been linked in; "duplicate symbol" from the macOS linker means
+more C symbols to rename.

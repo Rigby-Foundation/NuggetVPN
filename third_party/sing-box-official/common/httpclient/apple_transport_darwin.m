@@ -7,18 +7,18 @@
 #import <stdlib.h>
 #import <string.h>
 
-typedef struct box_apple_http_session {
+typedef struct nvpn_box_apple_http_session {
 	void *handle;
-} box_apple_http_session_t;
+} nvpn_box_apple_http_session_t;
 
-typedef struct box_apple_http_task {
+typedef struct nvpn_box_apple_http_task {
 	void *task;
 	void *done_semaphore;
-	box_apple_http_response_t *response;
+	nvpn_box_apple_http_response_t *response;
 	char *error;
-} box_apple_http_task_t;
+} nvpn_box_apple_http_task_t;
 
-static NSString *const box_apple_http_verify_time_key = @"sing-box.verify-time";
+static NSString *const nvpn_box_apple_http_verify_time_key = @"sing-box.verify-time";
 
 static void box_set_error_string(char **error_out, NSString *message) {
 	if (error_out == NULL || *error_out != NULL) {
@@ -60,19 +60,19 @@ static bool box_evaluate_trust(SecTrustRef trustRef, NSArray *anchors, bool anch
 	return result;
 }
 
-static NSDate *box_apple_http_verify_date_for_request(NSURLRequest *request) {
+static NSDate *nvpn_box_apple_http_verify_date_for_request(NSURLRequest *request) {
 	if (request == nil) {
 		return nil;
 	}
-	id value = [NSURLProtocol propertyForKey:box_apple_http_verify_time_key inRequest:request];
+	id value = [NSURLProtocol propertyForKey:nvpn_box_apple_http_verify_time_key inRequest:request];
 	if (![value isKindOfClass:[NSNumber class]]) {
 		return nil;
 	}
 	return [NSDate dateWithTimeIntervalSince1970:[(NSNumber *)value longLongValue] / 1000.0];
 }
 
-static box_apple_http_response_t *box_create_response(NSHTTPURLResponse *httpResponse, NSData *data) {
-	box_apple_http_response_t *response = calloc(1, sizeof(box_apple_http_response_t));
+static nvpn_box_apple_http_response_t *box_create_response(NSHTTPURLResponse *httpResponse, NSData *data) {
+	nvpn_box_apple_http_response_t *response = calloc(1, sizeof(nvpn_box_apple_http_response_t));
 	response->status_code = (int)httpResponse.statusCode;
 	NSDictionary *headers = httpResponse.allHeaderFields;
 	response->header_count = headers.count;
@@ -96,7 +96,7 @@ static box_apple_http_response_t *box_create_response(NSHTTPURLResponse *httpRes
 	return response;
 }
 
-@interface BoxAppleHTTPSessionDelegate : NSObject <NSURLSessionTaskDelegate, NSURLSessionDataDelegate>
+@interface NVPNBoxAppleHTTPSessionDelegate : NSObject <NSURLSessionTaskDelegate, NSURLSessionDataDelegate>
 @property(nonatomic, assign) BOOL insecure;
 @property(nonatomic, assign) BOOL anchorOnly;
 @property(nonatomic, strong) NSArray *anchors;
@@ -104,7 +104,7 @@ static box_apple_http_response_t *box_create_response(NSHTTPURLResponse *httpRes
 @property(nonatomic, strong) NSData *pinnedPublicKeyHashes;
 @end
 
-@implementation BoxAppleHTTPSessionDelegate
+@implementation NVPNBoxAppleHTTPSessionDelegate
 
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
@@ -127,7 +127,7 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
 		completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
 		return;
 	}
-	NSDate *verifyDate = box_apple_http_verify_date_for_request(task.currentRequest ?: task.originalRequest);
+	NSDate *verifyDate = nvpn_box_apple_http_verify_date_for_request(task.currentRequest ?: task.originalRequest);
 	BOOL needsCustomHandling = self.insecure || self.anchorOnly || self.anchors.count > 0 || self.pinnedCertificateHashes.length > 0 || self.pinnedPublicKeyHashes.length > 0 || verifyDate != nil;
 	if (!needsCustomHandling) {
 		completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
@@ -147,7 +147,7 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
 			ok = NO;
 		} else {
 			NSData *leafData = CFBridgingRelease(SecCertificateCopyData(leafCertificate));
-			char *pinError = box_apple_http_verify_pinned_certificate(
+			char *pinError = nvpn_box_apple_http_verify_pinned_certificate(
 				(uint8_t *)self.pinnedCertificateHashes.bytes,
 				self.pinnedCertificateHashes.length,
 				(uint8_t *)self.pinnedPublicKeyHashes.bytes,
@@ -173,16 +173,16 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
 
 @end
 
-@interface BoxAppleHTTPSessionHandle : NSObject
+@interface NVPNBoxAppleHTTPSessionHandle : NSObject
 @property(nonatomic, strong) NSURLSession *session;
-@property(nonatomic, strong) BoxAppleHTTPSessionDelegate *delegate;
+@property(nonatomic, strong) NVPNBoxAppleHTTPSessionDelegate *delegate;
 @end
 
-@implementation BoxAppleHTTPSessionHandle
+@implementation NVPNBoxAppleHTTPSessionHandle
 @end
 
-box_apple_http_session_t *box_apple_http_session_create(
-	const box_apple_http_session_config_t *config,
+nvpn_box_apple_http_session_t *nvpn_box_apple_http_session_create(
+	const nvpn_box_apple_http_session_config_t *config,
 	char **error_out
 ) {
 	@autoreleasepool {
@@ -210,7 +210,7 @@ box_apple_http_session_t *box_apple_http_session_create(
 		if (config != NULL && config->max_tls_version != 0) {
 			sessionConfig.TLSMaximumSupportedProtocolVersion = (tls_protocol_version_t)config->max_tls_version;
 		}
-		BoxAppleHTTPSessionDelegate *delegate = [[BoxAppleHTTPSessionDelegate alloc] init];
+		NVPNBoxAppleHTTPSessionDelegate *delegate = [[NVPNBoxAppleHTTPSessionDelegate alloc] init];
 		if (config != NULL) {
 			delegate.insecure = config->insecure;
 			delegate.anchorOnly = config->anchor_only;
@@ -231,36 +231,36 @@ box_apple_http_session_t *box_apple_http_session_create(
 			box_set_error_string(error_out, @"create URLSession");
 			return NULL;
 		}
-		BoxAppleHTTPSessionHandle *handle = [[BoxAppleHTTPSessionHandle alloc] init];
+		NVPNBoxAppleHTTPSessionHandle *handle = [[NVPNBoxAppleHTTPSessionHandle alloc] init];
 		handle.session = session;
 		handle.delegate = delegate;
-		box_apple_http_session_t *sessionHandle = calloc(1, sizeof(box_apple_http_session_t));
+		nvpn_box_apple_http_session_t *sessionHandle = calloc(1, sizeof(nvpn_box_apple_http_session_t));
 		sessionHandle->handle = (__bridge_retained void *)handle;
 		return sessionHandle;
 	}
 }
 
-void box_apple_http_session_retire(box_apple_http_session_t *session) {
+void nvpn_box_apple_http_session_retire(nvpn_box_apple_http_session_t *session) {
 	if (session == NULL || session->handle == NULL) {
 		return;
 	}
-	BoxAppleHTTPSessionHandle *handle = (__bridge_transfer BoxAppleHTTPSessionHandle *)session->handle;
+	NVPNBoxAppleHTTPSessionHandle *handle = (__bridge_transfer NVPNBoxAppleHTTPSessionHandle *)session->handle;
 	[handle.session finishTasksAndInvalidate];
 	free(session);
 }
 
-void box_apple_http_session_close(box_apple_http_session_t *session) {
+void nvpn_box_apple_http_session_close(nvpn_box_apple_http_session_t *session) {
 	if (session == NULL || session->handle == NULL) {
 		return;
 	}
-	BoxAppleHTTPSessionHandle *handle = (__bridge_transfer BoxAppleHTTPSessionHandle *)session->handle;
+	NVPNBoxAppleHTTPSessionHandle *handle = (__bridge_transfer NVPNBoxAppleHTTPSessionHandle *)session->handle;
 	[handle.session invalidateAndCancel];
 	free(session);
 }
 
-box_apple_http_task_t *box_apple_http_session_send_async(
-	box_apple_http_session_t *session,
-	const box_apple_http_request_t *request,
+nvpn_box_apple_http_task_t *nvpn_box_apple_http_session_send_async(
+	nvpn_box_apple_http_session_t *session,
+	const nvpn_box_apple_http_request_t *request,
 	char **error_out
 ) {
 	@autoreleasepool {
@@ -268,7 +268,7 @@ box_apple_http_task_t *box_apple_http_session_send_async(
 			box_set_error_string(error_out, @"invalid apple HTTP request");
 			return NULL;
 		}
-		BoxAppleHTTPSessionHandle *handle = (__bridge BoxAppleHTTPSessionHandle *)session->handle;
+		NVPNBoxAppleHTTPSessionHandle *handle = (__bridge NVPNBoxAppleHTTPSessionHandle *)session->handle;
 		NSURL *requestURL = [NSURL URLWithString:[NSString stringWithUTF8String:request->url]];
 		if (requestURL == nil) {
 			box_set_error_string(error_out, @"invalid request URL");
@@ -288,9 +288,9 @@ box_apple_http_task_t *box_apple_http_session_send_async(
 			urlRequest.HTTPBody = [NSData dataWithBytes:request->body length:request->body_len];
 		}
 		if (request->has_verify_time) {
-			[NSURLProtocol setProperty:@(request->verify_time_unix_millis) forKey:box_apple_http_verify_time_key inRequest:urlRequest];
+			[NSURLProtocol setProperty:@(request->verify_time_unix_millis) forKey:nvpn_box_apple_http_verify_time_key inRequest:urlRequest];
 		}
-		box_apple_http_task_t *task = calloc(1, sizeof(box_apple_http_task_t));
+		nvpn_box_apple_http_task_t *task = calloc(1, sizeof(nvpn_box_apple_http_task_t));
 		dispatch_semaphore_t doneSemaphore = dispatch_semaphore_create(0);
 		task->done_semaphore = (__bridge_retained void *)doneSemaphore;
 		NSURLSessionDataTask *dataTask = [handle.session dataTaskWithRequest:urlRequest completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
@@ -305,7 +305,7 @@ box_apple_http_task_t *box_apple_http_session_send_async(
 		}];
 		if (dataTask == nil) {
 			box_set_error_string(error_out, @"create data task");
-			box_apple_http_task_close(task);
+			nvpn_box_apple_http_task_close(task);
 			return NULL;
 		}
 		task->task = (__bridge_retained void *)dataTask;
@@ -314,8 +314,8 @@ box_apple_http_task_t *box_apple_http_session_send_async(
 	}
 }
 
-box_apple_http_response_t *box_apple_http_task_wait(
-	box_apple_http_task_t *task,
+nvpn_box_apple_http_response_t *nvpn_box_apple_http_task_wait(
+	nvpn_box_apple_http_task_t *task,
 	char **error_out
 ) {
 	if (task == NULL || task->done_semaphore == NULL) {
@@ -330,7 +330,7 @@ box_apple_http_response_t *box_apple_http_task_wait(
 	return task->response;
 }
 
-void box_apple_http_task_cancel(box_apple_http_task_t *task) {
+void nvpn_box_apple_http_task_cancel(nvpn_box_apple_http_task_t *task) {
 	if (task == NULL || task->task == NULL) {
 		return;
 	}
@@ -338,7 +338,7 @@ void box_apple_http_task_cancel(box_apple_http_task_t *task) {
 	[nsTask cancel];
 }
 
-void box_apple_http_task_close(box_apple_http_task_t *task) {
+void nvpn_box_apple_http_task_close(nvpn_box_apple_http_task_t *task) {
 	if (task == NULL) {
 		return;
 	}
@@ -354,7 +354,7 @@ void box_apple_http_task_close(box_apple_http_task_t *task) {
 	free(task);
 }
 
-void box_apple_http_response_free(box_apple_http_response_t *response) {
+void nvpn_box_apple_http_response_free(nvpn_box_apple_http_response_t *response) {
 	if (response == NULL) {
 		return;
 	}

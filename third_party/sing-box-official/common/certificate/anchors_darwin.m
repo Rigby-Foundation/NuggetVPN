@@ -3,7 +3,7 @@
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 
-void *box_certificate_anchors_from_der(const uint8_t *const *ders, const size_t *lens, size_t count) {
+void *nvpn_box_certificate_anchors_from_der(const uint8_t *const *ders, const size_t *lens, size_t count) {
 	if (count == 0 || ders == NULL || lens == NULL) {
 		return NULL;
 	}
@@ -34,7 +34,7 @@ void *box_certificate_anchors_from_der(const uint8_t *const *ders, const size_t 
 	return certificates;
 }
 
-void box_certificate_release_anchors(void *anchors) {
+void nvpn_box_certificate_release_anchors(void *anchors) {
 	if (anchors == NULL) {
 		return;
 	}

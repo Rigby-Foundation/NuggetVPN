@@ -17,7 +17,7 @@
 typedef nw_connection_t _Nullable (*box_nw_connection_create_with_connected_socket_and_parameters_f)(int connected_socket, nw_parameters_t parameters);
 typedef const char * _Nullable (*box_sec_protocol_metadata_string_accessor_f)(sec_protocol_metadata_t metadata);
 
-typedef struct box_apple_tls_client {
+typedef struct nvpn_box_apple_tls_client {
 	void *connection;
 	void *queue;
 	void *ready_semaphore;
@@ -26,65 +26,65 @@ typedef struct box_apple_tls_client {
 	atomic_bool ready;
 	atomic_bool ready_done;
 	char *ready_error;
-	box_apple_tls_state_t state;
-} box_apple_tls_client_t;
+	nvpn_box_apple_tls_state_t state;
+} nvpn_box_apple_tls_client_t;
 
-struct box_apple_tls_read_result {
+struct nvpn_box_apple_tls_read_result {
 	void *content;
 	bool eof;
 	char *error;
 };
 
-extern void box_apple_tls_read_callback(uintptr_t callback_handle, box_apple_tls_read_result_t *result);
+extern void nvpn_box_apple_tls_read_callback(uintptr_t callback_handle, nvpn_box_apple_tls_read_result_t *result);
 
-static nw_connection_t box_apple_tls_connection(box_apple_tls_client_t *client) {
+static nw_connection_t nvpn_box_apple_tls_connection(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL || client->connection == NULL) {
 		return nil;
 	}
 	return (__bridge nw_connection_t)client->connection;
 }
 
-static dispatch_queue_t box_apple_tls_client_queue(box_apple_tls_client_t *client) {
+static dispatch_queue_t nvpn_box_apple_tls_client_queue(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL || client->queue == NULL) {
 		return nil;
 	}
 	return (__bridge dispatch_queue_t)client->queue;
 }
 
-static dispatch_semaphore_t box_apple_tls_ready_semaphore(box_apple_tls_client_t *client) {
+static dispatch_semaphore_t nvpn_box_apple_tls_ready_semaphore(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL || client->ready_semaphore == NULL) {
 		return nil;
 	}
 	return (__bridge dispatch_semaphore_t)client->ready_semaphore;
 }
 
-static NSArray *box_apple_tls_client_anchors(box_apple_tls_client_t *client) {
+static NSArray *nvpn_box_apple_tls_client_anchors(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL || client->anchors == NULL) {
 		return nil;
 	}
 	return (__bridge NSArray *)client->anchors;
 }
 
-static dispatch_data_t box_apple_tls_read_result_content(box_apple_tls_read_result_t *result) {
+static dispatch_data_t nvpn_box_apple_tls_read_result_content(nvpn_box_apple_tls_read_result_t *result) {
 	if (result == NULL || result->content == NULL) {
 		return nil;
 	}
 	return (__bridge dispatch_data_t)result->content;
 }
 
-static void box_apple_tls_state_reset(box_apple_tls_state_t *state) {
+static void nvpn_box_apple_tls_state_reset(nvpn_box_apple_tls_state_t *state) {
 	if (state == NULL) {
 		return;
 	}
 	free(state->alpn);
 	free(state->server_name);
 	free(state->peer_cert_chain);
-	memset(state, 0, sizeof(box_apple_tls_state_t));
+	memset(state, 0, sizeof(nvpn_box_apple_tls_state_t));
 }
 
-static void box_apple_tls_client_destroy(box_apple_tls_client_t *client) {
+static void nvpn_box_apple_tls_client_destroy(nvpn_box_apple_tls_client_t *client) {
 	free(client->ready_error);
-	box_apple_tls_state_reset(&client->state);
+	nvpn_box_apple_tls_state_reset(&client->state);
 	if (client->anchors != NULL) {
 		CFRelease((CFTypeRef)client->anchors);
 	}
@@ -100,12 +100,12 @@ static void box_apple_tls_client_destroy(box_apple_tls_client_t *client) {
 	free(client);
 }
 
-static void box_apple_tls_client_release(box_apple_tls_client_t *client) {
+static void nvpn_box_apple_tls_client_release(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL) {
 		return;
 	}
 	if (atomic_fetch_sub(&client->ref_count, 1) == 1) {
-		box_apple_tls_client_destroy(client);
+		nvpn_box_apple_tls_client_destroy(client);
 	}
 }
 
@@ -139,7 +139,7 @@ static void box_set_error_from_nw_error(char **error_out, nw_error_t error) {
 	CFRelease(cfError);
 }
 
-static ssize_t box_apple_tls_dispatch_data_copy(dispatch_data_t content, void *buffer, size_t buffer_len, char **error_out) {
+static ssize_t nvpn_box_apple_tls_dispatch_data_copy(dispatch_data_t content, void *buffer, size_t buffer_len, char **error_out) {
 	if (content == nil) {
 		return 0;
 	}
@@ -174,17 +174,17 @@ static ssize_t box_apple_tls_dispatch_data_copy(dispatch_data_t content, void *b
 	return (ssize_t)copied;
 }
 
-ssize_t box_apple_tls_copy_dispatch_data_for_test(const void *first, size_t first_len, const void *second, size_t second_len, void *buffer, size_t buffer_len, char **error_out) {
+ssize_t nvpn_box_apple_tls_copy_dispatch_data_for_test(const void *first, size_t first_len, const void *second, size_t second_len, void *buffer, size_t buffer_len, char **error_out) {
 	@autoreleasepool {
 		dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
 		dispatch_data_t first_data = first_len > 0 ? dispatch_data_create(first, first_len, queue, DISPATCH_DATA_DESTRUCTOR_DEFAULT) : dispatch_data_empty;
 		dispatch_data_t second_data = second_len > 0 ? dispatch_data_create(second, second_len, queue, DISPATCH_DATA_DESTRUCTOR_DEFAULT) : dispatch_data_empty;
 		dispatch_data_t content = dispatch_data_create_concat(first_data, second_data);
-		return box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, error_out);
+		return nvpn_box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, error_out);
 	}
 }
 
-static char *box_apple_tls_metadata_copy_negotiated_protocol(sec_protocol_metadata_t metadata) {
+static char *nvpn_box_apple_tls_metadata_copy_negotiated_protocol(sec_protocol_metadata_t metadata) {
 	static box_sec_protocol_metadata_string_accessor_f copy_fn;
 	static box_sec_protocol_metadata_string_accessor_f get_fn;
 	static dispatch_once_t onceToken;
@@ -204,7 +204,7 @@ static char *box_apple_tls_metadata_copy_negotiated_protocol(sec_protocol_metada
 	return NULL;
 }
 
-static char *box_apple_tls_metadata_copy_server_name(sec_protocol_metadata_t metadata) {
+static char *nvpn_box_apple_tls_metadata_copy_server_name(sec_protocol_metadata_t metadata) {
 	static box_sec_protocol_metadata_string_accessor_f copy_fn;
 	static box_sec_protocol_metadata_string_accessor_f get_fn;
 	static dispatch_once_t onceToken;
@@ -269,7 +269,7 @@ static bool box_evaluate_trust(sec_trust_t trust, NSArray *anchors, bool anchor_
 	return result;
 }
 
-static nw_connection_t box_apple_tls_create_connection(int connected_socket, nw_parameters_t parameters) {
+static nw_connection_t nvpn_box_apple_tls_create_connection(int connected_socket, nw_parameters_t parameters) {
 	static box_nw_connection_create_with_connected_socket_and_parameters_f create_fn;
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
@@ -287,8 +287,8 @@ static nw_connection_t box_apple_tls_create_connection(int connected_socket, nw_
 	return create_fn(connected_socket, parameters);
 }
 
-static bool box_apple_tls_state_copy(const box_apple_tls_state_t *source, box_apple_tls_state_t *destination) {
-	memset(destination, 0, sizeof(box_apple_tls_state_t));
+static bool nvpn_box_apple_tls_state_copy(const nvpn_box_apple_tls_state_t *source, nvpn_box_apple_tls_state_t *destination) {
+	memset(destination, 0, sizeof(nvpn_box_apple_tls_state_t));
 	destination->version = source->version;
 	destination->cipher_suite = source->cipher_suite;
 	if (source->alpn != NULL) {
@@ -314,18 +314,18 @@ static bool box_apple_tls_state_copy(const box_apple_tls_state_t *source, box_ap
 	return true;
 
 oom:
-	box_apple_tls_state_reset(destination);
+	nvpn_box_apple_tls_state_reset(destination);
 	return false;
 }
 
 // Captures TLS negotiation results from the verify block. The sec_metadata
 // exposed here is live for the duration of the handshake; the one retrieved
 // after nw_connection_state_ready may return stale ALPN/server_name buffers.
-static void box_apple_tls_state_load(sec_protocol_metadata_t sec_metadata, box_apple_tls_state_t *state) {
+static void nvpn_box_apple_tls_state_load(sec_protocol_metadata_t sec_metadata, nvpn_box_apple_tls_state_t *state) {
 	state->version = (uint16_t)sec_protocol_metadata_get_negotiated_tls_protocol_version(sec_metadata);
 	state->cipher_suite = (uint16_t)sec_protocol_metadata_get_negotiated_tls_ciphersuite(sec_metadata);
-	state->alpn = box_apple_tls_metadata_copy_negotiated_protocol(sec_metadata);
-	state->server_name = box_apple_tls_metadata_copy_server_name(sec_metadata);
+	state->alpn = nvpn_box_apple_tls_metadata_copy_negotiated_protocol(sec_metadata);
+	state->server_name = nvpn_box_apple_tls_metadata_copy_server_name(sec_metadata);
 
 	NSMutableData *chain_data = [NSMutableData data];
 	sec_protocol_metadata_access_peer_certificate_chain(sec_metadata, ^(sec_certificate_t certificate) {
@@ -353,7 +353,7 @@ static void box_apple_tls_state_load(sec_protocol_metadata_t sec_metadata, box_a
 	}
 }
 
-box_apple_tls_client_t *box_apple_tls_client_create(
+nvpn_box_apple_tls_client_t *nvpn_box_apple_tls_client_create(
 	int connected_socket,
 	const char *server_name,
 	const char *alpn,
@@ -367,7 +367,7 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 	int64_t verify_time_unix_millis,
 	char **error_out
 ) {
-	box_apple_tls_client_t *client = calloc(1, sizeof(box_apple_tls_client_t));
+	nvpn_box_apple_tls_client_t *client = calloc(1, sizeof(nvpn_box_apple_tls_client_t));
 	if (client == NULL) {
 		close(connected_socket);
 		box_set_error_message(error_out, "apple TLS: out of memory");
@@ -404,13 +404,13 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 		sec_protocol_options_set_peer_authentication_required(sec_options, !insecure);
 		sec_protocol_options_set_verify_block(sec_options, ^(sec_protocol_metadata_t metadata, sec_trust_t trust, sec_protocol_verify_complete_t complete) {
 			if (client->state.version == 0) {
-				box_apple_tls_state_load(metadata, &client->state);
+				nvpn_box_apple_tls_state_load(metadata, &client->state);
 			}
-			complete(insecure || box_evaluate_trust(trust, box_apple_tls_client_anchors(client), anchor_only, verifyDate));
-		}, box_apple_tls_client_queue(client));
+			complete(insecure || box_evaluate_trust(trust, nvpn_box_apple_tls_client_anchors(client), anchor_only, verifyDate));
+		}, nvpn_box_apple_tls_client_queue(client));
 	}, NW_PARAMETERS_DEFAULT_CONFIGURATION);
 
-	nw_connection_t connection = box_apple_tls_create_connection(connected_socket, parameters);
+	nw_connection_t connection = nvpn_box_apple_tls_create_connection(connected_socket, parameters);
 	if (connection == NULL) {
 		close(connected_socket);
 		if (client->anchors != NULL) {
@@ -440,35 +440,35 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 					atomic_store(&client->ready, true);
 				}
 				atomic_store(&client->ready_done, true);
-				dispatch_semaphore_signal(box_apple_tls_ready_semaphore(client));
+				dispatch_semaphore_signal(nvpn_box_apple_tls_ready_semaphore(client));
 			}
 			break;
 		case nw_connection_state_failed:
 			if (!atomic_load(&client->ready_done)) {
 				box_set_error_from_nw_error(&client->ready_error, error);
 				atomic_store(&client->ready_done, true);
-				dispatch_semaphore_signal(box_apple_tls_ready_semaphore(client));
+				dispatch_semaphore_signal(nvpn_box_apple_tls_ready_semaphore(client));
 			}
 			break;
 		case nw_connection_state_cancelled:
 			if (!atomic_load(&client->ready_done)) {
 				box_set_error_from_nw_error(&client->ready_error, error);
 				atomic_store(&client->ready_done, true);
-				dispatch_semaphore_signal(box_apple_tls_ready_semaphore(client));
+				dispatch_semaphore_signal(nvpn_box_apple_tls_ready_semaphore(client));
 			}
-			box_apple_tls_client_release(client);
+			nvpn_box_apple_tls_client_release(client);
 			break;
 		default:
 			break;
 		}
 	});
-	nw_connection_set_queue(connection, box_apple_tls_client_queue(client));
+	nw_connection_set_queue(connection, nvpn_box_apple_tls_client_queue(client));
 	nw_connection_start(connection);
 	return client;
 }
 
-int box_apple_tls_client_wait_ready(box_apple_tls_client_t *client, int timeout_msec, char **error_out) {
-	dispatch_semaphore_t ready_semaphore = box_apple_tls_ready_semaphore(client);
+int nvpn_box_apple_tls_client_wait_ready(nvpn_box_apple_tls_client_t *client, int timeout_msec, char **error_out) {
+	dispatch_semaphore_t ready_semaphore = nvpn_box_apple_tls_ready_semaphore(client);
 	if (ready_semaphore == nil) {
 		box_set_error_message(error_out, "apple TLS: invalid client");
 		return 0;
@@ -500,30 +500,30 @@ int box_apple_tls_client_wait_ready(box_apple_tls_client_t *client, int timeout_
 	return 0;
 }
 
-void box_apple_tls_client_cancel(box_apple_tls_client_t *client) {
+void nvpn_box_apple_tls_client_cancel(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL) {
 		return;
 	}
-	nw_connection_t connection = box_apple_tls_connection(client);
+	nw_connection_t connection = nvpn_box_apple_tls_connection(client);
 	if (connection != nil) {
 		nw_connection_cancel(connection);
 	}
 }
 
-void box_apple_tls_client_free(box_apple_tls_client_t *client) {
+void nvpn_box_apple_tls_client_free(nvpn_box_apple_tls_client_t *client) {
 	if (client == NULL) {
 		return;
 	}
-	nw_connection_t connection = box_apple_tls_connection(client);
+	nw_connection_t connection = nvpn_box_apple_tls_connection(client);
 	if (connection != nil) {
 		nw_connection_cancel(connection);
 	}
-	box_apple_tls_client_release(client);
+	nvpn_box_apple_tls_client_release(client);
 }
 
-ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, size_t buffer_len, int timeout_msec, bool *eof_out, char **error_out) {
+ssize_t nvpn_box_apple_tls_client_read(nvpn_box_apple_tls_client_t *client, void *buffer, size_t buffer_len, int timeout_msec, bool *eof_out, char **error_out) {
 	@autoreleasepool {
-		nw_connection_t connection = box_apple_tls_connection(client);
+		nw_connection_t connection = nvpn_box_apple_tls_connection(client);
 		if (connection == nil) {
 			box_set_error_message(error_out, "apple TLS: invalid client");
 			return -1;
@@ -537,7 +537,7 @@ ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, 
 		nw_connection_receive(connection, 1, (uint32_t)buffer_len, ^(dispatch_data_t content, nw_content_context_t context, bool is_complete, nw_error_t error) {
 			@autoreleasepool {
 				if (content != NULL) {
-					ssize_t copied = box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, &local_error);
+					ssize_t copied = nvpn_box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, &local_error);
 					if (copied >= 0) {
 						content_len = (size_t)copied;
 					}
@@ -581,9 +581,9 @@ ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, 
 	}
 }
 
-ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, int timeout_msec, char **error_out) {
+ssize_t nvpn_box_apple_tls_client_write(nvpn_box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, int timeout_msec, char **error_out) {
 	@autoreleasepool {
-		nw_connection_t connection = box_apple_tls_connection(client);
+		nw_connection_t connection = nvpn_box_apple_tls_connection(client);
 		if (connection == nil) {
 			box_set_error_message(error_out, "apple TLS: invalid client");
 			return -1;
@@ -597,7 +597,7 @@ ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *b
 			box_set_error_message(error_out, "apple TLS: out of memory");
 			return -1;
 		}
-		dispatch_queue_t queue = box_apple_tls_client_queue(client);
+		dispatch_queue_t queue = nvpn_box_apple_tls_client_queue(client);
 		if (queue == nil) {
 			free(content_copy);
 			box_set_error_message(error_out, "apple TLS: invalid client");
@@ -646,9 +646,9 @@ ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *b
 	}
 }
 
-bool box_apple_tls_client_read_async(box_apple_tls_client_t *client, size_t maximum_len, uintptr_t callback_handle, char **error_out) {
+bool nvpn_box_apple_tls_client_read_async(nvpn_box_apple_tls_client_t *client, size_t maximum_len, uintptr_t callback_handle, char **error_out) {
 	@autoreleasepool {
-		nw_connection_t connection = box_apple_tls_connection(client);
+		nw_connection_t connection = nvpn_box_apple_tls_connection(client);
 		if (connection == nil) {
 			box_set_error_message(error_out, "apple TLS: invalid client");
 			return false;
@@ -660,9 +660,9 @@ bool box_apple_tls_client_read_async(box_apple_tls_client_t *client, size_t maxi
 		uint32_t receive_len = maximum_len > UINT32_MAX ? UINT32_MAX : (uint32_t)maximum_len;
 		nw_connection_receive(connection, 1, receive_len, ^(dispatch_data_t content, nw_content_context_t context, bool is_complete, nw_error_t error) {
 			@autoreleasepool {
-				box_apple_tls_read_result_t *result = calloc(1, sizeof(box_apple_tls_read_result_t));
+				nvpn_box_apple_tls_read_result_t *result = calloc(1, sizeof(nvpn_box_apple_tls_read_result_t));
 				if (result == NULL) {
-					box_apple_tls_read_callback(callback_handle, NULL);
+					nvpn_box_apple_tls_read_callback(callback_handle, NULL);
 					return;
 				}
 				size_t content_size = content != NULL ? dispatch_data_get_size(content) : 0;
@@ -675,14 +675,14 @@ bool box_apple_tls_client_read_async(box_apple_tls_client_t *client, size_t maxi
 				if (is_complete && (context == NULL || nw_content_context_get_is_final(context))) {
 					result->eof = true;
 				}
-				box_apple_tls_read_callback(callback_handle, result);
+				nvpn_box_apple_tls_read_callback(callback_handle, result);
 			}
 		});
 		return true;
 	}
 }
 
-ssize_t box_apple_tls_read_result_copy(box_apple_tls_read_result_t *result, void *buffer, size_t buffer_len, bool *eof_out, char **error_out) {
+ssize_t nvpn_box_apple_tls_read_result_copy(nvpn_box_apple_tls_read_result_t *result, void *buffer, size_t buffer_len, bool *eof_out, char **error_out) {
 	@autoreleasepool {
 		if (result == NULL) {
 			box_set_error_message(error_out, "apple TLS: read result unavailable");
@@ -701,15 +701,15 @@ ssize_t box_apple_tls_read_result_copy(box_apple_tls_read_result_t *result, void
 		if (eof_out != NULL) {
 			*eof_out = result->eof;
 		}
-		dispatch_data_t content = box_apple_tls_read_result_content(result);
+		dispatch_data_t content = nvpn_box_apple_tls_read_result_content(result);
 		if (content == nil) {
 			return 0;
 		}
-		return box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, error_out);
+		return nvpn_box_apple_tls_dispatch_data_copy(content, buffer, buffer_len, error_out);
 	}
 }
 
-void box_apple_tls_read_result_free(box_apple_tls_read_result_t *result) {
+void nvpn_box_apple_tls_read_result_free(nvpn_box_apple_tls_read_result_t *result) {
 	if (result == NULL) {
 		return;
 	}
@@ -720,13 +720,13 @@ void box_apple_tls_read_result_free(box_apple_tls_read_result_t *result) {
 	free(result);
 }
 
-bool box_apple_tls_client_copy_state(box_apple_tls_client_t *client, box_apple_tls_state_t *state, char **error_out) {
-	dispatch_queue_t queue = box_apple_tls_client_queue(client);
+bool nvpn_box_apple_tls_client_copy_state(nvpn_box_apple_tls_client_t *client, nvpn_box_apple_tls_state_t *state, char **error_out) {
+	dispatch_queue_t queue = nvpn_box_apple_tls_client_queue(client);
 	if (queue == nil || state == NULL) {
 		box_set_error_message(error_out, "apple TLS: invalid client");
 		return false;
 	}
-	memset(state, 0, sizeof(box_apple_tls_state_t));
+	memset(state, 0, sizeof(nvpn_box_apple_tls_state_t));
 	__block bool copied = false;
 	__block char *local_error = NULL;
 	dispatch_sync(queue, ^{
@@ -734,7 +734,7 @@ bool box_apple_tls_client_copy_state(box_apple_tls_client_t *client, box_apple_t
 			box_set_error_message(&local_error, "apple TLS: metadata unavailable");
 			return;
 		}
-		if (!box_apple_tls_state_copy(&client->state, state)) {
+		if (!nvpn_box_apple_tls_state_copy(&client->state, state)) {
 			box_set_error_message(&local_error, "apple TLS: out of memory");
 			return;
 		}
@@ -750,10 +750,10 @@ bool box_apple_tls_client_copy_state(box_apple_tls_client_t *client, box_apple_t
 			free(local_error);
 		}
 	}
-	box_apple_tls_state_reset(state);
+	nvpn_box_apple_tls_state_reset(state);
 	return false;
 }
 
-void box_apple_tls_state_free(box_apple_tls_state_t *state) {
-	box_apple_tls_state_reset(state);
+void nvpn_box_apple_tls_state_free(nvpn_box_apple_tls_state_t *state) {
+	nvpn_box_apple_tls_state_reset(state);
 }

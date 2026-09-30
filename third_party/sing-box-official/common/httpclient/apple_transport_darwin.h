@@ -2,10 +2,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct box_apple_http_session box_apple_http_session_t;
-typedef struct box_apple_http_task box_apple_http_task_t;
+typedef struct nvpn_box_apple_http_session nvpn_box_apple_http_session_t;
+typedef struct nvpn_box_apple_http_task nvpn_box_apple_http_task_t;
 
-typedef struct box_apple_http_session_config {
+typedef struct nvpn_box_apple_http_session_config {
 	const char *proxy_host;
 	int proxy_port;
 	const char *proxy_username;
@@ -19,9 +19,9 @@ typedef struct box_apple_http_session_config {
 	size_t pinned_certificate_sha256_len;
 	const uint8_t *pinned_public_key_sha256;
 	size_t pinned_public_key_sha256_len;
-} box_apple_http_session_config_t;
+} nvpn_box_apple_http_session_config_t;
 
-typedef struct box_apple_http_request {
+typedef struct nvpn_box_apple_http_request {
 	const char *method;
 	const char *url;
 	const char **header_keys;
@@ -31,9 +31,9 @@ typedef struct box_apple_http_request {
 	size_t body_len;
 	bool has_verify_time;
 	int64_t verify_time_unix_millis;
-} box_apple_http_request_t;
+} nvpn_box_apple_http_request_t;
 
-typedef struct box_apple_http_response {
+typedef struct nvpn_box_apple_http_response {
 	int status_code;
 	char **header_keys;
 	char **header_values;
@@ -41,30 +41,30 @@ typedef struct box_apple_http_response {
 	uint8_t *body;
 	size_t body_len;
 	char *error;
-} box_apple_http_response_t;
+} nvpn_box_apple_http_response_t;
 
-box_apple_http_session_t *box_apple_http_session_create(
-	const box_apple_http_session_config_t *config,
+nvpn_box_apple_http_session_t *nvpn_box_apple_http_session_create(
+	const nvpn_box_apple_http_session_config_t *config,
 	char **error_out
 );
-void box_apple_http_session_retire(box_apple_http_session_t *session);
-void box_apple_http_session_close(box_apple_http_session_t *session);
+void nvpn_box_apple_http_session_retire(nvpn_box_apple_http_session_t *session);
+void nvpn_box_apple_http_session_close(nvpn_box_apple_http_session_t *session);
 
-box_apple_http_task_t *box_apple_http_session_send_async(
-	box_apple_http_session_t *session,
-	const box_apple_http_request_t *request,
+nvpn_box_apple_http_task_t *nvpn_box_apple_http_session_send_async(
+	nvpn_box_apple_http_session_t *session,
+	const nvpn_box_apple_http_request_t *request,
 	char **error_out
 );
-box_apple_http_response_t *box_apple_http_task_wait(
-	box_apple_http_task_t *task,
+nvpn_box_apple_http_response_t *nvpn_box_apple_http_task_wait(
+	nvpn_box_apple_http_task_t *task,
 	char **error_out
 );
-void box_apple_http_task_cancel(box_apple_http_task_t *task);
-void box_apple_http_task_close(box_apple_http_task_t *task);
+void nvpn_box_apple_http_task_cancel(nvpn_box_apple_http_task_t *task);
+void nvpn_box_apple_http_task_close(nvpn_box_apple_http_task_t *task);
 
-void box_apple_http_response_free(box_apple_http_response_t *response);
+void nvpn_box_apple_http_response_free(nvpn_box_apple_http_response_t *response);
 
-char *box_apple_http_verify_pinned_certificate(
+char *nvpn_box_apple_http_verify_pinned_certificate(
 	uint8_t *certificate_hash_values,
 	size_t certificate_hash_values_len,
 	uint8_t *public_key_hash_values,
