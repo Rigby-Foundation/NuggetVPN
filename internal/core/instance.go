@@ -3,8 +3,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gofrs/uuid/v5"
 
@@ -43,13 +45,20 @@ type Instance struct {
 	// box.New populates. It exists whenever the Clash API is wanted, which is
 	// unconditional here because we always pass a PlatformLogWriter — see Stats.
 	traffic *trafficcontrol.Manager
+
+	// external is a whole external core (official sing-box, mihomo) running
+	// in place of the built-in one.
+	external *externalProcess
+	// engine is Xray running beside the built-in core, which reaches the
+	// servers through it.
+	engine *externalProcess
 }
 
-// Running reports whether a sing-box instance is currently up.
+// Running reports whether a core is currently up.
 func (i *Instance) Running() bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	return i.instance != nil
+	return i.instance != nil || i.external.alive()
 }
 
 // Stats returns sing-box's cumulative byte counters for the running instance.
@@ -63,6 +72,9 @@ func (i *Instance) Running() bool {
 func (i *Instance) Stats() (up, down int64, ok bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if i.external.alive() {
+		return i.external.externalStats()
+	}
 	if i.instance == nil || i.traffic == nil {
 		return 0, 0, false
 	}
@@ -101,6 +113,9 @@ func (i *Instance) RuleHits() ([]int, bool) {
 func (i *Instance) Connections() ([]ConnectionInfo, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if i.external.alive() {
+		return i.external.externalConnections()
+	}
 	if i.instance == nil || i.traffic == nil {
 		return nil, false
 	}
@@ -148,6 +163,9 @@ func (i *Instance) Connections() ([]ConnectionInfo, bool) {
 func (i *Instance) CloseConnection(id string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if i.external.alive() {
+		return i.external.closeConnection(id)
+	}
 	if i.instance == nil || i.traffic == nil {
 		return nil
 	}
@@ -175,6 +193,95 @@ func (i *Instance) Start(configJSON []byte, sink LogSink) error {
 	if err := i.stopLocked(); err != nil {
 		return fmt.Errorf("stop previous instance: %w", err)
 	}
+	return i.startBuiltinLocked(configJSON, sink)
+}
+
+// StartCore starts whichever core the request names. onExit is called when an
+// external core stops without being asked to — the tunnel is then down.
+func (i *Instance) StartCore(request StartRequest, sink LogSink, onExit func(error)) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if err := i.stopLocked(); err != nil {
+		return fmt.Errorf("stop previous instance: %w", err)
+	}
+
+	switch request.Core {
+	case "", CoreBuiltin:
+		return i.startBuiltinLocked(request.Config, sink)
+
+	case CoreXray:
+		// Xray first: the built-in core's proxy outbounds point at it.
+		var engine *externalProcess
+		engine, err := launchCore(CoreXray, map[string][]byte{"config.json": request.Aux},
+			func(dir string) []string { return []string{"run", "-c", filepath.Join(dir, "config.json")} },
+			nil, sink, func(err error) {
+				// Without Xray the tunnel carries nothing; take it down —
+				// unless another start has replaced it meanwhile.
+				i.mu.Lock()
+				current := i.engine == engine && engine != nil
+				if current {
+					_ = i.stopLocked()
+				}
+				i.mu.Unlock()
+				if current {
+					onExit(err)
+				}
+			})
+		if err != nil {
+			return err
+		}
+		if err := engine.waitReady(4 * time.Second); err != nil {
+			engine.stop()
+			return err
+		}
+		i.engine = engine
+		if err := i.startBuiltinLocked(request.Config, sink); err != nil {
+			engine.stop()
+			i.engine = nil
+			return err
+		}
+		return nil
+
+	case CoreSingBox, CoreMihomo:
+		var files map[string][]byte
+		var args func(string) []string
+		if request.Core == CoreSingBox {
+			files = map[string][]byte{"config.json": request.Config}
+			args = func(dir string) []string {
+				return []string{"run", "-c", filepath.Join(dir, "config.json"), "-D", dir}
+			}
+		} else {
+			files = map[string][]byte{"config.yaml": request.Config}
+			args = func(dir string) []string { return []string{"-d", dir, "-f", filepath.Join(dir, "config.yaml")} }
+		}
+		var external *externalProcess
+		external, err := launchCore(request.Core, files, args, request.Controller, sink, func(err error) {
+			i.mu.Lock()
+			current := i.external == external && external != nil
+			if current {
+				i.external = nil
+			}
+			i.mu.Unlock()
+			if current {
+				onExit(err)
+			}
+		})
+		if err != nil {
+			return err
+		}
+		if err := external.waitReady(10 * time.Second); err != nil {
+			external.stop()
+			return err
+		}
+		i.external = external
+		return nil
+	}
+	return fmt.Errorf("unknown core %q", request.Core)
+}
+
+// startBuiltinLocked starts the embedded sing-box. Call with mu held and
+// nothing running.
+func (i *Instance) startBuiltinLocked(configJSON []byte, sink LogSink) error {
 
 	ctx := include.Context(context.Background())
 	options, err := sbjson.UnmarshalExtendedContext[option.Options](ctx, configJSON)
@@ -217,6 +324,16 @@ func (i *Instance) Stop() error {
 }
 
 func (i *Instance) stopLocked() error {
+	if i.external != nil {
+		i.external.stop()
+		i.external = nil
+	}
+	defer func() {
+		if i.engine != nil {
+			i.engine.stop()
+			i.engine = nil
+		}
+	}()
 	if i.instance == nil {
 		return nil
 	}
