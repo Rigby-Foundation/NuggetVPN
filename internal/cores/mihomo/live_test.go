@@ -1,16 +1,18 @@
 package mihomo
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/hub"
+	"github.com/metacubex/mihomo/hub/executor"
+	"github.com/metacubex/mihomo/tunnel/statistic"
 	"gopkg.in/yaml.v3"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -19,12 +21,11 @@ import (
 // TestReportedRulesMapBack runs mihomo on a translated config, sends a
 // connection through it, and checks that the rule mihomo reports maps back
 // to the routing rule that caught it — for a combined rule, which mihomo
-// prints differently from how it is written. Needs NUGGET_MIHOMO and the
+// prints differently from how it is written. Needs NUGGET_LIVE and the
 // network.
 func TestReportedRulesMapBack(t *testing.T) {
-	binary := os.Getenv("NUGGET_MIHOMO")
-	if binary == "" {
-		t.Skip("set NUGGET_MIHOMO to run mihomo")
+	if os.Getenv("NUGGET_LIVE") == "" {
+		t.Skip("set NUGGET_LIVE to run mihomo against the network")
 	}
 	settings := models.DefaultSettings()
 	settings.DefaultAction = models.ActionDirect
@@ -36,10 +37,7 @@ func TestReportedRulesMapBack(t *testing.T) {
 		}},
 	}
 	settings.Normalize()
-	result, err := Build(Request{
-		Profile: servers[0], Profiles: servers, Settings: settings,
-		MixedPort: 17893, ControllerPort: 19093, ControllerSecret: "s3cret",
-	})
+	result, err := Build(Request{Profile: servers[0], Profiles: servers, Settings: settings, MixedPort: 17893})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,13 +48,15 @@ func TestReportedRulesMapBack(t *testing.T) {
 	data, _ := yaml.Marshal(config)
 
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "config.yaml"), data, 0o600)
-	process := exec.Command(binary, "-d", dir, "-f", filepath.Join(dir, "config.yaml"))
-	if err := process.Start(); err != nil {
+	C.SetHomeDir(dir)
+	C.SetConfig(filepath.Join(dir, "config.yaml"))
+	if err := hub.Parse(data); err != nil {
 		t.Fatal(err)
 	}
-	defer process.Process.Kill()
-	time.Sleep(2 * time.Second)
+	defer func() {
+		_ = hub.Parse([]byte("mode: direct\n"))
+		executor.Shutdown()
+	}()
 
 	// A slow download, so the connection is still open when asked about.
 	proxy, _ := url.Parse("http://127.0.0.1:17893")
@@ -74,28 +74,18 @@ func TestReportedRulesMapBack(t *testing.T) {
 	}()
 	time.Sleep(2500 * time.Millisecond)
 
-	request, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:19093/connections", nil)
-	request.Header.Set("Authorization", "Bearer s3cret")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer response.Body.Close()
-	var list struct {
-		Connections []struct {
-			Rule        string `json:"rule"`
-			RulePayload string `json:"rulePayload"`
-		} `json:"connections"`
-	}
-	json.NewDecoder(response.Body).Decode(&list)
-	if len(list.Connections) == 0 {
-		t.Fatal("no connection went through mihomo")
-	}
-	for _, connection := range list.Connections {
-		owner := result.RuleOwners[strings.ToLower(connection.RulePayload)]
-		t.Logf("mihomo reports %s %s → rule %q", connection.Rule, connection.RulePayload, owner)
+	seen := 0
+	statistic.DefaultManager.Range(func(tracker statistic.Tracker) bool {
+		info := tracker.Info()
+		seen++
+		owner := result.RuleOwners[strings.ToLower(info.RulePayload)]
+		t.Logf("mihomo reports %s %s → rule %q", info.Rule, info.RulePayload, owner)
 		if owner != "combo" {
 			t.Errorf("the reported rule did not map back to the combined rule; owners: %v", result.RuleOwners)
 		}
+		return true
+	})
+	if seen == 0 {
+		t.Fatal("no connection went through mihomo")
 	}
 }

@@ -3,12 +3,11 @@ package core
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/gofrs/uuid/v5"
+	xraycore "github.com/xtls/xray-core/core"
 
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"
@@ -46,19 +45,19 @@ type Instance struct {
 	// unconditional here because we always pass a PlatformLogWriter — see Stats.
 	traffic *trafficcontrol.Manager
 
-	// external is a whole external core (official sing-box, mihomo) running
-	// in place of the built-in one.
-	external *externalProcess
+	// alt is another core (official sing-box, mihomo) running in place of
+	// the built-in one.
+	alt coreRuntime
 	// engine is Xray running beside the built-in core, which reaches the
 	// servers through it.
-	engine *externalProcess
+	engine *xraycore.Instance
 }
 
 // Running reports whether a core is currently up.
 func (i *Instance) Running() bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	return i.instance != nil || i.external.alive()
+	return i.instance != nil || i.alt != nil
 }
 
 // Stats returns sing-box's cumulative byte counters for the running instance.
@@ -72,8 +71,9 @@ func (i *Instance) Running() bool {
 func (i *Instance) Stats() (up, down int64, ok bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.external.alive() {
-		return i.external.externalStats()
+	if i.alt != nil {
+		up, down = i.alt.stats()
+		return up, down, true
 	}
 	if i.instance == nil || i.traffic == nil {
 		return 0, 0, false
@@ -88,6 +88,9 @@ func (i *Instance) Stats() (up, down int64, ok bool) {
 func (i *Instance) RuleHits() ([]int, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if i.alt != nil {
+		return i.alt.ruleHits()
+	}
 	if i.instance == nil || i.traffic == nil {
 		return nil, false
 	}
@@ -113,8 +116,8 @@ func (i *Instance) RuleHits() ([]int, bool) {
 func (i *Instance) Connections() ([]ConnectionInfo, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.external.alive() {
-		return i.external.externalConnections()
+	if i.alt != nil {
+		return i.alt.connections(), true
 	}
 	if i.instance == nil || i.traffic == nil {
 		return nil, false
@@ -163,8 +166,8 @@ func (i *Instance) Connections() ([]ConnectionInfo, bool) {
 func (i *Instance) CloseConnection(id string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.external.alive() {
-		return i.external.closeConnection(id)
+	if i.alt != nil {
+		return i.alt.closeConnection(id)
 	}
 	if i.instance == nil || i.traffic == nil {
 		return nil
@@ -196,9 +199,9 @@ func (i *Instance) Start(configJSON []byte, sink LogSink) error {
 	return i.startBuiltinLocked(configJSON, sink)
 }
 
-// StartCore starts whichever core the request names. onExit is called when an
-// external core stops without being asked to — the tunnel is then down.
-func (i *Instance) StartCore(request StartRequest, sink LogSink, onExit func(error)) error {
+// StartCore starts whichever core the request names, stopping any running
+// one first.
+func (i *Instance) StartCore(request StartRequest, sink LogSink) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if err := i.stopLocked(); err != nil {
@@ -211,69 +214,31 @@ func (i *Instance) StartCore(request StartRequest, sink LogSink, onExit func(err
 
 	case CoreXray:
 		// Xray first: the built-in core's proxy outbounds point at it.
-		var engine *externalProcess
-		engine, err := launchCore(CoreXray, map[string][]byte{"config.json": request.Aux},
-			func(dir string) []string { return []string{"run", "-c", filepath.Join(dir, "config.json")} },
-			nil, sink, func(err error) {
-				// Without Xray the tunnel carries nothing; take it down —
-				// unless another start has replaced it meanwhile.
-				i.mu.Lock()
-				current := i.engine == engine && engine != nil
-				if current {
-					_ = i.stopLocked()
-				}
-				i.mu.Unlock()
-				if current {
-					onExit(err)
-				}
-			})
+		engine, err := startXray(request.Aux, sink)
 		if err != nil {
 			return err
 		}
-		if err := engine.waitReady(4 * time.Second); err != nil {
-			engine.stop()
+		if err := i.startBuiltinLocked(request.Config, sink); err != nil {
+			_ = engine.Close()
 			return err
 		}
 		i.engine = engine
-		if err := i.startBuiltinLocked(request.Config, sink); err != nil {
-			engine.stop()
-			i.engine = nil
-			return err
-		}
 		return nil
 
-	case CoreSingBox, CoreMihomo:
-		var files map[string][]byte
-		var args func(string) []string
-		if request.Core == CoreSingBox {
-			files = map[string][]byte{"config.json": request.Config}
-			args = func(dir string) []string {
-				return []string{"run", "-c", filepath.Join(dir, "config.json"), "-D", dir}
-			}
-		} else {
-			files = map[string][]byte{"config.yaml": request.Config}
-			args = func(dir string) []string { return []string{"-d", dir, "-f", filepath.Join(dir, "config.yaml")} }
-		}
-		var external *externalProcess
-		external, err := launchCore(request.Core, files, args, request.Controller, sink, func(err error) {
-			i.mu.Lock()
-			current := i.external == external && external != nil
-			if current {
-				i.external = nil
-			}
-			i.mu.Unlock()
-			if current {
-				onExit(err)
-			}
-		})
+	case CoreSingBox:
+		alt, err := startOfficialSingBox(request.Config, sink)
 		if err != nil {
 			return err
 		}
-		if err := external.waitReady(10 * time.Second); err != nil {
-			external.stop()
+		i.alt = alt
+		return nil
+
+	case CoreMihomo:
+		alt, err := startMihomo(request.Config, sink)
+		if err != nil {
 			return err
 		}
-		i.external = external
+		i.alt = alt
 		return nil
 	}
 	return fmt.Errorf("unknown core %q", request.Core)
@@ -324,13 +289,15 @@ func (i *Instance) Stop() error {
 }
 
 func (i *Instance) stopLocked() error {
-	if i.external != nil {
-		i.external.stop()
-		i.external = nil
+	if i.alt != nil {
+		alt := i.alt
+		i.alt = nil
+		return alt.close()
 	}
+	// Xray goes after the built-in core, which sends through it.
 	defer func() {
 		if i.engine != nil {
-			i.engine.stop()
+			_ = i.engine.Close()
 			i.engine = nil
 		}
 	}()

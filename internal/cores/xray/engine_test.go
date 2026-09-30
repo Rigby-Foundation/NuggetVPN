@@ -1,12 +1,14 @@
 package xray
 
 import (
+	"bytes"
 	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	xraycore "github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/infra/conf/serial"
+	_ "github.com/xtls/xray-core/main/distro/all"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
@@ -61,33 +63,36 @@ func TestEngineBuildsEveryProtocol(t *testing.T) {
 	if err := json.Unmarshal(config, &parsed); err != nil {
 		t.Fatal(err)
 	}
-	// Every server is reached through the chain.
+	// Every server is reached through the chain, and the chain through the
+	// built-in core's bypass.
+	port, user, _ := engine.Bypass()
 	for _, outbound := range parsed["outbounds"].([]any) {
 		entry := outbound.(map[string]any)
 		tag := entry["tag"].(string)
-		if !strings.HasPrefix(tag, "server-") {
-			continue
-		}
 		stream, _ := entry["streamSettings"].(map[string]any)
 		sockopt, _ := stream["sockopt"].(map[string]any)
-		if sockopt["dialerProxy"] != "hop-1" {
+		switch {
+		case strings.HasPrefix(tag, "server-") && sockopt["dialerProxy"] != "hop-1":
 			t.Errorf("%s does not go through the chain: %v", tag, stream)
+		case tag == "hop-1" && sockopt["dialerProxy"] != bypassTag:
+			t.Errorf("the chain does not leave through the bypass: %v", stream)
+		case tag == bypassTag:
+			server := entry["settings"].(map[string]any)["servers"].([]any)[0].(map[string]any)
+			users := server["users"].([]any)[0].(map[string]any)
+			if int(server["port"].(float64)) != port || users["user"] != user {
+				t.Errorf("bypass outbound does not match the entry point: %v", entry)
+			}
 		}
 	}
 
-	// Xray's own check, when a binary is at hand (NUGGET_XRAY=path).
-	binary := os.Getenv("NUGGET_XRAY")
-	if binary == "" {
-		t.Log("set NUGGET_XRAY to check the config with Xray itself")
-		return
-	}
-	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, config, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	output, err := exec.Command(binary, "run", "-test", "-c", file).CombinedOutput()
+	// Xray's own loader, which is linked in.
+	loaded, err := serial.LoadJSONConfig(bytes.NewReader(config))
 	if err != nil {
-		t.Fatalf("Xray rejected the config: %v\n%s\n%s", err, output, config)
+		t.Fatalf("Xray rejected the config: %v\n%s", err, config)
 	}
-	t.Logf("Xray accepts it: %s", strings.TrimSpace(string(output)))
+	instance, err := xraycore.New(loaded)
+	if err != nil {
+		t.Fatalf("Xray could not construct the config: %v\n%s", err, config)
+	}
+	_ = instance.Close()
 }

@@ -237,12 +237,10 @@ export interface RoutingSetup {
 /** The cores the tunnel can run on. */
 export type CoreName = "builtin" | "sing-box" | "mihomo" | "xray";
 
-/** An installable core; see core.CoreInfo. */
+/** A core built into the app; see core.CoreInfo. */
 export interface CoreInfo {
     name: CoreName;
-    installed: boolean;
     version?: string;
-    path?: string;
 }
 
 /** An open connection; see app.LiveConnection. */
@@ -256,7 +254,7 @@ export interface LiveConnection {
     app_path?: string;
     /** Routing rule id; "__default" for everything else, "" for built-in routes. */
     rule: string;
-    /** An external core's own name for the rule, when it maps to none. */
+    /** mihomo's own name for the rule, when it maps to none. */
     rule_text?: string;
     route: "proxy" | "direct";
     server?: string;

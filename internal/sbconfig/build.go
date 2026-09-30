@@ -68,17 +68,22 @@ type Request struct {
 	// for servers Build does not dial itself. Asked after every server has
 	// gone through Dial.
 	ServerDomains func() []string
-	// DirectProcesses are programs whose traffic goes straight out: the
-	// program that dials the servers must not have its own connections
-	// routed back to itself.
-	DirectProcesses []string
-
-	// ControllerPort and ControllerSecret, when set, open the Clash API on
-	// loopback: how the service reads an external sing-box's counters and
-	// connections. The built-in core is read in-process and needs neither.
-	ControllerPort   int
-	ControllerSecret string
+	// Bypass, when set, is a loopback entry point whose traffic goes
+	// straight out: how the engine dialing the servers (Xray, in this same
+	// process) reaches them without its connections being routed back into
+	// itself.
+	Bypass *Bypass
 }
+
+// Bypass is a password-protected SOCKS entry point on loopback.
+type Bypass struct {
+	Port     int
+	Username string
+	Password string
+}
+
+// BypassTag is the bypass entry point's inbound.
+const BypassTag = "bypass-in"
 
 // Result is a generated configuration plus the details the caller reports back
 // to the UI.
@@ -205,7 +210,7 @@ func Build(request Request) (Result, error) {
 	}
 	geo := geoSources{local: request.LocalRuleSets, custom: request.CustomGeo}
 	plan := newRoutePlan(settings, geo, request.RuleLists, outboundFor)
-	plan.directProcesses = request.DirectProcesses
+	plan.bypass = request.Bypass != nil
 	plan.warnings = append(plan.warnings, serverWarnings...)
 	routeRules, owners, splitRuleCount := plan.buildRouteRules(serverDomains)
 	dns := plan.buildDNS(splitTunnel, serverDomains)
@@ -213,7 +218,7 @@ func Build(request Request) (Result, error) {
 	config := map[string]any{
 		"log": buildLog(settings),
 		"dns":      dns,
-		"inbounds": buildInbounds(settings, request.MixedPort),
+		"inbounds": buildInbounds(settings, request.MixedPort, request.Bypass),
 		"outbounds": func() []map[string]any {
 			return outbounds
 		}(),
@@ -325,8 +330,19 @@ func appendChain(
 }
 
 // buildInbounds returns the TUN interface plus an optional local mixed proxy.
-func buildInbounds(settings models.AppSettings, mixedPort int) []map[string]any {
-	inbounds := make([]map[string]any, 0, 2)
+func buildInbounds(settings models.AppSettings, mixedPort int, bypass *Bypass) []map[string]any {
+	inbounds := make([]map[string]any, 0, 3)
+
+	if bypass != nil {
+		inbounds = append(inbounds, map[string]any{
+			"type":        "socks",
+			"tag":         BypassTag,
+			"listen":      "127.0.0.1",
+			"listen_port": bypass.Port,
+			// A password, so no other program can use it to leave the tunnel.
+			"users": []map[string]any{{"username": bypass.Username, "password": bypass.Password}},
+		})
+	}
 
 	if mixedPort > 0 {
 		inbounds = append(inbounds, map[string]any{
@@ -588,14 +604,6 @@ func buildExperimental(request Request) map[string]any {
 	// with permissive CORS, so every local program and every web page the user
 	// visits could read the live connection list and drive the core.
 	experimental["clash_api"] = map[string]any{}
-	if request.ControllerPort > 0 {
-		// An external sing-box, which the service can only reach over HTTP:
-		// loopback only, behind a secret made for this start.
-		experimental["clash_api"] = map[string]any{
-			"external_controller": fmt.Sprintf("127.0.0.1:%d", request.ControllerPort),
-			"secret":              request.ControllerSecret,
-		}
-	}
 	if request.CacheFilePath != "" {
 		experimental["cache_file"] = map[string]any{
 			"enabled":      true,

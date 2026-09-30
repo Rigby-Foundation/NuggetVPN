@@ -42,7 +42,6 @@ type Client struct {
 	onLog    func(level, message string)
 	onState  func(running bool)
 	onStats  func(up, down int64)
-	onCore   func(name string, received, total int64, message string, done bool)
 	elevated bool
 }
 
@@ -282,7 +281,6 @@ func (c *Client) readLoop(conn net.Conn) {
 			Hits    []int  `json:"hits"`
 
 			Connections []ConnectionInfo `json:"connections"`
-			Cores       []CoreInfo       `json:"cores"`
 		}
 		if err := json.Unmarshal(line, &envelope); err != nil {
 			continue
@@ -310,7 +308,6 @@ func (c *Client) readLoop(conn net.Conn) {
 				Hits:    envelope.Hits,
 
 				Connections: envelope.Connections,
-				Cores:       envelope.Cores,
 			}
 			close(waiter)
 		}
@@ -330,7 +327,7 @@ func (c *Client) readLoop(conn net.Conn) {
 
 func (c *Client) dispatchEvent(name, level, message string, running bool, up, down int64) {
 	c.mu.Lock()
-	onLog, onState, onStats, onCore := c.onLog, c.onState, c.onStats, c.onCore
+	onLog, onState, onStats := c.onLog, c.onState, c.onStats
 	c.mu.Unlock()
 
 	switch name {
@@ -345,14 +342,6 @@ func (c *Client) dispatchEvent(name, level, message string, running bool, up, do
 	case EventStats:
 		if onStats != nil {
 			onStats(up, down)
-		}
-	case EventCoreProgress:
-		if onCore != nil {
-			onCore(level, up, down, "", false)
-		}
-	case EventCoreDone:
-		if onCore != nil {
-			onCore(level, 0, 0, message, true)
 		}
 	}
 }
@@ -471,20 +460,12 @@ func (c *Client) CloseConnection(id string) error {
 	return err
 }
 
-// OnCoreInstall receives core install progress and, with done set, its end:
-// message is the error, empty on success.
-func (c *Client) OnCoreInstall(handler func(name string, received, total int64, message string, done bool)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.onCore = handler
-}
-
 // StartCore hands a config for any core to the service; see StartRequest.
 func (c *Client) StartCore(request StartRequest) error {
 	if err := c.Ensure(); err != nil {
 		return err
 	}
-	message := Request{Cmd: CmdStart, Core: request.Core, Controller: request.Controller}
+	message := Request{Cmd: CmdStart, Core: request.Core}
 	if request.Core == CoreMihomo {
 		message.Text = string(request.Config)
 	} else {
@@ -495,34 +476,6 @@ func (c *Client) StartCore(request StartRequest) error {
 	}
 	_, err := c.request(message)
 	return err
-}
-
-// CoreStatus lists the external cores. It starts the service if needed:
-// what is installed lives where only the service can write.
-func (c *Client) CoreStatus() ([]CoreInfo, error) {
-	if err := c.Ensure(); err != nil {
-		return nil, err
-	}
-	response, err := c.request(Request{Cmd: CmdCoreStatus})
-	return response.Cores, err
-}
-
-// InstallCore starts installing a core; see OnCoreInstall for the outcome.
-func (c *Client) InstallCore(name string) error {
-	if err := c.Ensure(); err != nil {
-		return err
-	}
-	_, err := c.request(Request{Cmd: CmdInstallCore, Core: name})
-	return err
-}
-
-// RemoveCore deletes an installed core.
-func (c *Client) RemoveCore(name string) ([]CoreInfo, error) {
-	if err := c.Ensure(); err != nil {
-		return nil, err
-	}
-	response, err := c.request(Request{Cmd: CmdRemoveCore, Core: name})
-	return response.Cores, err
 }
 
 // Shutdown stops the tunnel and asks the privileged service to exit. Called

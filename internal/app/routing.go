@@ -92,7 +92,7 @@ func (a *App) GetRuleHits() map[string]int {
 	if !connected {
 		return result
 	}
-	// An external core has no per-rule counters; count its connections.
+	// mihomo has no per-rule counters; count its connections.
 	if external {
 		for _, connection := range a.GetConnections() {
 			if connection.Rule != "" {

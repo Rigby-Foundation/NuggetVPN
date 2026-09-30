@@ -2,7 +2,6 @@ package core
 
 import (
 	"bufio"
-	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -304,52 +303,12 @@ func (s *Service) handle(request Request) Response {
 			response.OK, response.Error = false, "start requires a config"
 			break
 		}
-		start := StartRequest{Core: request.Core, Config: config, Aux: request.Aux, Controller: request.Controller}
-		if err := s.instance.StartCore(start, s.broadcastLog, func(err error) {
-			// An external core exited on its own: the tunnel is down.
-			s.broadcastLog("error", err.Error())
-			s.broadcastState(false)
-		}); err != nil {
+		start := StartRequest{Core: request.Core, Config: config, Aux: request.Aux}
+		if err := s.instance.StartCore(start, s.broadcastLog); err != nil {
 			response.OK, response.Error = false, err.Error()
 		}
 		response.Running = s.instance.Running()
 		s.broadcastState(response.Running)
-
-	case CmdCoreStatus:
-		response.Cores = CoreStatus()
-
-	case CmdInstallCore:
-		if s.instance.Running() {
-			response.OK, response.Error = false, "disconnect before installing or updating a core"
-			break
-		}
-		if _, known := coreSources[request.Core]; !known {
-			response.OK, response.Error = false, "unknown core "+request.Core
-			break
-		}
-		// A download can take minutes; the answer comes as events, so this
-		// connection is free meanwhile.
-		name := request.Core
-		go func() {
-			_, err := InstallCore(context.Background(), name, func(received, total int64) {
-				s.broadcast(Event{Event: EventCoreProgress, Level: name, Up: received, Down: total})
-			})
-			message := ""
-			if err != nil {
-				message = err.Error()
-			}
-			s.broadcast(Event{Event: EventCoreDone, Level: name, Message: message})
-		}()
-
-	case CmdRemoveCore:
-		if s.instance.Running() {
-			response.OK, response.Error = false, "disconnect before removing a core"
-			break
-		}
-		if err := RemoveCore(request.Core); err != nil {
-			response.OK, response.Error = false, err.Error()
-		}
-		response.Cores = CoreStatus()
 
 	case CmdStop:
 		if err := s.instance.Stop(); err != nil {

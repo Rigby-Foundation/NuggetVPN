@@ -64,8 +64,6 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     take_pending_link: { method: "TakePendingLink", args: [] },
     get_version: { method: "GetVersion", args: [] },
     list_cores: { method: "ListCores", args: [] },
-    install_core: { method: "InstallCore", args: ["name"] },
-    remove_core: { method: "RemoveCore", args: ["name"] },
     set_core: { method: "SetCore", args: ["name"] },
     export_backup: { method: "ExportBackup", args: ["ui"] },
     import_backup: { method: "ImportBackup", args: [] },
@@ -159,7 +157,6 @@ export const EVENTS = {
     /** A nuggetvpn:// link to offer in the Add dialog. */
     importLink: "import-link",
     updateProgress: "update-progress",
-    coreProgress: "core-progress",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */

@@ -2,11 +2,12 @@ package mihomo
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/hub/executor"
 	"gopkg.in/yaml.v3"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -61,8 +62,6 @@ func featureRequest(t *testing.T) Request {
 		Alternatives:     servers[:8],
 		MixedPort:        17890,
 		RuleLists:        map[string]sbconfig.RuleList{"https://lists.example/blocked.lst": {Path: listPath}},
-		ControllerPort:   19090,
-		ControllerSecret: "s3cret",
 	}
 }
 
@@ -103,20 +102,11 @@ func TestBuildTranslatesTheGraph(t *testing.T) {
 		t.Errorf("server names: %v", result.ServerFor)
 	}
 
-	// mihomo's own check, when a binary is at hand (NUGGET_MIHOMO=path).
-	binary := os.Getenv("NUGGET_MIHOMO")
-	if binary == "" {
-		t.Log("set NUGGET_MIHOMO to check the config with mihomo itself")
-		return
+	// mihomo's own parser, which is linked in.
+	C.SetHomeDir(t.TempDir())
+	if _, err := executor.ParseWithBytes(result.YAML); err != nil {
+		t.Fatalf("mihomo rejected the config: %v\n%s", err, result.YAML)
 	}
-	dir := t.TempDir()
-	file := filepath.Join(dir, "config.yaml")
-	os.WriteFile(file, result.YAML, 0o600)
-	output, err := exec.Command(binary, "-t", "-d", dir, "-f", file).CombinedOutput()
-	if err != nil || !strings.Contains(string(output), "successful") {
-		t.Fatalf("mihomo rejected the config: %v\n%s\n%s", err, output, result.YAML)
-	}
-	t.Logf("mihomo accepts it: %s", lastLine(string(output)))
 }
 
 func TestFullClashConfigRunsVerbatim(t *testing.T) {
@@ -128,6 +118,8 @@ rules:
   - DOMAIN-SUFFIX,example.com,G
   - MATCH,DIRECT
 external-ui: /etc/passwd
+external-controller: 0.0.0.0:9090
+secret: open
 `
 	request := featureRequest(t)
 	request.Profile = models.Profile{ID: "c", Name: "Clash", ConfigLink: clash}
@@ -137,7 +129,7 @@ external-ui: /etc/passwd
 	}
 	var config map[string]any
 	yaml.Unmarshal(result.YAML, &config)
-	if !result.Verbatim || config["secret"] != "s3cret" || config["tun"] == nil || config["external-ui"] != nil {
+	if !result.Verbatim || config["secret"] != nil || config["external-controller"] != nil || config["tun"] == nil || config["external-ui"] != nil {
 		t.Errorf("verbatim config not prepared: %+v", config)
 	}
 	rules, _ := config["rules"].([]any)
@@ -146,7 +138,3 @@ external-ui: /etc/passwd
 	}
 }
 
-func lastLine(text string) string {
-	lines := strings.Split(strings.TrimSpace(text), "\n")
-	return lines[len(lines)-1]
-}

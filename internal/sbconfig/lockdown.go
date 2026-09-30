@@ -34,7 +34,7 @@ func Lockdown(settings models.AppSettings, ownPath string) ([]byte, error) {
 
 	config := map[string]any{
 		"log":      buildLog(settings),
-		"inbounds": buildInbounds(settings, 0),
+		"inbounds": buildInbounds(settings, 0, nil),
 		"outbounds": []map[string]any{
 			{"type": "direct", "tag": DirectTag},
 		},

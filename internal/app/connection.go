@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	
+	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
@@ -546,8 +547,6 @@ func (a *App) startProfile(
 	switch settings.Core {
 	case models.CoreMihomo:
 		return a.startMihomo(profile, profiles, settings, alternatives, lists)
-	case models.CoreSingBox:
-		return a.startExternalSingBox(profile, request)
 	case models.CoreXray:
 		return a.startXray(profile, profiles, settings, request)
 	}
@@ -583,6 +582,11 @@ func (a *App) startProfile(
 		}
 	}
 
+	if settings.Core == models.CoreSingBox {
+		// The same config, on official sing-box instead of the fork.
+		a.appendLog("Running on official sing-box")
+		return a.core.StartCore(core.StartRequest{Core: core.CoreSingBox, Config: result.JSON})
+	}
 	return a.core.Start(result.JSON)
 }
 

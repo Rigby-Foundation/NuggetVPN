@@ -29,9 +29,7 @@ type Request struct {
 	Alternatives []models.Profile
 	MixedPort    int
 	// RuleLists are the converted rule lists, by URL; see sbconfig.RuleList.
-	RuleLists        map[string]sbconfig.RuleList
-	ControllerPort   int
-	ControllerSecret string
+	RuleLists map[string]sbconfig.RuleList
 }
 
 // Result is the config and what the app needs to read mihomo's reports.
@@ -137,8 +135,6 @@ func Build(request Request) (Result, error) {
 		"find-process-mode":   "always",
 		"unified-delay":       true,
 		"tcp-concurrent":      true,
-		"external-controller": fmt.Sprintf("127.0.0.1:%d", request.ControllerPort),
-		"secret":              request.ControllerSecret,
 		"profile":             map[string]any{"store-selected": false, "store-fake-ip": false},
 		"geo-auto-update":     false,
 		"tun":                 tun(settings),
@@ -696,12 +692,15 @@ func singleClashProxy(raw string) (map[string]any, bool) {
 }
 
 // buildVerbatim runs a complete Clash config as it is, except for what the
-// app has to own: the tunnel, the controller it reads counters from, and the
-// local proxy port.
+// app has to own: the tunnel and the local proxy port. Any API it asks for
+// is dropped: mihomo runs inside the privileged service, which reads it
+// directly.
 func buildVerbatim(config map[string]any, request Request, settings models.AppSettings) (Result, error) {
 	config["tun"] = tun(settings)
-	config["external-controller"] = fmt.Sprintf("127.0.0.1:%d", request.ControllerPort)
-	config["secret"] = request.ControllerSecret
+	for _, key := range []string{"external-controller", "external-controller-tls", "external-controller-unix",
+		"external-controller-pipe", "external-controller-cors", "external-doh-server", "secret"} {
+		delete(config, key)
+	}
 	config["mixed-port"] = request.MixedPort
 	config["allow-lan"] = false
 	config["find-process-mode"] = "always"

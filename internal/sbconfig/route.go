@@ -55,8 +55,8 @@ type routePlan struct {
 	// a rule list that has not been downloaded.
 	warnings []string
 
-	// directProcesses always go straight out; see Request.DirectProcesses.
-	directProcesses []string
+	// bypass sends the bypass entry point straight out; see Request.Bypass.
+	bypass bool
 }
 
 func newRoutePlan(settings models.AppSettings, geo geoSources, lists map[string]RuleList, outboundFor map[string]string) *routePlan {
@@ -96,6 +96,13 @@ func (p *routePlan) buildRouteRules(serverDomains []string) (rules []map[string]
 		owners = append(owners, owner)
 	}
 
+	// The engine dialing the servers (Xray) reaches them directly, or its
+	// connections would be routed back into itself. First, so nothing below
+	// — not even sniffing — touches them.
+	if p.bypass {
+		add("", map[string]any{"inbound": []string{BypassTag}, "outbound": DirectTag})
+	}
+
 	// Anything still reaching port 53 is DNS. The TUN captures it through
 	// dns_mode as well; this covers the local mixed proxy.
 	add("", map[string]any{"port": []int{53}, "action": "hijack-dns"})
@@ -107,12 +114,6 @@ func (p *routePlan) buildRouteRules(serverDomains []string) (rules []map[string]
 		"sniffer": p.sniffers(),
 		"timeout": "500ms",
 	})
-
-	// The program dialing the servers for the core (Xray) must reach them
-	// directly, or its connections would be routed back into itself.
-	if len(p.directProcesses) > 0 {
-		add("", map[string]any{"process_path": p.directProcesses, "outbound": DirectTag})
-	}
 
 	// Private ranges stay on the local network whatever the graph says;
 	// tunnelling them breaks LAN access and, with it, the user's printer.

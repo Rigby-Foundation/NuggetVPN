@@ -6,6 +6,11 @@
 // server's traffic there instead of dialing the server itself. Everything
 // the app does with routing — rules, live counts, the connections screen,
 // the kill switch — keeps working, because the built-in core still does it.
+//
+// Both run in the same process, so Xray's own connections to the servers
+// cannot be told apart by program. Instead Xray dials through a
+// password-protected SOCKS entry point on the built-in core that goes
+// straight out (see sbconfig.Request.Bypass).
 package xray
 
 import (
@@ -32,11 +37,35 @@ type Engine struct {
 	domains   []string
 	byProfile map[string]link.Outbound
 	chainTag  string
+
+	bypassPort int
+	bypassUser string
+	bypassPass string
 }
+
+// bypassTag is Xray's outbound to the built-in core's bypass entry point.
+const bypassTag = "bypass"
 
 // New prepares an engine. chain is the proxy chain, empty for none.
 func New(settings models.AppSettings, chain []models.Profile) (*Engine, error) {
-	engine := &Engine{settings: settings, byProfile: map[string]link.Outbound{}}
+	port, err := freePort()
+	if err != nil {
+		return nil, err
+	}
+	engine := &Engine{
+		settings: settings, byProfile: map[string]link.Outbound{},
+		bypassPort: port, bypassUser: randomToken(), bypassPass: randomToken(),
+		// Everything leaves through the bypass.
+		chainTag: bypassTag,
+	}
+	engine.outbounds = append(engine.outbounds, map[string]any{
+		"tag":      bypassTag,
+		"protocol": "socks",
+		"settings": map[string]any{"servers": []any{map[string]any{
+			"address": "127.0.0.1", "port": port,
+			"users": []any{map[string]any{"user": engine.bypassUser, "pass": engine.bypassPass}},
+		}}},
+	})
 	// The hops come first; each dials through the previous one.
 	for index, hop := range chain {
 		tag := fmt.Sprintf("hop-%d", index+1)
@@ -92,9 +121,18 @@ func (e *Engine) Dial(profile models.Profile) (link.Outbound, error) {
 		"version":     "5",
 		"username":    user,
 		"password":    pass,
+		// Binding to an address keeps the core from pinning this dial to the
+		// network interface, which loopback is not on.
+		"inet4_bind_address": "127.0.0.1",
 	}
 	e.byProfile[profile.ID] = dial
 	return cloneOutbound(dial), nil
+}
+
+// Bypass is the entry point on the built-in core Xray reaches the servers
+// through: a loopback port and its credentials.
+func (e *Engine) Bypass() (port int, username, password string) {
+	return e.bypassPort, e.bypassUser, e.bypassPass
 }
 
 // ServerDomains are the servers' hostnames, which the built-in core must

@@ -103,8 +103,8 @@ type App struct {
 	// serverFor maps the running config's outbound tags to server profile
 	// ids; see sbconfig.Result.ServerFor.
 	serverFor map[string]string
-	// ruleTexts, set while an external core runs, traces the rules it
-	// reports back to routing rules; see ruleForText.
+	// ruleTexts, set while mihomo runs, traces the rules it reports back to
+	// routing rules; see ruleForText.
 	ruleTexts map[string]string
 
 	// connectGen counts connects and disconnects, so a reconnect in progress
@@ -175,7 +175,6 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)
 	a.prepareNotifications()
-	a.forwardCoreEvents()
 	registerURLScheme()
 	_, startup := a.snapshot()
 	if startup.GlobalShortcut != "" {

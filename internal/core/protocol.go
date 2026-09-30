@@ -36,12 +36,6 @@ const (
 	CmdConnections = "connections"
 	// CmdCloseConnection closes one connection, or all with an empty ID.
 	CmdCloseConnection = "close_connection"
-	// CmdCoreStatus lists the external cores and which are installed.
-	CmdCoreStatus = "core_status"
-	// CmdInstallCore downloads and installs the newest build of a core.
-	CmdInstallCore = "install_core"
-	// CmdRemoveCore deletes an installed core.
-	CmdRemoveCore = "remove_core"
 )
 
 // Event names pushed from the core service to the GUI.
@@ -50,14 +44,7 @@ const (
 	EventState = "state"
 	// EventStats carries cumulative byte counters, pushed once a second while
 	// the tunnel is up so the GUI never has to poll.
-	EventStats = "stats"
-	// EventCoreProgress carries a core download's progress in Up (received)
-	// and Down (total).
-	EventCoreProgress = "core_progress"
-	// EventCoreDone ends a core install: Level names the core, Message is
-	// the error, empty on success.
-	EventCoreDone = "core_done"
-)
+	EventStats = "stats")
 
 // Request is one command from the GUI to the core service.
 type Request struct {
@@ -68,13 +55,11 @@ type Request struct {
 	Token string `json:"token,omitempty"`
 	// ConnectionID names the connection CmdCloseConnection closes.
 	ConnectionID string `json:"connection_id,omitempty"`
-	// Core, Aux and Controller extend CmdStart to other cores; see
-	// StartRequest. Core names the core for CmdInstallCore and CmdRemoveCore.
+	// Core and Aux extend CmdStart to other cores; see StartRequest.
 	Core string `json:"core,omitempty"`
 	// Text is a start's config when it is not JSON (mihomo's YAML).
-	Text       string          `json:"text,omitempty"`
-	Aux        json.RawMessage `json:"aux,omitempty"`
-	Controller *Controller     `json:"controller,omitempty"`
+	Text string          `json:"text,omitempty"`
+	Aux  json.RawMessage `json:"aux,omitempty"`
 }
 
 // Response answers exactly one Request.
@@ -90,8 +75,6 @@ type Response struct {
 	Hits []int `json:"hits,omitempty"`
 	// Connections answers CmdConnections.
 	Connections []ConnectionInfo `json:"connections,omitempty"`
-	// Cores answers CmdCoreStatus and CmdInstallCore.
-	Cores []CoreInfo `json:"cores,omitempty"`
 }
 
 // ConnectionInfo is one open connection, as the core tracks it.
@@ -107,8 +90,8 @@ type ConnectionInfo struct {
 	Process string `json:"process,omitempty"`
 	// Rule is the index of the route rule that matched, or -1 for none.
 	Rule int `json:"rule"`
-	// RuleText is an external core's own description of the rule that
-	// matched ("DOMAIN-SUFFIX,example.com"), where there is no index.
+	// RuleText is mihomo's own description of the rule that matched
+	// ("DomainSuffix,example.com"), where there is no index.
 	RuleText string `json:"rule_text,omitempty"`
 	Outbound string `json:"outbound"`
 	Upload   int64  `json:"upload"`
