@@ -26,7 +26,7 @@ interface AppSidebarProps {
     status: ConnectionStatus;
 }
 
-const TABS = [
+export const TABS = [
     { id: "connection", label: "nav.connection", icon: Power },
     { id: "configuration", label: "nav.configuration", icon: Server },
     { id: "proxies", label: "nav.proxies", icon: Signal },
@@ -36,7 +36,7 @@ const TABS = [
     { id: "logs", label: "nav.logs", icon: FileText },
 ] as const satisfies readonly { id: string; label: MessageKey; icon: unknown }[];
 
-const STATUS_DOT: Record<ConnectionStatus, string> = {
+export const STATUS_DOT: Record<ConnectionStatus, string> = {
     idle: "bg-status-idle",
     connecting: "bg-status-connecting animate-pulse",
     connected: "bg-status-connected",

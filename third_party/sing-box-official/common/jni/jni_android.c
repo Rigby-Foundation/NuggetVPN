@@ -1,13 +1,11 @@
 #include <jni.h>
 #include <stdint.h>
 
-static JavaVM *javaVM;
+// NuggetVPN: a library has one JNI_OnLoad, and the built-in core (the
+// sing-box fork linked beside this copy) defines it. Ask the fork for the VM
+// it was given.
+extern uintptr_t box_jni_vm(void);
 
-JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
-	javaVM = vm;
-	return JNI_VERSION_1_6;
-}
-
-uintptr_t box_jni_vm(void) {
-	return (uintptr_t) javaVM;
+uintptr_t nvpn_box_jni_vm(void) {
+	return box_jni_vm();
 }

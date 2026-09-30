@@ -8,6 +8,7 @@ import { BeamMigrationDialog } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import TopBar from "@/components/layout/TopBar";
 import { WindowControls } from "@/components/layout/WindowControls";
@@ -127,6 +128,7 @@ const IP_RECHECK_MS = 5 * 60 * 1000;
  */
 function guessPlatform(): string {
     const agent = navigator.userAgent;
+    if (agent.includes("Android")) return "android";
     if (agent.includes("Windows")) return "windows";
     if (agent.includes("Mac OS")) return "macos";
     return "linux";
@@ -944,6 +946,8 @@ function App() {
         startTransition(() => setActiveTab(tab));
     };
     const isMac = platform === "macos";
+    // A phone: no window to control, and the page is the whole screen.
+    const isPhone = platform === "android";
 
     return (
         <PluginsProvider actions={pluginActions}>
@@ -998,10 +1002,11 @@ function App() {
                 <SidebarInset
                     className={cn(
                         "overflow-hidden flex flex-col",
-                        !isMac && "bg-transparent! m-0! p-0! shadow-none! rounded-none!"
+                        !isMac && "bg-transparent! m-0! p-0! shadow-none! rounded-none!",
+                        isPhone && "rounded-none! [--window-radius:0px]"
                     )}
                 >
-                    {!isMac ? (
+                    {!isMac && !isPhone ? (
                         <div className="bg-inset z-50">
                             <WindowControls
                                 onClose={appWindow.close}
@@ -1013,9 +1018,11 @@ function App() {
                     <div
                         className={cn(
                             "flex-1 flex flex-col overflow-hidden",
-                            isMac
-                                ? "px-2 pb-4 pt-2"
-                                : "bg-background m-2 mt-0 border rounded-[var(--window-radius)] shadow-sm"
+                            isPhone
+                                ? "bg-background"
+                                : isMac
+                                  ? "px-2 pb-4 pt-2"
+                                  : "bg-background m-2 mt-0 border rounded-[var(--window-radius)] shadow-sm"
                         )}
                     >
                         {isMac && isMobile ? (
@@ -1198,6 +1205,9 @@ function App() {
                                     />
                                 )}
                             </div>
+                        {isMobile ? (
+                            <BottomNav activeTab={activeTab} onTabChange={changeTab} status={connection.state.status} />
+                        ) : null}
                     </div>
                 </SidebarInset>
             </SidebarProvider>

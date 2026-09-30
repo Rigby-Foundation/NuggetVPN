@@ -77,6 +77,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     stop_speed_test: { method: "StopSpeedTest", args: [] },
     get_speed_tests: { method: "GetSpeedTests", args: [] },
     get_wifi_state: { method: "GetWifiState", args: [] },
+    get_system_palette: { method: "GetSystemPalette", args: [] },
+    set_system_bars: { method: "SetSystemBars", args: ["color", "light"] },
     list_plugins: { method: "ListPlugins", args: [] },
     pick_plugin: { method: "PickPlugin", args: [] },
     install_plugin: { method: "InstallPlugin", args: ["token"] },

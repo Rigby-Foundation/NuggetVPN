@@ -43,6 +43,10 @@
             if (ua.indexOf("Windows") !== -1) {
                 document.documentElement.style.setProperty("--window-radius", "8px");
             }
+            // A phone: the page is the screen, with nothing to round.
+            if (ua.indexOf("Android") !== -1) {
+                document.documentElement.style.setProperty("--window-radius", "0px");
+            }
         })();
     </script>
 </head>

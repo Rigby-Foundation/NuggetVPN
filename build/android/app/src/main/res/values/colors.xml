@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="wails_blue">#E3A13B</color>
+    <color name="wails_blue_dark">#B97C1E</color>
+    <!-- The app's dark background, so there is no flash before the page. -->
+    <color name="wails_background">#101012</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

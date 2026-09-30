@@ -174,7 +174,9 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	if window, ok := a.app.Window.GetByName(WindowName); ok {
 		a.window, _ = window.(*application.WebviewWindow)
 	}
-	a.buildTray()
+	if !onAndroid {
+		a.buildTray()
+	}
 	a.registerCloseHook()
 
 	a.core.OnLog(func(level, message string) {
@@ -194,7 +196,11 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	// argument.
 	a.receiveLinks(os.Args[1:]...)
 	go a.runBackground(ctx)
-	a.startCommandLine()
+	if onAndroid {
+		a.startPlatform()
+	} else {
+		a.startCommandLine()
+	}
 	return nil
 }
 

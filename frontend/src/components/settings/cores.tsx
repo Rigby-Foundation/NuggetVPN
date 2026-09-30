@@ -6,6 +6,7 @@ import { SettingsGroup } from "@/components/settings/shell";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { isAndroid } from "@/lib/platform";
 import { AppSettings, CoreInfo, CoreName } from "@/types";
 
 interface CoreEntry {
@@ -67,7 +68,9 @@ export function CorePanel({
         <SettingsGroup>
             <p className="text-xs leading-relaxed text-muted-foreground">{t("core.description")}</p>
             <div className="space-y-2" role="radiogroup" aria-label={t("settings.core")}>
-                {CORES.map((core) => {
+                {/* Android gives the tunnel to one core through VpnService; the
+                    built-in core has that wiring, and Xray works behind it. */}
+                {CORES.filter((core) => !isAndroid || core.id === "builtin" || core.id === "xray").map((core) => {
                     const active = appSettings.core === core.id;
                     const version = versions[core.id];
                     return (

@@ -3,8 +3,15 @@ package plugins
 import (
 	_ "embed"
 	"net/http"
+	"runtime"
 	"strings"
 )
+
+// PagesAllowed says whether plugin pages may run. Not on Android, where the
+// WebView hands its native bridge (addJavascriptInterface) to every frame,
+// sandboxed or not, so a plugin page could reach the app's Go methods.
+// Plugins there bring their themes, fonts and routing setups only.
+var PagesAllowed = runtime.GOOS != "android"
 
 // Prefix is the path plugin files are served under: /plugins/<id>/<file>.
 const Prefix = "/plugins/"
@@ -55,6 +62,11 @@ func (s *Store) Handler(next http.Handler) http.Handler {
 		}
 		content, err := s.ReadFile(id, name)
 		if err != nil {
+			http.NotFound(writer, request)
+			return
+		}
+		// Plugin pages only where they can be sandboxed; see PagesAllowed.
+		if !PagesAllowed && (strings.HasPrefix(kind, "text/html") || strings.HasPrefix(kind, "text/javascript")) {
 			http.NotFound(writer, request)
 			return
 		}
@@ -115,6 +127,11 @@ func policy(host, id string, network []string) string {
 // client id header that a navigation cannot carry and a sandboxed page
 // cannot add without a CORS preflight, which is refused here too.
 func GuardRuntime(next http.Handler) http.Handler {
+	// Android calls the runtime through its JavaScript bridge, not these
+	// requests, and runs no plugin pages at all; see PagesAllowed.
+	if !PagesAllowed {
+		return next
+	}
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/wails/runtime" &&
 			(request.Method != http.MethodPost || request.Header.Get("x-wails-client-id") == "") {

@@ -31,6 +31,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, useT } from "@/lib/i18n";
+import { isAndroid } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { PluginInfo, PluginPermission, PluginPreview } from "@/types";
 
@@ -317,6 +318,7 @@ export function PluginsPanel() {
         <div className="space-y-4">
             <SettingsGroup>
                 <p className="text-xs leading-relaxed text-muted-foreground">{t("plugins.description")}</p>
+                {isAndroid ? <p className="text-xs leading-relaxed text-muted-foreground">{t("plugins.android")}</p> : null}
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void pick()}>
                     <Plus size={14} aria-hidden="true" />
                     {t("plugins.install")}

@@ -28,6 +28,8 @@ import {
     USER_FONT_PREFIX,
 } from "@/lib/appearance";
 import { invoke } from "@/lib/backend";
+import { backgroundHex, loadMonet, monetTheme, saveMonet, SystemPalette } from "@/lib/monet";
+import { isAndroid } from "@/lib/platform";
 import { currentLanguage, scriptOf, useI18n } from "@/lib/i18n";
 import { THEME_CLASSES, THEME_IDS } from "@/lib/themes";
 
@@ -46,6 +48,8 @@ interface AppearanceContext {
     /** Adds a font the backend stored, and chooses it. */
     addUserFont: (font: UserFont) => void;
     removeUserFont: (id: string) => void;
+    /** Whether "system" follows the wallpaper's colours (Android 12+). */
+    hasMonet: boolean;
     /** Replaces the themes and fonts the enabled plugins bring. */
     setPluginContent: (themes: CustomTheme[], fonts: UserFont[]) => void;
 }
@@ -67,7 +71,9 @@ const PROVIDER_THEMES = [...THEME_IDS, CUSTOM_THEME_IDS.dark, CUSTOM_THEME_IDS.l
 export const PROVIDER_CLASSES: Record<string, string> = { ...THEME_CLASSES, ...CUSTOM_THEME_CLASSES };
 
 function Appearance({ children }: { children: ReactNode }) {
-    const { theme, setTheme } = useTheme();
+    const { theme, setTheme, resolvedTheme } = useTheme();
+    // Android 12's wallpaper colours, which "system" follows there.
+    const [monet, setMonet] = useState<CustomTheme | null>(() => (isAndroid ? loadMonet() : null));
     const [prefs, setPrefs] = useState(loadAppearance);
     // The font follows the language as well as the choice: switching to a
     // language the chosen font does not cover changes the font in use.
@@ -83,8 +89,40 @@ function Appearance({ children }: { children: ReactNode }) {
     // Layout effect, so the colours change in the same frame as the class and
     // a switch never paints one frame of the half-applied result.
     useLayoutEffect(() => {
-        applyCustomTheme(activeCustom);
-    }, [activeCustom]);
+        applyCustomTheme(activeCustom ?? (theme === "system" ? monet ?? undefined : undefined));
+    }, [activeCustom, theme, monet]);
+
+    useEffect(() => {
+        if (!isAndroid) return;
+        const load = () =>
+            invoke<SystemPalette | null>("get_system_palette")
+                .then((palette) => {
+                    const next = palette ? monetTheme(palette) : null;
+                    setMonet(next);
+                    saveMonet(next);
+                })
+                .catch(() => undefined);
+        void load();
+        // The wallpaper, or dark mode, may have changed while away.
+        const onVisible = () => {
+            if (document.visibilityState === "visible") void load();
+        };
+        document.addEventListener("visibilitychange", onVisible);
+        return () => document.removeEventListener("visibilitychange", onVisible);
+    }, []);
+
+    // The status and navigation bars follow the page.
+    useEffect(() => {
+        if (!isAndroid) return;
+        const frame = requestAnimationFrame(() => {
+            const color = backgroundHex();
+            if (!color) return;
+            const dark = document.documentElement.classList.contains("dark") ||
+                [...document.documentElement.classList].some((name) => name.startsWith("theme-dark-"));
+            void invoke("set_system_bars", { color, light: !dark }).catch(() => undefined);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [theme, resolvedTheme, activeCustom, monet]);
 
     const update = useCallback((patch: Partial<AppearancePrefs>) => {
         setPrefs((current) => ({ ...current, ...patch }));
@@ -121,6 +159,7 @@ function Appearance({ children }: { children: ReactNode }) {
             setRadius: (radius) => update({ radius }),
             setMotion: (motion) => update({ motion }),
             activeCustom,
+            hasMonet: monet !== null,
             showCustomTheme,
             saveCustomTheme: (custom) => {
                 setPrefs((current) => {
@@ -187,7 +226,7 @@ function Appearance({ children }: { children: ReactNode }) {
                 }));
             },
         }),
-        [activeCustom, prefs, setTheme, update, showCustomTheme]
+        [activeCustom, monet, prefs, setTheme, update, showCustomTheme]
     );
 
     return <Context.Provider value={context}>{children}</Context.Provider>;
@@ -237,7 +276,7 @@ export function bootAppearance() {
         if (className) {
             document.documentElement.classList.add(className);
         }
-        applyCustomTheme(activeCustomTheme(prefs, stored));
+        applyCustomTheme(activeCustomTheme(prefs, stored) ?? (isAndroid && stored === "system" ? loadMonet() ?? undefined : undefined));
     } catch {
         // No storage: the defaults stand, and next-themes catches up on mount.
     }

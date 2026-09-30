@@ -37,6 +37,14 @@ import { BackupPanel } from "@/components/settings/backup";
 import { CorePanel } from "@/components/settings/cores";
 import { PluginsPanel } from "@/components/settings/plugins";
 import { WifiPanel } from "@/components/settings/wifi";
+import { isAndroid } from "@/lib/platform";
+
+/**
+ * Sections with nothing to offer on Android: the Wi-Fi rules need the
+ * network's name, which is not read there yet; Beam is a desktop app; and
+ * updates come from wherever the app was installed.
+ */
+const HIDDEN_ON_ANDROID = new Set(["wifi", "beam", "updates"]);
 import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
@@ -337,9 +345,10 @@ function SettingsView({
       }
       case "behaviour": {
         const parts = [
-          appSettings.launch_at_startup ? t("behaviour.summary.startup") : "",
+          appSettings.launch_at_startup && !isAndroid ? t("behaviour.summary.startup") : "",
           appSettings.auto_connect ? t("behaviour.summary.autoConnect") : "",
-          t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
+          isAndroid ? "" : t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
+          isAndroid && appSettings.auto_reconnect !== false ? t("behaviour.summary.reconnect") : "",
         ].filter(Boolean);
         return parts.join(" · ");
       }
@@ -467,17 +476,20 @@ function SettingsView({
         return (
           <>
             <SettingsGroup title={t("behaviour.startup")}>
-              <SettingsField
-                label={t("behaviour.launch")}
-                description={t("behaviour.launch.description")}
-                control={
-                  <Switch
-                    checked={appSettings.launch_at_startup}
-                    onCheckedChange={(checked) => onSettingsChange("launch_at_startup", checked)}
-                    aria-label={t("behaviour.launch")}
-                  />
-                }
-              />
+              {/* Android starts apps itself. */}
+              {isAndroid ? null : (
+                <SettingsField
+                  label={t("behaviour.launch")}
+                  description={t("behaviour.launch.description")}
+                  control={
+                    <Switch
+                      checked={appSettings.launch_at_startup}
+                      onCheckedChange={(checked) => onSettingsChange("launch_at_startup", checked)}
+                      aria-label={t("behaviour.launch")}
+                    />
+                  }
+                />
+              )}
               <SettingsField
                 label={t("behaviour.autoConnect")}
                 description={t("behaviour.autoConnect.description")}
@@ -580,6 +592,8 @@ function SettingsView({
               />
             </SettingsGroup>
 
+            {/* No window to close on a phone: the app goes to the background. */}
+            {isAndroid ? null : (
             <SettingsGroup
               title={t("behaviour.closing")}
               description={t("behaviour.closing.description")}
@@ -609,6 +623,7 @@ function SettingsView({
                 })}
               </div>
             </SettingsGroup>
+            )}
           </>
         );
 
@@ -1046,7 +1061,9 @@ function SettingsView({
               <div className="enter-stagger space-y-4 pe-1">{detail(open.id)}</div>
             ) : (
               <div className="enter-stagger space-y-2 pe-1">
-                {SECTIONS.filter((section) => section.id !== "beam" || beamPreview).map((section) => (
+                {SECTIONS.filter(
+                  (section) => (section.id !== "beam" || beamPreview) && !(isAndroid && HIDDEN_ON_ANDROID.has(section.id))
+                ).map((section) => (
                   <SettingsRow
                     key={section.id}
                     icon={section.icon}

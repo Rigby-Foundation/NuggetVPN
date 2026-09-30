@@ -1,0 +1,131 @@
+version: '3'
+
+# NuggetVPN's Android build, adapted from the Wails template: our own
+# main_android.go registers main (no generated overlay), the sing-box feature
+# tags are added, and the NDK toolchain is found on Windows hosts as well.
+#
+#   wails3 task android:build           debug library for one ABI (arm64)
+#   wails3 task android:package         release APK for arm64 and x86_64
+#   wails3 task android:run:device      debug build on a connected phone
+#
+# Needs: Go, the Android NDK (ANDROID_NDK_HOME, or under the SDK), and for
+# the APK a JDK 17+ and the Android SDK (ANDROID_HOME).
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  APP_ID: org.rigbyfoundation.nuggetvpn
+  MIN_SDK: '24'
+  SDK_ROOT:
+    sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"'
+  ADB:
+    sh: 'command -v adb || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}/platform-tools/adb"'
+  TAGS: 'android,{{.SING_BOX_TAGS}}'
+
+tasks:
+  build:
+    summary: Builds the Go library for one ABI (ARCH=arm64|amd64, PRODUCTION=true for release)
+    deps:
+      - task: common:build:frontend
+        vars:
+          PRODUCTION:
+            ref: .PRODUCTION
+    cmds:
+      - task: compile:go:shared
+        vars:
+          ARCH: '{{.ARCH | default "arm64"}}'
+          PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  compile:go:shared:
+    internal: true
+    summary: Compiles the Go code into app/src/main/jniLibs/<abi>/libwails.so
+    cmds:
+      - |
+        NDK_ROOT="$ANDROID_NDK_HOME"
+        if [ -z "$NDK_ROOT" ]; then
+          NDK_ROOT=$(ls -d "{{.SDK_ROOT}}"/ndk/* 2>/dev/null | sort -V | tail -1)
+        fi
+        if [ -z "$NDK_ROOT" ] || [ ! -d "$NDK_ROOT" ]; then
+          echo "Android NDK not found: set ANDROID_NDK_HOME, or install one with sdkmanager 'ndk;27.2.12479018'"
+          exit 1
+        fi
+        case "{{OS}}" in
+          darwin)  HOST=darwin-x86_64;  EXT="" ;;
+          windows) HOST=windows-x86_64; EXT=".cmd" ;;
+          *)       HOST=linux-x86_64;   EXT="" ;;
+        esac
+        TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/$HOST/bin"
+        case "{{.ARCH}}" in
+          arm64) TARGET=aarch64-linux-android; ABI=arm64-v8a ;;
+          amd64) TARGET=x86_64-linux-android;  ABI=x86_64 ;;
+          *) echo "Unsupported architecture: {{.ARCH}}"; exit 1 ;;
+        esac
+        export CC="$TOOLCHAIN/${TARGET}{{.MIN_SDK}}-clang${EXT}"
+        export CXX="$TOOLCHAIN/${TARGET}{{.MIN_SDK}}-clang++${EXT}"
+        export CGO_ENABLED=1 GOOS=android GOARCH={{.ARCH}}
+        mkdir -p build/android/app/src/main/jniLibs/$ABI
+        if [ "{{.PRODUCTION}}" = "true" ]; then
+          go build -buildmode=c-shared -tags "production,{{.TAGS}}" -trimpath -buildvcs=false -ldflags="-w -s" \
+            -o build/android/app/src/main/jniLibs/$ABI/libwails.so .
+        else
+          go build -buildmode=c-shared -tags "debug,{{.TAGS}}" -buildvcs=false -gcflags=all="-l" \
+            -o build/android/app/src/main/jniLibs/$ABI/libwails.so .
+        fi
+        rm -f build/android/app/src/main/jniLibs/$ABI/libwails.h
+
+  package:
+    summary: Release APK for arm64 and x86_64, in bin/ (signed with ANDROID_KEYSTORE_FILE if set, else the debug key)
+    deps:
+      - task: common:build:frontend
+        vars:
+          PRODUCTION: "true"
+    cmds:
+      - task: compile:go:shared
+        vars: { ARCH: arm64, PRODUCTION: "true" }
+      - task: compile:go:shared
+        vars: { ARCH: amd64, PRODUCTION: "true" }
+      - task: assemble
+        vars: { VARIANT: Release }
+
+  apk:
+    summary: Debug APK for arm64, in bin/
+    deps:
+      - task: build
+        vars: { ARCH: arm64 }
+    cmds:
+      - task: assemble
+        vars: { VARIANT: Debug }
+
+  assemble:
+    internal: true
+    cmds:
+      - |
+        cd build/android
+        chmod +x ./gradlew 2>/dev/null || true
+        ./gradlew assemble{{.VARIANT}}
+        mkdir -p "../../{{.BIN_DIR}}"
+        VARIANT_DIR=$(echo "{{.VARIANT}}" | tr '[:upper:]' '[:lower:]')
+        cp app/build/outputs/apk/$VARIANT_DIR/app-$VARIANT_DIR.apk "../../{{.BIN_DIR}}/{{.APP_NAME}}.apk"
+        echo "APK: {{.BIN_DIR}}/{{.APP_NAME}}.apk"
+
+  run:device:
+    summary: Builds a debug APK and runs it on a connected phone
+    deps:
+      - task: build
+        vars: { ARCH: arm64 }
+    cmds:
+      - task: assemble
+        vars: { VARIANT: Debug }
+      - '"{{.ADB}}" install -r "{{.BIN_DIR}}/{{.APP_NAME}}.apk"'
+      - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
+
+  logs:
+    summary: Streams the app's log from a connected phone
+    cmds:
+      - '"{{.ADB}}" logcat -v time | grep -E "(Wails|NuggetBridge|NuggetVpnService|GoLog|sing-box)"'
+
+  clean:
+    summary: Removes Android build outputs
+    cmds:
+      - rm -rf build/android/app/build build/android/.gradle build/android/app/src/main/jniLibs

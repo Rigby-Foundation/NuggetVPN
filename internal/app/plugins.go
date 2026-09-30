@@ -150,6 +150,9 @@ func pluginInfo(manifest plugins.Manifest, state plugins.State) PluginInfo {
 	if manifest.Panel != nil {
 		info.Panel, info.PanelTitle = url(manifest.Panel.File), manifest.Panel.Title
 	}
+	if !plugins.PagesAllowed {
+		info.Panel, info.PanelTitle, info.Background = "", "", ""
+	}
 	for _, theme := range manifest.Themes {
 		item := PluginTheme{
 			ID:   "plugin:" + manifest.ID + ":" + theme.ID,

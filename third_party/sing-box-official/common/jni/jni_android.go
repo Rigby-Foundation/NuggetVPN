@@ -4,10 +4,10 @@ package jni
 
 /*
 #include <stdint.h>
-extern uintptr_t box_jni_vm(void);
+extern uintptr_t nvpn_box_jni_vm(void);
 */
 import "C"
 
 func VM() uintptr {
-	return uintptr(C.box_jni_vm())
+	return uintptr(C.nvpn_box_jni_vm())
 }

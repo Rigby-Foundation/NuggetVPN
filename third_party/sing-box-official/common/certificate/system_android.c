@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void *box_system_certificates_der(uintptr_t vmPtr, int *out_length) {
+void *nvpn_box_system_certificates_der(uintptr_t vmPtr, int *out_length) {
 	*out_length = 0;
 
 	JavaVM *vm = (JavaVM *) vmPtr;

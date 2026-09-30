@@ -1,6 +1,6 @@
 # NuggetVPN
 
-A fast, good-looking VPN client for Windows, macOS and Linux, built with
+A fast, good-looking VPN client for Windows, macOS, Linux and Android, built with
 [Wails v3](https://v3.wails.io/) and [React 19](https://react.dev/).
 
 Every proxy core it can run is compiled **into** the app as a Go library.
@@ -198,6 +198,37 @@ the TUN interface. It asks once per app session, not once per connection.
 Wails ships the `.app`, `.deb`, `.rpm` and AppImage packagers. The DMG
 script is ours, in `build/darwin/make-dmg.sh`, and it only uses `hdiutil` and
 `osascript`.
+
+### Android
+
+The same app, on Wails' Android support: the Go code is built into a shared
+library that a small Java host (`build/android`) loads into a WebView. You
+need the Android NDK (`ANDROID_NDK_HOME`), and for the APK a JDK 17 and the
+Android SDK (`ANDROID_HOME`).
+
+```bash
+wails3 task android:apk          # debug APK for arm64, in bin/
+wails3 task android:package      # release APK for arm64 and x86_64
+wails3 task android:run:device   # debug build on a connected phone
+```
+
+How it differs from the desktop:
+
+- **The tunnel:** Android's VpnService provides it. The core service runs
+  inside the app, and `internal/android` gives sing-box the tunnel, keeps the
+  core's own sockets out of it, and reports the network in use.
+- **Cores:** the built-in core, and Xray behind it. Official sing-box and
+  mihomo aren't available there yet.
+- **The "System" theme:** on Android 12 and later it follows the
+  wallpaper's colours (Material You).
+- **Plugins:** they bring themes, fonts and routing setups, but their pages
+  don't run. Android's WebView gives its native bridge to every frame, so a
+  plugin page couldn't be kept apart from the app.
+- **Not on Android:** Wi-Fi rules, launching at login, the global shortcut,
+  the tray, the command line and in-app updates.
+
+Release APKs are signed with the key from the `ANDROID_KEYSTORE_*` secrets;
+see `.github/workflows/release.yml`.
 
 ### Build tags are required
 

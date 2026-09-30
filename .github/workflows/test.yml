@@ -67,6 +67,57 @@ jobs:
         run: go test -tags "$SING_BOX_TAGS" -count=1 ./...
         shell: bash
 
+  android:
+    name: Build (android)
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install the Android NDK
+        run: |
+          sdkmanager --install "ndk;27.2.12479018" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Put Go tool binaries on PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
+      - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Build a debug APK
+        run: wails3 task android:apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NuggetVPN-android-debug
+          path: bin/NuggetVPN.apk
+          if-no-files-found: error
+
   build:
     name: Build (${{ matrix.name }})
     # Deliberately not gated on `test`: both compile the same dependency tree,

@@ -207,6 +207,9 @@ func (i *Instance) StartCore(request StartRequest, sink LogSink) error {
 	if err := i.stopLocked(); err != nil {
 		return fmt.Errorf("stop previous instance: %w", err)
 	}
+	if err := coreAvailable(request.Core); err != nil {
+		return err
+	}
 
 	switch request.Core {
 	case "", CoreBuiltin:
@@ -248,7 +251,7 @@ func (i *Instance) StartCore(request StartRequest, sink LogSink) error {
 // nothing running.
 func (i *Instance) startBuiltinLocked(configJSON []byte, sink LogSink) error {
 
-	ctx := include.Context(context.Background())
+	ctx := withPlatform(include.Context(context.Background()))
 	options, err := sbjson.UnmarshalExtendedContext[option.Options](ctx, configJSON)
 	if err != nil {
 		return fmt.Errorf("invalid sing-box config: %w", err)
@@ -312,5 +315,7 @@ func (i *Instance) stopLocked() error {
 	if cancel != nil {
 		cancel()
 	}
-	return instance.Close()
+	err := instance.Close()
+	platformStopped()
+	return err
 }

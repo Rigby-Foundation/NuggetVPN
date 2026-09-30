@@ -152,7 +152,7 @@ function ThemePicker({ theme, setTheme }: Props) {
     const palettes = THEME_PRESETS.filter((preset) => preset.family === "palette").sort(
         (a, b) => Number(a.mode === "dark") - Number(b.mode === "dark")
     );
-    const { prefs, activeCustom, showCustomTheme, saveCustomTheme, deleteCustomTheme } =
+    const { prefs, activeCustom, hasMonet, showCustomTheme, saveCustomTheme, deleteCustomTheme } =
         useAppearance();
     const [editing, setEditing] = useState<{ theme: CustomTheme; isNew: boolean } | null>(null);
 
@@ -191,7 +191,7 @@ function ThemePicker({ theme, setTheme }: Props) {
                         ) : null}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
-                        {t("picker.systemHint")}
+                        {t(hasMonet ? "picker.systemMonet" : "picker.systemHint")}
                     </span>
                 </span>
             </button>

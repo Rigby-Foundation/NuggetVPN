@@ -374,7 +374,9 @@ func buildInbounds(settings models.AppSettings, mixedPort int, bypass *Bypass) [
 		"route_exclude_address": privateRanges,
 	}
 	// strict_route is only implemented on Linux and Windows.
-	if runtime.GOOS != "darwin" {
+	// Not on Android, where VpnService owns the routes and there is no
+	// firewall for the core to set.
+	if runtime.GOOS != "darwin" && runtime.GOOS != "android" {
 		tun["strict_route"] = true
 	}
 	if name := tunInterfaceNameFor(runtime.GOOS); name != "" {
@@ -670,7 +672,8 @@ func cleanList(values []string) []string {
 // is the Wintun adapter name.
 func tunInterfaceNameFor(goos string) string {
 	switch goos {
-	case "darwin", "ios":
+	// Android names the interface itself (tun0) when VpnService makes it.
+	case "darwin", "ios", "android":
 		return ""
 	default:
 		return "NuggetVPN"
