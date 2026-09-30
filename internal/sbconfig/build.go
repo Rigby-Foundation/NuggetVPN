@@ -64,13 +64,20 @@ type Request struct {
 	// another program (Xray) takes over talking to the servers. It then also
 	// owns the proxy chain, so Build does not build one.
 	Dial func(models.Profile) (link.Outbound, error)
-	// ServerDomains are server hostnames to resolve without the tunnel, for
-	// servers Build does not dial itself.
-	ServerDomains []string
+	// ServerDomains returns server hostnames to resolve without the tunnel,
+	// for servers Build does not dial itself. Asked after every server has
+	// gone through Dial.
+	ServerDomains func() []string
 	// DirectProcesses are programs whose traffic goes straight out: the
 	// program that dials the servers must not have its own connections
 	// routed back to itself.
 	DirectProcesses []string
+
+	// ControllerPort and ControllerSecret, when set, open the Clash API on
+	// loopback: how the service reads an external sing-box's counters and
+	// connections. The built-in core is read in-process and needs neither.
+	ControllerPort   int
+	ControllerSecret string
 }
 
 // Result is a generated configuration plus the details the caller reports back
@@ -192,7 +199,10 @@ func Build(request Request) (Result, error) {
 	outbounds = append(outbounds, map[string]any{"type": "direct", "tag": DirectTag})
 
 	splitTunnel := settings.SplitTunnelling()
-	serverDomains := dedupe(append(proxyServerDomains(outbounds, endpoints), request.ServerDomains...))
+	serverDomains := proxyServerDomains(outbounds, endpoints)
+	if request.ServerDomains != nil {
+		serverDomains = dedupe(append(serverDomains, request.ServerDomains()...))
+	}
 	geo := geoSources{local: request.LocalRuleSets, custom: request.CustomGeo}
 	plan := newRoutePlan(settings, geo, request.RuleLists, outboundFor)
 	plan.directProcesses = request.DirectProcesses
@@ -393,8 +403,9 @@ func (p *routePlan) buildDNS(splitTunnel bool, serverDomains []string) map[strin
 	}
 
 	dns := map[string]any{
-		"strategy":          "ipv4_only",
-		"independent_cache": true,
+		"strategy": "ipv4_only",
+		// No independent_cache: since 1.14 the cache is always kept per
+		// server, and official sing-box 1.15 refuses the old option outright.
 		// Recovers the domain behind an address for logging and rule matching
 		// now that there is no fake-IP mapping to consult.
 		"reverse_mapping": true,
@@ -577,6 +588,14 @@ func buildExperimental(request Request) map[string]any {
 	// with permissive CORS, so every local program and every web page the user
 	// visits could read the live connection list and drive the core.
 	experimental["clash_api"] = map[string]any{}
+	if request.ControllerPort > 0 {
+		// An external sing-box, which the service can only reach over HTTP:
+		// loopback only, behind a secret made for this start.
+		experimental["clash_api"] = map[string]any{
+			"external_controller": fmt.Sprintf("127.0.0.1:%d", request.ControllerPort),
+			"secret":              request.ControllerSecret,
+		}
+	}
 	if request.CacheFilePath != "" {
 		experimental["cache_file"] = map[string]any{
 			"enabled":      true,

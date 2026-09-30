@@ -28,6 +28,9 @@ type LiveConnection struct {
 	// "everything else", "" for the connections the app routes itself (the
 	// local network, the proxy's own address).
 	Rule string `json:"rule"`
+	// RuleText is an external core's own description of the matched rule,
+	// when it cannot be traced back to a routing rule.
+	RuleText string `json:"rule_text,omitempty"`
 	// Route is "proxy" or "direct".
 	Route string `json:"route"`
 	// Server is the profile the connection goes through, for proxied ones.
@@ -45,6 +48,7 @@ func (a *App) GetConnections() []LiveConnection {
 	connected := a.state.Status == StatusConnected
 	owners := a.ruleOwners
 	servers := a.serverFor
+	texts := a.ruleTexts
 	a.mu.Unlock()
 	if !connected {
 		return result
@@ -73,12 +77,19 @@ func (a *App) GetConnections() []LiveConnection {
 			live.App = filepath.Base(strings.ReplaceAll(connection.Process, `\`, "/"))
 		}
 		switch {
+		case connection.RuleText != "":
+			// An external core names the rule rather than numbering it.
+			if owner, ok := ruleForText(texts, connection.RuleText); ok {
+				live.Rule = owner
+			} else {
+				live.RuleText = connection.RuleText
+			}
 		case connection.Rule < 0:
 			live.Rule = DefaultRuleHits
 		case connection.Rule < len(owners):
 			live.Rule = owners[connection.Rule]
 		}
-		if connection.Outbound == sbconfig.DirectTag {
+		if strings.EqualFold(connection.Outbound, sbconfig.DirectTag) {
 			live.Route = "direct"
 		} else {
 			live.Server = servers[connection.Outbound]

@@ -84,8 +84,10 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         };
     }, [connected, paused]);
 
-    const ruleLabel = (id: string) => {
+    const ruleLabel = (id: string, text?: string) => {
         if (id === DEFAULT_RULE) return t("routing.catchAll");
+        // An external core's own description, where it maps to no rule.
+        if (!id && text) return text;
         if (!id) return t("connections.builtIn");
         const index = rules.findIndex((rule) => rule.id === id);
         if (index < 0) return t("connections.oldRule");
@@ -100,7 +102,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         const needle = filter.trim().toLowerCase();
         const matching = needle
             ? rows.filter((row) =>
-                  [row.host, row.destination, row.app, row.protocol, ruleLabel(row.rule), via(row)]
+                  [row.host, row.destination, row.app, row.protocol, ruleLabel(row.rule, row.rule_text), via(row)]
                       .filter(Boolean)
                       .some((field) => String(field).toLowerCase().includes(needle))
               )
@@ -229,7 +231,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                                 <td className="px-2 py-1.5">
                                                     <span className="flex items-center gap-1.5 truncate">
                                                         {meta ? <meta.icon size={12} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" /> : null}
-                                                        <span className="truncate">{ruleLabel(row.rule)}</span>
+                                                        <span className="truncate" title={row.rule_text}>{ruleLabel(row.rule, row.rule_text)}</span>
                                                     </span>
                                                 </td>
                                                 <td className="px-2 py-1.5">

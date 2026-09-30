@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/sagernet/sing-box/option"
 	sbjson "github.com/sagernet/sing/common/json"
 
+	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
 
@@ -330,5 +332,53 @@ func TestLockdownConfig(t *testing.T) {
 	last := config.Route.Rules[len(config.Route.Rules)-1]
 	if last["action"] != "reject" || len(last) != 1 {
 		t.Errorf("the last rule should refuse everything: %v", last)
+	}
+}
+
+// The same config, run by official sing-box instead of the built-in fork:
+// its own check must accept it. Needs NUGGET_SINGBOX (a 1.15 binary).
+func TestOfficialSingBoxAcceptsTheConfig(t *testing.T) {
+	binary := os.Getenv("NUGGET_SINGBOX")
+	if binary == "" {
+		t.Skip("set NUGGET_SINGBOX to check with official sing-box")
+	}
+	request := featureRequest(t)
+	request.ControllerPort, request.ControllerSecret = 19099, "s3cret"
+	result, err := Build(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(file, result.JSON, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command(binary, "check", "-c", file).CombinedOutput()
+	if err != nil {
+		t.Fatalf("official sing-box rejected the config: %v\n%s", err, output)
+	}
+}
+
+// With Xray dialing the servers, the built-in core gets SOCKS entry points
+// instead, lets Xray itself straight out, and resolves the real servers'
+// names without the tunnel.
+func TestEngineConfigIsAccepted(t *testing.T) {
+	request := featureRequest(t)
+	port := 20000
+	request.Dial = func(profile models.Profile) (link.Outbound, error) {
+		port++
+		return link.Outbound{"type": "socks", "server": "127.0.0.1", "server_port": port, "version": "5", "username": "u", "password": "p"}, nil
+	}
+	request.ServerDomains = func() []string { return []string{"main.example.com", "jp.example.com"} }
+	request.DirectProcesses = []string{`C:\ProgramData\NuggetVPN\cores\xray\xray.exe`}
+	result, err := Build(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	construct(t, result.JSON)
+	text := string(result.JSON)
+	for _, want := range []string{`"process_path"`, "xray.exe", "jp.example.com", `"type": "socks"`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %s", want)
+		}
 	}
 }

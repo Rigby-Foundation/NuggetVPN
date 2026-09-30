@@ -102,6 +102,8 @@ export interface AppSettings {
     update_check: boolean | null;
     /** "Ctrl+Alt+V"-style; "" for none. */
     global_shortcut: string;
+    /** Which program runs the tunnel. */
+    core: CoreName;
     /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;
@@ -232,6 +234,17 @@ export interface RoutingSetup {
     graph: RoutingGraph;
 }
 
+/** The cores the tunnel can run on. */
+export type CoreName = "builtin" | "sing-box" | "mihomo" | "xray";
+
+/** An installable core; see core.CoreInfo. */
+export interface CoreInfo {
+    name: CoreName;
+    installed: boolean;
+    version?: string;
+    path?: string;
+}
+
 /** An open connection; see app.LiveConnection. */
 export interface LiveConnection {
     id: string;
@@ -243,6 +256,8 @@ export interface LiveConnection {
     app_path?: string;
     /** Routing rule id; "__default" for everything else, "" for built-in routes. */
     rule: string;
+    /** An external core's own name for the rule, when it maps to none. */
+    rule_text?: string;
     route: "proxy" | "direct";
     server?: string;
     upload: number;

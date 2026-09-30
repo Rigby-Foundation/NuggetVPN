@@ -25,6 +25,7 @@ var servers = []models.Profile{
 	{ID: "tuic", Name: "TUIC", ConfigLink: "tuic://11111111-2222-3333-4444-555555555555:password@tuic.example.com:443?congestion_control=bbr&alpn=h3#TUIC"},
 	{ID: "ss", Name: "SS", ConfigLink: "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ@ss.example.com:8388#SS"},
 	{ID: "wg", Name: "WG", ConfigLink: "wireguard://cHJpdmF0ZWtleXByaXZhdGVrZXlwcml2YXRla2V5MTI%3D@wg.example.com:51820?address=10.0.0.2%2F32&publickey=cHVibGlja2V5cHVibGlja2V5cHVibGlja2V5MTIzND0%3D&mtu=1280#WG"},
+	{ID: "xhttp", Name: "XHTTP", ConfigLink: "vless://11111111-2222-3333-4444-555555555555@x.example.com:443?encryption=none&security=tls&type=xhttp&path=%2Fdl&host=cdn.example.com&mode=stream-one#X"},
 	{ID: "hop", Name: "Hop", ConfigLink: "trojan://pw@hop.example.com:443?sni=hop.example.com#H"},
 }
 
@@ -57,7 +58,7 @@ func featureRequest(t *testing.T) Request {
 	settings.Normalize()
 	return Request{
 		Profile: servers[0], Profiles: servers, Settings: settings,
-		Alternatives:     servers[:7],
+		Alternatives:     servers[:8],
 		MixedPort:        17890,
 		RuleLists:        map[string]sbconfig.RuleList{"https://lists.example/blocked.lst": {Path: listPath}},
 		ControllerPort:   19090,

@@ -89,6 +89,7 @@ const PENDING_SETTINGS: AppSettings = {
     clipboard_offer: null,
     update_check: null,
     global_shortcut: "",
+    core: "builtin",
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Archive,
   CheckCircle2,
+  Cpu,
   CircleArrowUp,
   ChevronDown,
   ChevronUp,
@@ -31,6 +32,7 @@ import { BeamMigrationPanel } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import { UpdatesPanel } from "@/components/settings/updates";
 import { BackupPanel } from "@/components/settings/backup";
+import { CorePanel } from "@/components/settings/cores";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
 import {
@@ -99,6 +101,7 @@ type SectionId =
   | "sync"
   | "beam"
   | "backup"
+  | "core"
   | "updates";
 
 interface Section {
@@ -199,6 +202,12 @@ const SECTIONS: Section[] = [
     icon: PackageOpen,
     title: "settings.beam",
     blurb: "settings.beam.blurb",
+  },
+  {
+    id: "core",
+    icon: Cpu,
+    title: "settings.core",
+    blurb: "settings.core.blurb",
   },
   {
     id: "backup",
@@ -341,6 +350,16 @@ function SettingsView({
         ].join(" · ");
       case "sync":
         return appSettings.auth_server || t("status.idle");
+      case "core":
+        return t(
+          appSettings.core === "mihomo"
+            ? "core.mihomo"
+            : appSettings.core === "xray"
+              ? "core.xray"
+              : appSettings.core === "sing-box"
+                ? "core.singbox"
+                : "core.builtin"
+        );
       case "beam": {
         if (appSettings.beam_migration === "done") return t("settings.beam.done");
         const count = beamPreview?.subscriptions.length ?? 0;
@@ -889,6 +908,9 @@ function SettingsView({
 
       case "backup":
         return <BackupPanel />;
+
+      case "core":
+        return <CorePanel appSettings={appSettings} onSettingsChange={onSettingsChange} />;
 
       case "sync":
         return (

@@ -530,7 +530,7 @@ func (a *App) startProfile(
 		a.appendLog("WARN " + warning)
 	}
 
-	result, err := sbconfig.Build(sbconfig.Request{
+	request := sbconfig.Request{
 		Profile:       profile,
 		Profiles:      profiles,
 		Settings:      settings,
@@ -540,7 +540,19 @@ func (a *App) startProfile(
 		CustomGeo:     customGeo,
 		RuleLists:     lists,
 		Alternatives:  alternatives,
-	})
+	}
+
+	// Another core than the built-in one: see cores.go.
+	switch settings.Core {
+	case models.CoreMihomo:
+		return a.startMihomo(profile, profiles, settings, alternatives, lists)
+	case models.CoreSingBox:
+		return a.startExternalSingBox(profile, request)
+	case models.CoreXray:
+		return a.startXray(profile, profiles, settings, request)
+	}
+
+	result, err := sbconfig.Build(request)
 	if err != nil {
 		return err
 	}
@@ -550,6 +562,7 @@ func (a *App) startProfile(
 	a.mu.Lock()
 	a.ruleOwners = result.RuleOwners
 	a.serverFor = result.ServerFor
+	a.ruleTexts = nil
 	a.mu.Unlock()
 
 	// Mirror the config to disk purely so users can inspect what ran.

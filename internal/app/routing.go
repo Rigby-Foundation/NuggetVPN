@@ -87,8 +87,21 @@ func (a *App) GetRuleHits() map[string]int {
 	a.mu.Lock()
 	connected := a.state.Status == StatusConnected
 	owners := a.ruleOwners
+	external := a.ruleTexts != nil
 	a.mu.Unlock()
-	if !connected || len(owners) == 0 {
+	if !connected {
+		return result
+	}
+	// An external core has no per-rule counters; count its connections.
+	if external {
+		for _, connection := range a.GetConnections() {
+			if connection.Rule != "" {
+				result[connection.Rule]++
+			}
+		}
+		return result
+	}
+	if len(owners) == 0 {
 		return result
 	}
 
