@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"slices"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -97,8 +98,16 @@ func runCoreService() error {
 }
 
 func runGUI() {
-	notifier := notifications.New()
+	// System notifications, where Wails has them. On Android its Linux
+	// notifier would look for D-Bus, fail, and stop the app from starting.
+	var notifier *notifications.NotificationService
+	services := []application.Service{}
+	if runtime.GOOS != "android" {
+		notifier = notifications.New()
+		services = append(services, application.NewService(notifier))
+	}
 	service := app.New(version, appIcon, notifier)
+	services = append([]application.Service{application.NewService(service)}, services...)
 
 	// Started by the system at login: come up without a window, unless
 	// closing is set to quit — then there would be no tray icon to reopen it
@@ -115,10 +124,7 @@ func runGUI() {
 		Name:        "NuggetVPN",
 		Description: "Modern, lightweight VPN client with an embedded sing-box core",
 		Icon:        appIcon,
-		Services: []application.Service{
-			application.NewService(service),
-			application.NewService(notifier),
-		},
+		Services:    services,
 		Assets: application.AssetOptions{
 			Handler: app.PluginFiles(app.UserFilesHandler(application.AssetFileServerFS(assets))),
 			// Before the runtime endpoint: see plugins.GuardRuntime.

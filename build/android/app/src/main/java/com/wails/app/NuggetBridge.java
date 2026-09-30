@@ -16,14 +16,12 @@ import android.net.VpnService;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.system.Os;
 import android.util.Log;
 import android.view.View;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -59,29 +57,6 @@ public final class NuggetBridge {
 
     private NuggetBridge(Context context) {
         this.context = context.getApplicationContext();
-    }
-
-    /**
-     * Points the Go side's folders at the app's private storage. Go reads the
-     * environment once, when the library loads, so this must run before
-     * anything touches WailsBridge.
-     */
-    public static void prepareEnvironment(Context context) {
-        try {
-            File files = context.getFilesDir();
-            File runtime = new File(files, "runtime");
-            //noinspection ResultOfMethodCallIgnored
-            runtime.mkdirs();
-            Os.setenv("HOME", files.getAbsolutePath(), true);
-            Os.setenv("XDG_DATA_HOME", files.getAbsolutePath(), true);
-            Os.setenv("XDG_CONFIG_HOME", new File(files, "config").getAbsolutePath(), true);
-            // Not the system cache folder: Android may empty it while the
-            // core's socket and rule lists are in use.
-            Os.setenv("XDG_CACHE_HOME", runtime.getAbsolutePath(), true);
-            Os.setenv("TMPDIR", context.getCacheDir().getAbsolutePath(), true);
-        } catch (Exception e) {
-            Log.e(TAG, "prepareEnvironment", e);
-        }
     }
 
     /** Hands the bridge to Go; called once the Go library is loaded. */

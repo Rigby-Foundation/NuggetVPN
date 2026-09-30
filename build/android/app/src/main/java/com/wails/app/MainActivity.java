@@ -105,10 +105,6 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        // NuggetVPN: before the Go library loads, which reads the environment
-        // once; see NuggetBridge.prepareEnvironment.
-        NuggetBridge.prepareEnvironment(this);
-
         // Initialize the native Go library, once per process
         if (sharedBridge == null) {
             sharedBridge = new WailsBridge(this);

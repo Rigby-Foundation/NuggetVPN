@@ -36,6 +36,7 @@ frontend/tsconfig.tsbuildinfo
 # only its build outputs are ignored.
 build/ios/
 build/android/.gradle/
+build/android/build/
 build/android/app/build/
 build/android/app/src/main/jniLibs/
 build/android/local.properties

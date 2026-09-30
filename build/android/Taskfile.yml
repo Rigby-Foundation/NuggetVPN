@@ -64,6 +64,9 @@ tasks:
         export CC="$TOOLCHAIN/${TARGET}{{.MIN_SDK}}-clang${EXT}"
         export CXX="$TOOLCHAIN/${TARGET}{{.MIN_SDK}}-clang++${EXT}"
         export CGO_ENABLED=1 GOOS=android GOARCH={{.ARCH}}
+        # 16 KB pages: Android 15 devices can use them, and warn about (or
+        # refuse) libraries aligned for 4 KB.
+        export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
         mkdir -p build/android/app/src/main/jniLibs/$ABI
         if [ "{{.PRODUCTION}}" = "true" ]; then
           go build -buildmode=c-shared -tags "production,{{.TAGS}}" -trimpath -buildvcs=false -ldflags="-w -s" \
