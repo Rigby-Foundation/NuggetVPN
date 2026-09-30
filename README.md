@@ -22,6 +22,10 @@ nothing is shelled out to.
 - **Fastest server**: the tunnel keeps measuring the best few servers and
   moves to whichever is fastest.
 - **Kill switch** and **automatic reconnect**.
+- **Server health**: servers are checked in the background, and in
+  automatic mode the ones that keep failing are tried last.
+- **Wi-Fi rules**: connect on networks you don't trust, disconnect on ones
+  you do.
 - **QR codes** for sharing a server. `nuggetvpn://` links and links copied
   to the clipboard are offered for import.
 
@@ -35,6 +39,8 @@ nothing is shelled out to.
 - **Ready-made setups**, custom geo files, notes, and `.vflow` files for
   sharing a whole routing setup.
 - **Live hit counts** on every rule.
+- **A schedule** that switches routing setups by time of the week, such as
+  "Work" on weekdays from 9 to 6.
 
 ### Watching
 
@@ -42,15 +48,21 @@ nothing is shelled out to.
   the rule that caught it and the server it went through. You can close any
   of them.
 - **Live traffic counters** read from the core, not estimated.
+- **Statistics**: traffic by app, day by day, and each server's uptime and
+  latency over the last day and week. Kept on your computer only.
+- **Speed test** through the current server, from the Connection screen.
 - **Logs** streamed from the core. They are off by default in release
   builds.
+- **A command line**: `NuggetVPN status`, `connect Tokyo`, `disconnect` and
+  more control the running app from a terminal or a script. See
+  [docs/cli.md](docs/cli.md).
 
 ### Plugins
 
 Plugins can bring themes, fonts and routing setups, and add pages of their
 own. A plugin’s code runs in a sandbox, sealed off from the app and your
 files, and can only do what you allow when you install it. See
-[docs/plugins.md](docs/plugins.md) to write one, and
+[docs/plugins](docs/plugins/README.md) to write one, and
 [`examples/plugins/glance`](examples/plugins/glance) for an example.
 
 ### Everything else
@@ -234,6 +246,11 @@ go build -tags "$(make -s tags)" .
 - **`internal/link/`**: parses share links, sing-box JSON and Clash YAML.
 - **`internal/remote/`**: subscriptions and the optional profile sync server.
 - **`internal/probe/`**: latency and connectivity checks.
+- **`internal/stats/`**, **`internal/speedtest/`**: statistics kept over
+  time, and the speed test.
+- **`internal/wifi/`**: reads the Wi-Fi network's name on each system.
+- **`internal/cli/`**: the command line, and the socket the app answers it
+  on.
 - **`internal/geodat/`**, **`internal/vflow/`**: geo files and the `.vflow`
   routing format.
 - **`internal/beam/`**, **`internal/autostart/`**: Beam import and launch at
@@ -249,6 +266,11 @@ go build -tags "$(make -s tags)" .
 - **`frontend/`**: the React app. `src/lib/backend.ts` bridges it to Go, and
   `src/locales/` holds the translations.
 - **`Taskfile.yml`**, **`build/`**: the Wails build and packaging pipeline.
+
+## Documentation
+
+[`docs/`](docs/README.md) has guides for writing plugins and using the
+command line.
 
 ## Troubleshooting
 
