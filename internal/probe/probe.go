@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
@@ -18,6 +19,10 @@ const (
 	pingTimeout = 2 * time.Second
 	workerLimit = 12
 )
+
+// dialControl, when set, prepares each probe socket before it connects; on
+// Android it keeps the socket out of the tunnel.
+var dialControl func(network, address string, conn syscall.RawConn) error
 
 // ProfilePing is one measurement; PingMS is null when the probe failed.
 type ProfilePing struct {
@@ -210,7 +215,8 @@ func measureICMP(host string, timeout time.Duration) *uint64 {
 
 func measureTCP(host string, port int, timeout time.Duration) *uint64 {
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), timeout)
+	dialer := net.Dialer{Timeout: timeout, Control: dialControl}
+	conn, err := dialer.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return nil
 	}

@@ -30,6 +30,7 @@ import { useLogs } from "@/hooks/use-logs";
 import { LOCAL, profileDomain, reconcileSelection, useProfiles } from "@/hooks/use-profiles";
 import { useTraffic } from "@/hooks/use-traffic";
 import { stripAnsi } from "@/lib/ansi";
+import { useBack } from "@/lib/back";
 import { useI18n, useT } from "@/lib/i18n";
 import type { HostActions } from "@/lib/plugin-host";
 import { cn } from "@/lib/utils";
@@ -945,6 +946,9 @@ function App() {
         }
         startTransition(() => setActiveTab(tab));
     };
+    // On a phone, Back from any other tab returns to Connection before it
+    // leaves the app.
+    useBack(activeTab !== "connection", () => startTransition(() => setActiveTab("connection")));
     const isMac = platform === "macos";
     // A phone: no window to control, and the page is the whole screen.
     const isPhone = platform === "android";

@@ -4,6 +4,7 @@ import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
+import { useBackEscapes } from "@/lib/back"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +62,8 @@ function DialogContent({
                        }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Content is only mounted while open, so this holds for exactly that long.
+  useBackEscapes()
   return (
       <DialogPortal data-slot="dialog-portal">
         <DialogOverlay />

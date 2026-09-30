@@ -4,6 +4,7 @@ import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
+import { useBackEscapes } from "@/lib/back"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -59,6 +60,7 @@ function SheetContent({
                       }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
 }) {
+  useBackEscapes()
   return (
       <SheetPortal>
         <SheetOverlay />

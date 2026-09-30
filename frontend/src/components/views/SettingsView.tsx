@@ -37,6 +37,7 @@ import { BackupPanel } from "@/components/settings/backup";
 import { CorePanel } from "@/components/settings/cores";
 import { PluginsPanel } from "@/components/settings/plugins";
 import { WifiPanel } from "@/components/settings/wifi";
+import { useBack } from "@/lib/back";
 import { isAndroid } from "@/lib/platform";
 
 /**
@@ -273,6 +274,8 @@ function SettingsView({
     setDirection(id === null ? "back" : "forward");
     setOpenId(id);
   };
+  // On a phone, Back from a section returns to the categories.
+  useBack(openId !== null, () => navigate(null));
 
   // Back to the categories when Settings is clicked from inside a section.
   // The first render is skipped: arriving at Settings is not a request to
@@ -350,7 +353,9 @@ function SettingsView({
           isAndroid ? "" : t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
           isAndroid && appSettings.auto_reconnect !== false ? t("behaviour.summary.reconnect") : "",
         ].filter(Boolean);
-        return parts.join(" · ");
+        // The parts read mid-sentence; whichever comes first starts it.
+        const summary = parts.join(" · ");
+        return summary.charAt(0).toLocaleUpperCase() + summary.slice(1);
       }
       case "connection":
         return t("connection.summary", { mtu: String(appSettings.mtu), dns: appSettings.dns || "—" });
@@ -403,7 +408,7 @@ function SettingsView({
         return t("settings.beam.found", { count });
       }
       default:
-        return section.blurb;
+        return t(section.blurb);
     }
   };
 

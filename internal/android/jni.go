@@ -284,3 +284,10 @@ func AppIcon(packageName string) string {
 	icon, _ := call("appIcon", packageName)
 	return icon
 }
+
+// Protect keeps a socket out of the tunnel, so what it measures is the path to
+// the server rather than a trip through the core. Before the tunnel is up
+// there is nothing to keep it out of, and it reports true.
+func Protect(fd int) bool {
+	return callBool("protect", fd) || !callBool("vpnRunning", 0)
+}

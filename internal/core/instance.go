@@ -147,8 +147,13 @@ func (i *Instance) Connections() ([]ConnectionInfo, bool) {
 		if info.Host == "" && metadata.Destination.IsFqdn() {
 			info.Host = metadata.Destination.Fqdn
 		}
-		if owner := metadata.ProcessInfo; owner != nil && len(owner.ProcessPaths) > 0 {
-			info.Process = owner.ProcessPaths[0]
+		if owner := metadata.ProcessInfo; owner != nil {
+			// A phone knows the app by its package, not a path.
+			if len(owner.ProcessPaths) > 0 {
+				info.Process = owner.ProcessPaths[0]
+			} else if len(owner.PackageNames) > 0 {
+				info.Process = owner.PackageNames[0]
+			}
 		}
 		if connection.Rule != nil {
 			if position, ok := index[connection.Rule]; ok {

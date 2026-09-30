@@ -6,6 +6,7 @@ import PageShell from "@/components/layout/PageShell";
 import { kindMeta } from "@/components/routing/nodes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -42,6 +43,7 @@ interface ConnectionsViewProps {
  */
 function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const t = useT();
+    const appLabels = useAppLabels();
     const [rows, setRows] = useState<Row[]>([]);
     const [filter, setFilter] = useState("");
     const [sort, setSort] = useState<Sort>("recent");
@@ -160,8 +162,8 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                 </div>
             ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-48 flex-1">
                             <Search size={14} className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                             <Input
                                 value={filter}
@@ -196,8 +198,11 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                 {rows.length === 0 ? t("connections.none") : t("connections.noMatch")}
                             </p>
                         ) : (
-                            <table className="w-full table-fixed text-xs">
-                                <thead className="sticky top-0 z-10 bg-card/95 text-start text-[11px] text-muted-foreground backdrop-blur">
+                            // Below sm the table is laid out as cards: the site on top,
+                            // app and rule under it, then the server, with the data
+                            // on the right. Five columns left a phone a word per cell.
+                            <table className="w-full table-fixed text-xs max-sm:block">
+                                <thead className="max-sm:hidden sticky top-0 z-10 bg-card/95 text-start text-[11px] text-muted-foreground backdrop-blur">
                                     <tr>
                                         <th className="w-[30%] px-3 py-2 text-start font-medium">{t("connections.col.site")}</th>
                                         <th className="w-[16%] px-2 py-2 text-start font-medium">{t("connections.col.app")}</th>
@@ -207,13 +212,13 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                         <th className="w-10 px-2 py-2" />
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="max-sm:block">
                                     {shown.map((row) => {
                                         const rule = rules.find((item) => item.id === row.rule);
                                         const meta = rule ? kindMeta(rule.kind) : null;
                                         return (
-                                            <tr key={row.id} className="group border-t border-border/60 hover:bg-muted/30">
-                                                <td className="px-3 py-1.5">
+                                            <tr key={row.id} className="group border-t border-border/60 hover:bg-muted/30 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-2 max-sm:first:border-t-0">
+                                                <td className="px-3 py-1.5 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:p-0">
                                                     <span className="block truncate font-medium" title={row.host || row.destination}>
                                                         {row.host || row.destination}
                                                     </span>
@@ -223,21 +228,21 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                                             .join(" · ")}
                                                     </span>
                                                 </td>
-                                                <td className="px-2 py-1.5">
+                                                <td className="px-2 py-1.5 max-sm:col-start-1 max-sm:row-start-2 max-sm:p-0">
                                                     <span className="block truncate" title={row.app_path}>
-                                                        {row.app || <span className="text-muted-foreground">—</span>}
+                                                        {(row.app && appLabels.get(row.app)) || row.app || <span className="text-muted-foreground">—</span>}
                                                     </span>
                                                 </td>
-                                                <td className="px-2 py-1.5">
+                                                <td className="px-2 py-1.5 max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0">
                                                     <span className="flex items-center gap-1.5 truncate">
                                                         {meta ? <meta.icon size={12} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" /> : null}
                                                         <span className="truncate" title={row.rule_text}>{ruleLabel(row.rule, row.rule_text)}</span>
                                                     </span>
                                                 </td>
-                                                <td className="px-2 py-1.5">
+                                                <td className="px-2 py-1.5 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-3 max-sm:p-0 max-sm:text-muted-foreground">
                                                     <span className={cn("block truncate", row.route === "direct" && "text-muted-foreground")}>{via(row)}</span>
                                                 </td>
-                                                <td className="px-2 py-1.5 text-end tabular-nums">
+                                                <td className="px-2 py-1.5 text-end tabular-nums max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:p-0">
                                                     <span className="block text-[11px]">
                                                         <ArrowUp size={10} className="inline" aria-hidden="true" /> {formatBytes(row.upload)}{" "}
                                                         <ArrowDown size={10} className="inline" aria-hidden="true" /> {formatBytes(row.download)}
@@ -246,13 +251,13 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                                         {formatRate(row.rate)}
                                                     </span>
                                                 </td>
-                                                <td className="px-2 py-1.5 text-end">
+                                                <td className="px-2 py-1.5 text-end max-sm:col-start-3 max-sm:row-start-3 max-sm:p-0">
                                                     <button
                                                         type="button"
                                                         onClick={() => void close(row.id)}
                                                         aria-label={t("connections.close", { name: row.host || row.destination })}
                                                         title={t("connections.closeHint")}
-                                                        className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+                                                        className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100"
                                                     >
                                                         <X size={13} aria-hidden="true" />
                                                     </button>

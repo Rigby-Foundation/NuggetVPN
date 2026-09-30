@@ -221,7 +221,9 @@ function ConfigurationView({
                                 label={`${source.label}, ${detailOf(source)}`}
                                 className="group select-none"
                             >
-                                <div className="p-4 flex items-center gap-3">
+                                {/* Usage wraps onto a row of its own, the card's full width:
+                                    beside the buttons it had a phone's width to share. */}
+                                <div className="p-4 flex flex-wrap items-center gap-x-3">
                                     {selecting ? <Tick checked={isPicked} /> : null}
                                     <span className="flex-1 min-w-0">
                                         <span className="block font-medium truncate">
@@ -232,9 +234,6 @@ function ConfigurationView({
                                                 ? `${source.domain} · ${detailOf(source)}`
                                                 : detailOf(source)}
                                         </span>
-                                        {source.kind === "subscription" && source.info ? (
-                                            <SubscriptionUsage info={source.info} />
-                                        ) : null}
                                     </span>
 
                                     {refreshing && selecting ? (
@@ -290,6 +289,12 @@ function ConfigurationView({
                                         >
                                             <Trash2 size={16} aria-hidden="true" />
                                         </Button>
+                                    ) : null}
+
+                                    {source.kind === "subscription" && source.info ? (
+                                        <span className="block basis-full">
+                                            <SubscriptionUsage info={source.info} />
+                                        </span>
                                     ) : null}
                                 </div>
                             </SelectableCard>

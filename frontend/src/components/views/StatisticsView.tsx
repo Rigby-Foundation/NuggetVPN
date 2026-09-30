@@ -11,6 +11,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -110,6 +111,8 @@ function percent(value: number): string {
 
 function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsViewProps) {
     const t = useT();
+    // On a phone traffic is counted by package; show the app it belongs to.
+    const appLabels = useAppLabels();
     const [days, setDays] = useState(1);
     const [usage, setUsage] = useState<AppUsage | null>(null);
     const [health, setHealth] = useState<Record<string, ServerHealth>>({});
@@ -159,7 +162,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
         <div className="enter-stagger absolute inset-0 overflow-y-auto px-6 py-5">
             <div className="mx-auto max-w-4xl space-y-4">
                 <header className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                         <h2 className="text-base font-semibold">{t("stats.title")}</h2>
                         <p className="text-xs text-muted-foreground">{t("stats.subtitle")}</p>
                     </div>
@@ -213,11 +216,11 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                     {programs.slice(0, 40).map((program) => {
                                         const size = program.up + program.down;
                                         return (
-                                            <li key={program.program} className="grid grid-cols-[minmax(0,12rem)_1fr_auto] items-center gap-3 text-xs">
+                                            <li key={program.program} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:gap-y-0">
                                                 <span className="truncate font-medium" title={program.program}>
-                                                    {program.program ? programName(program.program) : t("stats.unknownApp")}
+                                                    {program.program ? appLabels.get(program.program) || programName(program.program) : t("stats.unknownApp")}
                                                 </span>
-                                                <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                                <span className="order-last col-span-full h-1.5 overflow-hidden rounded-full bg-muted sm:order-none sm:col-span-1">
                                                     <span className="block h-full rounded-full bg-primary/70" style={{ width: `${Math.max(1, (size / largest) * 100)}%` }} />
                                                 </span>
                                                 <span className="tnum flex gap-3 text-muted-foreground">
@@ -251,16 +254,16 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                         <p className="text-xs text-muted-foreground">{t("stats.health.empty")}</p>
                     ) : (
                         <>
-                            <div className="mb-2 grid grid-cols-[minmax(0,12rem)_1fr_3.5rem_3.5rem_4rem] gap-3 text-[11px] text-muted-foreground">
+                            <div className="mb-2 grid grid-cols-[minmax(0,1fr)_3.5rem_4rem] sm:grid-cols-[minmax(0,12rem)_1fr_3.5rem_3.5rem_4rem] gap-3 text-[11px] text-muted-foreground">
                                 <span>{t("stats.health.server")}</span>
-                                <span>{t("stats.health.day")}</span>
+                                <span className="hidden sm:block">{t("stats.health.day")}</span>
                                 <span className="text-end">24h</span>
-                                <span className="text-end">7d</span>
+                                <span className="hidden text-end sm:block">7d</span>
                                 <span className="text-end">{t("stats.health.latency")}</span>
                             </div>
                             <ul className="space-y-2">
                                 {servers.map(({ profile, record }) => (
-                                    <li key={profile.id} className="grid grid-cols-[minmax(0,12rem)_1fr_3.5rem_3.5rem_4rem] items-center gap-3 text-xs">
+                                    <li key={profile.id} className="grid grid-cols-[minmax(0,1fr)_3.5rem_4rem] sm:grid-cols-[minmax(0,12rem)_1fr_3.5rem_3.5rem_4rem] items-center gap-x-3 gap-y-1 text-xs sm:gap-y-3">
                                         <span className="flex min-w-0 items-center gap-1.5">
                                             {record.failing ? (
                                                 <AlertTriangle size={12} className="shrink-0 text-status-error" aria-label={t("stats.health.failing")} />
@@ -269,11 +272,13 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                                 {profile.name}
                                             </span>
                                         </span>
-                                        <Timeline samples={record.recent} />
+                                        <span className="order-last col-span-full sm:order-none sm:col-span-1">
+                                            <Timeline samples={record.recent} />
+                                        </span>
                                         <span className={cn("tnum text-end", record.uptime_24h >= 0 && record.uptime_24h < 0.9 && "text-status-error")}>
                                             {percent(record.uptime_24h)}
                                         </span>
-                                        <span className="tnum text-end text-muted-foreground">{percent(record.uptime_7d)}</span>
+                                        <span className="tnum hidden text-end text-muted-foreground sm:block">{percent(record.uptime_7d)}</span>
                                         <span className="tnum text-end text-muted-foreground">{record.latency_ms ? `${record.latency_ms} ms` : "—"}</span>
                                     </li>
                                 ))}
