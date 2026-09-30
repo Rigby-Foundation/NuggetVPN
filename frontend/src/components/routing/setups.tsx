@@ -1,6 +1,8 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Check, ChevronDown, Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, Copy, Pencil, Plus, Trash2 } from "lucide-react";
+
+import { ScheduleDialog } from "@/components/routing/schedule";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +57,7 @@ export function SetupSwitcher({
     const setups = settings.routing_setups ?? [];
     const active = setups.find((setup) => setup.id === settings.active_routing_setup) ?? setups[0];
     const [editing, setEditing] = useState<Editing | null>(null);
+    const [scheduling, setScheduling] = useState(false);
     const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);
 
@@ -180,6 +183,14 @@ export function SetupSwitcher({
                             <Pencil size={13} aria-hidden="true" /> {t("routing.setup.rename")}
                         </DropdownMenuItem>
                     ) : null}
+                    {setups.length > 1 ? (
+                        <DropdownMenuItem className="gap-2 text-xs" onClick={() => setScheduling(true)}>
+                            <CalendarClock size={13} aria-hidden="true" /> {t("schedule.open")}
+                            {(settings.routing_schedule ?? []).length > 0 ? (
+                                <span className="ms-auto text-[10px] text-muted-foreground">{t("schedule.on")}</span>
+                            ) : null}
+                        </DropdownMenuItem>
+                    ) : null}
                     {active && setups.length > 1 ? (
                         <DropdownMenuItem
                             className="gap-2 text-xs text-destructive focus:text-destructive"
@@ -190,6 +201,22 @@ export function SetupSwitcher({
                     ) : null}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            {scheduling ? (
+                <ScheduleDialog
+                    settings={settings}
+                    busy={busy}
+                    nameOf={nameOf}
+                    onClose={() => setScheduling(false)}
+                    onSave={(schedule, fallback) =>
+                        void run(async () => {
+                            const saved = await save({ ...settings, routing_schedule: schedule, schedule_fallback: fallback });
+                            setScheduling(false);
+                            return saved;
+                        })
+                    }
+                />
+            ) : null}
 
             {editing ? (
                 <Dialog open onOpenChange={(isOpen) => (isOpen ? undefined : setEditing(null))}>

@@ -187,7 +187,31 @@ type AppSettings struct {
 	// it instead of the built-in rule-sets. The files themselves live in
 	// storage.GeoDir; this records where each came from.
 	GeoFiles map[string]GeoFile `json:"geo_files"`
+
+	// RoutingSchedule switches routing setups by the time of the week; see
+	// ScheduledSetup. ScheduleFallback is the setup outside every entry;
+	// empty leaves whichever is on.
+	RoutingSchedule  []ScheduleEntry `json:"routing_schedule"`
+	ScheduleFallback string          `json:"schedule_fallback"`
+
+	// WifiAutoConnect connects on joining a Wi-Fi network that is not in
+	// TrustedNetworks. WifiTrustedDisconnect disconnects on joining one that
+	// is.
+	WifiAutoConnect       bool     `json:"wifi_auto_connect"`
+	WifiTrustedDisconnect bool     `json:"wifi_trusted_disconnect"`
+	TrustedNetworks       []string `json:"trusted_networks"`
+
+	// ServerHealth checks the servers now and then, keeps their history, and
+	// tries the ones that keep failing last. A pointer so older settings
+	// default to on.
+	ServerHealth *bool `json:"server_health"`
+	// AppStats counts traffic by program, day by day. A pointer so older
+	// settings default to on.
+	AppStats *bool `json:"app_stats"`
 }
+
+// On reports a default-on setting.
+func On(value *bool) bool { return value == nil || *value }
 
 // GeoFile describes an imported geoip.dat or geosite.dat.
 type GeoFile struct {
@@ -321,6 +345,19 @@ func (s *AppSettings) Normalize() {
 	s.normalizeRouting()
 	s.normalizeSetups()
 	s.normalizeIdentity()
+	s.normalizeSchedule()
+	s.normalizeNetworks()
+	if s.RoutingSchedule == nil {
+		s.RoutingSchedule = []ScheduleEntry{}
+	}
+	if s.ServerHealth == nil {
+		enabled := true
+		s.ServerHealth = &enabled
+	}
+	if s.AppStats == nil {
+		enabled := true
+		s.AppStats = &enabled
+	}
 }
 
 // LoggingOn reports whether logs are kept; see LoggingEnabled.

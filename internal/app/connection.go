@@ -10,6 +10,7 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/stats"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 	"os"
 	"path/filepath"
@@ -143,6 +144,7 @@ func (a *App) handleCoreState(running bool) {
 
 	a.flushUsage()
 	a.resetTraffic()
+	a.recordEvent(state.ProfileID, stats.KindDrop, false)
 	a.appendLog("The tunnel stopped unexpectedly")
 	a.notify(notifyDropped)
 
@@ -293,6 +295,7 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 
 		alternatives := alternativesFor(plan, profiles, settings, mode, profile.ID)
 		if err := a.startProfile(profile, profiles, settings, alternatives); err != nil {
+			a.recordEvent(profile.ID, stats.KindConnect, false)
 			lastErr = err
 			a.appendLog(fmt.Sprintf("%s failed: %v", profile.Name, err))
 			if !plan.resilient {
@@ -301,6 +304,7 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 			continue
 		}
 
+		a.recordEvent(profile.ID, stats.KindConnect, true)
 		a.beginSession(profile.ID)
 		a.lockedDown.Store(false)
 		a.mu.Lock()
@@ -450,7 +454,9 @@ func (a *App) rankByLatency(
 ) []string {
 	pings := map[string]uint64{}
 	const unreachable = ^uint64(0)
-	for _, result := range probe.Ping(candidates, settings, domain) {
+	icmp := probe.Ping(candidates, settings, domain)
+	a.recordPings(icmp, true)
+	for _, result := range icmp {
 		if result.PingMS != nil {
 			pings[result.ID] = *result.PingMS
 			continue
@@ -479,6 +485,7 @@ func (a *App) rankByLatency(
 
 	limit := min(len(order), probeCandidates)
 	results := probe.Connectivity(candidates, settings, domain, order[:limit], probeTimeoutMS)
+	a.recordPings(results, false)
 
 	reachable := make([]string, 0, limit)
 	seen := map[string]bool{}
@@ -506,7 +513,7 @@ func (a *App) rankByLatency(
 			reachable = append(reachable, id)
 		}
 	}
-	return reachable
+	return a.demoteFailing(reachable)
 }
 
 // startProfile generates a config for one profile and hands it to the core.

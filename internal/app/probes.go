@@ -15,6 +15,7 @@ func (a *App) PingProfiles(sourceDomain string) []probe.ProfilePing {
 	if results == nil {
 		return []probe.ProfilePing{}
 	}
+	a.recordPings(results, true)
 	return results
 }
 
@@ -30,5 +31,6 @@ func (a *App) ProbeProfilesConnectivity(
 	if results == nil {
 		return []probe.ProfilePing{}
 	}
+	a.recordPings(results, false)
 	return results
 }

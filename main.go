@@ -24,6 +24,7 @@ import (
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/app"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/cli"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -42,6 +43,10 @@ var appIcon []byte
 var version = "2.0.0"
 
 func main() {
+	// NuggetVPN status, connect, ...: control the running app and exit.
+	if cli.IsCommand(os.Args[1:]) {
+		os.Exit(cli.Run(os.Args[1:], storage.CLISocketPath(), storage.CLITokenPath(), version))
+	}
 	for _, arg := range os.Args[1:] {
 		if arg == "--core-service" {
 			if err := runCoreService(); err != nil {

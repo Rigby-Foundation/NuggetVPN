@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Cpu,
   Puzzle,
+  Wifi,
   CircleArrowUp,
   ChevronDown,
   ChevronUp,
@@ -35,6 +36,7 @@ import { UpdatesPanel } from "@/components/settings/updates";
 import { BackupPanel } from "@/components/settings/backup";
 import { CorePanel } from "@/components/settings/cores";
 import { PluginsPanel } from "@/components/settings/plugins";
+import { WifiPanel } from "@/components/settings/wifi";
 import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
@@ -106,6 +108,7 @@ type SectionId =
   | "backup"
   | "core"
   | "plugins"
+  | "wifi"
   | "updates";
 
 interface Section {
@@ -188,6 +191,12 @@ const SECTIONS: Section[] = [
     icon: Fingerprint,
     title: "settings.subscriptions",
     blurb: "settings.subscriptions.blurb",
+  },
+  {
+    id: "wifi",
+    icon: Wifi,
+    title: "settings.wifi",
+    blurb: "settings.wifi.blurb",
   },
   {
     id: "privacy",
@@ -361,6 +370,10 @@ function SettingsView({
         ].join(" · ");
       case "sync":
         return appSettings.auth_server || t("status.idle");
+      case "wifi":
+        return appSettings.wifi_auto_connect || appSettings.wifi_trusted_disconnect
+          ? t("wifi.summary", { count: (appSettings.trusted_networks ?? []).length })
+          : t("wifi.summary.off");
       case "plugins":
         return plugins.length === 0
           ? t("plugins.summary.none")
@@ -915,6 +928,28 @@ function SettingsView({
                 />
               }
             />
+            <SettingsField
+              label={t("privacy.appStats")}
+              description={t("privacy.appStats.description")}
+              control={
+                <Switch
+                  checked={appSettings.app_stats !== false}
+                  onCheckedChange={(checked) => onSettingsChange("app_stats", checked)}
+                  aria-label={t("privacy.appStats")}
+                />
+              }
+            />
+            <SettingsField
+              label={t("privacy.serverHealth")}
+              description={t("privacy.serverHealth.description")}
+              control={
+                <Switch
+                  checked={appSettings.server_health !== false}
+                  onCheckedChange={(checked) => onSettingsChange("server_health", checked)}
+                  aria-label={t("privacy.serverHealth")}
+                />
+              }
+            />
           </SettingsGroup>
         );
 
@@ -929,6 +964,9 @@ function SettingsView({
 
       case "plugins":
         return <PluginsPanel />;
+
+      case "wifi":
+        return <WifiPanel appSettings={appSettings} onSettingsChange={onSettingsChange} />;
 
       case "sync":
         return (

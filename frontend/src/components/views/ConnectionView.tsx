@@ -10,6 +10,7 @@ import {
     TriangleAlert,
 } from "lucide-react";
 
+import { SpeedTest } from "@/components/speed-test";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { MessageKey, useT } from "@/lib/i18n";
@@ -274,6 +275,11 @@ function ConnectionView({
                                 : ipInfo?.region || undefined
                         }
                     />
+                </div>
+            ) : null}
+            {state.status === "connected" ? (
+                <div className="enter-stagger flex w-full justify-center" style={{ ["--enter-offset" as string]: 4 }}>
+                    <SpeedTest />
                 </div>
             ) : null}
         </div>

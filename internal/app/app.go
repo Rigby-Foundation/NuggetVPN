@@ -21,6 +21,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/cli"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
@@ -117,6 +118,13 @@ type App struct {
 	// lockedDown is set while the kill switch's lockdown config runs.
 	lockedDown atomic.Bool
 
+	// insights and automation are the background work's state; see
+	// insights.go and automation.go.
+	insights   insights
+	automation automation
+	// commandLine answers NuggetVPN status and the like; nil until started.
+	commandLine *cli.Server
+
 	// notifier shows system notifications; nil in tests.
 	notifier *notifications.NotificationService
 
@@ -185,6 +193,8 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	// A link the app was started with, on the platforms that pass it as an
 	// argument.
 	a.receiveLinks(os.Args[1:]...)
+	go a.runBackground(ctx)
+	a.startCommandLine()
 	return nil
 }
 
@@ -192,6 +202,8 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 // exits, so no root process is left holding the system routes.
 func (a *App) ServiceShutdown() error {
 	a.flushUsage()
+	_ = a.statsStore().Save()
+	a.stopCommandLine()
 	a.core.Shutdown()
 
 	a.logMu.Lock()

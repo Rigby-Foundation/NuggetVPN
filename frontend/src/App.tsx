@@ -17,6 +17,7 @@ import LogsView from "@/components/views/LogsView";
 import ProxiesView from "@/components/views/ProxiesView";
 import RoutingView from "@/components/views/RoutingView";
 import ConnectionsView from "@/components/views/ConnectionsView";
+import StatisticsView from "@/components/views/StatisticsView";
 import { subscriptionAlert } from "@/components/subscription-usage";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
@@ -92,6 +93,13 @@ const PENDING_SETTINGS: AppSettings = {
     update_check: null,
     global_shortcut: "",
     core: "builtin",
+    routing_schedule: [],
+    schedule_fallback: "",
+    wifi_auto_connect: false,
+    wifi_trusted_disconnect: false,
+    trusted_networks: [],
+    server_health: null,
+    app_stats: null,
     subscription_auto_update: null,
     close_action: "tray",
     routing_comments: [],
@@ -1096,6 +1104,10 @@ function App() {
                                         rules={settings.routing_rules ?? []}
                                         profiles={profiles}
                                     />
+                                )}
+
+                                {activeTab === "statistics" && (
+                                    <StatisticsView profiles={profiles} settings={settings} onSettingsChange={updateSetting} />
                                 )}
 
                                 {activeTab === "logs" && (

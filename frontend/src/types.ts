@@ -104,6 +104,19 @@ export interface AppSettings {
     global_shortcut: string;
     /** Which program runs the tunnel. */
     core: CoreName;
+    /** Switches routing setups by the time of the week. */
+    routing_schedule: ScheduleEntry[];
+    /** The setup outside every schedule entry; "" leaves whichever is on. */
+    schedule_fallback: string;
+    /** Connect on joining a Wi-Fi network that is not trusted. */
+    wifi_auto_connect: boolean;
+    /** Disconnect on joining a trusted Wi-Fi network. */
+    wifi_trusted_disconnect: boolean;
+    trusted_networks: string[];
+    /** Check servers in the background and try failing ones last. */
+    server_health: boolean | null;
+    /** Count traffic by program. */
+    app_stats: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
     close_action: CloseAction;
@@ -448,4 +461,66 @@ export interface PluginPreview {
     installed?: string;
     new_permissions: PluginPermission[];
     has_script: boolean;
+}
+
+/** One entry of the routing schedule; see models.ScheduleEntry. */
+export interface ScheduleEntry {
+    id: string;
+    setup: string;
+    /** 0 = Sunday … 6 = Saturday. */
+    days: number[];
+    /** "HH:MM", local time; an end before the start runs past midnight. */
+    start: string;
+    end: string;
+}
+
+/** Traffic by program; see app.AppUsage. */
+export interface AppUsage {
+    programs: { program: string; up: number; down: number }[];
+    days: { day: string; up: number; down: number }[];
+}
+
+/** One observation of a server; see stats.Sample. */
+export interface HealthSample {
+    at: number;
+    kind: "ping" | "connect" | "drop";
+    /** Latency for a ping that answered; -1 for a failure. */
+    ms: number;
+}
+
+/** A server's record, summed up; see stats.Health. */
+export interface ServerHealth {
+    /** 0–1, or -1 when there were no checks. */
+    uptime_24h: number;
+    uptime_7d: number;
+    latency_ms: number;
+    checks: number;
+    failing: boolean;
+    recent: HealthSample[];
+}
+
+/** A finished speed test; see stats.SpeedResult. */
+export interface SpeedResult {
+    at: number;
+    server: string;
+    download_mbps: number;
+    upload_mbps: number;
+    latency_ms: number;
+    jitter_ms: number;
+}
+
+/** A speed test in progress; see speedtest.Progress. */
+export interface SpeedProgress {
+    phase: "latency" | "download" | "upload";
+    fraction: number;
+    mbps: number;
+    latency_ms: number;
+}
+
+/** The Wi-Fi network; see app.WifiState. */
+export interface WifiState {
+    on_wifi: boolean;
+    ssid: string;
+    hidden: boolean;
+    unsupported: boolean;
 }

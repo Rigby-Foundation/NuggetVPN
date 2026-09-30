@@ -122,6 +122,20 @@ func ControlSocketPath() string {
 	return filepath.Join(os.TempDir(), fmt.Sprintf("nuggetvpn-%d.sock", os.Getuid()))
 }
 
+// CLISocketPath is where the running app answers the command line; see
+// internal/cli. Short paths fall back to the temp directory as for the core.
+func CLISocketPath() string {
+	path := filepath.Join(RuntimeDir(), "cli.sock")
+	if len(path) <= maxUnixSocketPath {
+		return path
+	}
+	return filepath.Join(os.TempDir(), fmt.Sprintf("nuggetvpn-cli-%d.sock", os.Getuid()))
+}
+
+// CLITokenPath holds the token the command line must present. It is in the
+// user's own runtime folder, readable by them alone.
+func CLITokenPath() string { return filepath.Join(RuntimeDir(), "cli.token") }
+
 // CoreConfigPath is where the generated sing-box config is mirrored for
 // debugging. The core service receives its config over the socket, so this file
 // is informational only.

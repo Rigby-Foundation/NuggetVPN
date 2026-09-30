@@ -70,6 +70,13 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     list_user_files: { method: "ListUserFiles", args: ["kind"] },
     import_user_file: { method: "ImportUserFile", args: ["kind"] },
     remove_user_file: { method: "RemoveUserFile", args: ["kind", "id"] },
+    get_app_usage: { method: "GetAppUsage", args: ["days"] },
+    clear_statistics: { method: "ClearStatistics", args: [] },
+    get_server_health: { method: "GetServerHealth", args: [] },
+    run_speed_test: { method: "RunSpeedTest", args: [] },
+    stop_speed_test: { method: "StopSpeedTest", args: [] },
+    get_speed_tests: { method: "GetSpeedTests", args: [] },
+    get_wifi_state: { method: "GetWifiState", args: [] },
     list_plugins: { method: "ListPlugins", args: [] },
     pick_plugin: { method: "PickPlugin", args: [] },
     install_plugin: { method: "InstallPlugin", args: ["token"] },
@@ -167,6 +174,8 @@ export const EVENTS = {
     /** A nuggetvpn:// link to offer in the Add dialog. */
     importLink: "import-link",
     updateProgress: "update-progress",
+    speedProgress: "speed-progress",
+    wifi: "wifi-changed",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */
