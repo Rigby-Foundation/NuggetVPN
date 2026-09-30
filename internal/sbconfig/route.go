@@ -54,6 +54,9 @@ type routePlan struct {
 	// Warnings are things the user asked for that could not be done, such as
 	// a rule list that has not been downloaded.
 	warnings []string
+
+	// directProcesses always go straight out; see Request.DirectProcesses.
+	directProcesses []string
 }
 
 func newRoutePlan(settings models.AppSettings, geo geoSources, lists map[string]RuleList, outboundFor map[string]string) *routePlan {
@@ -104,6 +107,12 @@ func (p *routePlan) buildRouteRules(serverDomains []string) (rules []map[string]
 		"sniffer": p.sniffers(),
 		"timeout": "500ms",
 	})
+
+	// The program dialing the servers for the core (Xray) must reach them
+	// directly, or its connections would be routed back into itself.
+	if len(p.directProcesses) > 0 {
+		add("", map[string]any{"process_path": p.directProcesses, "outbound": DirectTag})
+	}
 
 	// Private ranges stay on the local network whatever the graph says;
 	// tunnelling them breaks LAN access and, with it, the user's printer.

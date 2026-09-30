@@ -59,6 +59,18 @@ type Request struct {
 	// exit becomes a group that keeps measuring every server's latency and
 	// sends traffic through the fastest, switching as that changes.
 	Alternatives []models.Profile
+
+	// Dial, when set, replaces parsing a profile into an outbound: it is how
+	// another program (Xray) takes over talking to the servers. It then also
+	// owns the proxy chain, so Build does not build one.
+	Dial func(models.Profile) (link.Outbound, error)
+	// ServerDomains are server hostnames to resolve without the tunnel, for
+	// servers Build does not dial itself.
+	ServerDomains []string
+	// DirectProcesses are programs whose traffic goes straight out: the
+	// program that dials the servers must not have its own connections
+	// routed back to itself.
+	DirectProcesses []string
 }
 
 // Result is a generated configuration plus the details the caller reports back
@@ -96,7 +108,13 @@ func Build(request Request) (Result, error) {
 		return Result{JSON: encoded, Verbatim: true}, nil
 	}
 
-	exit, err := link.ParseOutbound(request.Profile.ConfigLink, settings)
+	dial := func(profile models.Profile) (link.Outbound, error) {
+		return link.ParseOutbound(profile.ConfigLink, settings)
+	}
+	if request.Dial != nil {
+		dial = request.Dial
+	}
+	exit, err := dial(request.Profile)
 	if err != nil {
 		return Result{}, err
 	}
@@ -105,9 +123,13 @@ func Build(request Request) (Result, error) {
 	endpoints := []map[string]any{}
 
 	// Build the chain first so the exit outbound can detour through its tail.
-	chainTags, chainErr := appendChain(&outbounds, &endpoints, request, settings)
-	if chainErr != nil {
-		return Result{}, chainErr
+	var chainTags []string
+	if request.Dial == nil {
+		var chainErr error
+		chainTags, chainErr = appendChain(&outbounds, &endpoints, request, settings)
+		if chainErr != nil {
+			return Result{}, chainErr
+		}
 	}
 
 	// Each server traffic can leave through: the connected one, and any
@@ -139,7 +161,7 @@ func Build(request Request) (Result, error) {
 			if _, full := link.FullConfig(alternative.ConfigLink); full {
 				continue
 			}
-			outbound, err := link.ParseOutbound(alternative.ConfigLink, settings)
+			outbound, err := dial(alternative)
 			if err != nil {
 				continue
 			}
@@ -165,14 +187,15 @@ func Build(request Request) (Result, error) {
 
 	// Rules and the default can send traffic through servers other than the
 	// connected one; each gets an outbound of its own.
-	outboundFor, serverWarnings := appendRuleServers(&outbounds, &endpoints, request, settings, chainTags)
+	outboundFor, serverWarnings := appendRuleServers(&outbounds, &endpoints, request, settings, chainTags, dial)
 
 	outbounds = append(outbounds, map[string]any{"type": "direct", "tag": DirectTag})
 
 	splitTunnel := settings.SplitTunnelling()
-	serverDomains := proxyServerDomains(outbounds, endpoints)
+	serverDomains := dedupe(append(proxyServerDomains(outbounds, endpoints), request.ServerDomains...))
 	geo := geoSources{local: request.LocalRuleSets, custom: request.CustomGeo}
 	plan := newRoutePlan(settings, geo, request.RuleLists, outboundFor)
+	plan.directProcesses = request.DirectProcesses
 	plan.warnings = append(plan.warnings, serverWarnings...)
 	routeRules, owners, splitRuleCount := plan.buildRouteRules(serverDomains)
 	dns := plan.buildDNS(splitTunnel, serverDomains)
@@ -487,6 +510,7 @@ func appendRuleServers(
 	request Request,
 	settings models.AppSettings,
 	chainTags []string,
+	dial func(models.Profile) (link.Outbound, error),
 ) (map[string]string, []string) {
 	outboundFor := map[string]string{request.Profile.ID: ExitTag}
 	var warnings []string
@@ -521,7 +545,7 @@ func appendRuleServers(
 			outboundFor[id] = ExitTag
 			continue
 		}
-		outbound, err := link.ParseOutbound(profile.ConfigLink, settings)
+		outbound, err := dial(profile)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s cannot be a routing destination (%v); its traffic goes through the connected server", profile.Name, err))
 			outboundFor[id] = ExitTag
