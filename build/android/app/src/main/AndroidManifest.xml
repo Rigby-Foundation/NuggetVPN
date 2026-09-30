@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Scanning a server's QR code. Asked for on the first scan; phones
+         without a camera can still install the app and pick an image. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- Naming the app behind a connection, for the connections screen. -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"

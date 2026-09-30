@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
 
     // The Go-side dialog ID of the in-flight file picker (-1 when idle)
     private int pendingFilePickerCallbackID = -1;
+    private NuggetChromeClient chromeClient;
     private static final int PHOTO_CAPTURE_REQUEST = 7002;
     private static final int VIDEO_CAPTURE_REQUEST = 7003;
     private static final int CAMERA_PERMISSION_REQUEST = 7010;
@@ -148,6 +149,10 @@ public class MainActivity extends AppCompatActivity {
                 .setDomain(WAILS_HOST)
                 .addPathHandler("/", new WailsPathHandler(bridge))
                 .build();
+
+        // File inputs and the camera, for adding a server from a QR code.
+        chromeClient = new NuggetChromeClient(this, WAILS_HOST);
+        webView.setWebChromeClient(chromeClient);
 
         // Set up WebView client to intercept requests
         webView.setWebViewClient(new WebViewClient() {
@@ -267,6 +272,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (chromeClient != null && chromeClient.onRequestPermissionsResult(requestCode, grantResults)) {
+            return;
+        }
         if (requestCode == CAMERA_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 launchCameraCapture(pendingCaptureIsVideo);
@@ -474,6 +482,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (chromeClient != null && chromeClient.onActivityResult(requestCode, resultCode, data)) {
+            return;
+        }
         if (requestCode == NuggetBridge.VPN_PERMISSION_REQUEST) {
             NuggetBridge.onPermissionResult(resultCode == RESULT_OK);
             return;

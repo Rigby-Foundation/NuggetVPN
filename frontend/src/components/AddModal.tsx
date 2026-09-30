@@ -1,7 +1,7 @@
 import { ClipboardEvent, useEffect, useRef, useState } from "react";
-import { Loader2, QrCode } from "lucide-react";
+import { Image as ImageIcon, Loader2, QrCode, ScanLine } from "lucide-react";
 
-import { decodeQrImage } from "@/components/qr";
+import { decodeQrImage, QrScanner } from "@/components/qr";
 
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
+import { isAndroid } from "@/lib/platform";
 
 interface AddModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ function AddModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [camera, setCamera] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,7 +105,12 @@ function AddModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md" onPaste={onPaste}>
+      <DialogContent
+        className="sm:max-w-md"
+        onPaste={onPaste}
+        // On a phone, focusing the field raised the keyboard over the dialog.
+        onOpenAutoFocus={isAndroid ? (event) => event.preventDefault() : undefined}
+      >
         <DialogHeader>
           <DialogTitle>{t("add.title")}</DialogTitle>
         </DialogHeader>
@@ -112,7 +119,8 @@ function AddModal({
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="config-link">{t("add.linkLabel")}</Label>
-              <button
+              {/* On a phone the QR choices are full buttons under the field. */}
+              {isAndroid ? null : <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={scanning}
@@ -121,7 +129,7 @@ function AddModal({
               >
                 {scanning ? <Loader2 size={12} className="animate-spin" /> : <QrCode size={12} aria-hidden="true" />}
                 {t("add.qr")}
-              </button>
+              </button>}
               <input
                 ref={fileRef}
                 type="file"
@@ -142,6 +150,22 @@ function AddModal({
               className="font-mono text-xs resize-none"
               rows={3}
             />
+            {isAndroid ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => setCamera(true)}>
+                  <ScanLine size={16} className="me-2" aria-hidden="true" />
+                  {t("add.qrScan")}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={scanning}>
+                  {scanning ? (
+                    <Loader2 size={16} className="me-2 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ImageIcon size={16} className="me-2" aria-hidden="true" />
+                  )}
+                  {t("add.qrImage")}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {!isSubscription && (
@@ -176,6 +200,18 @@ function AddModal({
                 : t("add.addProfile")}
           </Button>
         </DialogFooter>
+        {/* Inside this content, so Radix nests it rather than taking
+            it for a click outside that closes this dialog. */}
+        {camera ? (
+          <QrScanner
+            onClose={() => setCamera(false)}
+            onResult={(text) => {
+              setCamera(false);
+              setErrorMsg("");
+              setInputLink(text);
+            }}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
