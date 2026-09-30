@@ -119,7 +119,18 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Build a debug APK
-        run: wails3 task android:apk
+        run: |
+          set -o pipefail
+          wails3 task android:apk 2>&1 | tee "$RUNNER_TEMP/android-build.log"
+
+      # The end of a failed build, as an annotation on the run, which can be
+      # read without opening the full log.
+      - name: Report a failed build
+        if: failure()
+        run: |
+          grep -nE "error:|FAILED|What went wrong|Exception|cannot find symbol|e: " "$RUNNER_TEMP/android-build.log" | head -40 > "$RUNNER_TEMP/errors.txt" || true
+          tail -60 "$RUNNER_TEMP/android-build.log" >> "$RUNNER_TEMP/errors.txt"
+          echo "::error title=Android build::$(sed -e 's/%/%25/g' -e 's/\r//g' "$RUNNER_TEMP/errors.txt" | sed ':a;N;$!ba;s/\n/%0A/g')"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
