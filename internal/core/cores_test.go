@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -163,9 +164,14 @@ func TestEmbeddedCoresCarryTraffic(t *testing.T) {
 }
 
 func TestCoresReportVersions(t *testing.T) {
+	// The built-in core and mihomo are read from the module versions the
+	// binary records, which a test binary may not carry.
+	info, _ := debug.ReadBuildInfo()
+	haveModules := info != nil && len(info.Deps) > 0
 	for _, core := range Cores() {
 		t.Logf("%s %s", core.Name, core.Version)
-		if core.Name != CoreBuiltin && core.Version == "" {
+		fromModules := core.Name == CoreBuiltin || core.Name == CoreMihomo
+		if core.Version == "" && (haveModules || !fromModules) {
 			t.Errorf("%s has no version", core.Name)
 		}
 	}
