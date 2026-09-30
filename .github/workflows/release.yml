@@ -216,6 +216,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # The shared build steps compile for the host too, which needs GTK.
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
       # The runner image has the Android SDK; only the NDK and the platform
       # the app compiles against are added. (android-actions/setup-android
       # asks for the long-gone "tools" package and fails.)
