@@ -7,15 +7,13 @@ on:
 env:
   WAILS_VERSION: v3.0.0-alpha2.117
 
-# Runners are Blacksmith. The cache actions below are the upstream ones on
-# purpose: Blacksmith intercepts them and serves from a colocated cache, and its
-# own useblacksmith/* forks are archived.
+# Runners are GitHub-hosted.
 jobs:
   macos:
     name: macOS (universal .dmg)
     # Apple Silicon; the universal build compiles arm64 and amd64 then lipos
-    # them together, so the extra cores pay for themselves here.
-    runs-on: blacksmith-12vcpu-macos-15
+    # them together.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +54,7 @@ jobs:
 
   linux:
     name: Linux (.deb / .rpm / .AppImage)
-    runs-on: nugget-linux
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -116,9 +114,7 @@ jobs:
 
   windows:
     name: Windows (installer)
-    # Blacksmith's Windows runners are in public beta; swap back to
-    # `windows-latest` if this job turns flaky.
-    runs-on: windows-pc
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
 
@@ -149,9 +145,9 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Install NSIS
-        # The installer is built with makensis, which the Blacksmith Windows
-        # image does not ship (GitHub's older Windows images did). Chocolatey
-        # when the image has it, otherwise the official zip.
+        # The installer is built with makensis, which the windows-2025 image
+        # does not ship (GitHub's older Windows images did). Chocolatey when
+        # the image has it, otherwise the official zip.
         shell: pwsh
         run: |
           if (Get-Command makensis -ErrorAction SilentlyContinue) {
@@ -198,7 +194,7 @@ jobs:
 
   android:
     name: Android (.apk)
-    runs-on: nugget-linux
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -282,7 +278,7 @@ jobs:
   publish:
     name: Publish release
     needs: [macos, linux, windows, android]
-    runs-on: nugget-linux
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
