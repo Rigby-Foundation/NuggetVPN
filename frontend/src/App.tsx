@@ -964,6 +964,9 @@ function App() {
                         background: "var(--popover)",
                         color: "var(--popover-foreground)",
                         border: "1px solid var(--border)",
+                        // Errors can quote a long unbroken string (a link, a
+                        // response body); wrap it rather than run off screen.
+                        overflowWrap: "anywhere",
                     },
                 }}
             />

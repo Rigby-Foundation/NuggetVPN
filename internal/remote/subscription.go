@@ -101,7 +101,7 @@ func (c *Client) ImportSubscription(
 
 	imported := buildProfiles(SubscriptionLinks(body), sourceDomain, rawURL)
 	if len(imported) == 0 {
-		return nil, fmt.Errorf("no supported profiles found in subscription")
+		return nil, emptySubscription(sourceDomain, body, headers, time.Now())
 	}
 	attachInfo(imported, ParseSubscriptionInfo(headers, time.Now()))
 	return append(profiles, imported...), nil
@@ -180,9 +180,7 @@ func (c *Client) RefreshSubscriptions(
 		fresh := buildProfiles(SubscriptionLinks(body), sourceDomain, subURL)
 		if len(fresh) == 0 {
 			if strict {
-				return profiles, summary, fmt.Errorf(
-					"subscription %q returned no supported links. Response preview: %s",
-					sourceDomain, preview(body, 220))
+				return profiles, summary, emptySubscription(sourceDomain, body, headers, time.Now())
 			}
 			summary.Failed++
 			continue
@@ -222,8 +220,7 @@ func SubscriptionLinks(raw string) []string {
 		if strings.Contains(candidate, ".time:") || strings.Contains(candidate, "fake_ip") {
 			continue
 		}
-		if strings.Contains(candidate, "@127.0.0.1:") ||
-			strings.Contains(candidate, "00000000-0000-0000-0000-000000000000") {
+		if isPlaceholder(candidate) {
 			continue
 		}
 		links = append(links, strings.ReplaceAll(candidate, "&amp;", "&"))
@@ -351,11 +348,11 @@ func collectSubscriptionSources(profiles []models.Profile) map[string]string {
 }
 
 func preview(body string, limit int) string {
-	compact := strings.Join(strings.Fields(body), " ")
+	compact := []rune(strings.Join(strings.Fields(body), " "))
 	if len(compact) <= limit {
-		return compact
+		return string(compact)
 	}
-	return compact[:limit]
+	return string(compact[:limit]) + "…"
 }
 
 // explainStatus adds a hint to the statuses that a device-limited panel
