@@ -34,7 +34,7 @@ jobs:
           - name: macos
             runner: blacksmith-6vcpu-macos-15
           - name: windows
-            runner: blacksmith-4vcpu-windows-2025
+            runner: DESKTOP-0T5UT93
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -153,7 +153,7 @@ jobs:
           - name: linux-amd64
             runner: nugget-linux
           - name: windows-amd64
-            runner: blacksmith-8vcpu-windows-2025
+            runner: DESKTOP-0T5UT93
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

@@ -118,7 +118,7 @@ jobs:
     name: Windows (installer)
     # Blacksmith's Windows runners are in public beta; swap back to
     # `windows-latest` if this job turns flaky.
-    runs-on: blacksmith-8vcpu-windows-2025
+    runs-on: DESKTOP-0T5UT93
     steps:
       - uses: actions/checkout@v4
 
