@@ -10,6 +10,7 @@ import {
     useEdgesState,
     useNodesState,
     useReactFlow,
+    useStore,
     type Connection,
     type Edge,
     type Node,
@@ -180,6 +181,9 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
     const { setCenter, getZoom, fitView } = useReactFlow();
+    // The zoom, for CSS: a connector's catch area stays the same size on
+    // screen however far the canvas is zoomed out. See App.css.
+    const zoom = useStore((state) => state.transform[2]);
 
     // The whole graph is fitted on first sight, and again whenever the canvas
     // changes size — the window resized, or the phone layout replacing the
@@ -520,7 +524,7 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
     );
 
     return (
-        <div ref={wrapperRef} className="h-full w-full">
+        <div ref={wrapperRef} className="h-full w-full" style={{ ["--flow-zoom" as string]: zoom }}>
         <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -532,6 +536,8 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            // A dragged wire snaps to a connector this far away.
+            connectionRadius={40}
             fitView
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.25}

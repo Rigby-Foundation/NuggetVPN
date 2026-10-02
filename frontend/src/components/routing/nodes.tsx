@@ -1,4 +1,4 @@
-import { createContext, KeyboardEvent, useContext, useEffect, useMemo, useState } from "react";
+import { Children, createContext, isValidElement, KeyboardEvent, useContext, useEffect, useMemo, useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import {
     ArrowDownUp,
@@ -257,6 +257,14 @@ function NodeShell({
     children?: React.ReactNode;
 }) {
     const t = useT();
+    // Connectors are drawn beside the card, not in it. The card clips its
+    // content to round its corners, and its backdrop blur makes it the box
+    // they are placed in, so inside it half of each dot was cut off, along
+    // with the area around it that catches the pointer.
+    const parts = Children.toArray(children);
+    const isHandle = (part: React.ReactNode) => isValidElement(part) && part.type === Handle;
+    const handles = parts.filter(isHandle);
+    const content = parts.filter((part) => !isHandle(part));
     return (
         <>
         <Resizer box={box} selected={selected} accent={accent} minWidth={wide ? 260 : 200} />
@@ -320,11 +328,12 @@ function NodeShell({
             </div>
 
             {box?.sized ? (
-                <div className="nowheel min-h-0 flex-1 overflow-y-auto">{children}</div>
+                <div className="nowheel min-h-0 flex-1 overflow-y-auto">{content}</div>
             ) : (
-                children
+                content
             )}
         </div>
+        {handles}
         </>
     );
 }
@@ -958,7 +967,7 @@ export function SourceNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: meta.accent, width: 9, height: 9, border: "none" }}
+                style={{ background: meta.accent, width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
     );
@@ -1109,7 +1118,7 @@ export function LogicalNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: LOGICAL_META.accent, width: 9, height: 9, border: "none" }}
+                style={{ background: LOGICAL_META.accent, width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
     );
@@ -1143,7 +1152,7 @@ export function CatchAllNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: "var(--routing-default)", width: 9, height: 9, border: "none" }}
+                style={{ background: "var(--routing-default)", width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
     );
@@ -1190,7 +1199,7 @@ export function ActionNode({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Left}
-                style={{ background: meta.accent, width: 9, height: 9, border: "none" }}
+                style={{ background: meta.accent, width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
     );
@@ -1227,7 +1236,7 @@ export function ServerNode({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Left}
-                style={{ background: accent, width: 9, height: 9, border: "none" }}
+                style={{ background: accent, width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
     );

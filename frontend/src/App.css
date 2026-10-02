@@ -422,6 +422,30 @@
 
 .react-flow__handle {
     border: 2px solid var(--background);
+    transition: scale 120ms ease;
+}
+
+/* A routing connector is a small dot, and aiming at one took several tries.
+   The area that catches the pointer reaches well past the dot, further
+   again under a finger. It is measured on screen: divided by the canvas
+   zoom (set by RoutingView), it does not shrink as the canvas zooms out. */
+.react-flow__handle::after {
+    content: "";
+    position: absolute;
+    inset: calc(-14px / var(--flow-zoom, 1));
+    border-radius: 9999px;
+}
+
+@media (pointer: coarse) {
+    .react-flow__handle::after {
+        inset: calc(-20px / var(--flow-zoom, 1));
+    }
+}
+
+.react-flow__handle:hover,
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto {
+    scale: 1.35;
 }
 
 /* React Flow's built-in node types centre their text; the custom nodes here
