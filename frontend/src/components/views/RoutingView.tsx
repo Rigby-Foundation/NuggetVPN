@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Download, FileUp, Globe2, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload, Plus } from "lucide-react";
+import { Download, FileUp, Globe2, Info, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload, Plus } from "lucide-react";
 import {
     Background,
     BackgroundVariant,
@@ -40,6 +40,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -55,10 +56,10 @@ import {
     RuleListStatus,
 } from "@/types";
 
+// Domain patterns are added as a domains card, switched to patterns there.
 const SOURCE_KINDS: RoutingKind[] = [
     "apps",
     "domains",
-    "domain_regex",
     "ip",
     "port",
     "protocol",
@@ -69,6 +70,59 @@ const SOURCE_KINDS: RoutingKind[] = [
     "logical",
 ];
 const ACTIONS: RoutingAction[] = ["proxy", "direct", "block", "drop"];
+
+/**
+ * Destinations that can be taken off the canvas while nothing goes to them:
+ * many setups never block or drop anything, and the two cards only take room.
+ * Which ones are hidden is how this device shows the canvas, not part of the
+ * routing, so it is kept here rather than in the settings.
+ */
+const HIDEABLE_ACTIONS: RoutingAction[] = ["block", "drop"];
+const HIDDEN_ACTIONS_KEY = "nugget.routing.hiddenActions";
+
+function useHiddenActions() {
+    const [hidden, setHidden] = useState<RoutingAction[]>(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(HIDDEN_ACTIONS_KEY) ?? "[]");
+            return Array.isArray(saved) ? saved.filter((action) => HIDEABLE_ACTIONS.includes(action)) : [];
+        } catch {
+            return [];
+        }
+    });
+    const update = useCallback((next: RoutingAction[]) => {
+        setHidden(next);
+        try {
+            localStorage.setItem(HIDDEN_ACTIONS_KEY, JSON.stringify(next));
+        } catch {
+            // Not remembered; the canvas still works.
+        }
+    }, []);
+    const hide = useCallback((action: RoutingAction) => update([...hidden.filter((item) => item !== action), action]), [hidden, update]);
+    const show = useCallback((action: RoutingAction) => update(hidden.filter((item) => item !== action)), [hidden, update]);
+    return { hidden, hide, show };
+}
+
+/** A small "i" that shows an explanation on hover, focus or click. */
+function InfoTip({ text }: { text: string }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Tooltip open={open} onOpenChange={setOpen}>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    onClick={() => setOpen((value) => !value)}
+                    aria-label={text}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                >
+                    <Info size={12} aria-hidden="true" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-60 text-[11px] leading-relaxed">
+                {text}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
 
 /** The catch-all source node has a fixed id; destinations are keyed by action. */
 const DEFAULT_NODE = "default";
@@ -156,6 +210,9 @@ interface RoutingViewProps {
 
 interface CanvasProps {
     settings: AppSettings;
+    /** Destinations taken off the canvas; any that something uses still shows. */
+    hiddenActions: RoutingAction[];
+    onHideAction: (action: RoutingAction) => void;
     onChange: (patch: Partial<AppSettings>) => void;
     profiles: Profile[];
     /** Open connections by rule id; null while disconnected. */
@@ -177,7 +234,7 @@ function serverIds(settings: AppSettings): string[] {
     return ids;
 }
 
-function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasProps) {
+function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profiles, hits, onReady }: CanvasProps) {
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
     const { setCenter, getZoom, fitView } = useReactFlow();
@@ -368,12 +425,18 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                     onDelete: () => removeRule(rule.id),
                 },
             })),
-            ...ACTIONS.map((action) => ({
-                id: actionNodeId(action),
-                type: "action",
-                position: positioned(actionNodeId(action), 0),
-                data: { action, inbound: inboundCounts[actionNodeId(action)] ?? 0 },
-            })),
+            ...ACTIONS.flatMap((action) => {
+                const inbound = inboundCounts[actionNodeId(action)] ?? 0;
+                // Something going there keeps it on the canvas, hidden or not.
+                if (inbound === 0 && hiddenActions.includes(action)) return [];
+                const hideable = inbound === 0 && HIDEABLE_ACTIONS.includes(action);
+                return [{
+                    id: actionNodeId(action),
+                    type: "action",
+                    position: positioned(actionNodeId(action), 0),
+                    data: { action, inbound, onHide: hideable ? () => onHideAction(action) : undefined },
+                }];
+            }),
             ...servers.map((profileId, index) => {
                 const profile = profiles.find((item) => item.id === profileId);
                 return {
@@ -413,7 +476,7 @@ function RoutingCanvas({ settings, onChange, profiles, hits, onReady }: CanvasPr
                 },
             };
         });
-    }, [rules, layout, inboundCounts, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
+    }, [rules, layout, inboundCounts, hiddenActions, onHideAction, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
         // An edge carrying connections right now is drawn heavier, so the
@@ -566,6 +629,8 @@ function Palette({
     onSetDefault,
     onAddServer,
     onAddPreset,
+    hiddenActions,
+    onShowAction,
     profiles,
     placedServers,
     geoPanel,
@@ -578,6 +643,9 @@ function Palette({
     onSetDefault: (action: RoutingAction) => void;
     onAddServer: (profileId: string) => void;
     onAddPreset: (rules: PresetRule[], placement: PresetPlacement) => void;
+    /** Hidden destinations nothing uses, offered here to put back. */
+    hiddenActions: RoutingAction[];
+    onShowAction: (action: RoutingAction) => void;
     profiles: Profile[];
     placedServers: string[];
     geoPanel: React.ReactNode;
@@ -608,8 +676,9 @@ function Palette({
             </div>
             {tab === "order" ? orderPanel : (
             <>
-            <p className="px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
-                {t("routing.sources")}
+            <p className="flex items-center gap-1 px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
+                <span className="flex-1">{t("routing.sources")}</span>
+                <InfoTip text={t("routing.dragHint")} />
             </p>
             {SOURCE_KINDS.map((kind) => {
                 const meta = kindMeta(kind);
@@ -679,6 +748,21 @@ function Palette({
                     ))}
                 </DropdownMenuContent>
             </DropdownMenu>
+            {hiddenActions.map((action) => {
+                const meta = ACTION_META[action];
+                return (
+                    <button
+                        key={action}
+                        type="button"
+                        onClick={() => onShowAction(action)}
+                        title={t("routing.action.show")}
+                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
+                    >
+                        <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
+                        <span className="truncate">{t(meta.label)}</span>
+                    </button>
+                );
+            })}
 
             <PresetList onAdd={onAddPreset} />
 
@@ -695,10 +779,6 @@ function Palette({
             </button>
 
             {geoPanel}
-
-            <p className="px-2 pt-3 text-[11px] leading-relaxed text-muted-foreground">
-                {t("routing.dragHint")}
-            </p>
             </>
             )}
         </aside>
@@ -743,8 +823,9 @@ function GeoPanel({
 
     return (
         <>
-            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                {t("routing.geo.title")}
+            <p className="flex items-center gap-1 px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
+                <span className="flex-1">{t("routing.geo.title")}</span>
+                <InfoTip text={t("routing.geo.explain")} />
             </p>
             <div className="space-y-2 px-1">
                 {GEO_KINDS.map(({ kind, label, icon: Icon }) => {
@@ -825,9 +906,6 @@ function GeoPanel({
                         </div>
                     );
                 })}
-                <p className="px-1 text-[10px] leading-relaxed text-muted-foreground">
-                    {t("routing.geo.explain")}
-                </p>
             </div>
         </>
     );
@@ -1094,6 +1172,11 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
     const { plugins } = usePlugins();
     const isMobile = useIsMobile();
     const [paletteOpen, setPaletteOpen] = useState(false);
+    const hiddenActions = useHiddenActions();
+    // A hidden destination something goes to is on the canvas regardless.
+    const offeredActions = hiddenActions.hidden.filter(
+        (action) => action !== settings.default_action && !rules.some((rule) => rule.action === action)
+    );
     const pluginSetups = plugins
         .filter((plugin) => plugin.enabled)
         .flatMap((plugin) => plugin.routing.map((setup) => ({ plugin, setup })));
@@ -1330,6 +1413,8 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                             <ReactFlowProvider>
                                 <RoutingCanvas
                                     settings={settings}
+                                    hiddenActions={hiddenActions.hidden}
+                                    onHideAction={hiddenActions.hide}
                                     onChange={onChange}
                                     profiles={profiles}
                                     hits={hits}
@@ -1375,6 +1460,8 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                                     addPreset(presetRules, placement);
                                     setPaletteOpen(false);
                                 }}
+                                hiddenActions={offeredActions}
+                                onShowAction={hiddenActions.show}
                                 profiles={profiles}
                                 placedServers={placedServers}
                                 geoPanel={<GeoPanel settings={settings} onChange={onChange} />}
@@ -1402,6 +1489,8 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                         onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
                         onAddServer={addServer}
                         onAddPreset={addPreset}
+                        hiddenActions={offeredActions}
+                        onShowAction={hiddenActions.show}
                         profiles={profiles}
                         placedServers={placedServers}
                         geoPanel={<GeoPanel settings={settings} onChange={onChange} />}

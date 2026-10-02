@@ -921,6 +921,7 @@ export function CommentNode({ data, selected }: NodeProps) {
 
 /** What changes a rule node can make to its rule. */
 export interface RulePatch {
+    kind?: RoutingSource;
     values?: string[];
     invert?: boolean;
     dns?: string;
@@ -959,6 +960,9 @@ export function SourceNode({ data, selected }: NodeProps) {
             hits={hits}
             order={order}
         >
+            {kind === "domains" || kind === "domain_regex" ? (
+                <DomainModeSwitch kind={kind} values={values} onChange={onChange} />
+            ) : null}
             <div className="px-3.5 pb-3">
                 <EntryEditor kind={kind} values={values} onChange={(next) => onChange({ values: next })} />
             </div>
@@ -970,6 +974,68 @@ export function SourceNode({ data, selected }: NodeProps) {
                 style={{ background: meta.accent, width: 14, height: 14, border: "none" }}
             />
         </NodeShell>
+    );
+}
+
+/** A domain as a pattern matching it and its subdomains, as "domains" does. */
+function domainAsPattern(domain: string): string {
+    return `(^|\\.)${domain.replace(/^\.+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
+}
+
+/**
+ * Domains and domain patterns are one card: this switches between listing
+ * names and writing regular expressions. Names carry over as the patterns
+ * that match them; a pattern has no name to go back to, so switching back
+ * waits until the list is empty.
+ */
+function DomainModeSwitch({
+    kind,
+    values,
+    onChange,
+}: {
+    kind: "domains" | "domain_regex";
+    values: string[];
+    onChange: (patch: RulePatch) => void;
+}) {
+    const t = useT();
+    const locked = kind === "domain_regex" && values.length > 0;
+    const options = [
+        { kind: "domains" as const, label: t("routing.domains.names") },
+        { kind: "domain_regex" as const, label: t("routing.domains.pattern") },
+    ];
+    return (
+        <div className="px-3.5 pb-2">
+            <div className="nodrag inline-flex rounded-md bg-muted/60 p-0.5" role="radiogroup" aria-label={t("routing.source.domains")}>
+                {options.map((option) => {
+                    const active = option.kind === kind;
+                    const disabled = !active && option.kind === "domains" && locked;
+                    return (
+                        <button
+                            key={option.kind}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            disabled={disabled}
+                            title={disabled ? t("routing.domains.patternLocked") : undefined}
+                            onClick={() => {
+                                if (active) return;
+                                onChange(
+                                    option.kind === "domain_regex"
+                                        ? { kind: option.kind, values: values.map(domainAsPattern) }
+                                        : { kind: option.kind }
+                                );
+                            }}
+                            className={cn(
+                                "rounded px-2 py-0.5 text-[11px] transition-colors disabled:opacity-50",
+                                active ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground"
+                            )}
+                        >
+                            {option.label}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
 
@@ -1162,6 +1228,8 @@ export interface ActionNodeData {
     action: RoutingAction;
     /** How many sources currently feed this destination. */
     inbound: number;
+    /** Takes the destination off the canvas; set only while nothing uses it. */
+    onHide?: () => void;
     [key: string]: unknown;
 }
 
@@ -1182,7 +1250,7 @@ function InboundSummary({ accent, status, inbound }: { accent: string; status: s
 
 /** A destination: everything wired into it goes here. */
 export function ActionNode({ data, selected }: NodeProps) {
-    const { action, inbound } = data as ActionNodeData;
+    const { action, inbound, onHide } = data as ActionNodeData;
     const meta = ACTION_META[action];
     const t = useT();
 
@@ -1194,6 +1262,7 @@ export function ActionNode({ data, selected }: NodeProps) {
             subtitle={t(meta.hint)}
             selected={selected}
             box={data as BoxData}
+            onDelete={onHide}
         >
             <InboundSummary accent={meta.accent} status={t(meta.status)} inbound={inbound} />
             <Handle

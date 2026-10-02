@@ -32,6 +32,8 @@ interface ConfigurationViewProps {
     onCopySources: (sources: ConfigSource[]) => Promise<void>;
     /** The link that adds the same thing elsewhere; "" when there is none. */
     linkOf: (source: ConfigSource) => string;
+    /** The profiles a source holds, whose servers can be shared one by one. */
+    profileIdsOf: (source: ConfigSource) => string[];
     onAdd: () => void;
 }
 
@@ -62,6 +64,7 @@ function ConfigurationView({
     onRefreshSources,
     onCopySources,
     linkOf,
+    profileIdsOf,
     onAdd,
 }: ConfigurationViewProps) {
     const t = useT();
@@ -359,7 +362,7 @@ function ConfigurationView({
             ) : null}
 
             {sharing ? (
-                <ShareDialog title={sharing.label} link={linkOf(sharing)} onClose={() => setSharing(null)} />
+                <ShareDialog title={sharing.label} link={linkOf(sharing)} profileIds={profileIdsOf(sharing)} onClose={() => setSharing(null)} />
             ) : null}
 
             {confirmDelete ? (

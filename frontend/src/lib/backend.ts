@@ -37,6 +37,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     delete_profiles_by_source: { method: "DeleteProfilesBySource", args: ["sourceDomain"] },
     delete_profiles_by_ids: { method: "DeleteProfilesByIds", args: ["ids"] },
     set_favorites: { method: "SetFavorites", args: ["ids", "favorite"] },
+    share_links: { method: "ShareLinks", args: ["ids"] },
 
     get_settings: { method: "GetSettings", args: [] },
     save_settings: { method: "SaveSettings", args: ["settings"] },

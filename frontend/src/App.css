@@ -194,6 +194,15 @@
     --status-connected: oklch(var(--brand-l) var(--brand-c) var(--brand-h));
     --status-error: oklch(0.55 0.225 27.325);
 
+    /* Categorical chart hues, in fixed order; checked for colour-blind separation. */
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-7: #4a3aa7;
+
     --routing-apps: oklch(0.6 0.2 350);
     --routing-domains: oklch(0.53 0.2 300);
     --routing-ip: oklch(0.6 0.16 40);
@@ -257,6 +266,14 @@
     --status-connecting: oklch(0.75 0.1 var(--brand-h));
     --status-connected: oklch(var(--brand-l) var(--brand-c) var(--brand-h));
     --status-error: oklch(0.704 0.191 22.216);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
 
     --routing-apps: oklch(0.72 0.19 350);
     --routing-domains: oklch(0.7 0.18 300);
@@ -992,4 +1009,11 @@
 :root[data-backdrop] [data-slot="dialog-content"],
 :root[data-backdrop] [data-slot="sheet-content"] {
     background-color: oklch(var(--ui-bg-l) var(--ui-c) var(--ui-h));
+}
+
+/* The sidebar's wrapper already carries the see-through tint; painting the
+   inner panel too doubled it inside the wrapper's padding, which showed as a
+   hard edge down the sidebar's left side. */
+:root[data-backdrop] [data-slot="sidebar-inner"] {
+    background: transparent;
 }

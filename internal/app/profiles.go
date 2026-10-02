@@ -126,3 +126,33 @@ func (a *App) SetFavorites(ids []string, favorite bool) ([]models.Profile, error
 	}
 	return a.replaceProfiles(profiles), nil
 }
+
+// ShareLinks returns a share link for every server in the given profiles, in
+// their order: the link a profile was imported from, or for a JSON or YAML
+// config, one link per server in it. Profiles with nothing shareable are
+// skipped; an error means none of them had anything.
+func (a *App) ShareLinks(ids []string) ([]link.SharedLink, error) {
+	profiles, _ := a.snapshot()
+	byID := make(map[string]models.Profile, len(profiles))
+	for _, profile := range profiles {
+		byID[profile.ID] = profile
+	}
+	links := []link.SharedLink{}
+	var lastErr error
+	for _, id := range ids {
+		profile, ok := byID[id]
+		if !ok {
+			continue
+		}
+		shared, err := link.ShareLinks(profile.ConfigLink, profile.Name)
+		if err != nil {
+			lastErr = fmt.Errorf("%s: %w", profile.Name, err)
+			continue
+		}
+		links = append(links, shared...)
+	}
+	if len(links) == 0 && lastErr != nil {
+		return nil, lastErr
+	}
+	return links, nil
+}

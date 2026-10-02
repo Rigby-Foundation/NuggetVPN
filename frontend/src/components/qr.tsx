@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
-import { Copy } from "lucide-react";
+import { Copy, Loader2, QrCode } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { errorMessage, invoke } from "@/lib/backend";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /**
  * Reads a QR code out of an image — a screenshot of a provider's page, a
@@ -173,14 +175,24 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
     );
 }
 
-/** A link as a QR code, to scan with a phone, with a copy button. */
-export function ShareDialog({ title, link, onClose }: { title: string; link: string; onClose: () => void }) {
+async function copyText(text: string, done: string, failed: string) {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast.success(done, { id: "share-copy" });
+    } catch {
+        toast.error(failed, { id: "share-copy" });
+    }
+}
+
+/** A link as a QR code, always dark on light: scanners expect that. */
+function QrImage({ link }: { link: string }) {
     const t = useT();
     const [svg, setSvg] = useState("");
     const [tooLong, setTooLong] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
+        setTooLong(false);
         QRCode.toString(link, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#ffffff" } })
             .then((markup) => {
                 if (!cancelled) setSvg(markup);
@@ -194,43 +206,165 @@ export function ShareDialog({ title, link, onClose }: { title: string; link: str
         };
     }, [link]);
 
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(link);
-            toast.success(t("share.copied"), { id: "share-copy" });
-        } catch {
-            toast.error(t("share.copyFailed"), { id: "share-copy" });
-        }
-    };
+    return tooLong ? (
+        <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">{t("share.tooLong")}</p>
+    ) : (
+        <div
+            className="mx-auto aspect-square w-64 overflow-hidden rounded-lg bg-white p-2 [&_svg]:h-full [&_svg]:w-full"
+            role="img"
+            aria-label={t("share.qr")}
+            dangerouslySetInnerHTML={{ __html: svg }}
+        />
+    );
+}
+
+interface SharedLink {
+    name: string;
+    link: string;
+}
+
+/**
+ * Each server on its own, as a vless://, vmess://… link: what a subscription
+ * or a JSON config holds, for a client that takes single servers.
+ */
+function ServerLinks({ profileIds }: { profileIds: string[] }) {
+    const t = useT();
+    const [links, setLinks] = useState<SharedLink[] | null>(null);
+    const [error, setError] = useState("");
+    const [shown, setShown] = useState<number | null>(null);
+    // The parent builds a fresh array on every render; read again only when
+    // the profiles themselves change.
+    const key = profileIds.join(",");
+
+    useEffect(() => {
+        let cancelled = false;
+        invoke<SharedLink[]>("share_links", { ids: key ? key.split(",") : [] })
+            .then((value) => {
+                if (!cancelled) setLinks(value ?? []);
+            })
+            .catch((failure) => {
+                if (!cancelled) setError(errorMessage(failure));
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [key]);
+
+    if (error) return <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">{error}</p>;
+    if (!links) {
+        return (
+            <div className="grid place-items-center p-6 text-muted-foreground">
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            </div>
+        );
+    }
+    if (links.length === 0) return <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">{t("share.servers.none")}</p>;
+
+    return (
+        <div className="space-y-2">
+            {shown !== null && links[shown] ? <QrImage link={links[shown].link} /> : null}
+            <ul className="max-h-72 space-y-1 overflow-y-auto">
+                {links.map((item, index) => (
+                    <li key={index} className={cn("flex items-center gap-1 rounded-lg border bg-muted/40 p-1 ps-3", shown === index && "border-primary/60")}>
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium">{item.name || t("share.servers.unnamed")}</span>
+                            <span className="block truncate font-mono text-[10px] text-muted-foreground" title={item.link} dir="ltr">
+                                {item.link}
+                            </span>
+                        </span>
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            aria-pressed={shown === index}
+                            aria-label={t("share.qr")}
+                            title={t("share.qr")}
+                            onClick={() => setShown(shown === index ? null : index)}
+                        >
+                            <QrCode size={13} aria-hidden="true" />
+                        </Button>
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            aria-label={t("share.copy")}
+                            title={t("share.copy")}
+                            onClick={() => void copyText(item.link, t("share.copied"), t("share.copyFailed"))}
+                        >
+                            <Copy size={13} aria-hidden="true" />
+                        </Button>
+                    </li>
+                ))}
+            </ul>
+            <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                    void copyText(
+                        links.map((item) => item.link).join("\n"),
+                        t("share.servers.copiedAll", { count: links.length }),
+                        t("share.copyFailed")
+                    )
+                }
+            >
+                <Copy size={13} className="me-1.5" aria-hidden="true" />
+                {t("share.servers.copyAll", { count: links.length })}
+            </Button>
+        </div>
+    );
+}
+
+/**
+ * A configuration to add elsewhere: the link it came from as a QR code and
+ * text, and, given its profiles, each server's own link.
+ */
+export function ShareDialog({ title, link, profileIds, onClose }: { title: string; link: string; profileIds?: string[]; onClose: () => void }) {
+    const t = useT();
+    const [tab, setTab] = useState<"link" | "servers">("link");
 
     return (
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle className="truncate">{title}</DialogTitle>
-                    <DialogDescription>{t("share.explain")}</DialogDescription>
+                    <DialogDescription>{t(tab === "link" ? "share.explain" : "share.servers.explain")}</DialogDescription>
                 </DialogHeader>
-                {tooLong ? (
-                    <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">{t("share.tooLong")}</p>
+                {profileIds && profileIds.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-muted/60 p-0.5" role="tablist">
+                        {(["link", "servers"] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === option}
+                                onClick={() => setTab(option)}
+                                className={cn(
+                                    "rounded-md py-1 text-xs transition-colors",
+                                    tab === option ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {t(option === "link" ? "share.tab.link" : "share.tab.servers")}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+                {tab === "servers" && profileIds ? (
+                    <ServerLinks profileIds={profileIds} />
                 ) : (
-                    // Always black on white, whatever the theme: scanners
-                    // expect a dark code on a light ground.
-                    <div
-                        className="mx-auto aspect-square w-64 overflow-hidden rounded-lg bg-white p-2 [&_svg]:h-full [&_svg]:w-full"
-                        role="img"
-                        aria-label={t("share.qr")}
-                        dangerouslySetInnerHTML={{ __html: svg }}
-                    />
+                    <>
+                        <QrImage link={link} />
+                        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-1.5 ps-3">
+                            <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={link}>
+                                {link}
+                            </span>
+                            <Button size="sm" variant="ghost" onClick={() => void copyText(link, t("share.copied"), t("share.copyFailed"))}>
+                                <Copy size={13} className="me-1.5" aria-hidden="true" />
+                                {t("share.copy")}
+                            </Button>
+                        </div>
+                    </>
                 )}
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-1.5 ps-3">
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={link}>
-                        {link}
-                    </span>
-                    <Button size="sm" variant="ghost" onClick={() => void copy()}>
-                        <Copy size={13} className="me-1.5" aria-hidden="true" />
-                        {t("share.copy")}
-                    </Button>
-                </div>
             </DialogContent>
         </Dialog>
     );
