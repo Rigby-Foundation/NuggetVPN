@@ -238,14 +238,7 @@ func applyTransport(proxy map[string]any, source link.Outbound) error {
 	case "http":
 		proxy["network"], proxy["h2-opts"] = "h2", map[string]any{"host": texts(transport["host"]), "path": str(transport["path"])}
 	case "xhttp":
-		options := map[string]any{"path": str(transport["path"])}
-		if host := str(transport["host"]); host != "" {
-			options["host"] = host
-		}
-		if mode := str(transport["mode"]); mode != "" {
-			options["mode"] = mode
-		}
-		proxy["network"], proxy["xhttp-opts"] = "xhttp", options
+		proxy["network"], proxy["xhttp-opts"] = "xhttp", xhttpOptions(transport)
 	case "quic":
 		return fmt.Errorf("mihomo has no QUIC transport for this server")
 	}

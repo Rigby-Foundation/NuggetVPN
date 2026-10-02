@@ -820,6 +820,10 @@ func buildTransport(transportType string, params url.Values, host string) map[st
 		if padding := firstParam(params, "xPaddingBytes", "xpaddingbytes"); padding != "" {
 			transport["xPaddingBytes"] = padding
 		}
+		// Everything else rides in "extra"; see xhttp.go.
+		if extra := firstParam(params, "extra"); extra != "" {
+			applyXHTTPExtra(transport, extra)
+		}
 		return transport
 	}
 	return nil

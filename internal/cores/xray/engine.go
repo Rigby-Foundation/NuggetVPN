@@ -314,12 +314,9 @@ func streamSettings(source link.Outbound) (map[string]any, error) {
 		case "httpupgrade":
 			stream["network"], stream["httpupgradeSettings"] = "httpupgrade", map[string]any{"path": str(transport["path"]), "host": str(transport["host"])}
 		case "xhttp":
-			settings := map[string]any{"path": str(transport["path"]), "host": str(transport["host"])}
-			if mode := str(transport["mode"]); mode != "" {
-				settings["mode"] = mode
-			}
-			if padding := str(transport["xPaddingBytes"]); padding != "" {
-				settings["extra"] = map[string]any{"xPaddingBytes": padding}
+			settings, err := xhttpSettings(transport)
+			if err != nil {
+				return nil, err
 			}
 			stream["network"], stream["xhttpSettings"] = "xhttp", settings
 		case "http":
@@ -362,6 +359,47 @@ func streamSettings(source link.Outbound) (map[string]any, error) {
 		}
 	}
 	return stream, nil
+}
+
+// xhttpSettings is Xray's XHTTP block. The finer settings already carry
+// Xray's names (see link/xhttp.go) and go in "extra" as they are; only a
+// separate downlink is reshaped, from the built-in core's form back into a
+// stream setup of its own.
+func xhttpSettings(transport map[string]any) (map[string]any, error) {
+	settings := map[string]any{"path": str(transport["path"]), "host": str(transport["host"])}
+	if mode := str(transport["mode"]); mode != "" {
+		settings["mode"] = mode
+	}
+	extra := map[string]any{}
+	for key, value := range transport {
+		switch key {
+		case "type", "host", "path", "mode":
+		case "downloadSettings":
+			download, _ := value.(map[string]any)
+			if download == nil {
+				continue
+			}
+			inner := map[string]any{"type": "xhttp"}
+			for name, setting := range download {
+				if name != "server" && name != "server_port" && name != "tls" {
+					inner[name] = setting
+				}
+			}
+			stream, err := streamSettings(link.Outbound{"tls": download["tls"], "transport": inner})
+			if err != nil {
+				return nil, err
+			}
+			stream["address"] = str(download["server"])
+			stream["port"] = num(download["server_port"])
+			extra["downloadSettings"] = stream
+		default:
+			extra[key] = value
+		}
+	}
+	if len(extra) > 0 {
+		settings["extra"] = extra
+	}
+	return settings, nil
 }
 
 func str(value any) string {

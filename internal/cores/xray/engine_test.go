@@ -20,6 +20,7 @@ var profiles = []models.Profile{
 	{ID: "xhttp", Name: "XHTTP", ConfigLink: "vless://11111111-2222-3333-4444-555555555555@x.example.com:443?encryption=none&security=tls&type=xhttp&path=%2Fdl&host=cdn.example.com&mode=stream-one#X"},
 	{ID: "vmess", Name: "VMess", ConfigLink: "vmess://eyJ2IjoiMiIsInBzIjoiVk1lc3MiLCJhZGQiOiJ2bS5leGFtcGxlLmNvbSIsInBvcnQiOiI0NDMiLCJpZCI6IjExMTExMTExLTIyMjItMzMzMy00NDQ0LTU1NTU1NTU1NTU1NSIsImFpZCI6IjAiLCJzY3kiOiJhdXRvIiwibmV0Ijoid3MiLCJ0eXBlIjoibm9uZSIsImhvc3QiOiJ2bS5leGFtcGxlLmNvbSIsInBhdGgiOiIvd3MiLCJ0bHMiOiJ0bHMiLCJzbmkiOiJ2bS5leGFtcGxlLmNvbSJ9"},
 	{ID: "ss", Name: "SS", ConfigLink: "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ@ss.example.com:8388#SS"},
+	{ID: "xhttp-extra", Name: "XHTTP extra", ConfigLink: "vless://11111111-2222-3333-4444-555555555555@xe.example.com:443?encryption=none&type=xhttp&path=%2Fapi%2F&host=xe.example.com&mode=packet-up&security=tls&sni=xe.example.com&fp=chrome&alpn=h2%2Chttp%2F1.1&extra=%7B%22xmux%22%3A%7B%22cMaxLifetimeMs%22%3A0%2C%22cMaxReuseTimes%22%3A%2236-96%22%2C%22maxConcurrency%22%3A%228-32%22%2C%22maxConnections%22%3A0%2C%22hMaxRequestTimes%22%3A%22320-640%22%2C%22hMaxReusableSecs%22%3A%22720-1800%22%7D%2C%22uplinkDataKey%22%3A%22X-Data%22%2C%22uplinkChunkSize%22%3A3072%2C%22uplinkHTTPMethod%22%3A%22GET%22%2C%22uplinkDataPlacement%22%3A%22header%22%2C%22downloadSettings%22%3A%7B%22address%22%3A%22down.example.com%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22tlsSettings%22%3A%7B%22serverName%22%3A%22down.example.com%22%2C%22alpn%22%3A%5B%22h2%22%5D%7D%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fdown%22%7D%7D%7D#XE"},
 	{ID: "socks", Name: "SOCKS", ConfigLink: "socks5://user:pass@203.0.113.9:1080#S"},
 }
 
@@ -83,6 +84,21 @@ func TestEngineBuildsEveryProtocol(t *testing.T) {
 				t.Errorf("bypass outbound does not match the entry point: %v", entry)
 			}
 		}
+	}
+
+	// XHTTP's finer settings reach Xray, the downlink as a stream of its own.
+	var xhttpExtra map[string]any
+	for _, outbound := range parsed["outbounds"].([]any) {
+		stream, _ := outbound.(map[string]any)["streamSettings"].(map[string]any)
+		settings, _ := stream["xhttpSettings"].(map[string]any)
+		if extra, _ := settings["extra"].(map[string]any); extra["uplinkDataPlacement"] != nil {
+			xhttpExtra = extra
+		}
+	}
+	if xhttpExtra == nil || xhttpExtra["uplinkHTTPMethod"] != "GET" {
+		t.Errorf("XHTTP extra settings did not reach Xray: %v", xhttpExtra)
+	} else if download, _ := xhttpExtra["downloadSettings"].(map[string]any); download["address"] != "down.example.com" || download["network"] != "xhttp" {
+		t.Errorf("XHTTP downlink: %v", download)
 	}
 
 	// Xray's own loader, which is linked in.

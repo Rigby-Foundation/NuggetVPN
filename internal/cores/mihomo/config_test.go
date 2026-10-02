@@ -27,6 +27,7 @@ var servers = []models.Profile{
 	{ID: "ss", Name: "SS", ConfigLink: "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ@ss.example.com:8388#SS"},
 	{ID: "wg", Name: "WG", ConfigLink: "wireguard://cHJpdmF0ZWtleXByaXZhdGVrZXlwcml2YXRla2V5MTI%3D@wg.example.com:51820?address=10.0.0.2%2F32&publickey=cHVibGlja2V5cHVibGlja2V5cHVibGlja2V5MTIzND0%3D&mtu=1280#WG"},
 	{ID: "xhttp", Name: "XHTTP", ConfigLink: "vless://11111111-2222-3333-4444-555555555555@x.example.com:443?encryption=none&security=tls&type=xhttp&path=%2Fdl&host=cdn.example.com&mode=stream-one#X"},
+	{ID: "xhttp-extra", Name: "XHTTP extra", ConfigLink: "vless://11111111-2222-3333-4444-555555555555@xe.example.com:443?encryption=none&type=xhttp&path=%2Fapi%2F&host=xe.example.com&mode=packet-up&security=tls&sni=xe.example.com&fp=chrome&alpn=h2%2Chttp%2F1.1&extra=%7B%22xmux%22%3A%7B%22cMaxLifetimeMs%22%3A0%2C%22cMaxReuseTimes%22%3A%2236-96%22%2C%22maxConcurrency%22%3A%228-32%22%2C%22maxConnections%22%3A0%2C%22hMaxRequestTimes%22%3A%22320-640%22%2C%22hMaxReusableSecs%22%3A%22720-1800%22%7D%2C%22uplinkDataKey%22%3A%22X-Data%22%2C%22uplinkChunkSize%22%3A3072%2C%22uplinkHTTPMethod%22%3A%22GET%22%2C%22uplinkDataPlacement%22%3A%22header%22%2C%22downloadSettings%22%3A%7B%22address%22%3A%22down.example.com%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22tlsSettings%22%3A%7B%22serverName%22%3A%22down.example.com%22%2C%22alpn%22%3A%5B%22h2%22%5D%7D%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fdown%22%7D%7D%7D#XE"},
 	{ID: "hop", Name: "Hop", ConfigLink: "trojan://pw@hop.example.com:443?sni=hop.example.com#H"},
 }
 
@@ -59,7 +60,8 @@ func featureRequest(t *testing.T) Request {
 	settings.Normalize()
 	return Request{
 		Profile: servers[0], Profiles: servers, Settings: settings,
-		Alternatives: servers[:8],
+		// Every server but the chain hop, last.
+		Alternatives: servers[:len(servers)-1],
 		MixedPort:    17890,
 		RuleLists:    map[string]sbconfig.RuleList{"https://lists.example/blocked.lst": {Path: listPath}},
 	}
@@ -100,6 +102,13 @@ func TestBuildTranslatesTheGraph(t *testing.T) {
 	}
 	if result.ServerFor["Tokyo"] != "jp" {
 		t.Errorf("server names: %v", result.ServerFor)
+	}
+
+	// XHTTP's finer settings, under mihomo's names.
+	for _, want := range []string{"uplink-http-method: GET", "uplink-data-placement: header", "max-concurrency: 8-32", "download-settings:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("XHTTP setting missing: %q", want)
+		}
 	}
 
 	// mihomo's own parser, which is linked in.
