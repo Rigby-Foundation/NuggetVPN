@@ -58,7 +58,6 @@ const ru: Messages = {
 
     "connection.hint.idle": "Нажмите, чтобы подключиться",
     "connection.hint.connecting": "Ищем самый быстрый сервер…",
-    "connection.hint.connected": "Трафик идёт через туннель",
     "connection.hint.error": "Последняя попытка не удалась",
     "connection.connect": "Подключиться",
     "connection.disconnect": "Отключиться",

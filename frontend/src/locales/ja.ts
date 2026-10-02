@@ -60,7 +60,6 @@ const ja: Messages = {
 
     "connection.hint.idle": "タップして接続",
     "connection.hint.connecting": "最速のサーバーを探しています…",
-    "connection.hint.connected": "通信はトンネルを経由しています",
     "connection.hint.error": "前回の接続に失敗しました",
     "connection.connect": "接続",
     "connection.disconnect": "切断",

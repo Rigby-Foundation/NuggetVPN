@@ -47,7 +47,8 @@ const PRESENTATION = {
     },
     connected: {
         label: "status.connected",
-        hint: "connection.hint.connected",
+        // The status line above the button already says so.
+        hint: null,
         ring: "border-status-connected/40",
         disc:
             "bg-linear-to-tr from-status-connected to-status-connecting " +
@@ -63,7 +64,7 @@ const PRESENTATION = {
         icon: "text-status-error",
         dot: "bg-status-error",
     },
-} as const satisfies Record<string, { label: MessageKey; hint: MessageKey; ring: string; disc: string; icon: string; dot: string }>;
+} as const satisfies Record<string, { label: MessageKey; hint: MessageKey | null; ring: string; disc: string; icon: string; dot: string }>;
 
 /** Ticks once a second while connected, so the duration counts up. */
 function useElapsed(since: number | undefined): string {
@@ -228,9 +229,9 @@ function ConnectionView({
                     <p className="text-sm text-muted-foreground">
                         {t("connection.reconnecting", { attempt: state.attempt ?? 1 })}
                     </p>
-                ) : (
+                ) : presentation.hint ? (
                     <p className="text-sm text-muted-foreground">{t(presentation.hint)}</p>
-                )}
+                ) : null}
                 {state.blocked ? (
                     <p className="flex items-center gap-1.5 rounded-full bg-status-error/10 px-3 py-1 text-xs text-status-error">
                         <ShieldAlert size={13} aria-hidden="true" />

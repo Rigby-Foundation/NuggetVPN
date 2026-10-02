@@ -60,7 +60,6 @@ const zh: Messages = {
 
     "connection.hint.idle": "点击连接",
     "connection.hint.connecting": "正在寻找最快的服务器…",
-    "connection.hint.connected": "你的流量正通过隧道传输",
     "connection.hint.error": "上次尝试失败",
     "connection.connect": "连接",
     "connection.disconnect": "断开连接",
