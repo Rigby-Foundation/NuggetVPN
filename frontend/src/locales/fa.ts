@@ -62,7 +62,6 @@ const fa: Messages = {
 
     "connection.hint.idle": "برای اتصال بزنید",
     "connection.hint.connecting": "در حال یافتن سریع‌ترین سرور…",
-    "connection.hint.connected": "ترافیک شما از تونل عبور می‌کند",
     "connection.hint.error": "آخرین تلاش ناموفق بود",
     "connection.connect": "اتصال",
     "connection.disconnect": "قطع اتصال",

@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { MoreHorizontal, Power, Settings, Signal, Waypoints } from "lucide-react";
 
-import { STATUS_DOT, TABS } from "@/components/layout/AppSidebar";
+import { TABS } from "@/components/layout/AppSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ConnectionStatus } from "@/types";
 
 /** The screens with a place of their own in the bar; the rest are under More. */
 const PRIMARY = [
@@ -25,11 +24,9 @@ const PRIMARY_IDS = new Set<string>(PRIMARY.map((tab) => tab.id));
 export function BottomNav({
     activeTab,
     onTabChange,
-    status,
 }: {
     activeTab: string;
     onTabChange: (tab: string) => void;
-    status: ConnectionStatus;
 }) {
     const t = useT();
     const [more, setMore] = useState(false);
@@ -57,9 +54,6 @@ export function BottomNav({
                             <tab.icon size={19} aria-hidden="true" />
                         </span>
                         <span className="truncate">{t(tab.label)}</span>
-                        {tab.id === "connection" ? (
-                            <span className={cn("absolute end-[calc(50%-1.1rem)] top-1.5 h-2 w-2 rounded-full", STATUS_DOT[status])} aria-hidden="true" />
-                        ) : null}
                     </button>
                 ))}
                 <button type="button" onClick={() => setMore(true)} aria-expanded={more} className={item(inMore)}>

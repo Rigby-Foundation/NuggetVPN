@@ -58,7 +58,6 @@ const uk: Messages = {
 
     "connection.hint.idle": "Натисніть, щоб підключитися",
     "connection.hint.connecting": "Шукаємо найшвидший сервер…",
-    "connection.hint.connected": "Трафік іде через тунель",
     "connection.hint.error": "Остання спроба не вдалася",
     "connection.connect": "Підключитися",
     "connection.disconnect": "Відключитися",

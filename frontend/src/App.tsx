@@ -1005,7 +1005,6 @@ function App() {
                     onMinimize={appWindow.minimize}
                     onMaximize={appWindow.toggleMaximize}
                     platform={platform}
-                    status={connection.state.status}
                 />
                 <SidebarInset
                     className={cn(
@@ -1215,7 +1214,7 @@ function App() {
                                 )}
                             </div>
                         {isMobile ? (
-                            <BottomNav activeTab={activeTab} onTabChange={changeTab} status={connection.state.status} />
+                            <BottomNav activeTab={activeTab} onTabChange={changeTab} />
                         ) : null}
                     </div>
                 </SidebarInset>

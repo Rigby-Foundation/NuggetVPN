@@ -68,7 +68,6 @@ const en = {
     // Connection
     "connection.hint.idle": "Tap to connect",
     "connection.hint.connecting": "Finding the fastest server…",
-    "connection.hint.connected": "Your traffic is going through the tunnel",
     "connection.hint.error": "The last attempt failed",
     "connection.connect": "Connect",
     "connection.disconnect": "Disconnect",

@@ -14,7 +14,6 @@ import {
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import { MessageKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ConnectionStatus } from "@/types";
 
 interface AppSidebarProps {
     activeTab: string;
@@ -23,7 +22,6 @@ interface AppSidebarProps {
     onMinimize: () => void;
     onMaximize: () => void;
     platform?: string;
-    status: ConnectionStatus;
 }
 
 export const TABS = [
@@ -36,19 +34,6 @@ export const TABS = [
     { id: "logs", label: "nav.logs", icon: FileText },
 ] as const satisfies readonly { id: string; label: MessageKey; icon: unknown }[];
 
-export const STATUS_DOT: Record<ConnectionStatus, string> = {
-    idle: "bg-status-idle",
-    connecting: "bg-status-connecting animate-pulse",
-    connected: "bg-status-connected",
-    error: "bg-status-error",
-};
-
-const STATUS_LABEL: Record<ConnectionStatus, MessageKey> = {
-    idle: "status.idle",
-    connecting: "status.connecting",
-    connected: "status.connected",
-    error: "status.error",
-};
 
 function AppSidebar({
     activeTab,
@@ -57,7 +42,6 @@ function AppSidebar({
     onMinimize,
     onMaximize,
     platform,
-    status,
 }: AppSidebarProps) {
     const { t, dir } = useI18n();
     const isMac = platform === "macos";
@@ -104,16 +88,6 @@ function AppSidebar({
             </SidebarContent>
 
             <SidebarFooter className="gap-2">
-                {/* The tunnel state is visible from every screen, not only the
-                    one screen that happens to be about connecting. */}
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-                    <span
-                        className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[status])}
-                        aria-hidden="true"
-                    />
-                    <span className="truncate">{t(STATUS_LABEL[status])}</span>
-                </div>
-
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton
