@@ -192,7 +192,10 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                         </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 custom-scrollbar">
+                    {/* clip-path, not just overflow, holds the rounded corners: the
+                        sticky header is a layer of its own, and the WebView drew
+                        it square over the border at the top. */}
+                    <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]">
                         {shown.length === 0 ? (
                             <p className="p-6 text-center text-xs text-muted-foreground">
                                 {rows.length === 0 ? t("connections.none") : t("connections.noMatch")}
@@ -202,7 +205,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                             // app and rule under it, then the server, with the data
                             // on the right. Five columns left a phone a word per cell.
                             <table className="w-full table-fixed text-xs max-sm:block">
-                                <thead className="max-sm:hidden sticky top-0 z-10 bg-card/95 text-start text-[11px] text-muted-foreground backdrop-blur">
+                                <thead className="max-sm:hidden sticky top-0 z-10 bg-card text-start text-[11px] text-muted-foreground">
                                     <tr>
                                         <th className="w-[30%] px-3 py-2 text-start font-medium">{t("connections.col.site")}</th>
                                         <th className="w-[16%] px-2 py-2 text-start font-medium">{t("connections.col.app")}</th>

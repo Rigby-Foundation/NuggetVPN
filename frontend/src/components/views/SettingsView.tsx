@@ -20,6 +20,7 @@ import {
   Palette,
   Plus,
   RefreshCw,
+  Search,
   Router,
   ShieldHalf,
   Trash2,
@@ -55,7 +56,8 @@ import {
   RadiusPicker,
 } from "@/components/settings/appearance-options";
 import { effectiveFont, fontLabel } from "@/lib/appearance";
-import { LANGUAGES, LanguageChoice, MessageKey, scriptOf, useI18n } from "@/lib/i18n";
+import { LANGUAGES, LanguageChoice, MessageKey, scriptOf, translate, useI18n } from "@/lib/i18n";
+import en from "@/locales/en";
 import {
   SettingsField,
   SettingsGroup,
@@ -251,6 +253,70 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/**
+ * The list is grouped so fifteen sections read as four things, not a column
+ * to scan top to bottom.
+ */
+const GROUPS: { title: MessageKey; sections: SectionId[] }[] = [
+  { title: "settings.group.general", sections: ["appearance", "language", "behaviour", "updates"] },
+  { title: "settings.group.network", sections: ["connection", "tls", "chain", "subscriptions", "wifi"] },
+  { title: "settings.group.data", sections: ["privacy", "sync", "backup", "beam"] },
+  { title: "settings.group.advanced", sections: ["core", "plugins"] },
+];
+
+/**
+ * What each section contains, as the message-key prefixes of its controls,
+ * so a search finds a setting by its own name and not only its section's.
+ */
+const SEARCH_PREFIXES: Record<SectionId, string[]> = {
+  appearance: ["appearance.", "picker.", "editor."],
+  language: ["settings.language"],
+  behaviour: ["behaviour.", "shortcut.", "close."],
+  connection: ["connection.dns", "connection.mtu"],
+  tls: ["tls."],
+  chain: ["chain."],
+  subscriptions: ["identity.", "usage."],
+  wifi: ["wifi."],
+  privacy: ["privacy."],
+  sync: ["sync."],
+  beam: ["beam."],
+  core: ["core."],
+  plugins: ["plugins."],
+  backup: ["backup."],
+  updates: ["updates."],
+};
+/** Words that name a control without a message of their own. */
+const SEARCH_EXTRA: Partial<Record<SectionId, string[]>> = { connection: ["MTU"] };
+
+const ALL_KEYS = Object.keys(en) as MessageKey[];
+
+/** Settings whose text holds every word of the query, in the UI's language or English. */
+function searchSettings(query: string, language: Parameters<typeof translate>[0]): { id: SectionId; match: string }[] {
+  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const results: { id: SectionId; match: string }[] = [];
+  for (const section of SECTIONS) {
+    const keys = ALL_KEYS.filter(
+      (key) => SEARCH_PREFIXES[section.id].some((prefix) => key.startsWith(prefix)) && typeof en[key] === "string"
+    );
+    const texts = [
+      section.title,
+      section.blurb,
+      ...keys.filter((key) => !key.endsWith(".description")),
+      ...keys.filter((key) => key.endsWith(".description")),
+    ].map((key) => ({ shown: translate(language, key), english: translate("en", key) }));
+    texts.push(...(SEARCH_EXTRA[section.id] ?? []).map((word) => ({ shown: word, english: word })));
+    const haystack = texts.map((text) => `${text.shown} ${text.english}`).join(" ").toLocaleLowerCase();
+    if (!words.every((word) => haystack.includes(word))) continue;
+    // Show the first single text that matches, to say why this section is here.
+    const hit = texts.find((text) =>
+      words.some((word) => `${text.shown} ${text.english}`.toLocaleLowerCase().includes(word))
+    );
+    results.push({ id: section.id, match: hit?.shown.replace(/\{\w+\}/g, "…") ?? "" });
+  }
+  return results;
+}
+
 function SettingsView({
   theme,
   setTheme,
@@ -267,6 +333,8 @@ function SettingsView({
   openSignal,
 }: SettingsViewProps) {
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
+  // Kept while a section is open, so Back returns to the same results.
+  const [query, setQuery] = React.useState("");
   // Which way the last move went, so coming back animates in reverse.
   const [direction, setDirection] = React.useState<"forward" | "back">("forward");
 
@@ -1037,6 +1105,17 @@ function SettingsView({
   };
 
   const open = SECTIONS.find((section) => section.id === openId);
+  const visible = (id: SectionId) => (id !== "beam" || !!beamPreview) && !(isAndroid && HIDDEN_ON_ANDROID.has(id));
+  const results = query.trim() ? searchSettings(query, language).filter((result) => visible(result.id)) : null;
+  const row = (section: Section, subtitle = subtitleFor(section)) => (
+    <SettingsRow
+      key={section.id}
+      icon={section.icon}
+      title={t(section.title)}
+      subtitle={subtitle}
+      onClick={() => navigate(section.id)}
+    />
+  );
 
   return (
     // Keyed per page: each list or section is a fresh mount, which is what
@@ -1065,18 +1144,45 @@ function SettingsView({
             {open ? (
               <div className="enter-stagger space-y-4 pe-1">{detail(open.id)}</div>
             ) : (
-              <div className="enter-stagger space-y-2 pe-1">
-                {SECTIONS.filter(
-                  (section) => (section.id !== "beam" || beamPreview) && !(isAndroid && HIDDEN_ON_ANDROID.has(section.id))
-                ).map((section) => (
-                  <SettingsRow
-                    key={section.id}
-                    icon={section.icon}
-                    title={t(section.title)}
-                    subtitle={subtitleFor(section)}
-                    onClick={() => navigate(section.id)}
+              <div className="enter-stagger space-y-4 pe-1">
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
                   />
-                ))}
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") setQuery("");
+                      if (event.key === "Enter" && results?.length) navigate(results[0].id);
+                    }}
+                    placeholder={t("settings.search")}
+                    aria-label={t("settings.search")}
+                    className="h-9 ps-8"
+                  />
+                </div>
+                {results ? (
+                  results.length === 0 ? (
+                    <p className="px-1 text-sm text-muted-foreground">{t("settings.search.none")}</p>
+                  ) : (
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      {results.map((result) => row(SECTIONS.find((section) => section.id === result.id)!, result.match))}
+                    </div>
+                  )
+                ) : (
+                  GROUPS.map((group) => {
+                    const sections = group.sections.filter(visible).map((id) => SECTIONS.find((section) => section.id === id)!);
+                    if (sections.length === 0) return null;
+                    return (
+                      <section key={group.title} className="space-y-2">
+                        <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(group.title)}</h3>
+                        <div className="grid gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
+                      </section>
+                    );
+                  })
+                )}
               </div>
             )}
           </ScrollArea>

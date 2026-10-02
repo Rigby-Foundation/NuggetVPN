@@ -105,6 +105,89 @@ function Timeline({ samples }: { samples: HealthSample[] }) {
     );
 }
 
+/** Apps that get a slice of their own; the rest share "Other". */
+const SLICES = 7;
+
+interface Slice {
+    key: string;
+    label: string;
+    size: number;
+    color: string;
+}
+
+/**
+ * Each app's share of the traffic. Hovering a slice or its legend row shows
+ * that app in the middle; the list below has the exact numbers.
+ */
+function ShareChart({ slices, total }: { slices: Slice[]; total: number }) {
+    const t = useT();
+    const [active, setActive] = useState<string | null>(null);
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius;
+    // A sliver of card between slices, so neighbours never run together.
+    const gap = slices.length > 1 ? 1.2 : 0;
+    let offset = 0;
+    const focused = slices.find((slice) => slice.key === active);
+    const share = (size: number) => `${size / total >= 0.1 ? Math.round((size / total) * 100) : ((size / total) * 100).toFixed(1)}%`;
+
+    return (
+        <div className="mb-4 flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
+            <div className="relative h-36 w-36 shrink-0">
+                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={t("stats.share")}>
+                    {slices.map((slice) => {
+                        const length = (slice.size / total) * circumference;
+                        const dash = Math.max(0.4, length - gap);
+                        const start = offset;
+                        offset += length;
+                        return (
+                            <circle
+                                key={slice.key}
+                                cx="50"
+                                cy="50"
+                                r={radius}
+                                fill="none"
+                                stroke={slice.color}
+                                strokeWidth={active === slice.key ? 15 : 12}
+                                strokeDasharray={`${dash} ${circumference - dash}`}
+                                strokeDashoffset={-start}
+                                className="cursor-default transition-[stroke-width,opacity] duration-150"
+                                opacity={active && active !== slice.key ? 0.35 : 1}
+                                onMouseEnter={() => setActive(slice.key)}
+                                onMouseLeave={() => setActive(null)}
+                            >
+                                <title>{`${slice.label} · ${share(slice.size)} · ${formatBytes(slice.size)}`}</title>
+                            </circle>
+                        );
+                    })}
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                    <span className="tnum text-sm font-semibold">{focused ? share(focused.size) : formatBytes(total)}</span>
+                    <span className="w-full truncate text-[11px] text-muted-foreground">
+                        {focused ? focused.label : t("stats.total")}
+                    </span>
+                </div>
+            </div>
+            <ul className="grid w-full min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                {slices.map((slice) => (
+                    <li
+                        key={slice.key}
+                        className={cn(
+                            "flex min-w-0 items-center gap-2 rounded-md px-1.5 py-0.5 text-xs transition-colors",
+                            active === slice.key && "bg-muted/60"
+                        )}
+                        onMouseEnter={() => setActive(slice.key)}
+                        onMouseLeave={() => setActive(null)}
+                    >
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: slice.color }} aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate">{slice.label}</span>
+                        <span className="tnum shrink-0 text-muted-foreground">{share(slice.size)}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 function percent(value: number): string {
     return value < 0 ? "—" : `${Math.round(value * 100)}%`;
 }
@@ -147,6 +230,18 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     const programs = usage?.programs ?? [];
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
     const total = programs.reduce((sum, program) => ({ up: sum.up + program.up, down: sum.down + program.down }), { up: 0, down: 0 });
+    const label = (program: string) => (program ? appLabels.get(program) || programName(program) : t("stats.unknownApp"));
+    const ranked = [...programs].sort((a, b) => b.up + b.down - (a.up + a.down));
+    const slices: Slice[] = ranked.slice(0, SLICES).map((program, index) => ({
+        key: program.program,
+        label: label(program.program),
+        size: program.up + program.down,
+        color: `var(--series-${index + 1})`,
+    }));
+    const rest = ranked.slice(SLICES).reduce((sum, program) => sum + program.up + program.down, 0);
+    if (rest > 0) {
+        slices.push({ key: "\u0000other", label: t("stats.other"), size: rest, color: "color-mix(in oklab, var(--muted-foreground) 55%, transparent)" });
+    }
 
     const clear = async () => {
         setConfirmClear(false);
@@ -209,6 +304,9 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                     ) : (
                         <>
                             {days > 1 && usage ? <DayChart days={usage.days} /> : null}
+                            {programs.length > 0 && total.up + total.down > 0 ? (
+                                <ShareChart slices={slices} total={total.up + total.down} />
+                            ) : null}
                             {programs.length === 0 ? (
                                 <p className="text-xs text-muted-foreground">{t("stats.apps.empty")}</p>
                             ) : (
@@ -218,7 +316,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                         return (
                                             <li key={program.program} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:gap-y-0">
                                                 <span className="truncate font-medium" title={program.program}>
-                                                    {program.program ? appLabels.get(program.program) || programName(program.program) : t("stats.unknownApp")}
+                                                    {label(program.program)}
                                                 </span>
                                                 <span className="order-last col-span-full h-1.5 overflow-hidden rounded-full bg-muted sm:order-none sm:col-span-1">
                                                     <span className="block h-full rounded-full bg-primary/70" style={{ width: `${Math.max(1, (size / largest) * 100)}%` }} />

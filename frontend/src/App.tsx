@@ -804,6 +804,7 @@ function App() {
         },
         [profilesOf]
     );
+    const profileIdsOf = useCallback((source: ConfigSource) => profilesOf(source).map((profile) => profile.id), [profilesOf]);
     const handleCopySources = useCallback(
         async (list: ConfigSource[]) => {
             const links = list.map(linkOf).filter(Boolean);
@@ -1208,6 +1209,7 @@ function App() {
                                         onRefreshSources={handleRefreshSources}
                                         onCopySources={handleCopySources}
                                         linkOf={linkOf}
+                                        profileIdsOf={profileIdsOf}
                                         onAdd={() => setIsModalOpen(true)}
                                     />
                                 )}
