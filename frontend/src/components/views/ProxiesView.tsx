@@ -1,6 +1,7 @@
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Check, CheckSquare, Link2, RefreshCw, Search, Star, StarOff, Trash2, X, Zap } from "lucide-react";
+import { Activity, Check, CheckSquare, Download, Link2, Pencil, RefreshCw, Search, Star, StarOff, Trash2, X, Zap } from "lucide-react";
 
+import { useAppearance } from "@/components/appearance-provider";
 import PageShell from "@/components/layout/PageShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import { Translate, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
 import { Profile, ProxyMode } from "@/types";
+import { EditProxyDialog } from "./EditProxyDialog";
+import { ExportDialog } from "./ExportDialog";
 
 interface ProxiesViewProps {
     profiles: Profile[];
@@ -34,6 +37,7 @@ interface ProxiesViewProps {
     onSetFavorite: (ids: string[], favorite: boolean) => Promise<void>;
     onAddToChain: (ids: string[]) => Promise<void>;
     onDelete: (ids: string[]) => Promise<void>;
+    onUpdateProfile?: (id: string, name: string, link: string) => Promise<unknown>;
 }
 
 type Sort = "list" | "name" | "ping";
@@ -82,8 +86,11 @@ function ProxiesView({
     onSetFavorite,
     onAddToChain,
     onDelete,
+    onUpdateProfile,
 }: ProxiesViewProps) {
     const t = useT();
+    const { prefs } = useAppearance();
+    const cardLayout = prefs.layout.proxiesCardLayout;
     const domain = selectedSourceDomain.trim() || LOCAL;
     const isSubscription = domain !== LOCAL;
     const domainProfiles = useMemo(
@@ -98,6 +105,9 @@ function ProxiesView({
     const [sort, setSort] = useState<Sort>("list");
     const [starredOnly, setStarredOnly] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+    const [exportingProfiles, setExportingProfiles] = useState<Profile[] | null>(null);
+    const [exportTitle, setExportTitle] = useState("");
 
     // Multi-select, as on the Configuration screen.
     const [selecting, setSelecting] = useState(false);
@@ -249,6 +259,19 @@ function ProxiesView({
                                 {t("configuration.bulk.select")}
                             </Button>
                         ) : null}
+                        {domainProfiles.length > 0 ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    setExportTitle(domain !== LOCAL ? `${domain}` : "Proxies");
+                                    setExportingProfiles(domainProfiles);
+                                }}
+                            >
+                                <Download size={14} className="me-2" aria-hidden="true" />
+                                {t("logs.export")}
+                            </Button>
+                        ) : null}
                         <Button variant="outline" size="sm" onClick={onRefreshSource} disabled={isRefreshingSource}>
                             <RefreshCw size={14} className={cn("me-2", isRefreshingSource && "animate-spin")} aria-hidden="true" />
                             {isRefreshingSource ? t("proxies.refreshing") : t("proxies.refresh")}
@@ -345,7 +368,7 @@ function ProxiesView({
                     ) : shown.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-8 text-center">{t("proxies.noMatch")}</p>
                     ) : (
-                        <div className="enter-stagger grid gap-2 grid-cols-1 lg:grid-cols-2">
+                        <div className={cn("enter-stagger", cardLayout === "grid" ? "grid gap-2 grid-cols-1 sm:grid-cols-2" : "space-y-2")}>
                             {shown.map((profile) => {
                                 const ping = profilePings[profile.id];
                                 const selected =
@@ -359,48 +382,83 @@ function ProxiesView({
                                         label={`${profile.name}, ${profile.protocol}, ${pingLabel(t, ping)}`}
                                         className="group select-none"
                                     >
-                                        <div className="p-4 flex items-center justify-between gap-3">
+                                        <div className="p-3.5 flex items-center gap-3">
                                             {selecting ? <Tick checked={isPicked} /> : null}
-                                            <span className="min-w-0 flex-1">
-                                                <span className="font-medium flex items-center gap-2 min-w-0">
-                                                    <span className="truncate">{profile.name}</span>
-                                                    {selected && !selecting ? (
-                                                        <Badge variant="secondary" className="gap-1 shrink-0">
-                                                            <Check size={12} aria-hidden="true" /> {t("proxies.selected")}
-                                                        </Badge>
+                                            <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
+                                                {/* Top row: Name & badge on left, Ping on right */}
+                                                <div className="flex items-center justify-between gap-2 min-w-0">
+                                                    <div className="font-medium flex items-center gap-2 min-w-0">
+                                                        <span className="truncate">{profile.name}</span>
+                                                        {selected && !selecting ? (
+                                                            <Badge variant="secondary" className="gap-1 shrink-0 text-[10px] h-5 px-1.5 font-normal">
+                                                                <Check size={11} aria-hidden="true" /> {t("proxies.selected")}
+                                                            </Badge>
+                                                        ) : null}
+                                                    </div>
+                                                    <span className={cn("text-xs font-mono tnum shrink-0", pingTone(ping))}>
+                                                        {pingLabel(t, ping)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Bottom row: Server & Protocol on left, Action buttons on right */}
+                                                <div className="flex items-center justify-between gap-2 min-w-0">
+                                                    <span
+                                                        className="text-xs text-muted-foreground font-mono truncate"
+                                                        title={`${profile.server} (${profile.protocol})`}
+                                                    >
+                                                        {profile.server} · {profile.protocol}
+                                                    </span>
+
+                                                    {!selecting ? (
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setEditingProfile(profile);
+                                                                }}
+                                                                aria-label="Edit proxy"
+                                                                title="Edit proxy"
+                                                                className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                                                            >
+                                                                <Pencil size={13} aria-hidden="true" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setExportTitle(profile.name);
+                                                                    setExportingProfiles([profile]);
+                                                                }}
+                                                                aria-label="Export proxy"
+                                                                title="Export proxy"
+                                                                className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                                                            >
+                                                                <Download size={13} aria-hidden="true" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    void onSetFavorite([profile.id], !profile.favorite);
+                                                                }}
+                                                                aria-pressed={!!profile.favorite}
+                                                                aria-label={t(profile.favorite ? "proxies.unstar" : "proxies.star", { name: profile.name })}
+                                                                className={cn(
+                                                                    "rounded p-1 transition-colors hover:bg-muted",
+                                                                    profile.favorite
+                                                                        ? "text-status-connecting"
+                                                                        : "text-muted-foreground/70 hover:text-foreground"
+                                                                )}
+                                                            >
+                                                                <Star size={13} className={profile.favorite ? "fill-current" : ""} aria-hidden="true" />
+                                                            </button>
+                                                        </div>
+                                                    ) : profile.favorite ? (
+                                                        <Star size={13} className="shrink-0 fill-current text-status-connecting" aria-hidden="true" />
                                                     ) : null}
-                                                </span>
-                                                <span
-                                                    className="block text-xs text-muted-foreground font-mono truncate"
-                                                    title={`${profile.server} (${profile.protocol})`}
-                                                >
-                                                    {profile.server} · {profile.protocol}
-                                                </span>
-                                            </span>
-                                            <span className={cn("text-xs font-mono tnum shrink-0", pingTone(ping))}>
-                                                {pingLabel(t, ping)}
-                                            </span>
-                                            {!selecting ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        void onSetFavorite([profile.id], !profile.favorite);
-                                                    }}
-                                                    aria-pressed={!!profile.favorite}
-                                                    aria-label={t(profile.favorite ? "proxies.unstar" : "proxies.star", { name: profile.name })}
-                                                    className={cn(
-                                                        "shrink-0 rounded p-1 transition-opacity hover:bg-muted",
-                                                        profile.favorite
-                                                            ? "text-status-connecting"
-                                                            : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                                                    )}
-                                                >
-                                                    <Star size={15} className={profile.favorite ? "fill-current" : ""} aria-hidden="true" />
-                                                </button>
-                                            ) : profile.favorite ? (
-                                                <Star size={14} className="shrink-0 fill-current text-status-connecting" aria-hidden="true" />
-                                            ) : null}
+                                                </div>
+                                            </div>
                                         </div>
                                     </SelectableCard>
                                 );
@@ -455,6 +513,19 @@ function ProxiesView({
                             size="sm"
                             variant="ghost"
                             disabled={busy || picked.size === 0}
+                            onClick={() => {
+                                const selected = domainProfiles.filter((p) => picked.has(p.id));
+                                setExportTitle(`${selected.length} Proxies`);
+                                setExportingProfiles(selected);
+                            }}
+                        >
+                            <Download size={14} className="me-1.5" aria-hidden="true" />
+                            {t("logs.export")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy || picked.size === 0}
                             onClick={() => setConfirmDelete(true)}
                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
@@ -465,33 +536,57 @@ function ProxiesView({
                 </div>
             ) : null}
 
-            {confirmDelete ? (
-                <Dialog open onOpenChange={(open) => (open ? undefined : setConfirmDelete(false))}>
-                    <DialogContent className="sm:max-w-sm">
-                        <DialogHeader>
-                            <DialogTitle>{t("proxies.bulk.deleteTitle", { count: picked.size })}</DialogTitle>
-                            <DialogDescription>{t("proxies.bulk.deleteHint")}</DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-                                {t("common.cancel")}
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                disabled={busy}
-                                onClick={() =>
-                                    void run(async () => {
-                                        await onDelete(pickedIds);
-                                        setConfirmDelete(false);
-                                        stopSelecting();
-                                    })
-                                }
-                            >
-                                {t("configuration.bulk.deleteAction")}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+            <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{t("proxies.bulk.deleteTitle", { count: picked.size })}</DialogTitle>
+                        <DialogDescription>{t("proxies.bulk.deleteHint")}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+                            {t("common.cancel")}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() =>
+                                void run(async () => {
+                                    await onDelete(pickedIds);
+                                    setConfirmDelete(false);
+                                    stopSelecting();
+                                })
+                            }
+                        >
+                            {t("configuration.bulk.deleteAction")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {editingProfile ? (
+                <EditProxyDialog
+                    isOpen={Boolean(editingProfile)}
+                    profile={editingProfile}
+                    onClose={() => setEditingProfile(null)}
+                    onSave={async (id, name, link) => {
+                        if (onUpdateProfile) {
+                            await onUpdateProfile(id, name, link);
+                        }
+                    }}
+                    onExport={(p) => {
+                        setExportTitle(p.name);
+                        setExportingProfiles([p]);
+                    }}
+                />
+            ) : null}
+
+            {exportingProfiles ? (
+                <ExportDialog
+                    isOpen={Boolean(exportingProfiles)}
+                    profiles={exportingProfiles}
+                    title={exportTitle}
+                    onClose={() => setExportingProfiles(null)}
+                />
             ) : null}
         </PageShell>
     );

@@ -9,9 +9,13 @@ import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { BottomDockNav } from "@/components/layout/BottomDockNav";
+import { DesktopSidebarNav } from "@/components/layout/DesktopSidebarNav";
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import TopBar from "@/components/layout/TopBar";
+import { UnifiedHeader } from "@/components/layout/UnifiedHeader";
 import { WindowControls } from "@/components/layout/WindowControls";
+import { WindowDragHeader } from "@/components/layout/WindowDragHeader";
 import ConnectionView from "@/components/views/ConnectionView";
 import ConfigurationView from "@/components/views/ConfigurationView";
 import LogsView from "@/components/views/LogsView";
@@ -149,6 +153,8 @@ function App() {
         setSelection,
         load: loadProfiles,
         addProfile,
+        updateProfile,
+        updateSubscriptionUrl,
         importSubscription,
         deleteIds,
         refreshDomain,
@@ -172,6 +178,11 @@ function App() {
     const [refreshingDomain, setRefreshingDomain] = useState("");
     const [ipInfo, setIpInfo] = useState<IpInfo | null>(null);
     const [isCheckingIp, setIsCheckingIp] = useState(false);
+
+    useEffect(() => {
+        const radius = platform === "android" ? "0px" : platform === "windows" ? "8px" : "10px";
+        document.documentElement.style.setProperty("--window-radius", radius);
+    }, [platform]);
 
     const saveSettings = useCallback(async (next: AppSettings) => {
         // Go normalises and returns the canonical value, so the UI holds
@@ -937,6 +948,36 @@ function App() {
         [profiles, setSelection]
     );
 
+    const handleSelectProxy = useCallback(
+        (id: string) => {
+            const profile = profiles.find((item) => item.id === id);
+            if (!profile) {
+                return;
+            }
+            if (settings.proxy_chain_enabled && settings.proxy_chain.includes(id)) {
+                // A hop cannot also be the exit.
+                void saveSettings({
+                    ...settings,
+                    proxy_chain: settings.proxy_chain.filter((entry) => entry !== id),
+                });
+            }
+            setSelection({
+                domain: profileDomain(profile),
+                mode: "manual",
+                profileId: id,
+            });
+        },
+        [profiles, settings, saveSettings, setSelection]
+    );
+
+    const handleSelectAuto = useCallback(() => {
+        setSelection((current) => ({
+            ...current,
+            mode: "auto",
+            profileId: "",
+        }));
+    }, [setSelection]);
+
     // Clicking Settings while already in it goes back to its category list,
     // the way a second tap on a tab returns to its top level.
     const [settingsHome, setSettingsHome] = useState(0);
@@ -953,6 +994,32 @@ function App() {
     const isMac = platform === "macos";
     // A phone: no window to control, and the page is the whole screen.
     const isPhone = platform === "android";
+    const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || "top");
+
+    const unifiedHeaderElement = (
+        <UnifiedHeader
+            activeTab={activeTab}
+            onTabChange={changeTab}
+            onClose={appWindow.close}
+            onMinimize={appWindow.minimize}
+            onMaximize={appWindow.toggleMaximize}
+            platform={platform}
+            sources={sources}
+            selectedSourceDomain={selection.domain}
+            selectedProfileId={selection.profileId}
+            locked={connection.isConnected || connection.isBusy}
+            onSourceSelect={(source) => selectSource(source, false)}
+            onAddProfile={() => setIsModalOpen(true)}
+            profiles={profiles}
+            profilePings={profilePings}
+            selectedProxyMode={selection.mode}
+            onSelectProxy={handleSelectProxy}
+            onSelectAuto={handleSelectAuto}
+            connectionState={connection.state}
+            traffic={traffic}
+            onToggleConnection={toggleConnection}
+        />
+    );
 
     return (
         <PluginsProvider actions={pluginActions}>
@@ -997,72 +1064,114 @@ function App() {
                 />
             ) : null}
 
-            <SidebarProvider>
-                <AppSidebar
-                    activeTab={activeTab}
-                    onTabChange={changeTab}
-                    onClose={appWindow.close}
-                    onMinimize={appWindow.minimize}
-                    onMaximize={appWindow.toggleMaximize}
-                    platform={platform}
-                />
-                <SidebarInset
-                    className={cn(
-                        "overflow-hidden flex flex-col",
-                        !isMac && "bg-transparent! m-0! p-0! shadow-none! rounded-none!",
-                        isPhone && "rounded-none! [--window-radius:0px]"
-                    )}
-                >
-                    {!isMac && !isPhone ? (
-                        <div className="bg-inset z-50">
-                            <WindowControls
-                                onClose={appWindow.close}
-                                onMinimize={appWindow.minimize}
-                                onMaximize={appWindow.toggleMaximize}
-                            />
-                        </div>
-                    ) : null}
-                    <div
-                        className={cn(
-                            "flex-1 flex flex-col overflow-hidden",
-                            isPhone
-                                ? "bg-background"
-                                : isMac
-                                  ? "px-2 pb-4 pt-2"
-                                  : "bg-background m-2 mt-0 border rounded-[var(--window-radius)] shadow-sm"
-                        )}
-                    >
-                        {isMac && isMobile ? (
-                            <div className="drag-region h-8 px-4 flex items-center shrink-0">
-                                <MacWindowControls
-                                    onClose={appWindow.close}
-                                    onMinimize={appWindow.minimize}
-                                    onMaximize={appWindow.toggleMaximize}
-                                />
-                            </div>
-                        ) : null}
+            <div className={cn(
+                "h-full overflow-hidden bg-background",
+                navPosition === "sidebar-left" || navPosition === "sidebar-right" ? "flex flex-row" : "flex flex-col"
+            )}>
+                {/* 1. Left Sidebar Mode */}
+                {navPosition === "sidebar-left" ? (
+                    <DesktopSidebarNav
+                        position="left"
+                        activeTab={activeTab}
+                        onTabChange={changeTab}
+                        onClose={appWindow.close}
+                        onMinimize={appWindow.minimize}
+                        onMaximize={appWindow.toggleMaximize}
+                        platform={platform}
+                        sources={sources}
+                        selectedSourceDomain={selection.domain}
+                        selectedProfileId={selection.profileId}
+                        locked={connection.isConnected || connection.isBusy}
+                        onSourceSelect={(source) => selectSource(source, false)}
+                        onAddProfile={() => setIsModalOpen(true)}
+                        profiles={profiles}
+                        profilePings={profilePings}
+                        selectedProxyMode={selection.mode}
+                        onSelectProxy={handleSelectProxy}
+                        onSelectAuto={handleSelectAuto}
+                        connectionState={connection.state}
+                        traffic={traffic}
+                    />
+                ) : null}
 
-                        <TopBar
-                            sources={sources}
-                            selectedSourceDomain={selection.domain}
-                            selectedProfileId={selection.profileId}
-                            locked={connection.isConnected || connection.isBusy}
-                            onSourceSelect={(source) => selectSource(source, false)}
-                            onAddProfile={() => setIsModalOpen(true)}
+                {/* 2. Top Header (TopBar or WindowDragHeader for Bottom mode) */}
+                {navPosition === "top" ? (
+                    unifiedHeaderElement
+                ) : navPosition === "bottom" ? (
+                    <WindowDragHeader
+                        platform={platform}
+                        onClose={appWindow.close}
+                        onMinimize={appWindow.minimize}
+                        onMaximize={appWindow.toggleMaximize}
+                        showControls={true}
+                        showBrand={true}
+                        showServerSelector={true}
+                        sources={sources}
+                        selectedSourceDomain={selection.domain}
+                        selectedProfileId={selection.profileId}
+                        locked={connection.isConnected || connection.isBusy}
+                        onSourceSelect={(source) => selectSource(source, false)}
+                        onAddProfile={() => setIsModalOpen(true)}
+                        profiles={profiles}
+                        profilePings={profilePings}
+                        selectedProxyMode={selection.mode}
+                        onSelectProxy={handleSelectProxy}
+                        onSelectAuto={handleSelectAuto}
+                        connectionState={connection.state}
+                        onTabChange={changeTab}
+                    />
+                ) : null}
+
+                {/* Main Content Viewport */}
+                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+                    {/* Top drag bar if in sidebar mode */}
+                    {navPosition === "sidebar-left" ? (
+                        <WindowDragHeader
+                            platform={platform}
+                            onClose={appWindow.close}
+                            onMinimize={appWindow.minimize}
+                            onMaximize={appWindow.toggleMaximize}
+                            showControls={!isMac}
+                            showBrand={false}
+                            showServerSelector={false}
+                            onTabChange={changeTab}
                         />
+                    ) : navPosition === "sidebar-right" ? (
+                        <WindowDragHeader
+                            platform={platform}
+                            onClose={appWindow.close}
+                            onMinimize={appWindow.minimize}
+                            onMaximize={appWindow.toggleMaximize}
+                            showControls={isMac}
+                            showBrand={true}
+                            showServerSelector={false}
+                            onTabChange={changeTab}
+                        />
+                    ) : null}
 
-                            <div className="flex-1 relative overflow-hidden">
-                                {activeTab === "connection" && (
-                                    <ConnectionView
-                                        state={connection.state}
-                                        traffic={traffic}
-                                        onToggle={toggleConnection}
-                                        onDismissError={connection.dismissError}
-                                        ipInfo={ipInfo}
-                                        isCheckingIp={isCheckingIp}
-                                        ipCheckEnabled={settings.ip_check_enabled !== false}
-                                    />
-                                )}
+                    <div className="flex-1 relative overflow-hidden">
+                    {activeTab === "connection" && (
+                        <ConnectionView
+                            key="connection"
+                            state={connection.state}
+                            traffic={traffic}
+                            onToggle={toggleConnection}
+                            onDismissError={connection.dismissError}
+                            ipInfo={ipInfo}
+                            isCheckingIp={isCheckingIp}
+                            ipCheckEnabled={settings.ip_check_enabled !== false}
+                            profiles={profiles}
+                            profilePings={profilePings}
+                            selectedProxyMode={selection.mode}
+                            selectedProfileId={selection.profileId}
+                            onSelectProxy={handleSelectProxy}
+                            onSelectAuto={handleSelectAuto}
+                            onNavigateTab={changeTab}
+                            core={settings.core}
+                            mtu={settings.mtu}
+                            killSwitch={settings.kill_switch}
+                        />
+                    )}
 
                                 {activeTab === "settings" && (
                                     <SettingsView
@@ -1121,7 +1230,7 @@ function App() {
                                 )}
 
                                 {activeTab === "statistics" && (
-                                    <StatisticsView profiles={profiles} settings={settings} onSettingsChange={updateSetting} />
+                                    <StatisticsView key="statistics" profiles={profiles} settings={settings} onSettingsChange={updateSetting} />
                                 )}
 
                                 {activeTab === "logs" && (
@@ -1146,38 +1255,8 @@ function App() {
                                         isRefreshingSource={
                                             refreshingDomain === (selection.domain.trim() || LOCAL)
                                         }
-                                        onSelectProxy={(id) => {
-                                            const profile = profiles.find(
-                                                (item) => item.id === id
-                                            );
-                                            if (!profile) {
-                                                return;
-                                            }
-                                            if (
-                                                settings.proxy_chain_enabled &&
-                                                settings.proxy_chain.includes(id)
-                                            ) {
-                                                // A hop cannot also be the exit.
-                                                void saveSettings({
-                                                    ...settings,
-                                                    proxy_chain: settings.proxy_chain.filter(
-                                                        (entry) => entry !== id
-                                                    ),
-                                                });
-                                            }
-                                            setSelection({
-                                                domain: profileDomain(profile),
-                                                mode: "manual",
-                                                profileId: id,
-                                            });
-                                        }}
-                                        onSelectAuto={() =>
-                                            setSelection((current) => ({
-                                                ...current,
-                                                mode: "auto",
-                                                profileId: "",
-                                            }))
-                                        }
+                                        onSelectProxy={handleSelectProxy}
+                                        onSelectAuto={handleSelectAuto}
                                         onRefreshSource={() => {
                                             const source = sources.find(
                                                 (item) =>
@@ -1192,12 +1271,14 @@ function App() {
                                         onSetFavorite={setFavorites}
                                         onAddToChain={addToChain}
                                         onDelete={deleteProfiles}
+                                        onUpdateProfile={updateProfile}
                                     />
                                 )}
 
                                 {activeTab === "configuration" && (
                                     <ConfigurationView
                                         sources={sources}
+                                        profiles={profiles}
                                         selectedSource={selection.domain}
                                         selectedProfileId={selection.profileId}
                                         refreshingSourceDomain={refreshingDomain}
@@ -1207,18 +1288,54 @@ function App() {
                                         onDeleteSources={handleDeleteSources}
                                         onRefreshSources={handleRefreshSources}
                                         onCopySources={handleCopySources}
+                                        onUpdateSubscriptionUrl={updateSubscriptionUrl}
+                                        onUpdateProfile={updateProfile}
                                         linkOf={linkOf}
                                         profileIdsOf={profileIdsOf}
                                         onAdd={() => setIsModalOpen(true)}
                                     />
                                 )}
-                            </div>
-                        {isMobile ? (
-                            <BottomNav activeTab={activeTab} onTabChange={changeTab} />
-                        ) : null}
                     </div>
-                </SidebarInset>
-            </SidebarProvider>
+                </div>
+
+                {/* 3. Right Sidebar Mode */}
+                {navPosition === "sidebar-right" ? (
+                    <DesktopSidebarNav
+                        position="right"
+                        activeTab={activeTab}
+                        onTabChange={changeTab}
+                        onClose={appWindow.close}
+                        onMinimize={appWindow.minimize}
+                        onMaximize={appWindow.toggleMaximize}
+                        platform={platform}
+                        sources={sources}
+                        selectedSourceDomain={selection.domain}
+                        selectedProfileId={selection.profileId}
+                        locked={connection.isConnected || connection.isBusy}
+                        onSourceSelect={(source) => selectSource(source, false)}
+                        onAddProfile={() => setIsModalOpen(true)}
+                        profiles={profiles}
+                        profilePings={profilePings}
+                        selectedProxyMode={selection.mode}
+                        onSelectProxy={handleSelectProxy}
+                        onSelectAuto={handleSelectAuto}
+                        connectionState={connection.state}
+                        traffic={traffic}
+                    />
+                ) : null}
+
+                {/* 4. Bottom Dock Mode */}
+                {navPosition === "bottom" ? (
+                    <BottomDockNav activeTab={activeTab} onTabChange={changeTab} />
+                ) : null}
+
+                {/* Mobile Responsive Bottom Nav */}
+                {isMobile ? (
+                    <div className="md:hidden shrink-0">
+                        <BottomNav activeTab={activeTab} onTabChange={changeTab} />
+                    </div>
+                ) : null}
+            </div>
         </main>
         </PluginsProvider>
     );

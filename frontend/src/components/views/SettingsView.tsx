@@ -51,7 +51,9 @@ import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
 import {
+  AppearanceHeroPreview,
   FontPicker,
+  LayoutPicker,
   MotionPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
@@ -485,11 +487,20 @@ function SettingsView({
       case "appearance":
         return (
           <>
+            <AppearanceHeroPreview theme={theme} setTheme={setTheme} />
+
             <SettingsGroup
               title={t("appearance.theme")}
               description={t("appearance.theme.description")}
             >
               <ThemePicker theme={theme} setTheme={setTheme} />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title={t("appearance.layout")}
+              description={t("appearance.layout.description")}
+            >
+              <LayoutPicker />
             </SettingsGroup>
 
             <SettingsGroup title={t("appearance.font")} description={t("appearance.font.description")}>

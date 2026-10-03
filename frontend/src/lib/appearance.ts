@@ -353,6 +353,94 @@ export function newCustomTheme(mode: "light" | "dark" = "dark"): CustomTheme {
 }
 
 // ---------------------------------------------------------------------------
+// Layout Customization
+// ---------------------------------------------------------------------------
+
+export type NavPosition = "top" | "sidebar-left" | "sidebar-right" | "bottom";
+export type CockpitAlign = "center" | "top";
+export type TelemetryPlacement = "inside" | "below";
+export type TelemetryMetric = "download" | "upload" | "latency";
+export type DashboardWidth = "compact" | "normal" | "wide";
+export type CardLayout = "list" | "grid";
+
+export interface LayoutPrefs {
+    navPosition: NavPosition;
+    cockpitAlign: CockpitAlign;
+    telemetryPlacement: TelemetryPlacement;
+    telemetryOrder: TelemetryMetric[];
+    telemetryVisible: Record<TelemetryMetric, boolean>;
+    showQuickSwitch: boolean;
+    showSpeedTest: boolean;
+    dashboardWidth: DashboardWidth;
+    proxiesCardLayout: CardLayout;
+    configCardLayout: CardLayout;
+}
+
+export const DEFAULT_LAYOUT: LayoutPrefs = {
+    navPosition: "top",
+    cockpitAlign: "center",
+    telemetryPlacement: "inside",
+    telemetryOrder: ["download", "upload", "latency"],
+    telemetryVisible: {
+        download: true,
+        upload: true,
+        latency: true,
+    },
+    showQuickSwitch: false,
+    showSpeedTest: true,
+    dashboardWidth: "normal",
+    proxiesCardLayout: "list",
+    configCardLayout: "list",
+};
+
+export function sanitizeLayout(raw: unknown): LayoutPrefs {
+    if (!raw || typeof raw !== "object") return { ...DEFAULT_LAYOUT };
+    const val = raw as Partial<LayoutPrefs>;
+    const navPositions: NavPosition[] = ["top", "sidebar-left", "sidebar-right", "bottom"];
+    const cockpitAligns: CockpitAlign[] = ["center", "top"];
+    const telemetryPlacements: TelemetryPlacement[] = ["inside", "below"];
+    const dashboardWidths: DashboardWidth[] = ["compact", "normal", "wide"];
+    const cardLayouts: CardLayout[] = ["list", "grid"];
+    const allMetrics: TelemetryMetric[] = ["download", "upload", "latency"];
+
+    const navPosition = navPositions.includes(val.navPosition as NavPosition) ? (val.navPosition as NavPosition) : DEFAULT_LAYOUT.navPosition;
+    const cockpitAlign = cockpitAligns.includes(val.cockpitAlign as CockpitAlign) ? (val.cockpitAlign as CockpitAlign) : DEFAULT_LAYOUT.cockpitAlign;
+    const telemetryPlacement = telemetryPlacements.includes(val.telemetryPlacement as TelemetryPlacement) ? (val.telemetryPlacement as TelemetryPlacement) : DEFAULT_LAYOUT.telemetryPlacement;
+    const dashboardWidth = dashboardWidths.includes(val.dashboardWidth as DashboardWidth) ? (val.dashboardWidth as DashboardWidth) : DEFAULT_LAYOUT.dashboardWidth;
+    const proxiesCardLayout = cardLayouts.includes(val.proxiesCardLayout as CardLayout) ? (val.proxiesCardLayout as CardLayout) : DEFAULT_LAYOUT.proxiesCardLayout;
+    const configCardLayout = cardLayouts.includes(val.configCardLayout as CardLayout) ? (val.configCardLayout as CardLayout) : DEFAULT_LAYOUT.configCardLayout;
+
+    let telemetryOrder = Array.isArray(val.telemetryOrder)
+        ? val.telemetryOrder.filter((m): m is TelemetryMetric => allMetrics.includes(m))
+        : [...DEFAULT_LAYOUT.telemetryOrder];
+    for (const m of allMetrics) {
+        if (!telemetryOrder.includes(m)) telemetryOrder.push(m);
+    }
+
+    const rawVis = (val.telemetryVisible && typeof val.telemetryVisible === "object"
+        ? (val.telemetryVisible as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+    const telemetryVisible: Record<TelemetryMetric, boolean> = {
+        download: typeof rawVis.download === "boolean" ? rawVis.download : true,
+        upload: typeof rawVis.upload === "boolean" ? rawVis.upload : true,
+        latency: typeof rawVis.latency === "boolean" ? rawVis.latency : true,
+    };
+
+    return {
+        navPosition,
+        cockpitAlign,
+        telemetryPlacement,
+        telemetryOrder,
+        telemetryVisible,
+        showQuickSwitch: typeof val.showQuickSwitch === "boolean" ? val.showQuickSwitch : DEFAULT_LAYOUT.showQuickSwitch,
+        showSpeedTest: typeof val.showSpeedTest === "boolean" ? val.showSpeedTest : DEFAULT_LAYOUT.showSpeedTest,
+        dashboardWidth,
+        proxiesCardLayout,
+        configCardLayout,
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Persistence
 // ---------------------------------------------------------------------------
 
@@ -360,6 +448,7 @@ export interface AppearancePrefs {
     font: string;
     radius: string;
     motion: string;
+    layout: LayoutPrefs;
     customThemes: CustomTheme[];
     /** Which custom theme a custom-dark or custom-light theme id shows. */
     activeCustom: string;
@@ -378,6 +467,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     font: "google-sans",
     radius: "medium",
     motion: "fade",
+    layout: DEFAULT_LAYOUT,
     customThemes: [],
     activeCustom: "",
     userFonts: [],
@@ -476,6 +566,7 @@ export function loadAppearance(): AppearancePrefs {
             font: pick(allFonts(), raw.font, DEFAULT_APPEARANCE.font),
             radius: pick(RADII, raw.radius, DEFAULT_APPEARANCE.radius),
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
+            layout: sanitizeLayout(raw.layout),
             customThemes,
             activeCustom: [...customThemes, ...pluginThemes].some((theme) => theme.id === raw.activeCustom)
                 ? raw.activeCustom

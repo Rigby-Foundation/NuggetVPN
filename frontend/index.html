@@ -10,7 +10,7 @@
         content="Modern, lightweight, and fast VPN client built with Wails and React, powered by an embedded sing-box core. Open Source and privacy-focused." />
     <style>
         :root {
-            --window-radius: 16px;
+            --window-radius: 10px;
         }
 
         html, body, #root {
@@ -42,10 +42,10 @@
             var ua = navigator.userAgent || "";
             if (ua.indexOf("Windows") !== -1) {
                 document.documentElement.style.setProperty("--window-radius", "8px");
-            }
-            // A phone: the page is the screen, with nothing to round.
-            if (ua.indexOf("Android") !== -1) {
+            } else if (ua.indexOf("Android") !== -1) {
                 document.documentElement.style.setProperty("--window-radius", "0px");
+            } else {
+                document.documentElement.style.setProperty("--window-radius", "10px");
             }
         })();
     </script>

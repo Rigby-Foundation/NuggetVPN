@@ -438,8 +438,24 @@
 }
 
 .react-flow__handle {
-    border: 2px solid var(--background);
-    transition: scale 120ms ease;
+    width: 11px !important;
+    height: 11px !important;
+    border: 2px solid var(--card) !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 15%, transparent);
+    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 140ms ease !important;
+    transform-origin: center center !important;
+    z-index: 10;
+}
+
+.react-flow__handle-right {
+    right: 0 !important;
+    transform: translate(50%, -50%) !important;
+}
+
+.react-flow__handle-left {
+    left: 0 !important;
+    transform: translate(-50%, -50%) !important;
 }
 
 /* A routing connector is a small dot, and aiming at one took several tries.
@@ -449,20 +465,47 @@
 .react-flow__handle::after {
     content: "";
     position: absolute;
-    inset: calc(-14px / var(--flow-zoom, 1));
+    inset: calc(-12px / var(--flow-zoom, 1));
     border-radius: 9999px;
 }
 
 @media (pointer: coarse) {
     .react-flow__handle::after {
-        inset: calc(-20px / var(--flow-zoom, 1));
+        inset: calc(-18px / var(--flow-zoom, 1));
     }
 }
 
-.react-flow__handle:hover,
-.react-flow__handle.connectingfrom,
-.react-flow__handle.connectingto {
-    scale: 1.35;
+.react-flow__handle-right:hover,
+.react-flow__handle-right.connectingfrom,
+.react-flow__handle-right.connectingto {
+    transform: translate(50%, -50%) scale(1.22) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 35%, transparent), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+}
+
+.react-flow__handle-left:hover,
+.react-flow__handle-left.connectingfrom,
+.react-flow__handle-left.connectingto {
+    transform: translate(-50%, -50%) scale(1.22) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 35%, transparent), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Custom dual-contrast scissors cursor when hovering connections/wires in routing */
+.react-flow__edge,
+.react-flow__edge-path,
+.react-flow__edge-interaction {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cg stroke='%23000000' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5.5' cy='5.5' r='3.8'/%3E%3Ccircle cx='5.5' cy='18.5' r='3.8'/%3E%3Cline x1='8.5' y1='8.5' x2='21' y2='21'/%3E%3Cline x1='8.5' y1='15.5' x2='21' y2='3'/%3E%3C/g%3E%3Cg stroke='%23ffffff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5.5' cy='5.5' r='3.8'/%3E%3Ccircle cx='5.5' cy='18.5' r='3.8'/%3E%3Cline x1='8.5' y1='8.5' x2='21' y2='21'/%3E%3Cline x1='8.5' y1='15.5' x2='21' y2='3'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.4' fill='%23ffffff' stroke='%23000000' stroke-width='1'/%3E%3C/svg%3E") 12 12, pointer !important;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+    stroke-width: 2.75px !important;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 60%, transparent));
+    transition: stroke-width 150ms ease, filter 150ms ease;
+}
+
+.react-flow__edge:active .react-flow__edge-path {
+    stroke: #ef4444 !important;
+    stroke-dasharray: 2 4 !important;
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.75)) !important;
 }
 
 /* React Flow's built-in node types centre their text; the custom nodes here
@@ -951,12 +994,11 @@
     --p-accent: #ff6b3d; --p-on-accent: #1a1210;
 }
 
-/* Crimson: near-black wine with a deep red. Dark text on the accent — white
-   on this red falls short of 4.5:1. */
+/* Crimson: near-black wine with a rich, deep dark red accent. */
 .theme-dark-p-crimson {
-    --p-bg: #170c10; --p-sidebar: #12090c; --p-card: #221217; --p-lift: #321a21;
+    --p-bg: #14090d; --p-sidebar: #0f070a; --p-card: #1d0e14; --p-lift: #2c151e;
     --p-fg: #f6e4e8;
-    --p-accent: #e8364f; --p-on-accent: #170c10;
+    --p-accent: #a81228; --p-on-accent: #ffffff;
 }
 
 /* Ocean: deep-water blue with a sea-spray cyan. */

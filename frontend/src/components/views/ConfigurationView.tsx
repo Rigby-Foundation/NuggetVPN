@@ -1,6 +1,7 @@
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckSquare, Copy, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, CheckSquare, Copy, Download, Pencil, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
 
+import { useAppearance } from "@/components/appearance-provider";
 import PageShell from "@/components/layout/PageShell";
 import { ShareDialog } from "@/components/qr";
 import { SubscriptionUsage } from "@/components/subscription-usage";
@@ -17,19 +18,25 @@ import SelectableCard from "@/components/ui/selectable-card";
 import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
 import { useT } from "@/lib/i18n";
-import { ConfigSource } from "@/types";
+import { ConfigSource, Profile } from "@/types";
+import { EditConfigDialog } from "./EditConfigDialog";
+import { EditProxyDialog } from "./EditProxyDialog";
+import { ExportDialog } from "./ExportDialog";
 
 interface ConfigurationViewProps {
     sources: ConfigSource[];
     selectedSource: string;
     selectedProfileId: string;
     refreshingSourceDomain: string;
+    profiles?: Profile[];
     onSelectSource: (source: ConfigSource) => void;
     onDeleteSource: (source: ConfigSource) => void;
     onRefreshSource: (source: ConfigSource) => void;
     onDeleteSources: (sources: ConfigSource[]) => Promise<void>;
     onRefreshSources: (sources: ConfigSource[]) => Promise<void>;
     onCopySources: (sources: ConfigSource[]) => Promise<void>;
+    onUpdateSubscriptionUrl?: (domain: string, newUrl: string) => Promise<unknown>;
+    onUpdateProfile?: (id: string, name: string, configLink: string) => Promise<unknown>;
     /** The link that adds the same thing elsewhere; "" when there is none. */
     linkOf: (source: ConfigSource) => string;
     /** The profiles a source holds, whose servers can be shared one by one. */
@@ -57,17 +64,22 @@ function ConfigurationView({
     selectedSource,
     selectedProfileId,
     refreshingSourceDomain,
+    profiles,
     onSelectSource,
     onDeleteSource,
     onRefreshSource,
     onDeleteSources,
     onRefreshSources,
     onCopySources,
+    onUpdateSubscriptionUrl,
+    onUpdateProfile,
     linkOf,
     profileIdsOf,
     onAdd,
 }: ConfigurationViewProps) {
     const t = useT();
+    const { prefs } = useAppearance();
+    const cardLayout = prefs.layout.configCardLayout;
     const detailOf = (source: ConfigSource) =>
         source.kind === "subscription" ? t("sources.proxies", { count: source.count }) : source.detail;
     const isSelected = (source: ConfigSource) =>
@@ -82,6 +94,10 @@ function ConfigurationView({
     const anchorRef = useRef<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [sharing, setSharing] = useState<ConfigSource | null>(null);
+    const [editingSource, setEditingSource] = useState<ConfigSource | null>(null);
+    const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+    const [exportingProfiles, setExportingProfiles] = useState<Profile[] | null>(null);
+    const [exportTitle, setExportTitle] = useState("");
     const [busy, setBusy] = useState(false);
 
     // Sources that disappear (deleted, refreshed away) leave the selection.
@@ -205,7 +221,7 @@ function ConfigurationView({
                     </Button>
                 </div>
             ) : (
-                <div className={cn("enter-stagger space-y-2", selecting && "pb-20")}>
+                <div className={cn("enter-stagger", cardLayout === "grid" ? "grid gap-2.5 grid-cols-1 sm:grid-cols-2" : "space-y-2", selecting && "pb-20")}>
                     {sources.map((source) => {
                         const domain =
                             source.kind === "subscription"
@@ -256,6 +272,48 @@ function ConfigurationView({
                                             className="shrink-0"
                                         >
                                             <QrCode size={16} aria-hidden="true" />
+                                        </Button>
+                                    ) : null}
+
+                                    {!selecting ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Edit configuration"
+                                            title="Edit configuration"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                if (source.kind === "profile") {
+                                                    const p = (profiles || []).find((item) => item.id === source.profileId);
+                                                    if (p) {
+                                                        setEditingProfile(p);
+                                                        return;
+                                                    }
+                                                }
+                                                setEditingSource(source);
+                                            }}
+                                            className="shrink-0"
+                                        >
+                                            <Pencil size={16} aria-hidden="true" />
+                                        </Button>
+                                    ) : null}
+
+                                    {!selecting ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Export configuration"
+                                            title="Export configuration"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                const pIds = new Set(profileIdsOf(source));
+                                                const pList = (profiles || []).filter((p) => pIds.has(p.id));
+                                                setExportTitle(source.label);
+                                                setExportingProfiles(pList);
+                                            }}
+                                            className="shrink-0"
+                                        >
+                                            <Download size={16} aria-hidden="true" />
                                         </Button>
                                     ) : null}
 
@@ -351,6 +409,24 @@ function ConfigurationView({
                             size="sm"
                             variant="ghost"
                             disabled={busy || picked.size === 0}
+                            onClick={() => {
+                                const allIds = new Set(pickedSources.flatMap((s) => profileIdsOf(s)));
+                                const pList = (profiles || []).filter((p) => allIds.has(p.id));
+                                setExportTitle(
+                                    pickedSources.length === 1
+                                        ? pickedSources[0].label
+                                        : `${pickedSources.length} Configurations (${pList.length} proxies)`
+                                );
+                                setExportingProfiles(pList);
+                            }}
+                        >
+                            <Download size={14} className="me-1.5" aria-hidden="true" />
+                            {t("logs.export")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy || picked.size === 0}
                             onClick={() => setConfirmDelete(true)}
                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
@@ -365,38 +441,77 @@ function ConfigurationView({
                 <ShareDialog title={sharing.label} link={linkOf(sharing)} profileIds={profileIdsOf(sharing)} onClose={() => setSharing(null)} />
             ) : null}
 
-            {confirmDelete ? (
-                <Dialog open onOpenChange={(open) => (open ? undefined : setConfirmDelete(false))}>
-                    <DialogContent className="sm:max-w-sm">
-                        <DialogHeader>
-                            <DialogTitle>{t("configuration.bulk.deleteTitle", { count: pickedSources.length })}</DialogTitle>
-                            <DialogDescription>
-                                {pickedSources.slice(0, 5).map((source) => source.label).join(", ")}
-                                {pickedSources.length > 5
-                                    ? t("configuration.bulk.andMore", { count: pickedSources.length - 5 })
-                                    : ""}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-                                {t("common.cancel")}
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                disabled={busy}
-                                onClick={() =>
-                                    void run(async () => {
-                                        await onDeleteSources(pickedSources);
-                                        setConfirmDelete(false);
-                                        stopSelecting();
-                                    })
-                                }
-                            >
-                                {t("configuration.bulk.deleteAction")}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+            <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{t("configuration.bulk.deleteTitle", { count: pickedSources.length })}</DialogTitle>
+                        <DialogDescription>
+                            {pickedSources.slice(0, 5).map((source) => source.label).join(", ")}
+                            {pickedSources.length > 5
+                                ? t("configuration.bulk.andMore", { count: pickedSources.length - 5 })
+                                : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+                            {t("common.cancel")}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() =>
+                                void run(async () => {
+                                    await onDeleteSources(pickedSources);
+                                    setConfirmDelete(false);
+                                    stopSelecting();
+                                })
+                            }
+                        >
+                            {t("configuration.bulk.deleteAction")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {editingSource ? (
+                <EditConfigDialog
+                    isOpen={Boolean(editingSource)}
+                    source={editingSource}
+                    profiles={profiles || []}
+                    onClose={() => setEditingSource(null)}
+                    onUpdateSubscriptionUrl={onUpdateSubscriptionUrl}
+                    onUpdateProfile={onUpdateProfile}
+                    onExport={(pList, title) => {
+                        setExportTitle(title);
+                        setExportingProfiles(pList);
+                    }}
+                />
+            ) : null}
+
+            {editingProfile ? (
+                <EditProxyDialog
+                    isOpen={Boolean(editingProfile)}
+                    profile={editingProfile}
+                    onClose={() => setEditingProfile(null)}
+                    onSave={async (id, name, link) => {
+                        if (onUpdateProfile) {
+                            await onUpdateProfile(id, name, link);
+                        }
+                    }}
+                    onExport={(p) => {
+                        setExportTitle(p.name);
+                        setExportingProfiles([p]);
+                    }}
+                />
+            ) : null}
+
+            {exportingProfiles ? (
+                <ExportDialog
+                    isOpen={Boolean(exportingProfiles)}
+                    profiles={exportingProfiles}
+                    title={exportTitle}
+                    onClose={() => setExportingProfiles(null)}
+                />
             ) : null}
         </PageShell>
     );

@@ -190,6 +190,22 @@ export function useProfiles() {
         return summary;
     }, [load]);
 
+    const updateProfile = useCallback(
+        async (id: string, name: string, link: string) => {
+            const next = await invoke<Profile[]>("update_profile", { id, name, configLink: link });
+            return apply(next);
+        },
+        [apply]
+    );
+
+    const updateSubscriptionUrl = useCallback(
+        async (domain: string, newUrl: string) => {
+            const next = await invoke<Profile[]>("update_subscription_url", { domain, newURL: newUrl });
+            return apply(next);
+        },
+        [apply]
+    );
+
     /** Profiles belonging to the selected configuration. */
     const domainProfiles = useMemo(
         () => profiles.filter((profile) => profileDomain(profile) === selection.domain),
@@ -205,6 +221,8 @@ export function useProfiles() {
         domainProfiles,
         load,
         addProfile,
+        updateProfile,
+        updateSubscriptionUrl,
         importSubscription,
         deleteIds,
         refreshDomain,

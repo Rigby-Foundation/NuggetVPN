@@ -399,7 +399,7 @@ func (s *AppSettings) normalizeRouting() {
 
 	kept := make([]RoutingRule, 0, len(s.RoutingRules))
 	for index, rule := range s.RoutingRules {
-		if !ValidSourceKind(rule.Kind) || !ValidAction(rule.Action) {
+		if !ValidSourceKind(rule.Kind) || (rule.Action != "" && !ValidAction(rule.Action)) {
 			continue
 		}
 		if rule.ID == "" {

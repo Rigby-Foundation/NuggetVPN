@@ -39,9 +39,12 @@ var assets embed.FS
 //go:embed build/appicon.png
 var appIcon []byte
 
+//go:embed build/trayicon.png
+var trayIcon []byte
+
 // version is stamped into the core service handshake so the GUI can detect a
 // service left behind by an older build.
-var version = "2.1.1"
+var version = "2.2.0"
 
 func main() {
 	// NuggetVPN status, connect, ...: control the running app and exit.
@@ -106,7 +109,7 @@ func runGUI() {
 		notifier = notifications.New()
 		services = append(services, application.NewService(notifier))
 	}
-	service := app.New(version, appIcon, notifier)
+	service := app.New(version, trayIcon, notifier)
 	services = append([]application.Service{application.NewService(service)}, services...)
 
 	// Started by the system at login: come up without a window, unless

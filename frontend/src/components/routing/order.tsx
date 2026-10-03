@@ -48,10 +48,13 @@ export function RuleOrder({
     };
 
     const destination = (rule: RoutingRule) => {
+        if (!rule.action) {
+            return t("routing.order.empty");
+        }
         if (rule.action === "proxy" && rule.server) {
             return profiles.find((profile) => profile.id === rule.server)?.name ?? t("routing.server.gone");
         }
-        return t(ACTION_META[rule.action].label);
+        return ACTION_META[rule.action] ? t(ACTION_META[rule.action].label) : t("routing.order.empty");
     };
 
     if (rules.length === 0) {

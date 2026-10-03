@@ -19,6 +19,8 @@ import {
     CUSTOM_THEME_IDS,
     CustomTheme,
     DEFAULT_APPEARANCE,
+    DEFAULT_LAYOUT,
+    LayoutPrefs,
     loadAppearance,
     PLUGIN_THEME_PREFIX,
     saveAppearance,
@@ -38,6 +40,8 @@ interface AppearanceContext {
     setFont: (id: string) => void;
     setRadius: (id: string) => void;
     setMotion: (id: string) => void;
+    setLayout: (layout: Partial<LayoutPrefs>) => void;
+    resetLayout: () => void;
     /** The custom theme on screen, if one is. */
     activeCustom: CustomTheme | undefined;
     /** Shows a custom theme. */
@@ -158,6 +162,27 @@ function Appearance({ children }: { children: ReactNode }) {
             setFont: (font) => update({ font }),
             setRadius: (radius) => update({ radius }),
             setMotion: (motion) => update({ motion }),
+            setLayout: (layoutPatch) => {
+                setPrefs((current) => ({
+                    ...current,
+                    layout: {
+                        ...current.layout,
+                        ...layoutPatch,
+                        ...(layoutPatch.telemetryVisible ? {
+                            telemetryVisible: {
+                                ...current.layout.telemetryVisible,
+                                ...layoutPatch.telemetryVisible,
+                            },
+                        } : {}),
+                    },
+                }));
+            },
+            resetLayout: () => {
+                setPrefs((current) => ({
+                    ...current,
+                    layout: { ...DEFAULT_LAYOUT },
+                }));
+            },
             activeCustom,
             hasMonet: monet !== null,
             showCustomTheme,

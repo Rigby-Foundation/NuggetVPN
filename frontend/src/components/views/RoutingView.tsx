@@ -235,6 +235,7 @@ function serverIds(settings: AppSettings): string[] {
 }
 
 function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profiles, hits, onReady }: CanvasProps) {
+    const t = useT();
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
     const { setCenter, getZoom, fitView } = useReactFlow();
@@ -357,11 +358,15 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
     const inboundCounts = useMemo(() => {
         const counts: Record<string, number> = {};
         rules.forEach((rule) => {
-            const target = targetOf(rule.action, rule.server);
-            counts[target] = (counts[target] ?? 0) + 1;
+            if (rule.action) {
+                const target = targetOf(rule.action, rule.server);
+                counts[target] = (counts[target] ?? 0) + 1;
+            }
         });
-        const target = targetOf(settings.default_action, settings.default_server);
-        counts[target] = (counts[target] ?? 0) + 1;
+        if (settings.default_action) {
+            const target = targetOf(settings.default_action, settings.default_server);
+            counts[target] = (counts[target] ?? 0) + 1;
+        }
         return counts;
     }, [rules, settings.default_action, settings.default_server]);
 
@@ -488,22 +493,31 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
         });
         const active = (id: string) => (hits?.[id] ?? 0) > 0;
 
-        return [
-            ...rules.map((rule) => ({
+        const ruleEdges: Edge[] = rules
+            .filter((rule) => !!rule.action)
+            .map((rule) => ({
                 id: `edge:${rule.id}`,
                 source: rule.id,
                 target: targetOf(rule.action, rule.server),
                 animated: true,
                 style: dashed(kindMeta(rule.kind).accent, active(rule.id)),
-            })),
-            {
-                id: "edge:default",
-                source: DEFAULT_NODE,
-                target: targetOf(settings.default_action, settings.default_server),
-                animated: true,
-                style: dashed("var(--routing-default)", active(DEFAULT_HITS)),
-            },
-        ];
+            }));
+
+        const defaultEdge: Edge[] = settings.default_action
+            ? [
+                  {
+                      id: "edge:default",
+                      source: DEFAULT_NODE,
+                      target: targetOf(settings.default_action, settings.default_server),
+                      animated: true,
+                      style: dashed("var(--routing-default)", active(DEFAULT_HITS)),
+                      deletable: false,
+                      data: { deletable: false },
+                  },
+              ]
+            : [];
+
+        return [...ruleEdges, ...defaultEdge];
     }, [rules, settings.default_action, settings.default_server, hits]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(derivedNodes);
@@ -586,6 +600,31 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
         [onChange, updateRule]
     );
 
+    /** Clicking an edge with scissors cuts that connection. */
+    const onEdgeClick = useCallback(
+        (event: React.MouseEvent, edge: Edge) => {
+            event.stopPropagation();
+            const undeletable =
+                edge.id === "edge:default" ||
+                edge.source === DEFAULT_NODE ||
+                edge.deletable === false ||
+                (edge.data as Record<string, unknown> | undefined)?.deletable === false;
+
+            if (undeletable) {
+                const message =
+                    edge.id === "edge:default" || edge.source === DEFAULT_NODE
+                        ? t("routing.cannotDeleteDefault")
+                        : t("routing.cannotDeleteConnection");
+                toast(message, { icon: "⚠️", id: "cannot-delete-connection" });
+                return;
+            }
+
+            const ruleId = edge.id.startsWith("edge:") ? edge.id.slice("edge:".length) : edge.source;
+            updateRule(ruleId, { action: "" as RoutingAction, server: "" });
+        },
+        [updateRule, t]
+    );
+
     return (
         <div ref={wrapperRef} className="h-full w-full" style={{ ["--flow-zoom" as string]: zoom }}>
         <ReactFlow
@@ -599,6 +638,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onEdgeClick={onEdgeClick}
             // A dragged wire snaps to a connector this far away.
             connectionRadius={40}
             fitView

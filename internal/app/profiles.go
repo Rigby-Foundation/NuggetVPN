@@ -156,3 +156,93 @@ func (a *App) ShareLinks(ids []string) ([]link.SharedLink, error) {
 	}
 	return links, nil
 }
+
+// UpdateProfile updates an existing profile's name and configLink.
+func (a *App) UpdateProfile(id, name, configLink string) ([]models.Profile, error) {
+	trimmedLink := strings.TrimSpace(configLink)
+	if trimmedLink == "" {
+		return nil, fmt.Errorf("config link cannot be empty")
+	}
+
+	profiles, settings := a.snapshot()
+	index := -1
+	for i, p := range profiles {
+		if p.ID == id {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return nil, fmt.Errorf("profile not found: %s", id)
+	}
+
+	outbound, err := link.ParseOutbound(trimmedLink, settings)
+	if err != nil {
+		return nil, fmt.Errorf("invalid config link: %w", err)
+	}
+
+	resolvedName := strings.TrimSpace(name)
+	if resolvedName == "" {
+		resolvedName = link.ExtractName(trimmedLink)
+	}
+	if resolvedName == "" {
+		resolvedName = profiles[index].Name
+	}
+
+	server := outbound.Server()
+	if server == "" {
+		server = "Auto"
+	}
+
+	profiles[index].Name = resolvedName
+	profiles[index].ConfigLink = trimmedLink
+	profiles[index].Server = server
+	profiles[index].Protocol = link.DetectProtocol(trimmedLink)
+
+	return a.replaceProfiles(profiles), nil
+}
+
+// UpdateSubscriptionURL changes the subscription URL for a subscription domain.
+func (a *App) UpdateSubscriptionURL(domain, newURL string) ([]models.Profile, error) {
+	trimmedURL := strings.TrimSpace(newURL)
+	if trimmedURL == "" {
+		return nil, fmt.Errorf("subscription URL cannot be empty")
+	}
+	profiles, _ := a.snapshot()
+	updated := false
+	for i := range profiles {
+		if profiles[i].NormalizedSourceDomain() == domain {
+			profiles[i].SubscriptionURL = trimmedURL
+			updated = true
+		}
+	}
+	if !updated {
+		return nil, fmt.Errorf("subscription domain not found: %s", domain)
+	}
+	return a.replaceProfiles(profiles), nil
+}
+
+// ExportConfigs exports the given profiles into sing-box, clash, or xray configuration.
+func (a *App) ExportConfigs(ids []string, format string, full bool) (string, error) {
+	profiles, settings := a.snapshot()
+	byID := make(map[string]models.Profile, len(profiles))
+	for _, p := range profiles {
+		byID[p.ID] = p
+	}
+
+	var targets []models.Profile
+	if len(ids) == 0 {
+		targets = profiles
+	} else {
+		for _, id := range ids {
+			if p, ok := byID[id]; ok {
+				targets = append(targets, p)
+			}
+		}
+	}
+	if len(targets) == 0 {
+		return "", fmt.Errorf("no profiles to export")
+	}
+
+	return link.Export(targets, settings, format, full)
+}

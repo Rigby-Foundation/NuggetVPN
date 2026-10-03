@@ -257,7 +257,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         hint: "theme.crimson.hint",
         mode: "dark",
         className: "theme-dark-p-crimson",
-        swatch: { background: "#170c10", surface: "#321a21", accent: "#e8364f" },
+        swatch: { background: "#14090d", surface: "#2c151e", accent: "#a81228" },
     },
     {
         id: "ocean",

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from "lucide-react";
 
+import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -254,35 +255,36 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     };
 
     return (
-        <div className="enter-stagger absolute inset-0 overflow-y-auto px-6 py-5">
-            <div className="mx-auto max-w-4xl space-y-4">
-                <header className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                        <h2 className="text-base font-semibold">{t("stats.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("stats.subtitle")}</p>
-                    </div>
-                    <div className="flex rounded-lg bg-muted/50 p-0.5" role="tablist">
-                        {PERIODS.map((period) => (
-                            <button
-                                key={period.days}
-                                type="button"
-                                role="tab"
-                                aria-selected={days === period.days}
-                                onClick={() => setDays(period.days)}
-                                className={cn(
-                                    "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                                    days === period.days ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {t(period.label)}
-                            </button>
-                        ))}
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfirmClear(true)} aria-label={t("stats.clear")} title={t("stats.clear")}>
-                        <Trash2 size={15} aria-hidden="true" />
-                    </Button>
-                </header>
-
+        <>
+            <PageShell
+                title={t("stats.title")}
+                description={t("stats.subtitle")}
+                className="max-w-4xl mx-auto space-y-4"
+                actions={
+                    <>
+                        <div className="flex rounded-lg bg-muted/50 p-0.5" role="tablist">
+                            {PERIODS.map((period) => (
+                                <button
+                                    key={period.days}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={days === period.days}
+                                    onClick={() => setDays(period.days)}
+                                    className={cn(
+                                        "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                                        days === period.days ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {t(period.label)}
+                                </button>
+                            ))}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfirmClear(true)} aria-label={t("stats.clear")} title={t("stats.clear")}>
+                            <Trash2 size={15} aria-hidden="true" />
+                        </Button>
+                    </>
+                }
+            >
                 <Section
                     icon={AppWindow}
                     title={t("stats.apps")}
@@ -385,7 +387,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                         </>
                     )}
                 </Section>
-            </div>
+            </PageShell>
 
             {confirmClear ? (
                 <Dialog open onOpenChange={(open) => (open ? undefined : setConfirmClear(false))}>
@@ -405,7 +407,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                     </DialogContent>
                 </Dialog>
             ) : null}
-        </div>
+        </>
     );
 }
 

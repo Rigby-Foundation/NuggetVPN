@@ -971,7 +971,7 @@ export function SourceNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: meta.accent, width: 14, height: 14, border: "none" }}
+                style={{ background: meta.accent, color: meta.accent }}
             />
         </NodeShell>
     );
@@ -1184,7 +1184,7 @@ export function LogicalNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: LOGICAL_META.accent, width: 14, height: 14, border: "none" }}
+                style={{ background: LOGICAL_META.accent, color: LOGICAL_META.accent }}
             />
         </NodeShell>
     );
@@ -1218,7 +1218,7 @@ export function CatchAllNode({ data, selected }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                style={{ background: "var(--routing-default)", width: 14, height: 14, border: "none" }}
+                style={{ background: "var(--routing-default)", color: "var(--routing-default)" }}
             />
         </NodeShell>
     );
@@ -1268,7 +1268,7 @@ export function ActionNode({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Left}
-                style={{ background: meta.accent, width: 14, height: 14, border: "none" }}
+                style={{ background: meta.accent, color: meta.accent }}
             />
         </NodeShell>
     );
@@ -1305,7 +1305,7 @@ export function ServerNode({ data, selected }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Left}
-                style={{ background: accent, width: 14, height: 14, border: "none" }}
+                style={{ background: accent, color: accent }}
             />
         </NodeShell>
     );

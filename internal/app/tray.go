@@ -18,7 +18,6 @@ import (
 // the window back has to restore it.
 func (a *App) buildTray() {
 	tray := a.app.SystemTray.New()
-	tray.SetLabel("NuggetVPN")
 	tray.SetTooltip("NuggetVPN")
 	tray.SetIcon(a.icon)
 

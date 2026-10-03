@@ -36,7 +36,7 @@ function Figure({ label, value, unit, live }: { label: string; value: string; un
  * Measures the connection through the current server: latency, then
  * download and upload, live as it runs, with the last result kept.
  */
-export function SpeedTest() {
+export function SpeedTest({ className }: { className?: string } = {}) {
     const t = useT();
     const [running, setRunning] = useState(false);
     const [progress, setProgress] = useState<SpeedProgress | null>(null);
@@ -76,7 +76,7 @@ export function SpeedTest() {
     const latency = running ? progress?.latency_ms : result?.latency_ms;
 
     return (
-        <div className="w-full max-w-2xl rounded-lg border bg-card/50 px-4 py-3">
+        <div className={cn("w-full rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-md shadow-2xs", className)}>
             <div className="flex items-center gap-3">
                 <Gauge size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">

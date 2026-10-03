@@ -130,6 +130,24 @@ func TestNormalizeDropsUnusableRules(t *testing.T) {
 	}
 }
 
+func TestDisconnectedRulePreserved(t *testing.T) {
+	settings := DefaultSettings()
+	settings.RoutingRules = []RoutingRule{
+		{ID: "cut", Kind: SourceDomains, Values: []string{"cut.example"}, Action: ""},
+	}
+	settings.Normalize()
+
+	if len(settings.RoutingRules) != 1 || settings.RoutingRules[0].ID != "cut" {
+		t.Fatalf("expected disconnected rule to survive, got %+v", settings.RoutingRules)
+	}
+	if settings.RoutingRules[0].Usable() {
+		t.Fatal("disconnected rule should not be usable")
+	}
+	if len(settings.UsableRules()) != 0 {
+		t.Fatal("usable rules should exclude disconnected rules")
+	}
+}
+
 // TestCleanValuesRejectsBadAddresses stops a typo in an IP rule from reaching
 // sing-box, where it would fail the whole config rather than that one row.
 func TestCleanValuesRejectsBadAddresses(t *testing.T) {
