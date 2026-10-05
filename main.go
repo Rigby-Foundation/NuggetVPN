@@ -71,6 +71,7 @@ func main() {
 func runCoreService() error {
 	flags := flag.NewFlagSet("core-service", flag.ContinueOnError)
 	flags.Bool("core-service", true, "run the privileged core service")
+	flags.String("version", version, "version of the service")
 	socket := flags.String("socket", storage.ControlSocketPath(), "control socket path")
 	tokenFile := flags.String("token-file", storage.ControlTokenPath(), "path to the control token")
 	uid := flags.Int("uid", -1, "uid that should own the control socket")

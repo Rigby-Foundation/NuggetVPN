@@ -93,13 +93,20 @@ func Listen(socketPath, tokenPath string, handler Handler) (*Server, error) {
 	if err := os.WriteFile(tokenPath, []byte(token), 0o600); err != nil {
 		return nil, err
 	}
-	// A socket left by a copy that did not exit cleanly.
-	_ = os.Remove(socketPath)
-	listener, err := net.Listen("unix", socketPath)
+	network := "unix"
+	if strings.Contains(socketPath, ":") {
+		network = "tcp"
+	} else {
+		// A socket left by a copy that did not exit cleanly.
+		_ = os.Remove(socketPath)
+	}
+	listener, err := net.Listen(network, socketPath)
 	if err != nil {
 		return nil, err
 	}
-	_ = os.Chmod(socketPath, 0o600)
+	if network == "unix" {
+		_ = os.Chmod(socketPath, 0o600)
+	}
 	server := &Server{listener: listener, token: token, tokenPath: tokenPath}
 	server.wait.Add(1)
 	go server.accept(handler)
@@ -159,7 +166,11 @@ func Call(socketPath, tokenPath, command string, args []string) (Response, error
 	if err != nil {
 		return Response{}, ErrNotRunning
 	}
-	conn, err := net.DialTimeout("unix", socketPath, 3*time.Second)
+	network := "unix"
+	if strings.Contains(socketPath, ":") {
+		network = "tcp"
+	}
+	conn, err := net.DialTimeout(network, socketPath, 3*time.Second)
 	if err != nil {
 		return Response{}, ErrNotRunning
 	}

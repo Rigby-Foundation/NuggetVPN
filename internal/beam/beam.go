@@ -42,7 +42,7 @@ func dirFor(goos string, getenv func(string) string, home func() (string, error)
 		base = "."
 	}
 	switch goos {
-	case "darwin":
+	case "darwin", "ios":
 		return filepath.Join(base, "Library", "Application Support", "Beam")
 	case "windows":
 		if appData := getenv("APPDATA"); appData != "" {

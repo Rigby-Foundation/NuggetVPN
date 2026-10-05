@@ -84,6 +84,12 @@ func defaultDataRoot() string {
 		return filepath.Join(base, "NuggetVPN", "cores")
 	case "darwin":
 		return "/Library/Application Support/NuggetVPN/cores"
+	case "ios", "android":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		return filepath.Join(home, ".local", "share", "org.rigbyfoundation.nuggetvpn", "cores")
 	default:
 		return "/var/lib/nuggetvpn/cores"
 	}

@@ -41,7 +41,11 @@ export function BottomNav({
 
     return (
         <>
-            <nav className="flex shrink-0 items-stretch gap-1 border-t bg-background px-2 py-1" aria-label={t("nav.menu")}>
+            <nav
+                className="flex shrink-0 items-stretch gap-1 border-t bg-background px-2 pt-1"
+                style={{ paddingBottom: "max(0.25rem, env(safe-area-inset-bottom, 0px))" }}
+                aria-label={t("nav.menu")}
+            >
                 {PRIMARY.map((tab) => (
                     <button
                         key={tab.id}

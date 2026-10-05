@@ -110,23 +110,30 @@ func RunService(options ServiceOptions) error {
 }
 
 func (s *Service) run() error {
-	if err := os.MkdirAll(filepath.Dir(s.options.SocketPath), 0o755); err != nil {
-		return fmt.Errorf("create socket directory: %w", err)
+	network := "unix"
+	if strings.Contains(s.options.SocketPath, ":") {
+		network = "tcp"
+	} else {
+		if err := os.MkdirAll(filepath.Dir(s.options.SocketPath), 0o755); err != nil {
+			return fmt.Errorf("create socket directory: %w", err)
+		}
+		// A socket left behind by a crashed service would block Listen.
+		_ = os.Remove(s.options.SocketPath)
 	}
-	// A socket left behind by a crashed service would block Listen.
-	_ = os.Remove(s.options.SocketPath)
 
-	listener, err := net.Listen("unix", s.options.SocketPath)
+	listener, err := net.Listen(network, s.options.SocketPath)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.options.SocketPath, err)
 	}
 	defer listener.Close()
-	defer os.Remove(s.options.SocketPath)
+	if network == "unix" {
+		defer os.Remove(s.options.SocketPath)
+	}
 
 	// The service runs as root; hand the socket to the user that launched it.
 	// This is defence in depth only. The token is what actually authenticates,
 	// because chown and chmod do nothing for AF_UNIX sockets on Windows.
-	if s.options.OwnerUID > 0 {
+	if network == "unix" && s.options.OwnerUID > 0 {
 		gid := s.options.OwnerGID
 		if gid < 0 {
 			gid = -1
@@ -135,8 +142,10 @@ func (s *Service) run() error {
 			log.Printf("warning: could not chown control socket: %v", err)
 		}
 	}
-	if err := os.Chmod(s.options.SocketPath, 0o600); err != nil {
-		log.Printf("warning: could not chmod control socket: %v", err)
+	if network == "unix" {
+		if err := os.Chmod(s.options.SocketPath, 0o600); err != nil {
+			log.Printf("warning: could not chmod control socket: %v", err)
+		}
 	}
 
 	if s.options.ParentPID > 0 {

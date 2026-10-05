@@ -134,6 +134,7 @@ const IP_RECHECK_MS = 5 * 60 * 1000;
 function guessPlatform(): string {
     const agent = navigator.userAgent;
     if (agent.includes("Android")) return "android";
+    if (/iPhone|iPad|iPod/i.test(agent)) return "ios";
     if (agent.includes("Windows")) return "windows";
     if (agent.includes("Mac OS")) return "macos";
     return "linux";
@@ -180,9 +181,9 @@ function App() {
     const [isCheckingIp, setIsCheckingIp] = useState(false);
 
     useEffect(() => {
-        const radius = platform === "android" ? "0px" : platform === "windows" ? "8px" : "10px";
+        const radius = (platform === "android" || platform === "ios" || isMobile) ? "0px" : platform === "windows" ? "8px" : "10px";
         document.documentElement.style.setProperty("--window-radius", radius);
-    }, [platform]);
+    }, [platform, isMobile]);
 
     const saveSettings = useCallback(async (next: AppSettings) => {
         // Go normalises and returns the canonical value, so the UI holds
@@ -621,13 +622,19 @@ function App() {
     }, [profiles, selection.domain]);
 
     useEffect(() => {
-        if (activeTab !== "proxies") {
+        if (activeTab !== "proxies" && activeTab !== "connection") {
             return;
         }
         void refreshPings();
         const interval = setInterval(() => void refreshPings(), 30_000);
         return () => clearInterval(interval);
     }, [activeTab, refreshPings]);
+
+    useEffect(() => {
+        if (connection.isConnected) {
+            void refreshPings();
+        }
+    }, [connection.isConnected, refreshPings]);
 
     // ---- actions ----------------------------------------------------------
     const toggleConnection = useCallback(async () => {
@@ -993,7 +1000,7 @@ function App() {
     useBack(activeTab !== "connection", () => startTransition(() => setActiveTab("connection")));
     const isMac = platform === "macos";
     // A phone: no window to control, and the page is the whole screen.
-    const isPhone = platform === "android";
+    const isPhone = platform === "android" || platform === "ios";
     const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || "top");
 
     const unifiedHeaderElement = (
@@ -1026,6 +1033,10 @@ function App() {
         <main className="h-full overflow-hidden">
             <Toaster
                 position="top-center"
+                containerStyle={{
+                    top: "calc(env(safe-area-inset-top, 0px) + 64px)",
+                    zIndex: 99999,
+                }}
                 toastOptions={{
                     className: "shadow-lg",
                     style: {
@@ -1175,6 +1186,7 @@ function App() {
 
                                 {activeTab === "settings" && (
                                     <SettingsView
+                                        platform={platform}
                                         homeSignal={settingsHome}
                                         openSignal={settingsOpen}
                                         theme={theme}

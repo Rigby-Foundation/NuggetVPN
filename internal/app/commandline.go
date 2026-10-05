@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 // ---------------------------------------------------------------------------
 
 func (a *App) startCommandLine() {
+	if runtime.GOOS == "android" {
+		return
+	}
 	server, err := cli.Listen(storage.CLISocketPath(), storage.CLITokenPath(), a.handleCommand)
 	if err != nil {
 		a.appendLog("WARN command line: " + err.Error())

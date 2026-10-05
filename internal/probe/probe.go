@@ -173,6 +173,9 @@ func Connectivity(
 }
 
 func measureICMP(host string, timeout time.Duration) *uint64 {
+	if runtime.GOOS == "ios" {
+		return nil
+	}
 	address := resolveTarget(host)
 	if address == "" {
 		return nil

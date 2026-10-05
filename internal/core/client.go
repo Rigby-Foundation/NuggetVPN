@@ -10,7 +10,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -48,12 +50,16 @@ type Client struct {
 // NewClient returns a client for the given control socket. tokenPath is where
 // the per-session credential is handed to the elevated service.
 func NewClient(socketPath, tokenPath, version string) *Client {
-	return &Client{
+	c := &Client{
 		socketPath: socketPath,
 		tokenPath:  tokenPath,
 		version:    version,
 		pending:    map[uint64]chan Response{},
 	}
+	if runtime.GOOS == "ios" {
+		c.startStatsTickerIOS()
+	}
+	return c
 }
 
 // OnLog registers the sink for sing-box log lines.
@@ -88,6 +94,9 @@ func (c *Client) Connected() bool {
 // Ensure connects to the core service, launching it under an elevation prompt
 // if it is not already running. Callers should invoke it right before Start.
 func (c *Client) Ensure() error {
+	if runtime.GOOS == "ios" {
+		return nil
+	}
 	if c.Connected() {
 		return nil
 	}
@@ -115,8 +124,10 @@ func (c *Client) Ensure() error {
 	}
 
 	// A socket file with nothing behind it blocks the new listener.
-	if _, err := os.Stat(c.socketPath); err == nil {
-		_ = os.Remove(c.socketPath)
+	if !strings.Contains(c.socketPath, ":") {
+		if _, err := os.Stat(c.socketPath); err == nil {
+			_ = os.Remove(c.socketPath)
+		}
 	}
 
 	if err := c.launchService(); err != nil {
@@ -140,8 +151,12 @@ func (c *Client) Ensure() error {
 // the timeout expires.
 func (c *Client) waitForStaleService() {
 	deadline := time.Now().Add(staleServiceTimeout)
+	network := "unix"
+	if strings.Contains(c.socketPath, ":") {
+		network = "tcp"
+	}
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("unix", c.socketPath, dialTimeout)
+		conn, err := net.DialTimeout(network, c.socketPath, dialTimeout)
 		if err != nil {
 			return
 		}
@@ -210,6 +225,7 @@ func (c *Client) launchService() error {
 		"--core-service",
 		"--socket", c.socketPath,
 		"--token-file", c.tokenPath,
+		"--version", c.version,
 		"--uid", strconv.Itoa(os.Getuid()),
 		"--gid", strconv.Itoa(os.Getgid()),
 		"--parent", strconv.Itoa(os.Getpid()),
@@ -224,7 +240,11 @@ func (c *Client) launchService() error {
 }
 
 func (c *Client) connect() error {
-	conn, err := net.DialTimeout("unix", c.socketPath, dialTimeout)
+	network := "unix"
+	if strings.Contains(c.socketPath, ":") {
+		network = "tcp"
+	}
+	conn, err := net.DialTimeout(network, c.socketPath, dialTimeout)
 	if err != nil {
 		return err
 	}
@@ -385,6 +405,13 @@ func (c *Client) request(request Request) (Response, error) {
 
 // Start hands a generated config to the core service.
 func (c *Client) Start(configJSON []byte) error {
+	if runtime.GOOS == "ios" {
+		if err := StartTunnelIOS(configJSON); err != nil {
+			return err
+		}
+		c.dispatchEvent(EventState, "", "", true, 0, 0)
+		return nil
+	}
 	if err := c.Ensure(); err != nil {
 		return err
 	}
@@ -395,6 +422,13 @@ func (c *Client) Start(configJSON []byte) error {
 // Stop tears the tunnel down but leaves the service running, so the next
 // connection does not need another password prompt.
 func (c *Client) Stop() error {
+	if runtime.GOOS == "ios" {
+		if err := StopTunnelIOS(); err != nil {
+			return err
+		}
+		c.dispatchEvent(EventState, "", "", false, 0, 0)
+		return nil
+	}
 	if !c.Connected() {
 		return nil
 	}
@@ -404,6 +438,10 @@ func (c *Client) Stop() error {
 
 // Running reports the core service's view of the tunnel state.
 func (c *Client) Running() bool {
+	if runtime.GOOS == "ios" {
+		status := GetTunnelStatusIOS()
+		return status == 3 || status == 2
+	}
 	if !c.Connected() {
 		return false
 	}
@@ -417,6 +455,11 @@ func (c *Client) Running() bool {
 // Stats reads the byte counters on demand. The core also pushes them once a
 // second, so this is only for callers that need a value right now.
 func (c *Client) Stats() (up, down int64, ok bool) {
+	if runtime.GOOS == "ios" {
+		up, down := GetTunnelStatsIOS()
+		running := c.Running()
+		return up, down, running
+	}
 	if !c.Connected() {
 		return 0, 0, false
 	}
@@ -462,6 +505,13 @@ func (c *Client) CloseConnection(id string) error {
 
 // StartCore hands a config for any core to the service; see StartRequest.
 func (c *Client) StartCore(request StartRequest) error {
+	if runtime.GOOS == "ios" {
+		if err := StartTunnelIOS(request.Config); err != nil {
+			return err
+		}
+		c.dispatchEvent(EventState, "", "", true, 0, 0)
+		return nil
+	}
 	if err := c.Ensure(); err != nil {
 		return err
 	}
@@ -481,6 +531,10 @@ func (c *Client) StartCore(request StartRequest) error {
 // Shutdown stops the tunnel and asks the privileged service to exit. Called
 // when the GUI quits so no root process outlives the app.
 func (c *Client) Shutdown() {
+	if runtime.GOOS == "ios" {
+		_ = StopTunnelIOS()
+		return
+	}
 	if !c.Connected() {
 		return
 	}

@@ -41,9 +41,17 @@ function Onboarding({
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSkip = async () => {
-    const newSettings = { ...settings, skip_auth: true };
-    await invoke("save_settings", { settings: newSettings });
-    onComplete();
+    setIsLoading(true);
+    try {
+      const newSettings = { ...settings, skip_auth: true };
+      await invoke("save_settings", { settings: newSettings });
+      onSettingsChange(newSettings);
+    } catch (e) {
+      console.error("Failed to save settings on skip:", e);
+    } finally {
+      setIsLoading(false);
+      onComplete();
+    }
   };
 
   const checkServer = async () => {
@@ -122,8 +130,8 @@ function Onboarding({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/40 backdrop-blur-2xl flex items-center justify-center p-6">
-      <Card className="w-full max-w-md border-border/50 shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-background/40 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <Card className="w-full max-w-md border-border/50 shadow-2xl my-auto">
         <CardHeader className="text-center space-y-4 pb-8">
           <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary">
             <Server size={32} />
@@ -249,11 +257,13 @@ function Onboarding({
           )}
         </CardContent>
 
-        <CardFooter className="justify-center pt-0">
+        <CardFooter className="justify-center pt-0 pb-6 px-6">
           <Button
+            type="button"
             variant="ghost"
             onClick={handleSkip}
-            className="w-full text-muted-foreground"
+            disabled={isLoading}
+            className="w-full text-muted-foreground min-h-[48px] py-3 text-base active:opacity-70 cursor-pointer touch-manipulation select-none"
           >
             {t("onboarding.skip")}
           </Button>

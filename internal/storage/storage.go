@@ -28,7 +28,7 @@ func DataDir() string {
 		home = "."
 	}
 	switch runtime.GOOS {
-	case "darwin":
+	case "darwin", "ios":
 		return filepath.Join(home, "Library", "Application Support", Identifier)
 	case "windows":
 		if appData := os.Getenv("APPDATA"); appData != "" {
@@ -50,7 +50,7 @@ func LogDir() string {
 		home = "."
 	}
 	switch runtime.GOOS {
-	case "darwin":
+	case "darwin", "ios":
 		return filepath.Join(home, "Library", "Logs", Identifier)
 	case "windows":
 		if local := os.Getenv("LOCALAPPDATA"); local != "" {
@@ -72,7 +72,7 @@ func RuntimeDir() string {
 		home = "."
 	}
 	switch runtime.GOOS {
-	case "darwin":
+	case "darwin", "ios":
 		return filepath.Join(home, "Library", "Caches", Identifier)
 	case "windows":
 		if local := os.Getenv("LOCALAPPDATA"); local != "" {
@@ -115,6 +115,9 @@ const maxUnixSocketPath = 100
 // ControlSocketPath is the unix socket the privileged core service listens on.
 // A very long home directory falls back to a short path in the temp directory.
 func ControlSocketPath() string {
+	if runtime.GOOS == "ios" || runtime.GOOS == "android" {
+		return "127.0.0.1:45389"
+	}
 	path := filepath.Join(RuntimeDir(), "core.sock")
 	if len(path) <= maxUnixSocketPath {
 		return path
@@ -125,6 +128,9 @@ func ControlSocketPath() string {
 // CLISocketPath is where the running app answers the command line; see
 // internal/cli. Short paths fall back to the temp directory as for the core.
 func CLISocketPath() string {
+	if runtime.GOOS == "ios" || runtime.GOOS == "android" {
+		return "127.0.0.1:45390"
+	}
 	path := filepath.Join(RuntimeDir(), "cli.sock")
 	if len(path) <= maxUnixSocketPath {
 		return path
@@ -134,7 +140,12 @@ func CLISocketPath() string {
 
 // CLITokenPath holds the token the command line must present. It is in the
 // user's own runtime folder, readable by them alone.
-func CLITokenPath() string { return filepath.Join(RuntimeDir(), "cli.token") }
+func CLITokenPath() string {
+	if runtime.GOOS == "ios" || runtime.GOOS == "android" {
+		return filepath.Join(os.TempDir(), "nuggetvpn_cli.token")
+	}
+	return filepath.Join(RuntimeDir(), "cli.token")
+}
 
 // CoreConfigPath is where the generated sing-box config is mirrored for
 // debugging. The core service receives its config over the socket, so this file

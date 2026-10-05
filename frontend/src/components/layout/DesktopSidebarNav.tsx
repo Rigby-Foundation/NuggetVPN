@@ -69,7 +69,7 @@ export function DesktopSidebarNav({
 }: DesktopSidebarNavProps) {
     const { t, dir } = useI18n();
     const isMac = platform === "macos";
-    const isPhone = platform === "android";
+    const isPhone = platform === "android" || platform === "ios";
 
     const isConnected = connectionState.status === "connected";
     const isAuto = selectedProxyMode === "auto";

@@ -58,8 +58,12 @@ func defaultDeviceOS() string {
 		return "Windows"
 	case "darwin":
 		return "macOS"
+	case "ios":
+		return "iOS"
 	case "linux":
 		return "Linux"
+	case "android":
+		return "Android"
 	default:
 		return strings.ToUpper(runtime.GOOS[:1]) + runtime.GOOS[1:]
 	}

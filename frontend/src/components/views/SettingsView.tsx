@@ -39,14 +39,14 @@ import { CorePanel } from "@/components/settings/cores";
 import { PluginsPanel } from "@/components/settings/plugins";
 import { WifiPanel } from "@/components/settings/wifi";
 import { useBack } from "@/lib/back";
-import { isAndroid } from "@/lib/platform";
+import { isAndroid, isMobileDevice } from "@/lib/platform";
 
 /**
- * Sections with nothing to offer on Android: the Wi-Fi rules need the
+ * Sections with nothing to offer on mobile phones: the Wi-Fi rules need the
  * network's name, which is not read there yet; Beam is a desktop app; and
  * updates come from wherever the app was installed.
  */
-const HIDDEN_ON_ANDROID = new Set(["wifi", "beam", "updates"]);
+const HIDDEN_ON_MOBILE = new Set(["wifi", "beam", "updates"]);
 import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
@@ -89,6 +89,7 @@ type SettingsChangeHandler = <K extends keyof AppSettings>(
 ) => void;
 
 interface SettingsViewProps {
+  platform?: string;
   theme: string | undefined;
   setTheme: (value: string) => void;
   appSettings: AppSettings;
@@ -320,6 +321,7 @@ function searchSettings(query: string, language: Parameters<typeof translate>[0]
 }
 
 function SettingsView({
+  platform,
   theme,
   setTheme,
   appSettings,
@@ -334,6 +336,7 @@ function SettingsView({
   homeSignal,
   openSignal,
 }: SettingsViewProps) {
+  const isPhone = platform === "android" || platform === "ios" || isMobileDevice;
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
   // Kept while a section is open, so Back returns to the same results.
   const [query, setQuery] = React.useState("");
@@ -418,10 +421,10 @@ function SettingsView({
       }
       case "behaviour": {
         const parts = [
-          appSettings.launch_at_startup && !isAndroid ? t("behaviour.summary.startup") : "",
+          appSettings.launch_at_startup && !isPhone ? t("behaviour.summary.startup") : "",
           appSettings.auto_connect ? t("behaviour.summary.autoConnect") : "",
-          isAndroid ? "" : t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
-          isAndroid && appSettings.auto_reconnect !== false ? t("behaviour.summary.reconnect") : "",
+          isPhone ? "" : t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
+          isPhone && appSettings.auto_reconnect !== false ? t("behaviour.summary.reconnect") : "",
         ].filter(Boolean);
         // The parts read mid-sentence; whichever comes first starts it.
         const summary = parts.join(" · ");
@@ -496,12 +499,14 @@ function SettingsView({
               <ThemePicker theme={theme} setTheme={setTheme} />
             </SettingsGroup>
 
-            <SettingsGroup
-              title={t("appearance.layout")}
-              description={t("appearance.layout.description")}
-            >
-              <LayoutPicker />
-            </SettingsGroup>
+            {isPhone ? null : (
+              <SettingsGroup
+                title={t("appearance.layout")}
+                description={t("appearance.layout.description")}
+              >
+                <LayoutPicker />
+              </SettingsGroup>
+            )}
 
             <SettingsGroup title={t("appearance.font")} description={t("appearance.font.description")}>
               <FontPicker />
@@ -560,8 +565,8 @@ function SettingsView({
         return (
           <>
             <SettingsGroup title={t("behaviour.startup")}>
-              {/* Android starts apps itself. */}
-              {isAndroid ? null : (
+              {/* Phones manage app startup themselves. */}
+              {isPhone ? null : (
                 <SettingsField
                   label={t("behaviour.launch")}
                   description={t("behaviour.launch.description")}
@@ -677,7 +682,7 @@ function SettingsView({
             </SettingsGroup>
 
             {/* No window to close on a phone: the app goes to the background. */}
-            {isAndroid ? null : (
+            {isPhone ? null : (
             <SettingsGroup
               title={t("behaviour.closing")}
               description={t("behaviour.closing.description")}
@@ -1116,7 +1121,7 @@ function SettingsView({
   };
 
   const open = SECTIONS.find((section) => section.id === openId);
-  const visible = (id: SectionId) => (id !== "beam" || !!beamPreview) && !(isAndroid && HIDDEN_ON_ANDROID.has(id));
+  const visible = (id: SectionId) => (id !== "beam" || !!beamPreview) && !(isPhone && HIDDEN_ON_MOBILE.has(id));
   const results = query.trim() ? searchSettings(query, language).filter((result) => visible(result.id)) : null;
   const row = (section: Section, subtitle = subtitleFor(section)) => (
     <SettingsRow

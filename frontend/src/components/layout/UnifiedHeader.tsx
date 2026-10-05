@@ -86,7 +86,7 @@ export function UnifiedHeader({
 }: UnifiedHeaderProps) {
     const { t, dir } = useI18n();
     const isMac = platform === "macos";
-    const isPhone = platform === "android";
+    const isPhone = platform === "android" || platform === "ios";
 
     const isConnected = connectionState.status === "connected";
     const isConnecting = connectionState.status === "connecting";
@@ -112,13 +112,14 @@ export function UnifiedHeader({
     return (
         <header
             className={cn(
-                "drag-region relative z-30 flex h-14 w-full shrink-0 select-none items-center justify-between border-b bg-card/70 px-3 sm:px-4 backdrop-blur-md transition-colors overflow-hidden",
-                isMac && "pt-1"
+                "drag-region relative z-30 flex flex-col w-full shrink-0 select-none border-b bg-card/70 px-3 sm:px-4 backdrop-blur-md transition-colors overflow-hidden",
+                "pt-[env(safe-area-inset-top,0px)]"
             )}
             dir={dir}
         >
-            {/* Left Area: Window Controls + Brand Beacon */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className={cn("flex h-14 w-full items-center justify-between", isMac && "pt-1")}>
+                {/* Left Area: Window Controls + Brand Beacon */}
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 {isMac ? (
                     <div className="me-1">
                         <MacWindowControls
@@ -283,6 +284,7 @@ export function UnifiedHeader({
                         />
                     </div>
                 ) : null}
+            </div>
             </div>
         </header>
     );

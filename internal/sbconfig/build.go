@@ -374,9 +374,8 @@ func buildInbounds(settings models.AppSettings, mixedPort int, bypass *Bypass) [
 		"route_exclude_address": privateRanges,
 	}
 	// strict_route is only implemented on Linux and Windows.
-	// Not on Android, where VpnService owns the routes and there is no
-	// firewall for the core to set.
-	if runtime.GOOS != "darwin" && runtime.GOOS != "android" {
+	// Not on Android or iOS, where system network extensions / VpnService own the routes.
+	if runtime.GOOS != "darwin" && runtime.GOOS != "ios" && runtime.GOOS != "android" {
 		tun["strict_route"] = true
 	}
 	if name := tunInterfaceNameFor(runtime.GOOS); name != "" {

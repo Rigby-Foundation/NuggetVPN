@@ -1,0 +1,5 @@
+{
+  "Replace": {
+    "/Users/turborigby/NuggetVPN/main_ios.gen.go": "/Users/turborigby/NuggetVPN/build/ios/xcode/gen/main_ios.gen.go"
+  }
+}

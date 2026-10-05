@@ -24,6 +24,7 @@ includes:
   darwin: ./build/darwin/Taskfile.yml
   linux: ./build/linux/Taskfile.yml
   android: ./build/android/Taskfile.yml
+  ios: ./build/ios/Taskfile.yml
 
 tasks:
   build:

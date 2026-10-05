@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>NuggetVPN</title>
     <meta name="description"
         content="Modern, lightweight, and fast VPN client built with Wails and React, powered by an embedded sing-box core. Open Source and privacy-focused." />
@@ -40,10 +40,10 @@
     <script>
         (function () {
             var ua = navigator.userAgent || "";
-            if (ua.indexOf("Windows") !== -1) {
-                document.documentElement.style.setProperty("--window-radius", "8px");
-            } else if (ua.indexOf("Android") !== -1) {
+            if (/Android|iPhone|iPad|iPod/i.test(ua)) {
                 document.documentElement.style.setProperty("--window-radius", "0px");
+            } else if (ua.indexOf("Windows") !== -1) {
+                document.documentElement.style.setProperty("--window-radius", "8px");
             } else {
                 document.documentElement.style.setProperty("--window-radius", "10px");
             }

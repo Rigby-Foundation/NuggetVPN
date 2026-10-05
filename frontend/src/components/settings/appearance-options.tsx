@@ -56,6 +56,7 @@ import {
 } from "@/lib/appearance";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, scriptOf, useI18n, useT } from "@/lib/i18n";
+import { isMobileDevice } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 /**
@@ -505,6 +506,7 @@ export function LayoutPicker() {
     return (
         <div className="space-y-6">
             {/* 1. Global Navigation Placement */}
+            {!isMobileDevice && (
             <div>
                 <label className="text-xs font-semibold text-foreground/90 block mb-2.5">
                     {t("appearance.layout.navPosition")}
@@ -565,6 +567,7 @@ export function LayoutPicker() {
                     })}
                 </div>
             </div>
+            )}
 
             {/* 2. Cockpit Alignment & Telemetry Placement */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
