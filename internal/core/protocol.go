@@ -17,7 +17,12 @@
 // through a file rather than argv because argv is world-readable on Linux.
 package core
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"net"
+	"strconv"
+	"strings"
+)
 
 // Command names accepted by the core service.
 const (
@@ -113,3 +118,17 @@ type Event struct {
 
 // Responses and events share one connection, which keeps ordering between
 // "start succeeded" and the log lines that follow it.
+
+// isTCP reports whether addr is a TCP address rather than a filesystem socket path.
+func isTCP(addr string) bool {
+	if strings.ContainsAny(addr, `/\`) {
+		return false
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	p, err := strconv.Atoi(port)
+	return err == nil && p >= 0 && p <= 65535
+}
+

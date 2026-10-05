@@ -57,3 +57,32 @@ func TestIsCommand(t *testing.T) {
 		t.Error("no args is the window")
 	}
 }
+
+func TestIsTCP(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1:45389", true},
+		{"127.0.0.1:45390", true},
+		{":8080", true},
+		{"[::1]:8080", true},
+		{"localhost:1234", true},
+		{"/var/run/nugget.sock", false},
+		{"/tmp/nvcli.sock", false},
+		{"cli.sock", false},
+		{`C:\Users\runneradmin\AppData\Local\Temp\nvcli-99808885\s`, false},
+		{`C:/Users/runneradmin/AppData/Local/Temp/nvcli-99808885/s`, false},
+		{"C:s", false},
+		{"", false},
+		{"127.0.0.1:notaport", false},
+		{"127.0.0.1:70000", false},
+		{"127.0.0.1:-1", false},
+	}
+	for _, tc := range cases {
+		if got := isTCP(tc.addr); got != tc.want {
+			t.Errorf("isTCP(%q) = %v; want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+

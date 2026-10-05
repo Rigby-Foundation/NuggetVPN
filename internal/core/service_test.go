@@ -104,11 +104,14 @@ func startTestServiceOnSocket(t *testing.T) (*Client, string) {
 		done:    make(chan struct{}),
 	}
 
+	serviceErr := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_ = service.run()
+		if err := service.run(); err != nil {
+			serviceErr <- err
+		}
 	}()
 
 	client := NewClient(socket, filepath.Join(directory, "core.token"), "test")
@@ -118,6 +121,11 @@ func startTestServiceOnSocket(t *testing.T) (*Client, string) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
+		select {
+		case err := <-serviceErr:
+			t.Fatalf("service failed to run: %v", err)
+		default:
+		}
 		if err := client.connect(); err == nil {
 			break
 		}
@@ -247,7 +255,11 @@ func TestServiceRejectsUnauthenticatedClients(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			conn, err := net.DialTimeout("unix", socket, 2*time.Second)
+			network := "unix"
+			if isTCP(socket) {
+				network = "tcp"
+			}
+			conn, err := net.DialTimeout(network, socket, 2*time.Second)
 			if err != nil {
 				t.Fatalf("dial: %v", err)
 			}
@@ -352,3 +364,32 @@ func TestServiceListsAndClosesConnections(t *testing.T) {
 		t.Fatal("a malformed connection id should be an error")
 	}
 }
+
+func TestIsTCP(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1:45389", true},
+		{"127.0.0.1:45390", true},
+		{":8080", true},
+		{"[::1]:8080", true},
+		{"localhost:1234", true},
+		{"/var/run/nugget.sock", false},
+		{"/tmp/nvcore.sock", false},
+		{"core.sock", false},
+		{`C:\Users\runneradmin\AppData\Local\Temp\nvpn-99808885\core.sock`, false},
+		{`C:/Users/runneradmin/AppData/Local/Temp/nvpn-99808885/core.sock`, false},
+		{"C:core.sock", false},
+		{"", false},
+		{"127.0.0.1:notaport", false},
+		{"127.0.0.1:70000", false},
+		{"127.0.0.1:-1", false},
+	}
+	for _, tc := range cases {
+		if got := isTCP(tc.addr); got != tc.want {
+			t.Errorf("isTCP(%q) = %v; want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+

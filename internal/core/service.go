@@ -111,7 +111,7 @@ func RunService(options ServiceOptions) error {
 
 func (s *Service) run() error {
 	network := "unix"
-	if strings.Contains(s.options.SocketPath, ":") {
+	if isTCP(s.options.SocketPath) {
 		network = "tcp"
 	} else {
 		if err := os.MkdirAll(filepath.Dir(s.options.SocketPath), 0o755); err != nil {

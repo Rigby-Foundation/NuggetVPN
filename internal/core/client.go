@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -124,7 +123,7 @@ func (c *Client) Ensure() error {
 	}
 
 	// A socket file with nothing behind it blocks the new listener.
-	if !strings.Contains(c.socketPath, ":") {
+	if !isTCP(c.socketPath) {
 		if _, err := os.Stat(c.socketPath); err == nil {
 			_ = os.Remove(c.socketPath)
 		}
@@ -152,7 +151,7 @@ func (c *Client) Ensure() error {
 func (c *Client) waitForStaleService() {
 	deadline := time.Now().Add(staleServiceTimeout)
 	network := "unix"
-	if strings.Contains(c.socketPath, ":") {
+	if isTCP(c.socketPath) {
 		network = "tcp"
 	}
 	for time.Now().Before(deadline) {
@@ -241,7 +240,7 @@ func (c *Client) launchService() error {
 
 func (c *Client) connect() error {
 	network := "unix"
-	if strings.Contains(c.socketPath, ":") {
+	if isTCP(c.socketPath) {
 		network = "tcp"
 	}
 	conn, err := net.DialTimeout(network, c.socketPath, dialTimeout)

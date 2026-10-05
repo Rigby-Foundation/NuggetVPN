@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -94,7 +95,7 @@ func Listen(socketPath, tokenPath string, handler Handler) (*Server, error) {
 		return nil, err
 	}
 	network := "unix"
-	if strings.Contains(socketPath, ":") {
+	if isTCP(socketPath) {
 		network = "tcp"
 	} else {
 		// A socket left by a copy that did not exit cleanly.
@@ -167,7 +168,7 @@ func Call(socketPath, tokenPath, command string, args []string) (Response, error
 		return Response{}, ErrNotRunning
 	}
 	network := "unix"
-	if strings.Contains(socketPath, ":") {
+	if isTCP(socketPath) {
 		network = "tcp"
 	}
 	conn, err := net.DialTimeout(network, socketPath, 3*time.Second)
@@ -231,3 +232,17 @@ func Run(args []string, socketPath, tokenPath, version string) int {
 	}
 	return 0
 }
+
+// isTCP reports whether addr is a TCP address rather than a filesystem socket path.
+func isTCP(addr string) bool {
+	if strings.ContainsAny(addr, `/\`) {
+		return false
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	p, err := strconv.Atoi(port)
+	return err == nil && p >= 0 && p <= 65535
+}
+
