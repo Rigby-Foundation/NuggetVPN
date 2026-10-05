@@ -325,8 +325,7 @@ const RADIUS_CURVATURES: Record<string, { desc: string; px: string }> = {
 
 /**
  * Modern Segmented Corner Curvature Deck
- * Replaces Beam's 4 giant floating cards with an intuitive,
- * interactive geometry controller.
+ * Interactive geometry controller for window and element radii.
  */
 export function RadiusPicker() {
     const { prefs, setRadius } = useAppearance();
@@ -385,7 +384,7 @@ const MOTION_ICONS: Record<string, LucideIcon> = {
 
 /**
  * Modern Segmented Motion Controller
- * Replaces Beam's 4 giant floating motion cards with a cohesive controller.
+ * Cohesive controller for transition animations.
  */
 export function MotionPicker() {
     const { prefs, setMotion } = useAppearance();

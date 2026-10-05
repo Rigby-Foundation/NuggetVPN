@@ -4,7 +4,6 @@ import toast, { Toaster } from "react-hot-toast";
 import { appWindow, errorMessage, eventPayload, EVENTS, invoke, listen, save, writeTextFile } from "@/lib/backend";
 
 import AddModal from "@/components/AddModal";
-import { BeamMigrationDialog } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import AppSidebar from "@/components/layout/AppSidebar";
@@ -40,8 +39,6 @@ import type { HostActions } from "@/lib/plugin-host";
 import { cn } from "@/lib/utils";
 import {
     AppSettings,
-    BeamMigrationReport,
-    BeamOffer,
     ConfigSource,
     IpInfo,
     Profile,
@@ -87,7 +84,6 @@ const PENDING_SETTINGS: AppSettings = {
     proxy_chain_enabled: false,
     proxy_chain: [],
     proxy_chain_exit: "",
-    beam_migration: "",
     last_selection: null,
     launch_at_startup: false,
     auto_connect: false,
@@ -172,8 +168,6 @@ function App() {
     const [activeTab, setActiveTab] = useState("connection");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
-    const [beamOffer, setBeamOffer] = useState<BeamOffer | null>(null);
-    const [showBeam, setShowBeam] = useState(false);
     const [platform, setPlatform] = useState(guessPlatform);
     const [profilePings, setProfilePings] = useState<Record<string, number | null>>({});
     const [refreshingDomain, setRefreshingDomain] = useState("");
@@ -451,18 +445,6 @@ function App() {
             }
             selectionRestoredRef.current = true;
 
-            // After profiles, because the offer only prompts when there are
-            // none yet: someone already set up here does not need it.
-            try {
-                const offer = await invoke<BeamOffer>("get_beam_offer");
-                setBeamOffer(offer);
-                if (offer.prompt) {
-                    setShowBeam(true);
-                }
-            } catch {
-                // Only an offer; failing to look for Beam changes nothing.
-            }
-
             // Off means off: no refresh at start, none on a timer, for any
             // subscription. Refreshing by hand still works.
             if (!autoUpdate) {
@@ -527,43 +509,6 @@ function App() {
         }
         patchSettings({ last_selection: next });
     }, [selection, profiles, patchSettings]);
-
-    // ---- Beam migration ---------------------------------------------------
-    const migrateFromBeam = useCallback(async () => {
-        const report = await invoke<BeamMigrationReport>("migrate_from_beam");
-        setProfiles(report.profiles);
-        setSettings(report.settings);
-        if (report.theme) {
-            setTheme(report.theme);
-        }
-        // Empty means Beam's choice had no equivalent here; keep the current.
-        if (report.appearance.font) appearance.setFont(report.appearance.font);
-        if (report.appearance.radius) appearance.setRadius(report.appearance.radius);
-        if (report.appearance.motion) appearance.setMotion(report.appearance.motion);
-        if (report.selection) {
-            const { domain, profile_id } = report.selection;
-            setSelection({
-                domain,
-                mode: profile_id ? "manual" : "auto",
-                profileId: profile_id,
-            });
-        }
-        const total = report.outcomes.reduce((sum, outcome) => sum + outcome.profiles, 0);
-        appendLog([`Imported ${total} servers from Beam.`]);
-        return report;
-    }, [appearance, appendLog, setProfiles, setSelection, setTheme]);
-
-    const closeBeam = useCallback(() => {
-        setShowBeam(false);
-        // Closing without importing is the answer "not now"; record it so the
-        // offer is not repeated on every start. After an import the backend
-        // has already recorded "done".
-        if (!settingsRef.current.beam_migration) {
-            void invoke<AppSettings>("dismiss_beam_migration")
-                .then(setSettings)
-                .catch(() => undefined);
-        }
-    }, []);
 
     // ---- public address ---------------------------------------------------
     const checkIp = useCallback(async () => {
@@ -1060,14 +1005,7 @@ function App() {
                 onImportSubscription={handleImportSubscription}
             />
 
-            {/* One overlay at a time: the Beam offer first, then onboarding. */}
-            {showBeam && beamOffer?.preview ? (
-                <BeamMigrationDialog
-                    preview={beamOffer.preview}
-                    onImport={migrateFromBeam}
-                    onClose={closeBeam}
-                />
-            ) : showOnboarding ? (
+            {showOnboarding ? (
                 <Onboarding
                     settings={settings}
                     onComplete={() => startTransition(() => setShowOnboarding(false))}
@@ -1195,8 +1133,6 @@ function App() {
                                         profiles={profiles}
                                         selectedProfileId={selection.profileId}
                                         onSettingsChange={updateSetting}
-                                        beamPreview={beamOffer?.found ? beamOffer.preview : null}
-                                        onMigrateFromBeam={migrateFromBeam}
                                         onConnectSync={() =>
                                             startTransition(() => setShowOnboarding(true))
                                         }

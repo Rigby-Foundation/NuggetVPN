@@ -130,11 +130,6 @@ type AppSettings struct {
 	ProxyChain        []string `json:"proxy_chain"`
 	ProxyChainExit    string   `json:"proxy_chain_exit"`
 
-	// BeamMigration records the answer to the first-start offer to import
-	// from Beam, so it is asked once: "" (not yet asked), BeamMigrationDone
-	// or BeamMigrationDismissed. Settings still offers it either way.
-	BeamMigration string `json:"beam_migration"`
-
 	// LastSelection is the server the user last picked, so reopening the app
 	// lands on it rather than on the first subscription. Nil until one is
 	// chosen.
@@ -252,12 +247,6 @@ type Selection struct {
 	// changed a server's link keeps its name far more often than not.
 	ProfileName string `json:"profile_name"`
 }
-
-// Answers to the Beam migration offer.
-const (
-	BeamMigrationDone      = "done"
-	BeamMigrationDismissed = "dismissed"
-)
 
 // DefaultSettings is the configuration a fresh install starts from.
 func DefaultSettings() AppSettings {

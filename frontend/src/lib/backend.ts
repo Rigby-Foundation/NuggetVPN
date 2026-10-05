@@ -46,10 +46,6 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     save_settings: { method: "SaveSettings", args: ["settings"] },
     regenerate_hwid: { method: "RegenerateHWID", args: [] },
 
-    get_beam_offer: { method: "GetBeamOffer", args: [] },
-    migrate_from_beam: { method: "MigrateFromBeam", args: [] },
-    dismiss_beam_migration: { method: "DismissBeamMigration", args: [] },
-
     import_geo_file: { method: "ImportGeoFile", args: [] },
     download_geo_file: { method: "DownloadGeoFile", args: ["url"] },
     remove_geo_file: { method: "RemoveGeoFile", args: ["kind"] },

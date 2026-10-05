@@ -80,8 +80,6 @@ files, and can only do what you allow when you install it. See
 - **Updates** checked for and installed from inside the app.
 - **Backups**: settings, profiles, routing and theme files can be exported
   and imported as one file.
-- **Beam import**: on first start, the app offers to bring over profiles from
-  a Beam installation.
 
 ## Cores
 
@@ -284,8 +282,7 @@ go build -tags "$(make -s tags)" .
   on.
 - **`internal/geodat/`**, **`internal/vflow/`**: geo files and the `.vflow`
   routing format.
-- **`internal/beam/`**, **`internal/autostart/`**: Beam import and launch at
-  login.
+- **`internal/autostart/`**: launch at login.
 - **`internal/plugins/`**: reading, installing and serving plugins, the
   sandbox policy for their pages, and the SDK (`sdk/nugget.js`). The window
   side is `frontend/src/lib/plugin-host.ts`.

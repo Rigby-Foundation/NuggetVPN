@@ -83,8 +83,6 @@ export interface AppSettings {
     proxy_chain_enabled: boolean;
     proxy_chain: string[];
     proxy_chain_exit: string;
-    /** "" until the first-start Beam offer is answered, then "done" or "dismissed". */
-    beam_migration: "" | "done" | "dismissed";
     /** The server last picked, restored on the next start. */
     last_selection: SavedSelection | null;
     /** Read from the system on every load; see internal/autostart. */
@@ -349,69 +347,6 @@ export interface SavedSelection {
     profile_id: string;
     /** Fallback when the id is gone, e.g. the provider changed the link. */
     profile_name: string;
-}
-
-/** One line of what a Beam migration carries across, or leaves behind. */
-export interface BeamItem {
-    /** Which message; see ITEM_COPY in BeamMigration.tsx. */
-    key: string;
-    value?: string;
-    count?: number;
-}
-
-/** A Beam profile, described without its subscription URL. */
-export interface BeamSubscription {
-    name: string;
-    provider: string;
-    /** Empty for servers added to Beam by hand. */
-    host: string;
-    cached_nodes: number;
-    expires_at: number;
-    data_used: number;
-    data_limit: number;
-}
-
-export interface BeamPreview {
-    subscriptions: BeamSubscription[];
-    carried: BeamItem[];
-    skipped: BeamItem[];
-    /** The matching preset id, or empty. */
-    theme: string;
-    appearance: BeamAppearance;
-}
-
-/** Beam's font, corners and transition in this app's ids; empty = no match. */
-export interface BeamAppearance {
-    font: string;
-    radius: string;
-    motion: string;
-}
-
-export interface BeamOffer {
-    found: boolean;
-    /** Show the first-start dialog. */
-    prompt: boolean;
-    preview: BeamPreview | null;
-}
-
-export interface BeamOutcome {
-    name: string;
-    host: string;
-    profiles: number;
-    source: "fetched" | "cached" | "failed" | "local";
-    /** The fetch failure as the network reported it. */
-    error?: string;
-    no_servers?: boolean;
-    shared_host?: boolean;
-}
-
-export interface BeamMigrationReport {
-    profiles: Profile[];
-    settings: AppSettings;
-    outcomes: BeamOutcome[];
-    selection: { domain: string; profile_id: string } | null;
-    theme: string;
-    appearance: BeamAppearance;
 }
 
 /** A permission a plugin can hold; see internal/plugins. */

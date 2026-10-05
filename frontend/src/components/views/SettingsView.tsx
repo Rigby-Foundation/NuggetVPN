@@ -16,7 +16,6 @@ import {
   SlidersHorizontal,
   Fingerprint,
   Languages,
-  PackageOpen,
   Palette,
   Plus,
   RefreshCw,
@@ -31,7 +30,6 @@ import {
 import PageShell from "@/components/layout/PageShell";
 import SubscriptionIdentity from "@/components/views/SubscriptionIdentity";
 import ThemePicker from "@/components/settings/theme-picker";
-import { BeamMigrationPanel } from "@/components/BeamMigration";
 import { useAppearance } from "@/components/appearance-provider";
 import { UpdatesPanel } from "@/components/settings/updates";
 import { BackupPanel } from "@/components/settings/backup";
@@ -43,10 +41,10 @@ import { isAndroid, isMobileDevice } from "@/lib/platform";
 
 /**
  * Sections with nothing to offer on mobile phones: the Wi-Fi rules need the
- * network's name, which is not read there yet; Beam is a desktop app; and
- * updates come from wherever the app was installed.
+ * network's name, which is not read there yet; and updates come from wherever
+ * the app was installed.
  */
-const HIDDEN_ON_MOBILE = new Set(["wifi", "beam", "updates"]);
+const HIDDEN_ON_MOBILE = new Set(["wifi", "updates"]);
 import { usePlugins } from "@/components/plugins/plugins-provider";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
 import { invoke } from "@/lib/backend";
@@ -66,7 +64,7 @@ import {
   SettingsRow,
 } from "@/components/settings/shell";
 
-import { AppSettings, BeamMigrationReport, BeamPreview, CloseAction, Profile } from "@/types";
+import { AppSettings, CloseAction, Profile } from "@/types";
 import { cn } from "@/lib/utils";
 import { THEME_PRESETS } from "@/lib/themes";
 
@@ -99,9 +97,6 @@ interface SettingsViewProps {
   onConnectSync: () => void;
   onDisconnectSync: () => void;
   onRegenerateHWID: () => void;
-  /** Present only when a Beam installation was found. */
-  beamPreview: BeamPreview | null;
-  onMigrateFromBeam: () => Promise<BeamMigrationReport>;
   /** Changes when the sidebar's Settings is clicked while already here. */
   homeSignal: number;
   /** Opens a section from elsewhere: bump n to open id again. */
@@ -118,7 +113,6 @@ type SectionId =
   | "subscriptions"
   | "privacy"
   | "sync"
-  | "beam"
   | "backup"
   | "core"
   | "plugins"
@@ -225,12 +219,6 @@ const SECTIONS: Section[] = [
     blurb: "settings.sync.blurb",
   },
   {
-    id: "beam",
-    icon: PackageOpen,
-    title: "settings.beam",
-    blurb: "settings.beam.blurb",
-  },
-  {
     id: "core",
     icon: Cpu,
     title: "settings.core",
@@ -263,7 +251,7 @@ const SECTIONS: Section[] = [
 const GROUPS: { title: MessageKey; sections: SectionId[] }[] = [
   { title: "settings.group.general", sections: ["appearance", "language", "behaviour", "updates"] },
   { title: "settings.group.network", sections: ["connection", "tls", "chain", "subscriptions", "wifi"] },
-  { title: "settings.group.data", sections: ["privacy", "sync", "backup", "beam"] },
+  { title: "settings.group.data", sections: ["privacy", "sync", "backup"] },
   { title: "settings.group.advanced", sections: ["core", "plugins"] },
 ];
 
@@ -282,7 +270,6 @@ const SEARCH_PREFIXES: Record<SectionId, string[]> = {
   wifi: ["wifi."],
   privacy: ["privacy."],
   sync: ["sync."],
-  beam: ["beam."],
   core: ["core."],
   plugins: ["plugins."],
   backup: ["backup."],
@@ -331,8 +318,6 @@ function SettingsView({
   onConnectSync,
   onDisconnectSync,
   onRegenerateHWID,
-  beamPreview,
-  onMigrateFromBeam,
   homeSignal,
   openSignal,
 }: SettingsViewProps) {
@@ -475,11 +460,6 @@ function SettingsView({
                 ? "core.singbox"
                 : "core.builtin"
         );
-      case "beam": {
-        if (appSettings.beam_migration === "done") return t("settings.beam.done");
-        const count = beamPreview?.subscriptions.length ?? 0;
-        return t("settings.beam.found", { count });
-      }
       default:
         return t(section.blurb);
     }
@@ -1105,23 +1085,13 @@ function SettingsView({
           </SettingsGroup>
         );
 
-      case "beam":
-        return beamPreview ? (
-          <SettingsGroup
-            title="Beam"
-            description={t("settings.beam.description")}
-          >
-            <BeamMigrationPanel preview={beamPreview} onImport={onMigrateFromBeam} />
-          </SettingsGroup>
-        ) : null;
-
       default:
         return null;
     }
   };
 
   const open = SECTIONS.find((section) => section.id === openId);
-  const visible = (id: SectionId) => (id !== "beam" || !!beamPreview) && !(isPhone && HIDDEN_ON_MOBILE.has(id));
+  const visible = (id: SectionId) => !(isPhone && HIDDEN_ON_MOBILE.has(id));
   const results = query.trim() ? searchSettings(query, language).filter((result) => visible(result.id)) : null;
   const row = (section: Section, subtitle = subtitleFor(section)) => (
     <SettingsRow
