@@ -6,6 +6,7 @@ import { appWindow, errorMessage, eventPayload, EVENTS, invoke, listen, save, wr
 import AddModal from "@/components/AddModal";
 import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
+import Welcome from "@/components/Welcome";
 import AppSidebar from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BottomDockNav } from "@/components/layout/BottomDockNav";
@@ -168,7 +169,7 @@ function App() {
     const { logs, limit: logLimit, changeLimit, append: appendLog, clear: clearLogs } = useLogs(settings.logging_enabled !== false);
     const [activeTab, setActiveTab] = useState("connection");
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState<false | "welcome" | "sync">(false);
     const [platform, setPlatform] = useState(guessPlatform);
     const [profilePings, setProfilePings] = useState<Record<string, number | null>>({});
     const [refreshingDomain, setRefreshingDomain] = useState("");
@@ -388,7 +389,7 @@ function App() {
                 autoUpdate = stored.subscription_auto_update !== false;
 
                 if (!stored.auth_server && !stored.skip_auth) {
-                    setShowOnboarding(true);
+                    setShowOnboarding("welcome");
                 }
                 if (stored.pending_sync_upload && stored.auth_server && stored.auth_token) {
                     try {
@@ -1010,7 +1011,29 @@ function App() {
                 onImportSubscription={handleImportSubscription}
             />
 
-            {showOnboarding ? (
+            {showOnboarding === "welcome" ? (
+                <Welcome
+                    platform={platform}
+                    settings={settings}
+                    theme={theme}
+                    setTheme={setTheme}
+                    onSettingChange={updateSetting}
+                    profileCount={profiles.length}
+                    onImportSubscription={handleImportSubscription}
+                    onSaveProfile={handleAddProfile}
+                    onOpenAddDialog={() => setIsModalOpen(true)}
+                    onFinish={() => {
+                        // Marks the first start as done, so it is not shown again.
+                        updateSetting("skip_auth", true);
+                        // Adding a subscription moves to its server list; the
+                        // first thing after setup should be the connect button.
+                        startTransition(() => {
+                            setShowOnboarding(false);
+                            setActiveTab("connection");
+                        });
+                    }}
+                />
+            ) : showOnboarding === "sync" ? (
                 <Onboarding
                     settings={settings}
                     onComplete={() => startTransition(() => setShowOnboarding(false))}
@@ -1139,7 +1162,10 @@ function App() {
                                         selectedProfileId={selection.profileId}
                                         onSettingsChange={updateSetting}
                                         onConnectSync={() =>
-                                            startTransition(() => setShowOnboarding(true))
+                                            startTransition(() => setShowOnboarding("sync"))
+                                        }
+                                        onRestartWelcome={() =>
+                                            startTransition(() => setShowOnboarding("welcome"))
                                         }
                                         onDisconnectSync={() => {
                                             void saveSettings({

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { invoke } from "@/lib/backend";
-import { Server, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Server } from "lucide-react";
 import { AppSettings, Profile } from "../types";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ function Onboarding({
 }: OnboardingProps) {
   const t = useT();
   const [step, setStep] = useState(0);
-  const [serverUrl, setServerUrl] = useState("http://127.0.0.1:3001");
+  const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
@@ -58,7 +58,11 @@ function Onboarding({
     setIsLoading(true);
     setError("");
     try {
-      let url = serverUrl;
+      let url = serverUrl.trim();
+      if (!url) {
+        setError(t("onboarding.serverRequired"));
+        return;
+      }
       if (!url.startsWith("http")) {
         url = "http://" + url;
         setServerUrl(url);
@@ -137,8 +141,8 @@ function Onboarding({
             <Server size={32} />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-3xl font-black tracking-tight">
-              {t("onboarding.title")}
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              {t("welcome.sync")}
             </CardTitle>
             <CardDescription className="text-base">
               {step === 0
@@ -261,7 +265,7 @@ function Onboarding({
           <Button
             type="button"
             variant="ghost"
-            onClick={handleSkip}
+            onClick={() => void handleSkip()}
             disabled={isLoading}
             className="w-full text-muted-foreground min-h-[48px] py-3 text-base active:opacity-70 cursor-pointer touch-manipulation select-none"
           >

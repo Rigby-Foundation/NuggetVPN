@@ -22,6 +22,7 @@ import {
   Search,
   Router,
   ShieldHalf,
+  Sparkles,
   Trash2,
   Waypoints,
   type LucideIcon,
@@ -95,6 +96,8 @@ interface SettingsViewProps {
   selectedProfileId: string;
   onSettingsChange: SettingsChangeHandler;
   onConnectSync: () => void;
+  /** Shows the first-start setup again. */
+  onRestartWelcome: () => void;
   onDisconnectSync: () => void;
   onRegenerateHWID: () => void;
   /** Changes when the sidebar's Settings is clicked while already here. */
@@ -316,6 +319,7 @@ function SettingsView({
   selectedProfileId,
   onSettingsChange,
   onConnectSync,
+  onRestartWelcome,
   onDisconnectSync,
   onRegenerateHWID,
   homeSignal,
@@ -1163,16 +1167,24 @@ function SettingsView({
                     </div>
                   )
                 ) : (
-                  GROUPS.map((group) => {
-                    const sections = group.sections.filter(visible).map((id) => SECTIONS.find((section) => section.id === id)!);
-                    if (sections.length === 0) return null;
-                    return (
-                      <section key={group.title} className="space-y-2">
-                        <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(group.title)}</h3>
-                        <div className="grid gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
-                      </section>
-                    );
-                  })
+                  <>
+                    {GROUPS.map((group) => {
+                      const sections = group.sections.filter(visible).map((id) => SECTIONS.find((section) => section.id === id)!);
+                      if (sections.length === 0) return null;
+                      return (
+                        <section key={group.title} className="space-y-2">
+                          <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(group.title)}</h3>
+                          <div className="grid gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
+                        </section>
+                      );
+                    })}
+                    <div className="flex justify-center pt-2 pb-4">
+                      <Button variant="ghost" size="sm" onClick={onRestartWelcome} className="gap-2 text-muted-foreground">
+                        <Sparkles size={15} />
+                        {t("settings.restartWelcome")}
+                      </Button>
+                    </div>
+                  </>
                 )}
               </div>
             )}
