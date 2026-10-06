@@ -47,6 +47,7 @@ import {
 } from "@/types";
 
 import "./App.css";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 /**
  * Settings are owned by Go, including their defaults and normalisation. This is
@@ -566,14 +567,18 @@ function App() {
         setProfilePings(next);
     }, [profiles, selection.domain]);
 
+    // Re-measured while the server list or the home screen is showing, and
+    // not while the window is hidden: each sweep is a process per server on
+    // macOS and Linux, and the home screen is where the app sits.
+    const pageVisible = usePageVisible();
     useEffect(() => {
-        if (activeTab !== "proxies" && activeTab !== "connection") {
+        if (!pageVisible || (activeTab !== "proxies" && activeTab !== "connection")) {
             return;
         }
         void refreshPings();
-        const interval = setInterval(() => void refreshPings(), 30_000);
+        const interval = setInterval(() => void refreshPings(), activeTab === "proxies" ? 30_000 : 120_000);
         return () => clearInterval(interval);
-    }, [activeTab, refreshPings]);
+    }, [activeTab, refreshPings, pageVisible]);
 
     useEffect(() => {
         if (connection.isConnected) {

@@ -18,6 +18,7 @@ import { formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { AppSettings, AppUsage, HealthSample, Profile, ServerHealth } from "@/types";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 interface StatisticsViewProps {
     profiles: Profile[];
@@ -209,11 +210,13 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
         invoke<Record<string, ServerHealth>>("get_server_health").then((value) => setHealth(value ?? {})).catch(() => undefined);
     }, [days]);
 
+    const visible = usePageVisible();
     useEffect(() => {
+        if (!visible) return;
         load();
         const timer = setInterval(load, 10_000);
         return () => clearInterval(timer);
-    }, [load]);
+    }, [load, visible]);
 
     const servers = useMemo(() => {
         const byId = new Map(profiles.map((profile) => [profile.id, profile]));

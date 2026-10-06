@@ -12,6 +12,7 @@ import { formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LiveConnection, Profile, RoutingRule } from "@/types";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 /** How often the list is read while the screen is open. */
 const POLL_MS = 1000;
@@ -48,6 +49,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const [filter, setFilter] = useState("");
     const [sort, setSort] = useState<Sort>("recent");
     const [paused, setPaused] = useState(false);
+    const visible = usePageVisible();
     const previous = useRef(new Map<string, { bytes: number; at: number }>());
 
     useEffect(() => {
@@ -56,7 +58,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             previous.current.clear();
             return;
         }
-        if (paused) return;
+        if (paused || !visible) return;
         let cancelled = false;
         const read = async () => {
             try {
@@ -84,7 +86,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             cancelled = true;
             window.clearInterval(timer);
         };
-    }, [connected, paused]);
+    }, [connected, paused, visible]);
 
     const ruleLabel = (id: string, text?: string) => {
         if (id === DEFAULT_RULE) return t("routing.catchAll");

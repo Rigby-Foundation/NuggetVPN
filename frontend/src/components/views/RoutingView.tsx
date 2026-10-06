@@ -55,6 +55,7 @@ import {
     RoutingRule,
     RuleListStatus,
 } from "@/types";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 // Domain patterns are added as a domains card, switched to patterns there.
 const SOURCE_KINDS: RoutingKind[] = [
@@ -1121,11 +1122,13 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
 
     // Live connection counts, while connected and on screen.
     const [hits, setHits] = useState<Record<string, number> | null>(null);
+    const visible = usePageVisible();
     useEffect(() => {
         if (!connected) {
             setHits(null);
             return;
         }
+        if (!visible) return;
         let cancelled = false;
         const read = () =>
             invoke<Record<string, number>>("get_rule_hits")
@@ -1139,7 +1142,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             cancelled = true;
             window.clearInterval(timer);
         };
-    }, [connected]);
+    }, [connected, visible]);
 
     // What is known about each rule list, reloaded when the URLs change.
     const [lists, setLists] = useState<Record<string, RuleListStatus>>({});
