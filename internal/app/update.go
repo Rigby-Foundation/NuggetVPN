@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -130,10 +129,9 @@ func pickAsset(latest release) (name string, size int64, link string, ok bool) {
 	return "", 0, "", false
 }
 
-// InstallUpdate downloads the newest release and starts installing it. On
-// Windows the installer runs and the app quits so its files can be
-// replaced; on macOS the disk image opens, for the app to be dragged over
-// the old one. Elsewhere the release page is the way to update.
+// InstallUpdate downloads the newest release and installs it in place: the
+// app quits and the new version starts by itself. See installDownloaded for
+// how each system does it. Elsewhere the release page is the way to update.
 func (a *App) InstallUpdate() error {
 	a.mu.Lock()
 	latest := a.latest
@@ -160,22 +158,7 @@ func (a *App) InstallUpdate() error {
 		return err
 	}
 
-	switch runtime.GOOS {
-	case "windows":
-		if err := exec.Command(target).Start(); err != nil {
-			return fmt.Errorf("could not start the installer: %w", err)
-		}
-		// The installer replaces the running binary; get out of its way.
-		go func() {
-			time.Sleep(1500 * time.Millisecond)
-			a.QuitApp()
-		}()
-	case "darwin":
-		if err := exec.Command("open", target).Start(); err != nil {
-			return fmt.Errorf("could not open the disk image: %w", err)
-		}
-	}
-	return nil
+	return a.installDownloaded(target)
 }
 
 // download fetches link to target, reporting progress to the window.

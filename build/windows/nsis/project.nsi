@@ -50,6 +50,7 @@ VIAddVersionKey "ProductName"     "${INFO_PRODUCTNAME}"
 ManifestDPIAware true
 
 !include "MUI.nsh"
+!include "FileFunc.nsh" # GetParameters / GetOptions, for /relaunch
 
 !define MUI_ICON "..\icon.ico"
 !define MUI_UNICON "..\icon.ico"
@@ -84,12 +85,53 @@ Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
+# The app's own updater runs this as "/S /relaunch /D=<its folder>": silently,
+# over the copy that is running, then starting it again.
+Function .onInstSuccess
+!ifndef NUGGET_SILENT
+    ${GetParameters} $R0
+    ClearErrors
+    ${GetOptions} $R0 "/relaunch" $R1
+    IfErrors relaunch_skip
+!endif
+    # Through Explorer, so the app starts as the user, not with this
+    # installer's administrator rights.
+    Exec '"$WINDIR\explorer.exe" "$INSTDIR\${PRODUCT_EXECUTABLE}"'
+!ifndef NUGGET_SILENT
+    relaunch_skip:
+!endif
+FunctionEnd
+
 Section
     !insertmacro wails.setShellContext
 
     !insertmacro wails.webview2runtime
 
     SetOutPath $INSTDIR
+
+    # From the updater, the app and its service are still quitting: their
+    # files cannot be replaced until they have. Give them up to ten seconds,
+    # then end whatever is left.
+    ${GetParameters} $R0
+    ClearErrors
+    ${GetOptions} $R0 "/relaunch" $R1
+    IfErrors update_ready
+    StrCpy $R2 0
+    update_wait:
+        # find exits 0 while the program is still listed.
+        nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq ${PRODUCT_EXECUTABLE}" /NH | find /I "${PRODUCT_EXECUTABLE}"'
+        Pop $R3 # exit code
+        Pop $R4 # output
+        StrCmp $R3 "0" 0 update_ready
+        IntOp $R2 $R2 + 1
+        IntCmp $R2 20 update_kill
+        Sleep 500
+        Goto update_wait
+    update_kill:
+        nsExec::Exec 'taskkill /F /IM "${PRODUCT_EXECUTABLE}"'
+        Pop $R3
+        Sleep 1000
+    update_ready:
     
     !insertmacro wails.files
 
