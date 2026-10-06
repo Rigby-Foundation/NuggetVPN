@@ -82,8 +82,9 @@ func selectTargets(
 	return targets, results
 }
 
-// run fans the measurement out over a bounded worker pool.
-func run(targets []target, measure func(target) *uint64) []ProfilePing {
+// run fans the measurement out over a bounded worker pool. each, when set, is
+// told every result as soon as it is in, from the worker that measured it.
+func run(targets []target, measure func(target) *uint64, each ...func(ProfilePing)) []ProfilePing {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -109,9 +110,13 @@ func run(targets []target, measure func(target) *uint64) []ProfilePing {
 			defer group.Done()
 			for item := range queue {
 				value := measure(item)
+				result := ProfilePing{ID: item.id, PingMS: value}
 				mu.Lock()
-				results[indexes[item.id]] = ProfilePing{ID: item.id, PingMS: value}
+				results[indexes[item.id]] = result
 				mu.Unlock()
+				for _, report := range each {
+					report(result)
+				}
 			}
 		}()
 	}
@@ -244,4 +249,49 @@ func resolveTarget(host string) string {
 		}
 	}
 	return addresses[0].String()
+}
+
+// PingEach is Ping, telling each result to report as soon as it is in rather
+// than all of them at the end, so a caller with a deadline can use the ones
+// that are back by then. It returns when every probe has finished.
+func PingEach(
+	profiles []models.Profile,
+	settings models.AppSettings,
+	sourceDomain string,
+	report func(ProfilePing),
+) {
+	targets, failed := selectTargets(profiles, settings, sourceDomain, nil)
+	for _, result := range failed {
+		report(result)
+	}
+	run(targets, func(item target) *uint64 {
+		return measureICMP(item.host, pingTimeout)
+	}, report)
+}
+
+// ConnectivityEach is Connectivity, reporting each result as it comes in.
+func ConnectivityEach(
+	profiles []models.Profile,
+	settings models.AppSettings,
+	sourceDomain string,
+	ids []string,
+	timeoutMS uint64,
+	report func(ProfilePing),
+) {
+	timeout := time.Duration(max(200, min(timeoutMS, 10_000))) * time.Millisecond
+	targets, failed := selectTargets(profiles, settings, sourceDomain, ids)
+	for _, result := range failed {
+		report(result)
+	}
+	usable := targets[:0]
+	for _, item := range targets {
+		if item.port <= 0 {
+			report(ProfilePing{ID: item.id})
+			continue
+		}
+		usable = append(usable, item)
+	}
+	run(usable, func(item target) *uint64 {
+		return measureTCP(item.host, item.port, timeout)
+	}, report)
 }

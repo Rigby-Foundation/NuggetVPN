@@ -33,13 +33,9 @@ type ConnectionState struct {
 	Blocked bool `json:"blocked,omitempty"`
 }
 
-// probeCandidates bounds how many servers get a TCP reachability check before
-// connecting; the ICMP sweep has already ranked them by then.
-const (
-	probeCandidates = 8
-	// probeTimeoutMS is the per-server budget for that check.
-	probeTimeoutMS = 1200
-)
+// probeTimeoutMS is the per-server budget for the TCP check before
+// connecting; see rankByLatency.
+const probeTimeoutMS = 1200
 
 // Connection status values reported to the UI.
 const (
@@ -447,76 +443,98 @@ func (a *App) planConnection(
 	return connectionPlan{order: []string{selected}}, nil
 }
 
-// rankByLatency sorts candidates fastest-first, using an ICMP sweep refined by
-// a TCP handshake check on the leaders. ICMP is cheap but often filtered, so a
-// server that answers a real TCP connect outranks one that only pings.
+// rankBudget is how long connecting waits on measurements before it ranks
+// with what it has. The probes used to run one after the other and to the
+// end: an ICMP sweep of every server, two seconds for each that ignores ping
+// (many do), then a TCP check of the leaders. Across a subscription of fifty
+// that was ten seconds or more before the core even started.
+const rankBudget = 1500 * time.Millisecond
+
+// rankByLatency sorts candidates fastest-first. An ICMP sweep and a TCP
+// handshake check run side by side over every candidate, and the ranking
+// uses whatever is back within rankBudget: servers that completed a TCP
+// handshake first, by its time, since that is a real connection; then those
+// that only answered ping (a UDP-only protocol has no TCP listener); then the
+// rest in their usual order. Nothing is discarded, because a probe can be
+// wrong, and the plan falls back through the list anyway.
 func (a *App) rankByLatency(
 	candidates []models.Profile,
 	settings models.AppSettings,
 	domain string,
 ) []string {
-	pings := map[string]uint64{}
-	const unreachable = ^uint64(0)
-	icmp := probe.Ping(candidates, settings, domain)
-	a.recordPings(icmp, true)
-	for _, result := range icmp {
-		if result.PingMS != nil {
-			pings[result.ID] = *result.PingMS
-			continue
-		}
-		pings[result.ID] = unreachable
-	}
-
 	order := make([]string, 0, len(candidates))
 	for _, profile := range candidates {
 		order = append(order, profile.ID)
 	}
-	sort.SliceStable(order, func(i, j int) bool {
-		left, ok := pings[order[i]]
-		if !ok {
-			left = unreachable
-		}
-		right, ok := pings[order[j]]
-		if !ok {
-			right = unreachable
-		}
-		return left < right
-	})
 	if len(order) < 2 {
 		return order
 	}
 
-	limit := min(len(order), probeCandidates)
-	results := probe.Connectivity(candidates, settings, domain, order[:limit], probeTimeoutMS)
-	a.recordPings(results, false)
-
-	reachable := make([]string, 0, limit)
-	seen := map[string]bool{}
-	sort.SliceStable(results, func(i, j int) bool {
-		if results[i].PingMS == nil {
-			return false
-		}
-		if results[j].PingMS == nil {
-			return true
-		}
-		return *results[i].PingMS < *results[j].PingMS
+	type measured struct {
+		result probe.ProfilePing
+		icmp   bool
+	}
+	// Buffered for every result, so probes still running after the
+	// deadline never block on a reader that has gone.
+	results := make(chan measured, 2*len(candidates)+4)
+	go probe.PingEach(candidates, settings, domain, func(result probe.ProfilePing) {
+		results <- measured{result, true}
 	})
-	for _, result := range results {
-		if result.PingMS == nil {
-			continue
-		}
-		reachable = append(reachable, result.ID)
-		seen[result.ID] = true
-	}
+	go probe.ConnectivityEach(candidates, settings, domain, order, probeTimeoutMS, func(result probe.ProfilePing) {
+		results <- measured{result, false}
+	})
 
-	// Everything the TCP check could not reach keeps its ICMP ranking and goes
-	// to the back, rather than being discarded: the check can be wrong.
-	for _, id := range order {
-		if !seen[id] {
-			reachable = append(reachable, id)
+	tcp := map[string]uint64{}
+	icmp := map[string]uint64{}
+	var icmpSeen, tcpSeen []probe.ProfilePing
+	expected := 2 * len(candidates)
+	deadline := time.NewTimer(rankBudget)
+	defer deadline.Stop()
+collect:
+	for received := 0; received < expected; received++ {
+		select {
+		case item := <-results:
+			if item.icmp {
+				icmpSeen = append(icmpSeen, item.result)
+			} else {
+				tcpSeen = append(tcpSeen, item.result)
+			}
+			if item.result.PingMS == nil {
+				continue
+			}
+			if item.icmp {
+				icmp[item.result.ID] = *item.result.PingMS
+			} else {
+				tcp[item.result.ID] = *item.result.PingMS
+			}
+		case <-deadline.C:
+			break collect
 		}
 	}
-	return a.demoteFailing(reachable)
+	a.recordPings(icmpSeen, true)
+	a.recordPings(tcpSeen, false)
+
+	rank := func(id string) (tier int, ms uint64) {
+		if value, ok := tcp[id]; ok {
+			return 0, value
+		}
+		if value, ok := icmp[id]; ok {
+			return 1, value
+		}
+		return 2, 0
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		leftTier, leftMS := rank(order[i])
+		rightTier, rightMS := rank(order[j])
+		if leftTier != rightTier {
+			return leftTier < rightTier
+		}
+		return leftMS < rightMS
+	})
+	if len(tcp)+len(icmp) == 0 {
+		a.appendLog("No server answered a probe in time; trying them in order")
+	}
+	return a.demoteFailing(order)
 }
 
 // startProfile generates a config for one profile and hands it to the core.
