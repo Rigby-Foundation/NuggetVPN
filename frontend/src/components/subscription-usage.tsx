@@ -1,6 +1,6 @@
 import { ExternalLink, LifeBuoy } from "lucide-react";
-import { Browser } from "@wailsio/runtime";
 
+import { openExternal } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -19,10 +19,6 @@ export function subscriptionAlert(info: SubscriptionInfo | undefined, now = Date
     return null;
 }
 
-/** Opens a link in the system browser rather than inside the app. */
-function openExternal(url: string) {
-    void Browser.OpenURL(url).catch(() => window.open(url, "_blank", "noopener"));
-}
 
 /**
  * A subscription's data and time left, as its provider reports them: a bar

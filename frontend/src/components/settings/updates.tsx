@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Browser } from "@wailsio/runtime";
 import { Download, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 
 import { SettingsField, SettingsGroup } from "@/components/settings/shell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { errorMessage, eventPayload, EVENTS, invoke, listen } from "@/lib/backend";
+import { errorMessage, eventPayload, EVENTS, invoke, listen, openExternal } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { AppSettings, UpdateInfo } from "@/types";
@@ -65,7 +64,7 @@ export function UpdatesPanel({
         }
     };
 
-    const open = (url: string) => void Browser.OpenURL(url).catch(() => window.open(url, "_blank", "noopener"));
+    const open = openExternal;
     const percent = progress && progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : 0;
 
     return (

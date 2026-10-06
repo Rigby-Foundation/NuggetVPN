@@ -66,6 +66,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     list_cores: { method: "ListCores", args: [] },
     set_core: { method: "SetCore", args: ["name"] },
     unsupported_profiles: { method: "UnsupportedProfiles", args: [] },
+    open_url: { method: "OpenURL", args: ["url"] },
     export_backup: { method: "ExportBackup", args: ["ui"] },
     import_backup: { method: "ImportBackup", args: [] },
     list_user_files: { method: "ListUserFiles", args: ["kind"] },
@@ -231,3 +232,12 @@ export function errorMessage(error: unknown): string {
 
 /** The command table, exported so the Go test suite can check it for drift. */
 export const BACKEND_COMMANDS = COMMANDS;
+
+/**
+ * Opens a web page in the system browser. Never falls back to window.open:
+ * inside the app's webview that loads the page in place of the app itself,
+ * which is what happened on phones.
+ */
+export function openExternal(url: string): void {
+    void invoke("open_url", { url }).catch((error) => console.error("Could not open", url, error));
+}
