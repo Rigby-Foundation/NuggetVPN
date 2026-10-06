@@ -712,3 +712,63 @@ export function applyBackdrop(image: ThemeImage | undefined) {
     root.style.setProperty("--backdrop-panel", String(image.panel));
     root.style.setProperty("--backdrop-dim", String(image.dim));
 }
+
+// ---------------------------------------------------------------------------
+// Templates for custom themes
+// ---------------------------------------------------------------------------
+
+/**
+ * A CSS colour as OKLCH (l 0–1, c, h 0–360). Takes the two forms the presets'
+ * swatches are written in: oklch(…) and #rrggbb. Null for anything else.
+ */
+export function toOklch(css: string): { l: number; c: number; h: number } | null {
+    const value = css.trim();
+    const oklch = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)/i.exec(value);
+    if (oklch) {
+        const l = Number(oklch[1]) / (oklch[2] ? 100 : 1);
+        return { l, c: Number(oklch[3]), h: Number(oklch[4]) };
+    }
+    const hex = /^#([0-9a-f]{6})$/i.exec(value);
+    if (!hex) return null;
+    // sRGB → linear → OKLab → OKLCH (Björn Ottosson's matrices).
+    const channel = (offset: number) => {
+        const v = parseInt(hex[1].slice(offset, offset + 2), 16) / 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const [r, g, b] = [channel(0), channel(2), channel(4)];
+    const lms = [
+        Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b),
+        Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b),
+        Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b),
+    ];
+    const L = 0.2104542553 * lms[0] + 0.793617785 * lms[1] - 0.0040720468 * lms[2];
+    const A = 1.9779984951 * lms[0] - 2.428592205 * lms[1] + 0.4505937099 * lms[2];
+    const B = 0.0259040371 * lms[0] + 0.7827717662 * lms[1] - 0.808675766 * lms[2];
+    const c = Math.sqrt(A * A + B * B);
+    const h = c < 1e-4 ? 0 : ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360;
+    return { l: L, c, h };
+}
+
+/**
+ * The knobs of a custom theme that looks like a preset: its page colour and
+ * accent, read from the preset's swatch and kept inside the ranges a custom
+ * theme allows. The cards and borders are then derived the way they are for
+ * any custom theme, so the copy is close rather than exact.
+ */
+export function templateFrom(preset: {
+    mode: "light" | "dark";
+    swatch: { background: string; accent: string };
+}): Pick<CustomTheme, "mode" | "background" | "accent"> {
+    const range = BACKGROUND_LIGHTNESS[preset.mode];
+    const page = toOklch(preset.swatch.background) ?? { l: preset.mode === "dark" ? 0.15 : 0.98, c: 0.01, h: 285 };
+    const accent = toOklch(preset.swatch.accent) ?? { l: 0.7, c: 0.15, h: 70 };
+    return {
+        mode: preset.mode,
+        background: {
+            h: Math.round(page.h),
+            c: Math.min(0.08, Math.round(page.c * 1000) / 1000),
+            l: Math.min(range.max, Math.max(range.min, Math.round(page.l * 1000) / 1000)),
+        },
+        accent: { h: Math.round(accent.h), c: Math.min(0.25, Math.round(accent.c * 1000) / 1000) },
+    };
+}

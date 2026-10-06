@@ -11,7 +11,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { useAppearance } from "@/components/appearance-provider";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
     BACKGROUND_LIGHTNESS,
@@ -19,9 +29,11 @@ import {
     customThemeKnobs,
     CustomTheme,
     defaultThemeImage,
+    templateFrom,
     THEME_IMAGE_LIMITS,
     ThemeImage,
 } from "@/lib/appearance";
+import { THEME_PRESETS } from "@/lib/themes";
 import { UserFile } from "@/types";
 import { errorMessage, invoke } from "@/lib/backend";
 import { useT } from "@/lib/i18n";
@@ -195,6 +207,7 @@ export default function ThemeEditor({
     onClose: () => void;
 }) {
     const t = useT();
+    const { prefs } = useAppearance();
     const [draft, setDraft] = useState<CustomTheme | null>(theme);
     useEffect(() => setDraft(theme), [theme]);
     const [picking, setPicking] = useState(false);
@@ -235,6 +248,23 @@ export default function ThemeEditor({
         set({ mode, background: { ...draft.background, l: to.max - position * (to.max - to.min) } });
     };
 
+    // Another theme as the starting point: a preset's colours, or a copy of
+    // one of the user's own (with its picture). The name and id stay this
+    // theme's, so nothing is overwritten.
+    const customs = [...prefs.customThemes, ...prefs.pluginThemes].filter((custom) => custom.id !== draft.id);
+    const startFrom = (value: string) => {
+        const [kind, id] = value.split("|");
+        if (kind === "preset") {
+            const preset = THEME_PRESETS.find((item) => item.id === id);
+            if (preset) set({ ...templateFrom(preset), image: undefined });
+            return;
+        }
+        const custom = customs.find((item) => item.id === id);
+        if (custom) {
+            set({ mode: custom.mode, background: { ...custom.background }, accent: { ...custom.accent }, image: custom.image ? { ...custom.image } : undefined });
+        }
+    };
+
     const range = BACKGROUND_LIGHTNESS[draft.mode];
     const { h, c, l } = draft.background;
     const percent = (value: number) => `${Math.round(value * 100)}%`;
@@ -258,6 +288,31 @@ export default function ThemeEditor({
                             aria-label={t("editor.name")}
                             placeholder={t("editor.name")}
                         />
+                        <Select value="" onValueChange={startFrom}>
+                            <SelectTrigger className="w-full" aria-label={t("editor.startFrom")}>
+                                <SelectValue placeholder={t("editor.startFrom")} />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-80">
+                                {customs.length > 0 ? (
+                                    <SelectGroup>
+                                        <SelectLabel>{t("editor.startFrom.custom")}</SelectLabel>
+                                        {customs.map((custom) => (
+                                            <SelectItem key={custom.id} value={`custom|${custom.id}`}>
+                                                {custom.name || t("editor.untitled")}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                ) : null}
+                                <SelectGroup>
+                                    <SelectLabel>{t("editor.startFrom.presets")}</SelectLabel>
+                                    {THEME_PRESETS.map((preset) => (
+                                        <SelectItem key={preset.id} value={`preset|${preset.id}`}>
+                                            {t(preset.label)}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                         <Segmented value={draft.mode} onChange={switchMode} />
 
                         <section className="space-y-2.5">
