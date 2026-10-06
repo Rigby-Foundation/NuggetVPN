@@ -544,6 +544,12 @@ func (a *App) startProfile(
 	settings models.AppSettings,
 	alternatives []models.Profile,
 ) error {
+	// Building the config reads whole geo databases and rule lists, tens of
+	// megabytes that are garbage a moment later. Go returns freed memory to
+	// the system only slowly, so without this the spike stays in the app's
+	// footprint for minutes after every connect.
+	defer releaseMemory()
+
 	// Rule-sets from the user's own geoip.dat / geosite.dat, if any. What
 	// they lack is reported, not fatal: the rest of the routing still works.
 	localSets, customGeo, geoWarnings := geoRuleSets(settings)

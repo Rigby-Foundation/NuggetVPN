@@ -11,6 +11,8 @@ import (
 
 // ImportSubscription fetches a subscription URL and adds its profiles.
 func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
+	// A subscription body is read whole; see releaseMemory.
+	defer releaseMemory()
 	profiles, settings := a.snapshot()
 	updated, err := a.remote.ImportSubscription(a.context(), profiles, settings, url)
 	if err != nil {
@@ -21,6 +23,8 @@ func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
 
 // RefreshSubscriptionsOnStartup re-fetches every saved subscription.
 func (a *App) RefreshSubscriptionsOnStartup() (remote.RefreshSummary, error) {
+	// A subscription body is read whole; see releaseMemory.
+	defer releaseMemory()
 	profiles, settings := a.snapshot()
 	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, "")
 	if err != nil {
@@ -32,6 +36,8 @@ func (a *App) RefreshSubscriptionsOnStartup() (remote.RefreshSummary, error) {
 
 // RefreshSubscriptionByDomain re-fetches a single subscription.
 func (a *App) RefreshSubscriptionByDomain(sourceDomain string) (remote.RefreshSummary, error) {
+	// A subscription body is read whole; see releaseMemory.
+	defer releaseMemory()
 	profiles, settings := a.snapshot()
 	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, sourceDomain)
 	if err != nil {
