@@ -24,6 +24,9 @@ export interface SubscriptionInfo {
     title?: string;
     support_url?: string;
     web_page_url?: string;
+    /** The provider's message to its users, and where it links to. */
+    announce?: string;
+    announce_url?: string;
     updated_at: number;
 }
 

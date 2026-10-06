@@ -37,6 +37,10 @@ type SubscriptionInfo struct {
 	Title      string `json:"title,omitempty"`
 	SupportURL string `json:"support_url,omitempty"`
 	WebPageURL string `json:"web_page_url,omitempty"`
+	// Announce is the provider's message to its users, shown as a banner;
+	// AnnounceURL is where it points, when it has a link.
+	Announce    string `json:"announce,omitempty"`
+	AnnounceURL string `json:"announce_url,omitempty"`
 	// UpdatedAt is when this was read, in unix seconds.
 	UpdatedAt int64 `json:"updated_at"`
 }

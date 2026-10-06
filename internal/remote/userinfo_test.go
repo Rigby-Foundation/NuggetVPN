@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"encoding/base64"
 	"net/http"
 	"testing"
 	"time"
@@ -38,5 +39,36 @@ func TestRefreshKeepsFavoritesAndInfo(t *testing.T) {
 	kept := KeepIdentities(previous, fresh)
 	if kept[0].ID != "a" || !kept[0].Favorite || kept[0].SubscriptionInfo != info {
 		t.Errorf("refresh lost the favourite or the info: %+v", kept[0])
+	}
+}
+
+func TestAnnounceFromHeaderAndBody(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	message := "⚪ Белый интернет доступен\n🚫 — сервера без шифрования"
+	encoded := "base64:" + base64.StdEncoding.EncodeToString([]byte(message))
+
+	headers := http.Header{}
+	headers.Set("Announce", encoded)
+	headers.Set("Announce-Url", "https://t.me/provider")
+	info := ParseSubscriptionInfo(headers, now)
+	if info == nil || info.Announce != message || info.AnnounceURL != "https://t.me/provider" {
+		t.Fatalf("header announce: got %+v", info)
+	}
+
+	body := "#profile-title: Provider\n#announce: Plain text from the body\nvless://id@example.com:443#a\n#announce: too late, after a link\n"
+	info = ParseSubscriptionInfoWithBody(nil, body, now)
+	if info == nil || info.Announce != "Plain text from the body" || info.Title != "Provider" {
+		t.Fatalf("body announce: got %+v", info)
+	}
+
+	// A header wins over the same line in the body.
+	info = ParseSubscriptionInfoWithBody(headers, body, now)
+	if info.Announce != message {
+		t.Fatalf("header should win: got %q", info.Announce)
+	}
+
+	headers.Set("Announce-Url", "javascript:alert(1)")
+	if info := ParseSubscriptionInfo(headers, now); info.AnnounceURL != "" {
+		t.Fatalf("unsafe announce link kept: %q", info.AnnounceURL)
 	}
 }

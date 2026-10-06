@@ -103,7 +103,7 @@ func (c *Client) ImportSubscription(
 	if len(imported) == 0 {
 		return nil, emptySubscription(sourceDomain, body, headers, time.Now())
 	}
-	attachInfo(imported, ParseSubscriptionInfo(headers, time.Now()))
+	attachInfo(imported, ParseSubscriptionInfoWithBody(headers, body, time.Now()))
 	return append(profiles, imported...), nil
 }
 
@@ -195,7 +195,7 @@ func (c *Client) RefreshSubscriptions(
 				previous = append(previous, profile)
 			}
 		}
-		attachInfo(fresh, ParseSubscriptionInfo(headers, time.Now()))
+		attachInfo(fresh, ParseSubscriptionInfoWithBody(headers, body, time.Now()))
 		result = append(filtered, KeepIdentities(previous, fresh)...)
 		summary.Refreshed++
 	}
