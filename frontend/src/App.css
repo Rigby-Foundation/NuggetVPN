@@ -378,11 +378,11 @@
 }
 
 .animate-breathe {
-    animation: nugget-breathe 3.2s ease-in-out infinite;
+    animation: nugget-breathe calc(3.2s * var(--motion-scale, 1)) ease-in-out infinite;
 }
 
 .animate-sweep {
-    animation: nugget-sweep 1.4s linear infinite;
+    animation: nugget-sweep calc(1.4s * var(--motion-scale, 1)) linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -443,7 +443,7 @@
     border: 2px solid var(--card) !important;
     border-radius: 9999px !important;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 15%, transparent);
-    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 140ms ease !important;
+    transition: transform calc(140ms * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1), box-shadow calc(140ms * var(--motion-scale, 1)) ease !important;
     transform-origin: center center !important;
     z-index: 10;
 }
@@ -499,7 +499,7 @@
 .react-flow__edge:hover .react-flow__edge-path {
     stroke-width: 2.75px !important;
     filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 60%, transparent));
-    transition: stroke-width 150ms ease, filter 150ms ease;
+    transition: stroke-width calc(150ms * var(--motion-scale, 1)) ease, filter calc(150ms * var(--motion-scale, 1)) ease;
 }
 
 .react-flow__edge:active .react-flow__edge-path {
@@ -710,6 +710,11 @@
     --enter-name: nugget-fade-in;
     --enter-duration: 300ms;
     --enter-step: 35ms;
+    /* The animation speed setting: every duration is multiplied by it
+       (applyAppearance sets it; 0.5 is twice as fast). Tailwind's default
+       transition length follows it too. */
+    --motion-scale: 1;
+    --default-transition-duration: calc(150ms * var(--motion-scale));
 }
 :root[data-motion="slide"] {
     --enter-name: nugget-in-from-right;
@@ -738,8 +743,8 @@
    keeps a transform animation attached, which quietly changes stacking and
    fights hover effects like the connect button's scale. */
 .enter-stagger > * {
-    animation: var(--enter-name) var(--enter-duration) cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-    animation-delay: calc((var(--enter-offset, 0) + var(--enter-i, 0)) * var(--enter-step));
+    animation: var(--enter-name) calc(var(--enter-duration) * var(--motion-scale, 1)) cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation-delay: calc((var(--enter-offset, 0) + var(--enter-i, 0)) * var(--enter-step) * var(--motion-scale, 1));
 }
 
 /* A list nested in a staggered page starts after the page's header, and the
@@ -784,7 +789,7 @@
 @media (prefers-reduced-motion: reduce) {
     .enter-stagger > * {
         animation-name: nugget-fade-in;
-        animation-duration: 160ms;
+        animation-duration: calc(160ms * var(--motion-scale, 1));
         animation-delay: 0s;
     }
 }

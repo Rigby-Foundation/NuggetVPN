@@ -14,6 +14,7 @@ import {
     activeCustomTheme,
     AppearancePrefs,
     applyAppearance,
+    applyAccent,
     applyCustomTheme,
     CUSTOM_THEME_CLASSES,
     CUSTOM_THEME_IDS,
@@ -39,7 +40,12 @@ interface AppearanceContext {
     prefs: AppearancePrefs;
     setFont: (id: string) => void;
     setRadius: (id: string) => void;
+    /** Chooses a radius of its own, in rem. */
+    setRadiusCustom: (rem: number) => void;
     setMotion: (id: string) => void;
+    setMotionSpeed: (speed: number) => void;
+    /** An accent over the theme's; null goes back to the theme's. */
+    setAccent: (accent: AppearancePrefs["accent"]) => void;
     setLayout: (layout: Partial<LayoutPrefs>) => void;
     resetLayout: () => void;
     /** The custom theme on screen, if one is. */
@@ -94,7 +100,9 @@ function Appearance({ children }: { children: ReactNode }) {
     // a switch never paints one frame of the half-applied result.
     useLayoutEffect(() => {
         applyCustomTheme(activeCustom ?? (theme === "system" ? monet ?? undefined : undefined));
-    }, [activeCustom, theme, monet]);
+        // After the theme, which clears and rewrites the same properties.
+        applyAccent(prefs.accent);
+    }, [activeCustom, theme, monet, prefs.accent]);
 
     useEffect(() => {
         if (!isAndroid) return;
@@ -161,7 +169,10 @@ function Appearance({ children }: { children: ReactNode }) {
             prefs,
             setFont: (font) => update({ font }),
             setRadius: (radius) => update({ radius }),
+            setRadiusCustom: (radiusCustom) => update({ radius: "custom", radiusCustom }),
             setMotion: (motion) => update({ motion }),
+            setMotionSpeed: (motionSpeed) => update({ motionSpeed }),
+            setAccent: (accent) => update({ accent }),
             setLayout: (layoutPatch) => {
                 setPrefs((current) => ({
                     ...current,

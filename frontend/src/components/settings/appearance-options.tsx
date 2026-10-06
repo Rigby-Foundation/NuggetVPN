@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
+import { hueTrack, Slider } from "@/components/settings/theme-editor";
 import { Switch } from "@/components/ui/switch";
 import {
     CardLayout,
@@ -46,9 +47,12 @@ import {
     fontLabel,
     fontsFor,
     LayoutPrefs,
+    MOTION_SPEED_LIMITS,
     MOTIONS,
     NavPosition,
     RADII,
+    RADIUS_LIMITS,
+    radiusValue,
     TelemetryMetric,
     TelemetryPlacement,
     UserFont,
@@ -98,7 +102,7 @@ export function AppearanceHeroPreview({
     const { t, language } = useI18n();
     const script = scriptOf(language);
     const activeFont = effectiveFont(prefs.font, script);
-    const radiusEntry = RADII.find((r) => r.id === prefs.radius) ?? RADII[1];
+    const radius = radiusValue(prefs);
 
     return (
         <div className="relative overflow-hidden rounded-2xl border bg-card/70 p-5 shadow-sm backdrop-blur-sm transition-all">
@@ -120,7 +124,7 @@ export function AppearanceHeroPreview({
                         </span>
                         <span className="text-[11px] text-muted-foreground">•</span>
                         <span className="text-[11px] text-muted-foreground">
-                            Radius: {t(radiusEntry.label)} ({radiusEntry.value})
+                            Radius: {Math.round(parseFloat(radius) * 16)}px
                         </span>
                     </div>
 
@@ -157,7 +161,7 @@ export function AppearanceHeroPreview({
                     <button
                         type="button"
                         className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-95"
-                        style={{ borderRadius: radiusEntry.value }}
+                        style={{ borderRadius: radius }}
                     >
                         <Sparkles size={13} />
                         <span>Interactive Accent</span>
@@ -328,10 +332,12 @@ const RADIUS_CURVATURES: Record<string, { desc: string; px: string }> = {
  * Interactive geometry controller for window and element radii.
  */
 export function RadiusPicker() {
-    const { prefs, setRadius } = useAppearance();
+    const { prefs, setRadius, setRadiusCustom } = useAppearance();
     const t = useT();
+    const current = parseFloat(radiusValue(prefs));
 
     return (
+        <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {RADII.map((radius) => {
                 const active = prefs.radius === radius.id;
@@ -372,6 +378,19 @@ export function RadiusPicker() {
                 );
             })}
         </div>
+        {/* Any radius, not only the four above; dragging chooses it. */}
+        <Slider
+            label={t("appearance.radius.custom")}
+            value={current}
+            min={RADIUS_LIMITS.min}
+            max={RADIUS_LIMITS.max}
+            step={RADIUS_LIMITS.step}
+            track="linear-gradient(to right, var(--muted), var(--primary))"
+            thumb="var(--primary)"
+            onChange={setRadiusCustom}
+            format={(value) => `${Math.round(value * 16)}px`}
+        />
+        </div>
     );
 }
 
@@ -387,10 +406,11 @@ const MOTION_ICONS: Record<string, LucideIcon> = {
  * Cohesive controller for transition animations.
  */
 export function MotionPicker() {
-    const { prefs, setMotion } = useAppearance();
+    const { prefs, setMotion, setMotionSpeed } = useAppearance();
     const t = useT();
 
     return (
+        <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {MOTIONS.map((motion) => {
                 const Icon = MOTION_ICONS[motion.id] ?? Minus;
@@ -429,6 +449,95 @@ export function MotionPicker() {
                     </button>
                 );
             })}
+        </div>
+        <div className={cn(prefs.motion === "none" && "pointer-events-none opacity-50")}>
+            <Slider
+                label={t("appearance.motion.speed")}
+                value={prefs.motionSpeed}
+                min={MOTION_SPEED_LIMITS.min}
+                max={MOTION_SPEED_LIMITS.max}
+                step={MOTION_SPEED_LIMITS.step}
+                track="linear-gradient(to right, var(--muted), var(--primary))"
+                thumb="var(--primary)"
+                onChange={setMotionSpeed}
+                format={(value) => `${value.toFixed(2).replace(/\.?0+$/, "")}×`}
+            />
+        </div>
+        </div>
+    );
+}
+
+/** Hues offered as one-tap accents; any other is on the slider. */
+const ACCENT_HUES = [25, 50, 70, 95, 145, 175, 210, 250, 285, 320, 350];
+
+/**
+ * The accent on its own, over whichever theme is on: the theme keeps its
+ * surfaces and lightness, the accent its hue and vividness.
+ */
+export function AccentPicker() {
+    const { prefs, setAccent } = useAppearance();
+    const t = useT();
+    const accent = prefs.accent;
+    const swatch = (h: number, c: number) => `oklch(0.72 ${c} ${h})`;
+
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    onClick={() => setAccent(null)}
+                    aria-pressed={!accent}
+                    className={cn(
+                        "h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                        !accent ? "border-primary bg-primary/10 text-foreground" : "border-border/60 text-muted-foreground hover:bg-muted/50"
+                    )}
+                >
+                    {t("appearance.accent.theme")}
+                </button>
+                {ACCENT_HUES.map((h) => {
+                    const active = accent?.h === h;
+                    return (
+                        <button
+                            key={h}
+                            type="button"
+                            onClick={() => setAccent({ h, c: accent?.c ?? 0.15 })}
+                            aria-pressed={active}
+                            aria-label={t("appearance.accent.hue", { hue: h })}
+                            className={cn(
+                                "h-9 w-9 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110",
+                                active && "ring-2 ring-foreground"
+                            )}
+                            style={{ background: swatch(h, accent?.c ?? 0.15) }}
+                        />
+                    );
+                })}
+            </div>
+            {accent ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Slider
+                        label={t("appearance.accent.hueLabel")}
+                        value={accent.h}
+                        min={0}
+                        max={360}
+                        step={1}
+                        track={hueTrack(0.72, accent.c)}
+                        thumb={swatch(accent.h, accent.c)}
+                        onChange={(h) => setAccent({ ...accent, h })}
+                        format={(value) => `${Math.round(value)}°`}
+                    />
+                    <Slider
+                        label={t("appearance.accent.vividness")}
+                        value={accent.c}
+                        min={0}
+                        max={0.25}
+                        step={0.005}
+                        track={`linear-gradient(to right, ${swatch(accent.h, 0)}, ${swatch(accent.h, 0.25)})`}
+                        thumb={swatch(accent.h, accent.c)}
+                        onChange={(c) => setAccent({ ...accent, c })}
+                        format={(value) => `${Math.round((value / 0.25) * 100)}%`}
+                    />
+                </div>
+            ) : null}
         </div>
     );
 }

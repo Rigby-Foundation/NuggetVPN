@@ -53,6 +53,7 @@ import {
   AppearanceHeroPreview,
   FontPicker,
   LayoutPicker,
+  AccentPicker,
   MotionPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
@@ -486,6 +487,13 @@ function SettingsView({
               description={t("appearance.theme.description")}
             >
               <ThemePicker theme={theme} setTheme={setTheme} />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title={t("appearance.accent")}
+              description={t("appearance.accent.description")}
+            >
+              <AccentPicker />
             </SettingsGroup>
 
             {isPhone ? null : (

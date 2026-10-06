@@ -177,6 +177,12 @@ export interface RadiusOption {
     value: string;
 }
 
+/** The range the radius slider offers, in rem. */
+export const RADIUS_LIMITS = { min: 0, max: 1.75, step: 0.025 } as const;
+
+/** The range of the animation speed slider. */
+export const MOTION_SPEED_LIMITS = { min: 0.25, max: 3, step: 0.05 } as const;
+
 export const RADII: RadiusOption[] = [
     { id: "small", label: "appearance.radius.small", value: "0.375rem" },
     { id: "medium", label: "appearance.radius.medium", value: "0.625rem" },
@@ -446,8 +452,19 @@ export function sanitizeLayout(raw: unknown): LayoutPrefs {
 
 export interface AppearancePrefs {
     font: string;
+    /** A RADII id, or "custom" for radiusCustom. */
     radius: string;
+    /** The corner radius in rem when radius is "custom". */
+    radiusCustom: number;
     motion: string;
+    /** How fast animations play: 2 is twice as fast, 0.5 half. */
+    motionSpeed: number;
+    /**
+     * An accent hue and vividness over the theme's own, or null for the
+     * theme's. Its lightness stays the theme's, which is what keeps the text
+     * on a primary button readable whatever the hue.
+     */
+    accent: { h: number; c: number } | null;
     layout: LayoutPrefs;
     customThemes: CustomTheme[];
     /** Which custom theme a custom-dark or custom-light theme id shows. */
@@ -466,7 +483,10 @@ export interface AppearancePrefs {
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
     font: "google-sans",
     radius: "medium",
+    radiusCustom: 0.625,
     motion: "fade",
+    motionSpeed: 1,
+    accent: null,
     layout: DEFAULT_LAYOUT,
     customThemes: [],
     activeCustom: "",
@@ -564,8 +584,14 @@ export function loadAppearance(): AppearancePrefs {
         return {
             userFonts,
             font: pick(allFonts(), raw.font, DEFAULT_APPEARANCE.font),
-            radius: pick(RADII, raw.radius, DEFAULT_APPEARANCE.radius),
+            radius: raw.radius === "custom" ? "custom" : pick(RADII, raw.radius, DEFAULT_APPEARANCE.radius),
+            radiusCustom: clamp(raw.radiusCustom, RADIUS_LIMITS.min, RADIUS_LIMITS.max, DEFAULT_APPEARANCE.radiusCustom),
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
+            motionSpeed: clamp(raw.motionSpeed, MOTION_SPEED_LIMITS.min, MOTION_SPEED_LIMITS.max, 1),
+            accent:
+                raw.accent && typeof raw.accent === "object"
+                    ? { h: clamp(raw.accent.h, 0, 360, 70), c: clamp(raw.accent.c, 0, 0.25, 0.15) }
+                    : null,
             layout: sanitizeLayout(raw.layout),
             customThemes,
             activeCustom: [...customThemes, ...pluginThemes].some((theme) => theme.id === raw.activeCustom)
@@ -599,14 +625,32 @@ export function activeCustomTheme(prefs: AppearancePrefs, theme: string | null |
     return [...prefs.customThemes, ...prefs.pluginThemes].find((item) => item.id === prefs.activeCustom);
 }
 
+/** The radius in effect, as a CSS length. */
+export function radiusValue(prefs: Pick<AppearancePrefs, "radius" | "radiusCustom">): string {
+    if (prefs.radius === "custom") return `${prefs.radiusCustom}rem`;
+    return (RADII.find((option) => option.id === prefs.radius) ?? RADII[1]).value;
+}
+
 /** Writes font, radius and motion onto <html>. */
 export function applyAppearance(prefs: AppearancePrefs, script: Script) {
     const root = document.documentElement;
     const font = effectiveFont(prefs.font, script);
-    const radius = RADII.find((option) => option.id === prefs.radius) ?? RADII[1];
     root.style.setProperty("--app-font", font.family);
-    root.style.setProperty("--radius", radius.value);
+    root.style.setProperty("--radius", radiusValue(prefs));
     root.dataset.motion = prefs.motion;
+    // Durations are multiplied by this: faster means shorter.
+    root.style.setProperty("--motion-scale", String(1 / (prefs.motionSpeed || 1)));
+}
+
+/**
+ * Puts the chosen accent over the theme's, or leaves the theme's. Runs after
+ * applyCustomTheme, which clears and rewrites the same properties.
+ */
+export function applyAccent(accent: AppearancePrefs["accent"]) {
+    if (!accent) return;
+    const root = document.documentElement;
+    root.style.setProperty("--brand-h", String(accent.h));
+    root.style.setProperty("--brand-c", String(accent.c));
 }
 
 /**

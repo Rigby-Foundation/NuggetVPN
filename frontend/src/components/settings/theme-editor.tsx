@@ -38,12 +38,12 @@ import { cn } from "@/lib/utils";
  */
 
 /** A hue wheel unrolled, at the given lightness and chroma. */
-function hueTrack(l: number, c: number): string {
+export function hueTrack(l: number, c: number): string {
     const stops = [0, 60, 120, 180, 240, 300, 360].map((h) => `oklch(${l} ${c} ${h})`);
     return `linear-gradient(to right, ${stops.join(", ")})`;
 }
 
-function Slider({
+export function Slider({
     label,
     value,
     min,
