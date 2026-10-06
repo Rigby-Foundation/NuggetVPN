@@ -1,6 +1,8 @@
 package app
 
 import (
+	"runtime"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
@@ -133,6 +135,16 @@ func (a *App) closeWindow() {
 	case models.CloseQuit:
 		a.QuitApp()
 	case models.CloseHideCompletely:
+		// macOS keeps the app in the Dock and the app switcher whatever it
+		// does, so hiding the menu-bar icon too would only take away the way
+		// back. There it behaves as closing to the tray; the setting is not
+		// offered there, but one restored from a backup can carry it.
+		if runtime.GOOS == "darwin" {
+			if a.window != nil {
+				a.window.Hide()
+			}
+			return
+		}
 		// Nothing in the taskbar, nothing in the tray, tunnel still up.
 		// Launching the app again reaches this copy through the single-
 		// instance lock, and ShowWindow restores both.

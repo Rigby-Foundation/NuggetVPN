@@ -322,6 +322,11 @@ function SettingsView({
   openSignal,
 }: SettingsViewProps) {
   const isPhone = platform === "android" || platform === "ios" || isMobileDevice;
+  // macOS keeps every app with a window in the Dock and the app switcher,
+  // so "hide completely" cannot hide it; it is not offered there, and a
+  // setting carried over from another system acts as "keep in the tray".
+  const closeOptions = platform === "macos" ? CLOSE_OPTIONS.filter((option) => option.id !== "hide") : CLOSE_OPTIONS;
+  const closeAction = platform === "macos" && appSettings.close_action === "hide" ? "tray" : appSettings.close_action;
   const [openId, setOpenId] = React.useState<SectionId | null>(null);
   // Kept while a section is open, so Back returns to the same results.
   const [query, setQuery] = React.useState("");
@@ -408,7 +413,7 @@ function SettingsView({
         const parts = [
           appSettings.launch_at_startup && !isPhone ? t("behaviour.summary.startup") : "",
           appSettings.auto_connect ? t("behaviour.summary.autoConnect") : "",
-          isPhone ? "" : t(CLOSE_OPTIONS.find((option) => option.id === appSettings.close_action)?.summary ?? "close.tray.summary"),
+          isPhone ? "" : t(CLOSE_OPTIONS.find((option) => option.id === closeAction)?.summary ?? "close.tray.summary"),
           isPhone && appSettings.auto_reconnect !== false ? t("behaviour.summary.reconnect") : "",
         ].filter(Boolean);
         // The parts read mid-sentence; whichever comes first starts it.
@@ -668,8 +673,8 @@ function SettingsView({
               description={t("behaviour.closing.description")}
             >
               <div className="space-y-2" role="radiogroup" aria-label={t("behaviour.closing")}>
-                {CLOSE_OPTIONS.map((option) => {
-                  const active = appSettings.close_action === option.id;
+                {closeOptions.map((option) => {
+                  const active = closeAction === option.id;
                   return (
                     <button
                       key={option.id}
