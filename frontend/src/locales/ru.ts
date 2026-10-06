@@ -283,6 +283,8 @@ const ru: Messages = {
     "core.xray.limit.protocols": "Серверам Hysteria, Hysteria2, TUIC и SSH нужно другое ядро.",
     "core.xray.limit.plugins": "Плагины Shadowsocks не поддерживаются.",
     "core.xray.limit.tls": "Фрагментация TLS и настройки SNI не применяются.",
+    "core.needsOther": "Нужно другое ядро",
+    "core.tlsIgnored": "{core} не использует эти настройки. Чтобы они работали, выберите встроенное ядро или официальный sing-box в Настройках → Ядро.",
     "settings.restartWelcome": "Пройти первоначальную настройку заново",
     "core.chosen": "Теперь туннель работает на {name}.",
     "apps.choose": "Выбрать приложения…",

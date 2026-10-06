@@ -275,6 +275,8 @@ const ja: Messages = {
     "core.xray.limit.protocols": "Hysteria、Hysteria2、TUIC、SSH のサーバーには別のコアが必要です。",
     "core.xray.limit.plugins": "Shadowsocks プラグインには対応していません。",
     "core.xray.limit.tls": "TLS の分割と SNI の設定は適用されません。",
+    "core.needsOther": "別のコアが必要",
+    "core.tlsIgnored": "{core} はこれらの設定を使用しません。使うには 設定 → コア で内蔵コアか公式 sing-box に切り替えてください。",
     "settings.restartWelcome": "初回セットアップをもう一度行う",
     "core.chosen": "トンネルは {name} で動いています。",
     "apps.choose": "アプリを選択…",

@@ -664,6 +664,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
  * while wiring a rule up.
  */
 function Palette({
+    core,
     defaultAction,
     onAddSource,
     onAddNote,
@@ -678,6 +679,8 @@ function Palette({
     orderPanel,
     className,
 }: {
+    /** The chosen core; mihomo skips protocol rules, so they are not offered. */
+    core: string;
     defaultAction: RoutingAction;
     onAddSource: (kind: RoutingKind) => void;
     onAddNote: () => void;
@@ -723,12 +726,15 @@ function Palette({
             </p>
             {SOURCE_KINDS.map((kind) => {
                 const meta = kindMeta(kind);
+                const skipped = kind === "protocol" && core === "mihomo";
                 return (
                     <button
                         key={kind}
                         type="button"
                         onClick={() => onAddSource(kind)}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
+                        disabled={skipped}
+                        title={skipped ? t("core.mihomo.limit.protocol") : undefined}
+                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start disabled:opacity-45 disabled:hover:bg-transparent"
                     >
                         <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
                         <span className="truncate">{t(meta.label)}</span>
@@ -1484,7 +1490,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                                 <SheetTitle>{t("nav.routing")}</SheetTitle>
                             </SheetHeader>
                             <Palette
-                                className="w-full border-0 bg-transparent p-0"
+                                core={settings.core}                                className="w-full border-0 bg-transparent p-0"
                                 defaultAction={settings.default_action}
                                 onAddSource={(...args: Parameters<typeof addSource>) => {
                                     addSource(...args);
@@ -1526,7 +1532,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                     </Sheet>
                 ) : (
                     <Palette
-                        defaultAction={settings.default_action}
+                        core={settings.core}                        defaultAction={settings.default_action}
                         onAddSource={addSource}
                         onAddNote={addNote}
                         onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}

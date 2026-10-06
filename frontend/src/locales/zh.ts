@@ -275,6 +275,8 @@ const zh: Messages = {
     "core.xray.limit.protocols": "Hysteria、Hysteria2、TUIC 和 SSH 服务器需要其他核心。",
     "core.xray.limit.plugins": "不支持 Shadowsocks 插件。",
     "core.xray.limit.tls": "TLS 分片和 SNI 设置不生效。",
+    "core.needsOther": "需要其他内核",
+    "core.tlsIgnored": "{core} 不使用这些设置。要使用它们，请在 设置 → 内核 中切换到内置内核或官方 sing-box。",
     "settings.restartWelcome": "重新运行首次设置",
     "core.chosen": "隧道现在运行在 {name} 上。",
     "apps.choose": "选择应用…",

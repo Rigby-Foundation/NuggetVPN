@@ -1,4 +1,5 @@
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { Activity, Check, CheckSquare, Download, Link2, Pencil, RefreshCw, Search, Star, StarOff, Trash2, X, Zap } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
@@ -14,7 +15,10 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Flag } from "@/components/ui/flag";
 import SelectableCard from "@/components/ui/selectable-card";
+import { useUnsupported } from "@/lib/core-support";
+import { withoutFlagEmoji } from "@/lib/flags";
 import { Translate, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
@@ -89,6 +93,7 @@ function ProxiesView({
     onUpdateProfile,
 }: ProxiesViewProps) {
     const t = useT();
+    const unsupported = useUnsupported();
     const { prefs } = useAppearance();
     const cardLayout = prefs.layout.proxiesCardLayout;
     const domain = selectedSourceDomain.trim() || LOCAL;
@@ -187,6 +192,11 @@ function ProxiesView({
         const toggle = event.ctrlKey || event.metaKey;
         const range = event.shiftKey;
         if (!selecting && !toggle && !range) {
+            // Picking it would only fail on connect, with this same reason.
+            if (unsupported[profile.id]) {
+                toast.error(unsupported[profile.id], { id: "unsupported" });
+                return;
+            }
             onSelectProxy(profile.id);
             return;
         }
@@ -374,21 +384,28 @@ function ProxiesView({
                                 const selected =
                                     selectedProxyMode === "manual" && selectedProfileId === profile.id;
                                 const isPicked = picked.has(profile.id);
+                                const blocked = unsupported[profile.id];
                                 return (
                                     <SelectableCard
                                         key={profile.id}
                                         selected={selecting ? isPicked : selected}
                                         onSelect={(event) => handleCard(profile, event)}
-                                        label={`${profile.name}, ${profile.protocol}, ${pingLabel(t, ping)}`}
-                                        className="group select-none"
+                                        label={`${profile.name}, ${profile.protocol}, ${blocked ?? pingLabel(t, ping)}`}
+                                        className={cn("group select-none", blocked && !selecting && "opacity-55 hover:border-border")}
                                     >
                                         <div className="p-3.5 flex items-center gap-3">
                                             {selecting ? <Tick checked={isPicked} /> : null}
+                                            <Flag name={profile.name} size={34} />
                                             <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
                                                 {/* Top row: Name & badge on left, Ping on right */}
                                                 <div className="flex items-center justify-between gap-2 min-w-0">
                                                     <div className="font-medium flex items-center gap-2 min-w-0">
-                                                        <span className="truncate">{profile.name}</span>
+                                                        <span className="truncate">{withoutFlagEmoji(profile.name)}</span>
+                                                        {blocked ? (
+                                                            <Badge variant="outline" title={blocked} className="shrink-0 text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
+                                                                {t("core.needsOther")}
+                                                            </Badge>
+                                                        ) : null}
                                                         {selected && !selecting ? (
                                                             <Badge variant="secondary" className="gap-1 shrink-0 text-[10px] h-5 px-1.5 font-normal">
                                                                 <Check size={11} aria-hidden="true" /> {t("proxies.selected")}

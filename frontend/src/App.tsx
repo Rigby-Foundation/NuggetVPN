@@ -7,6 +7,7 @@ import AddModal from "@/components/AddModal";
 import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import Welcome from "@/components/Welcome";
+import { UnsupportedProvider } from "@/lib/core-support";
 import AppSidebar from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BottomDockNav } from "@/components/layout/BottomDockNav";
@@ -610,6 +611,15 @@ function App() {
         }
     }, [connection, profiles.length, selection, t]);
 
+    // The servers the chosen core cannot run; asked again whenever the
+    // servers or the core change.
+    const [unsupported, setUnsupported] = useState<Record<string, string>>({});
+    useEffect(() => {
+        invoke<Record<string, string>>("unsupported_profiles")
+            .then((result) => setUnsupported(result ?? {}))
+            .catch(() => setUnsupported({}));
+    }, [profiles, settings.core]);
+
     const handleAddProfile = useCallback(
         async (name: string, link: string) => {
             await addProfile(name, link);
@@ -981,6 +991,7 @@ function App() {
 
     return (
         <PluginsProvider actions={pluginActions}>
+        <UnsupportedProvider value={unsupported}>
         <main className="h-full overflow-hidden">
             <Toaster
                 position="top-center"
@@ -1083,6 +1094,7 @@ function App() {
                         showControls={true}
                         showBrand={true}
                         showServerSelector={true}
+                        showServerPicker={activeTab !== "connection"}
                         sources={sources}
                         selectedSourceDomain={selection.domain}
                         selectedProfileId={selection.profileId}
@@ -1316,6 +1328,7 @@ function App() {
                 ) : null}
             </div>
         </main>
+        </UnsupportedProvider>
         </PluginsProvider>
     );
 }

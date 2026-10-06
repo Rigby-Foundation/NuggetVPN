@@ -283,6 +283,8 @@ const uk: Messages = {
     "core.xray.limit.protocols": "Серверам Hysteria, Hysteria2, TUIC і SSH потрібне інше ядро.",
     "core.xray.limit.plugins": "Плагіни Shadowsocks не підтримуються.",
     "core.xray.limit.tls": "Фрагментація TLS і налаштування SNI не застосовуються.",
+    "core.needsOther": "Потрібне інше ядро",
+    "core.tlsIgnored": "{core} не використовує ці налаштування. Щоб вони працювали, оберіть вбудоване ядро або офіційний sing-box у Налаштуваннях → Ядро.",
     "settings.restartWelcome": "Пройти початкове налаштування знову",
     "core.chosen": "Тепер тунель працює на {name}.",
     "apps.choose": "Вибрати застосунки…",

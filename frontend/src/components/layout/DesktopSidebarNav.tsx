@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { LOCAL } from "@/hooks/use-profiles";
 import { ConfigSource, ConnectionState, Profile, ProxyMode, TrafficSample } from "@/types";
 import { NAV_TABS } from "./UnifiedHeader";
+import { Flag } from "@/components/ui/flag";
+import { useUnsupported } from "@/lib/core-support";
+import { withoutFlagEmoji } from "@/lib/flags";
 
 interface DesktopSidebarNavProps {
     position: "left" | "right";
@@ -68,6 +71,7 @@ export function DesktopSidebarNav({
     traffic,
 }: DesktopSidebarNavProps) {
     const { t, dir } = useI18n();
+    const unsupported = useUnsupported();
     const isMac = platform === "macos";
     const isPhone = platform === "android" || platform === "ios";
 
@@ -168,64 +172,70 @@ export function DesktopSidebarNav({
 
                 {/* Server Quick Selector Dropdown */}
                 <div className="flex items-center gap-1.5">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={locked}
-                                className="h-8 flex-1 justify-between gap-1.5 px-2.5 text-xs font-normal border-border/60 hover:bg-muted/60 min-w-0"
-                            >
-                                <span className="flex items-center gap-1.5 truncate min-w-0">
-                                    <Server size={13} className={cn("shrink-0", isConnected ? "text-status-connected" : "text-muted-foreground")} />
-                                    <span className="truncate">{activeServerLabel}</span>
-                                </span>
-                                <ChevronDown size={12} className="opacity-50 shrink-0 ms-1" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side={position === "left" ? "right" : "left"} align="end" className="w-64 max-h-80 overflow-y-auto">
-                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                                {t("proxies.title")}
-                            </DropdownMenuLabel>
-                            <DropdownMenuItem
-                                onClick={onSelectAuto}
-                                className="flex items-center justify-between text-xs"
-                            >
-                                <span className="flex items-center gap-2">
-                                    <Zap size={14} className="text-primary" />
-                                    {t("proxies.auto")}
-                                </span>
-                                {isAuto ? <Check size={14} className="text-primary" /> : null}
-                            </DropdownMenuItem>
-                            {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
-                            {quickPickProfiles.map((p) => {
-                                const ping = profilePings[p.id];
-                                const isChosen = !isAuto && selectedProfileId === p.id;
-                                return (
-                                    <DropdownMenuItem
-                                        key={p.id}
-                                        onClick={() => onSelectProxy(p.id)}
-                                        className="flex items-center justify-between text-xs gap-2"
-                                    >
-                                        <span className="truncate flex-1">{p.name}</span>
-                                        {ping ? (
-                                            <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                                                {ping}ms
-                                            </span>
-                                        ) : null}
-                                        {isChosen ? <Check size={14} className="text-primary shrink-0" /> : null}
-                                    </DropdownMenuItem>
-                                );
-                            })}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => onTabChange("proxies")}
-                                className="text-xs text-primary font-medium"
-                            >
-                                {t("proxies.sort.list")} →
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* The home screen has its own server picker; two at once is one too many. */}
+                    {activeTab !== "connection" ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={locked}
+                                    className="h-8 flex-1 justify-between gap-1.5 px-2.5 text-xs font-normal border-border/60 hover:bg-muted/60 min-w-0"
+                                >
+                                    <span className="flex items-center gap-1.5 truncate min-w-0">
+                                        <Server size={13} className={cn("shrink-0", isConnected ? "text-status-connected" : "text-muted-foreground")} />
+                                        <span className="truncate">{activeServerLabel}</span>
+                                    </span>
+                                    <ChevronDown size={12} className="opacity-50 shrink-0 ms-1" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side={position === "left" ? "right" : "left"} align="end" className="w-64 max-h-80 overflow-y-auto">
+                                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                    {t("proxies.title")}
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                    onClick={onSelectAuto}
+                                    className="flex items-center justify-between text-xs"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Zap size={14} className="text-primary" />
+                                        {t("proxies.auto")}
+                                    </span>
+                                    {isAuto ? <Check size={14} className="text-primary" /> : null}
+                                </DropdownMenuItem>
+                                {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
+                                {quickPickProfiles.map((p) => {
+                                    const ping = profilePings[p.id];
+                                    const isChosen = !isAuto && selectedProfileId === p.id;
+                                    return (
+                                        <DropdownMenuItem
+                                            key={p.id}
+                                            disabled={Boolean(unsupported[p.id])}
+                                            title={unsupported[p.id]}
+                                            onClick={() => onSelectProxy(p.id)}
+                                            className="flex items-center justify-between text-xs gap-2"
+                                        >
+                                            <Flag name={p.name} size={18} />
+                                            <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
+                                            {ping ? (
+                                                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                                                    {ping}ms
+                                                </span>
+                                            ) : null}
+                                            {isChosen ? <Check size={14} className="text-primary shrink-0" /> : null}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => onTabChange("proxies")}
+                                    className="text-xs text-primary font-medium"
+                                >
+                                    {t("proxies.sort.list")} →
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
 
                     <Tooltip delayDuration={350}>
                         <TooltipTrigger asChild>

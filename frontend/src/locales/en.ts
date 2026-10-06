@@ -290,6 +290,8 @@ const en = {
     "core.xray.limit.protocols": "Hysteria, Hysteria2, TUIC and SSH servers need another core.",
     "core.xray.limit.plugins": "Shadowsocks plugins aren’t supported.",
     "core.xray.limit.tls": "TLS fragmentation and SNI settings don’t apply.",
+    "core.needsOther": "Needs another core",
+    "core.tlsIgnored": "{core} ignores these settings. Switch to the built-in core or official sing-box in Settings → Core to use them.",
     "settings.restartWelcome": "Run first-start setup again",
     "core.chosen": "The tunnel now runs on {name}.",
     "apps.choose": "Choose apps…",

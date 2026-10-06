@@ -277,6 +277,8 @@ const fa: Messages = {
     "core.xray.limit.protocols": "سرورهای Hysteria، Hysteria2، TUIC و SSH به هستهٔ دیگری نیاز دارند.",
     "core.xray.limit.plugins": "افزونه‌های Shadowsocks پشتیبانی نمی‌شوند.",
     "core.xray.limit.tls": "تکه‌تکه‌کردن TLS و تنظیمات SNI اعمال نمی‌شوند.",
+    "core.needsOther": "هستهٔ دیگری لازم است",
+    "core.tlsIgnored": "{core} از این تنظیمات استفاده نمی‌کند. برای استفاده از آن‌ها، در تنظیمات ← هسته، هستهٔ داخلی یا sing-box رسمی را انتخاب کنید.",
     "settings.restartWelcome": "اجرای دوبارهٔ راه‌اندازی اولیه",
     "core.chosen": "تونل اکنون روی {name} اجرا می‌شود.",
     "apps.choose": "انتخاب برنامه‌ها…",

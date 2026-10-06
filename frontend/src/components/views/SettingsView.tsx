@@ -744,9 +744,17 @@ function SettingsView({
           </>
         );
 
-      case "tls":
+      case "tls": {
+        // Only the sing-box cores apply these; mihomo and Xray ignore them.
+        const tlsIgnored = appSettings.core === "mihomo" || appSettings.core === "xray";
         return (
           <>
+            {tlsIgnored ? (
+              <div className="rounded-xl border border-status-connecting/40 bg-status-connecting/10 px-4 py-3 text-sm">
+                {t("core.tlsIgnored", { core: t(appSettings.core === "xray" ? "core.xray" : "core.mihomo") })}
+              </div>
+            ) : null}
+            <fieldset disabled={tlsIgnored} className={cn("min-w-0 space-y-4", tlsIgnored && "opacity-50")}>
             <SettingsGroup>
               <SettingsField
                 label={t("tls.fragmentation.title")}
@@ -849,8 +857,10 @@ function SettingsView({
                 </div>
               )}
             </SettingsGroup>
+            </fieldset>
           </>
         );
+      }
 
       case "chain":
         return (
