@@ -368,9 +368,16 @@ export type TelemetryPlacement = "inside" | "below";
 export type TelemetryMetric = "download" | "upload" | "latency";
 export type DashboardWidth = "compact" | "normal" | "wide";
 export type CardLayout = "list" | "grid";
+/**
+ * How a sidebar sits: attached, a panel of its own beside the content; or
+ * inset, on the window's background with the content as a raised, rounded
+ * panel beside it.
+ */
+export type SidebarStyle = "attached" | "inset";
 
 export interface LayoutPrefs {
     navPosition: NavPosition;
+    sidebarStyle: SidebarStyle;
     cockpitAlign: CockpitAlign;
     telemetryPlacement: TelemetryPlacement;
     telemetryOrder: TelemetryMetric[];
@@ -384,6 +391,7 @@ export interface LayoutPrefs {
 
 export const DEFAULT_LAYOUT: LayoutPrefs = {
     navPosition: "top",
+    sidebarStyle: "attached",
     cockpitAlign: "center",
     telemetryPlacement: "inside",
     telemetryOrder: ["download", "upload", "latency"],
@@ -410,6 +418,7 @@ export function sanitizeLayout(raw: unknown): LayoutPrefs {
     const allMetrics: TelemetryMetric[] = ["download", "upload", "latency"];
 
     const navPosition = navPositions.includes(val.navPosition as NavPosition) ? (val.navPosition as NavPosition) : DEFAULT_LAYOUT.navPosition;
+    const sidebarStyle: SidebarStyle = val.sidebarStyle === "inset" ? "inset" : "attached";
     const cockpitAlign = cockpitAligns.includes(val.cockpitAlign as CockpitAlign) ? (val.cockpitAlign as CockpitAlign) : DEFAULT_LAYOUT.cockpitAlign;
     const telemetryPlacement = telemetryPlacements.includes(val.telemetryPlacement as TelemetryPlacement) ? (val.telemetryPlacement as TelemetryPlacement) : DEFAULT_LAYOUT.telemetryPlacement;
     const dashboardWidth = dashboardWidths.includes(val.dashboardWidth as DashboardWidth) ? (val.dashboardWidth as DashboardWidth) : DEFAULT_LAYOUT.dashboardWidth;
@@ -434,6 +443,7 @@ export function sanitizeLayout(raw: unknown): LayoutPrefs {
 
     return {
         navPosition,
+        sidebarStyle,
         cockpitAlign,
         telemetryPlacement,
         telemetryOrder,

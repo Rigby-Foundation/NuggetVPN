@@ -963,6 +963,9 @@ function App() {
     // A phone: no window to control, and the page is the whole screen.
     const isPhone = platform === "android" || platform === "ios";
     const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || "top");
+    const insetSidebar =
+        (navPosition === "sidebar-left" || navPosition === "sidebar-right") &&
+        appearance.prefs.layout?.sidebarStyle === "inset";
     const selectedSource = sources.find((source) =>
         source.kind === "profile"
             ? selection.domain === LOCAL && source.profileId === selection.profileId
@@ -1058,13 +1061,17 @@ function App() {
             ) : null}
 
             <div className={cn(
-                "h-full overflow-hidden bg-background",
+                "h-full overflow-hidden",
+                // Inset: the window takes the sidebar's tone, and the content
+                // sits on it as a raised panel (see the content column below).
+                insetSidebar ? "bg-sidebar" : "bg-background",
                 navPosition === "sidebar-left" || navPosition === "sidebar-right" ? "flex flex-row" : "flex flex-col"
             )}>
                 {/* 1. Left Sidebar Mode */}
                 {navPosition === "sidebar-left" ? (
                     <DesktopSidebarNav
                         position="left"
+                        inset={insetSidebar}
                         activeTab={activeTab}
                         onTabChange={changeTab}
                         onClose={appWindow.close}
@@ -1117,7 +1124,17 @@ function App() {
                 ) : null}
 
                 {/* Main Content Viewport */}
-                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+                <div
+                    className={cn(
+                        "flex-1 flex flex-col min-w-0 overflow-hidden relative",
+                        insetSidebar
+                            ? cn(
+                                  "my-2 rounded-xl border border-border/60 bg-background shadow-sm",
+                                  navPosition === "sidebar-left" ? "me-2" : "ms-2"
+                              )
+                            : "h-full"
+                    )}
+                >
                     {/* Top drag bar if in sidebar mode */}
                     {navPosition === "sidebar-left" ? (
                         <WindowDragHeader
@@ -1128,6 +1145,7 @@ function App() {
                             showControls={!isMac}
                             showBrand={false}
                             showServerSelector={false}
+                            flat={insetSidebar}
                             onTabChange={changeTab}
                         />
                     ) : navPosition === "sidebar-right" ? (
@@ -1139,6 +1157,7 @@ function App() {
                             showControls={isMac}
                             showBrand={true}
                             showServerSelector={false}
+                            flat={insetSidebar}
                             onTabChange={changeTab}
                         />
                     ) : null}
@@ -1299,6 +1318,7 @@ function App() {
                 {navPosition === "sidebar-right" ? (
                     <DesktopSidebarNav
                         position="right"
+                        inset={insetSidebar}
                         activeTab={activeTab}
                         onTabChange={changeTab}
                         onClose={appWindow.close}

@@ -24,6 +24,9 @@ import { withoutFlagEmoji } from "@/lib/flags";
 
 interface DesktopSidebarNavProps {
     position: "left" | "right";
+    /** On the window's background, beside an inset content panel: no
+        background or border of its own. */
+    inset?: boolean;
     activeTab: string;
     onTabChange: (tab: string) => void;
     onClose: () => void;
@@ -50,6 +53,7 @@ interface DesktopSidebarNavProps {
 
 export function DesktopSidebarNav({
     position,
+    inset = false,
     activeTab,
     onTabChange,
     onClose,
@@ -92,14 +96,17 @@ export function DesktopSidebarNav({
     return (
         <aside
             className={cn(
-                "relative z-20 flex h-full w-56 sm:w-60 flex-col justify-between select-none bg-card/75 backdrop-blur-md transition-all duration-200 shrink-0",
-                position === "left" ? "border-e" : "border-s"
+                "relative z-20 flex h-full w-56 sm:w-60 flex-col justify-between select-none transition-all duration-200 shrink-0",
+                inset
+                    ? "bg-transparent"
+                    : cn("bg-card/75 backdrop-blur-md", position === "left" ? "border-e" : "border-s")
             )}
             dir={dir}
         >
             {/* Top Brand / Controls Header */}
             <div className={cn(
-                "drag-region flex items-center justify-between px-4 border-b border-border/40 shrink-0",
+                "drag-region flex items-center justify-between px-4 shrink-0",
+                !inset && "border-b border-border/40",
                 isMac ? "h-14 pt-1" : "h-13"
             )}>
                 <div className="flex items-center gap-2.5 min-w-0">

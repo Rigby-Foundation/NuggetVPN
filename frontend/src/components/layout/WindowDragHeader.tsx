@@ -27,6 +27,8 @@ interface WindowDragHeaderProps {
     onMaximize: () => void;
     showControls?: boolean;
     showBrand?: boolean;
+    /** No background or rule of its own: the top of an inset content panel. */
+    flat?: boolean;
     showServerSelector?: boolean;
     /** Off on the home screen, which has its own picker; the add button stays. */
     showServerPicker?: boolean;
@@ -68,6 +70,7 @@ export function WindowDragHeader({
     onSelectAuto,
     connectionState,
     onTabChange,
+    flat = false,
 }: WindowDragHeaderProps) {
     const { t, dir } = useI18n();
     const unsupported = useUnsupported();
@@ -90,7 +93,8 @@ export function WindowDragHeader({
     return (
         <header
             className={cn(
-                "drag-region flex items-center justify-between border-b bg-card/50 backdrop-blur-md px-3 sm:px-4 shrink-0 select-none z-20",
+                "drag-region flex items-center justify-between px-3 sm:px-4 shrink-0 select-none z-20",
+                !flat && "border-b bg-card/50 backdrop-blur-md",
                 isMac ? "h-11 pt-0.5" : "h-9"
             )}
             dir={dir}

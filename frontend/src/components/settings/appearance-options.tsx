@@ -674,6 +674,64 @@ export function LayoutPicker() {
                         );
                     })}
                 </div>
+
+                {/* How the sidebar sits, for either side. */}
+                {layout.navPosition === "sidebar-left" || layout.navPosition === "sidebar-right" ? (
+                    <div className="mt-4">
+                        <label className="text-xs font-semibold text-foreground/90 block mb-2">
+                            {t("appearance.layout.sidebarStyle")}
+                        </label>
+                        <div className="grid grid-cols-2 gap-2.5">
+                            {(["attached", "inset"] as const).map((style) => {
+                                const active = (layout.sidebarStyle ?? "attached") === style;
+                                const right = layout.navPosition === "sidebar-right";
+                                const bar = <div className={cn("w-3.5 h-full shrink-0 rounded-[2px]", style === "inset" ? "bg-primary/50" : "bg-primary")} />;
+                                const content = (
+                                    <div
+                                        className={cn(
+                                            "flex-1 h-full rounded-[2px]",
+                                            style === "inset"
+                                                ? "rounded-[4px] border border-foreground/25 bg-background shadow-xs"
+                                                : "bg-muted-foreground/15"
+                                        )}
+                                    />
+                                );
+                                return (
+                                    <button
+                                        key={style}
+                                        type="button"
+                                        onClick={() => setLayout({ sidebarStyle: style })}
+                                        aria-pressed={active}
+                                        className={cn(
+                                            "flex items-center gap-3 rounded-xl border p-3 text-start transition-all",
+                                            active
+                                                ? "border-primary bg-primary/[0.05] ring-1 ring-primary shadow-xs"
+                                                : "border-border/60 bg-card/40 hover:border-border hover:bg-card/70"
+                                        )}
+                                    >
+                                        <div
+                                            className={cn(
+                                                "flex h-10 w-16 shrink-0 gap-1 overflow-hidden rounded-md border",
+                                                style === "inset" ? "bg-muted p-1" : "bg-muted/20 p-1"
+                                            )}
+                                            aria-hidden="true"
+                                        >
+                                            {right ? <>{content}{bar}</> : <>{bar}{content}</>}
+                                        </div>
+                                        <span className="min-w-0">
+                                            <span className="block text-xs font-semibold">
+                                                {t(style === "inset" ? "appearance.layout.sidebarStyle.inset" : "appearance.layout.sidebarStyle.attached")}
+                                            </span>
+                                            <span className="block text-[11px] text-muted-foreground">
+                                                {t(style === "inset" ? "appearance.layout.sidebarStyle.insetHint" : "appearance.layout.sidebarStyle.attachedHint")}
+                                            </span>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
             </div>
             )}
 
