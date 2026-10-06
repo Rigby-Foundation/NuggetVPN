@@ -173,6 +173,10 @@ jobs:
         # Produces bin/NuggetVPN.exe plus bin/NuggetVPN-amd64-installer.exe.
         run: wails3 task windows:package
 
+      - name: Package the silent installer
+        # bin/NuggetVPN-amd64-silent-installer.exe: no pages, starts the app.
+        run: wails3 task windows:create:nsis:silent
+
       - name: Archive
         shell: bash
         run: |
@@ -180,7 +184,11 @@ jobs:
           7z a "NuggetVPN-${{ github.ref_name }}-windows-amd64.zip" NuggetVPN.exe
           for installer in *-installer.exe; do
             [ -e "$installer" ] || continue
-            mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-installer.exe"
+            # The silent one keeps "silent" in its name: both match the glob.
+            case "$installer" in
+              *-silent-installer.exe) mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-silent-installer.exe" ;;
+              *) mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-installer.exe" ;;
+            esac
           done
           ls -la
 

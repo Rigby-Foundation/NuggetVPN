@@ -73,7 +73,15 @@ ManifestDPIAware true
 #!finalize 'signtool --file "%1"'
 
 Name "${INFO_PRODUCTNAME}"
-OutFile "..\..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
+!ifdef NUGGET_SILENT
+    # The silent build (makensis -DNUGGET_SILENT): installs with no pages
+    # and no questions, then starts the app. For a double-click install and
+    # for the install scripts; the regular one also takes /S.
+    SilentInstall silent
+    OutFile "..\..\..\bin\${INFO_PROJECTNAME}-${ARCH}-silent-installer.exe"
+!else
+    OutFile "..\..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
+!endif
 !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
 !else

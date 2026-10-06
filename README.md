@@ -7,6 +7,28 @@ Every proxy core it can run is compiled **into** the app as a Go library.
 There is no bundled executable, nothing is downloaded at runtime, and
 nothing is shelled out to.
 
+## Installing
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.ps1 | iex
+```
+
+macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.sh | sh
+```
+
+Both fetch the latest release from GitHub, check it against the SHA-256
+GitHub publishes for it, install it, and start the app; running them again
+updates. On Linux the `.deb` or `.rpm` is used when apt, dnf or zypper is
+there, the AppImage otherwise. Or download from
+[Releases](https://github.com/Rigby-Foundation/NuggetVPN/releases): on
+Windows, `…-silent-installer.exe` installs with no questions asked, and the
+regular installer takes `/S` for the same.
+
 ## Features
 
 ### Connecting
