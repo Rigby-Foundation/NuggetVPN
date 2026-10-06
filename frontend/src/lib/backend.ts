@@ -65,6 +65,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_version: { method: "GetVersion", args: [] },
     list_cores: { method: "ListCores", args: [] },
     set_core: { method: "SetCore", args: ["name"] },
+    unsupported_profiles: { method: "UnsupportedProfiles", args: [] },
     export_backup: { method: "ExportBackup", args: ["ui"] },
     import_backup: { method: "ImportBackup", args: [] },
     list_user_files: { method: "ListUserFiles", args: ["kind"] },

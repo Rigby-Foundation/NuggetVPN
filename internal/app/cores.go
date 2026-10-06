@@ -8,6 +8,7 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/cores/mihomo"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/cores/xray"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
@@ -40,6 +41,45 @@ func (a *App) SetCore(name string) (models.AppSettings, error) {
 		return saved, err
 	}
 	return saved, a.reapplyRouting()
+}
+
+// UnsupportedProfiles maps each profile the chosen core cannot run to why,
+// so the GUI can rule it out before a connection fails on it. The built-in
+// core runs everything, so it reports nothing.
+func (a *App) UnsupportedProfiles() map[string]string {
+	settings := a.GetSettings()
+	profiles, _ := a.snapshot()
+	result := map[string]string{}
+	for _, profile := range profiles {
+		if err := checkProfile(settings, profile); err != nil {
+			result[profile.ID] = err.Error()
+		}
+	}
+	return result
+}
+
+// checkProfile asks the chosen core whether it can run a profile.
+func checkProfile(settings models.AppSettings, profile models.Profile) error {
+	switch settings.Core {
+	case models.CoreXray:
+		return xray.Check(profile, settings)
+	case models.CoreMihomo:
+		return mihomo.Check(profile, settings)
+	case models.CoreSingBox:
+		// Official sing-box runs the fork's config as is, minus the
+		// transports only the fork has.
+		if _, full := link.FullConfig(profile.ConfigLink); full {
+			return nil
+		}
+		outbound, err := link.ParseOutbound(profile.ConfigLink, settings)
+		if err != nil {
+			return err
+		}
+		if transport, ok := outbound["transport"].(map[string]any); ok && transport["type"] == "xhttp" {
+			return fmt.Errorf("official sing-box has no XHTTP transport; use the built-in core or Xray")
+		}
+	}
+	return nil
 }
 
 // chainProfiles are the proxy chain's hops, in dial order.

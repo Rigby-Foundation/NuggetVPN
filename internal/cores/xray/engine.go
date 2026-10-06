@@ -494,3 +494,17 @@ func randomToken() string {
 	_, _ = rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }
+
+// Check reports why Xray cannot run a profile, the same refusal a connection
+// to it would meet; nil when it can.
+func Check(profile models.Profile, settings models.AppSettings) error {
+	if _, full := link.FullConfig(profile.ConfigLink); full {
+		return fmt.Errorf("%s is a complete sing-box config, which Xray cannot run", profile.Name)
+	}
+	source, err := link.ParseOutbound(profile.ConfigLink, settings)
+	if err != nil {
+		return err
+	}
+	_, err = convert(source)
+	return err
+}

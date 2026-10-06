@@ -397,7 +397,10 @@ func (a *App) planConnection(
 			continue
 		}
 		domainProfiles = append(domainProfiles, profile)
-		if !inChain[profile.ID] {
+		// A server the chosen core cannot run is never worth trying; if
+		// that rules out every one, candidates falls back below and the
+		// core's own refusal is what the user sees.
+		if !inChain[profile.ID] && checkProfile(settings, profile) == nil {
 			eligible = append(eligible, profile)
 		}
 	}

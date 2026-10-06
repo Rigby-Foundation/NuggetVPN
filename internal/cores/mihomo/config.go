@@ -715,3 +715,23 @@ func buildVerbatim(config map[string]any, request Request, settings models.AppSe
 	}
 	return Result{YAML: data, Verbatim: true, ServerFor: map[string]string{}, RuleOwners: map[string]string{"match": sbconfig.DefaultOwner}}, nil
 }
+
+// Check reports why mihomo cannot run a profile, the same refusal a
+// connection to it would meet; nil when it can.
+func Check(profile models.Profile, settings models.AppSettings) error {
+	if _, ok := fullClashConfig(profile.ConfigLink); ok {
+		return nil
+	}
+	if _, ok := singleClashProxy(profile.ConfigLink); ok {
+		return nil
+	}
+	if _, full := link.FullConfig(profile.ConfigLink); full {
+		return fmt.Errorf("%s is a complete sing-box config, which mihomo cannot run", profile.Name)
+	}
+	outbound, err := link.ParseOutbound(profile.ConfigLink, settings)
+	if err != nil {
+		return err
+	}
+	_, err = proxyFrom("check", outbound)
+	return err
+}
