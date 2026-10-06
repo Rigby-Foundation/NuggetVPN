@@ -963,6 +963,11 @@ function App() {
     // A phone: no window to control, and the page is the whole screen.
     const isPhone = platform === "android" || platform === "ios";
     const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || "top");
+    const selectedSource = sources.find((source) =>
+        source.kind === "profile"
+            ? selection.domain === LOCAL && source.profileId === selection.profileId
+            : source.domain === selection.domain
+    );
 
     const unifiedHeaderElement = (
         <UnifiedHeader
@@ -1156,8 +1161,9 @@ function App() {
                             onSelectProxy={handleSelectProxy}
                             onSelectAuto={handleSelectAuto}
                             onNavigateTab={changeTab}
-                            core={settings.core}
-                            mtu={settings.mtu}
+                            source={selectedSource}
+                            locked={connection.isConnected || connection.isBusy}
+                            onAddProfile={() => setIsModalOpen(true)}
                             killSwitch={settings.kill_switch}
                         />
                     )}

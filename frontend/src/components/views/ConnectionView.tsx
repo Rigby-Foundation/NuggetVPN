@@ -4,28 +4,42 @@ import {
     ArrowDown,
     ArrowUp,
     Check,
-    Clock,
+    ChevronDown,
     Copy,
-    Cpu,
+    Infinity as InfinityIcon,
+    Layers,
     Loader2,
     Lock,
+    Plus,
     Power,
     Server,
-    Shield,
     ShieldAlert,
     ShieldCheck,
     Signal,
     TriangleAlert,
+    Zap,
 } from "lucide-react";
 
+import { AnnounceBanner } from "@/components/announce-banner";
 import { useAppearance } from "@/components/appearance-provider";
 import { SpeedTest } from "@/components/speed-test";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LOCAL, profileDomain } from "@/hooks/use-profiles";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
-import { MessageKey, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ConnectionState, IpInfo, Profile, ProxyMode, TrafficSample } from "@/types";
+import { ConfigSource, ConnectionState, IpInfo, Profile, ProxyMode, TrafficSample } from "@/types";
+import { Flag } from "@/components/ui/flag";
+import { useUnsupported } from "@/lib/core-support";
+import { withoutFlagEmoji } from "@/lib/flags";
 
 interface ConnectionViewProps {
     state: ConnectionState;
@@ -36,7 +50,12 @@ interface ConnectionViewProps {
     isCheckingIp: boolean;
     ipCheckEnabled: boolean;
 
-    // Cockpit extras
+    /** The configuration the button connects with; none before one is added. */
+    source?: ConfigSource;
+    /** Switching is refused while connected or connecting. */
+    locked?: boolean;
+    onAddProfile?: () => void;
+
     profiles?: Profile[];
     profilePings?: Record<string, number | null>;
     selectedProxyMode?: ProxyMode;
@@ -44,10 +63,10 @@ interface ConnectionViewProps {
     onSelectProxy?: (id: string) => void;
     onSelectAuto?: () => void;
     onNavigateTab?: (tab: string) => void;
-    core?: string;
-    mtu?: number;
     killSwitch?: boolean;
 }
+
+const DAY = 24 * 60 * 60 * 1000;
 
 /** Ticks once a second while connected, so the duration counts up. */
 function useElapsed(since: number | undefined): string {
@@ -97,6 +116,72 @@ function PingWave({ active, ping }: { active: boolean; ping: number | null | und
     );
 }
 
+/**
+ * The left half of the route strip: which configuration the button connects
+ * with, and what is left of it — data, then days. Opens the configurations
+ * page, where it is chosen.
+ */
+function SourceSummary({ source, onOpen }: { source: ConfigSource; onOpen?: () => void }) {
+    const t = useT();
+    const info = source.kind === "subscription" ? source.info : undefined;
+
+    const meta: React.ReactNode[] = [];
+    let expired = false;
+    if (source.kind === "subscription") {
+        if (info && info.total > 0) {
+            meta.push(t("usage.of", {
+                used: formatBytes(info.upload + info.download),
+                total: formatBytes(info.total),
+            }));
+        } else if (info) {
+            meta.push(
+                <span key="unlimited" className="inline-flex items-center gap-1">
+                    <InfinityIcon size={13} aria-hidden="true" />
+                    {t("connection.unlimited")}
+                </span>
+            );
+        } else {
+            meta.push(source.detail);
+        }
+        if (info && info.expire > 0) {
+            const days = Math.ceil((info.expire * 1000 - Date.now()) / DAY);
+            expired = days <= 0;
+            meta.push(
+                <span key="days" className={cn("tabular-nums", expired && "text-status-error")}>
+                    {expired
+                        ? t("usage.expired", { date: new Date(info.expire * 1000).toLocaleDateString() })
+                        : t("connection.daysLeft", { count: days })}
+                </span>
+            );
+        }
+    } else {
+        meta.push(<span key="protocol" className="uppercase">{source.detail}</span>);
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-foreground/5"
+        >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Layers size={17} />
+            </span>
+            <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{source.label}</span>
+                <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    {meta.map((part, i) => (
+                        <span key={i} className="flex items-center gap-1.5">
+                            {i > 0 ? <span className="opacity-40">·</span> : null}
+                            {part}
+                        </span>
+                    ))}
+                </span>
+            </span>
+        </button>
+    );
+}
+
 function ConnectionView({
     state,
     traffic,
@@ -105,6 +190,9 @@ function ConnectionView({
     ipInfo,
     isCheckingIp,
     ipCheckEnabled,
+    source,
+    locked = false,
+    onAddProfile,
     profiles = [],
     profilePings = {},
     selectedProxyMode = "auto",
@@ -112,15 +200,13 @@ function ConnectionView({
     onSelectProxy,
     onSelectAuto,
     onNavigateTab,
-    core = "builtin",
-    mtu = 9000,
     killSwitch = false,
 }: ConnectionViewProps) {
     const t = useT();
+    const unsupported = useUnsupported();
     const isConnected = state.status === "connected";
     const isConnecting = state.status === "connecting";
     const isError = state.status === "error";
-    const isIdle = state.status === "idle";
     const busy = isConnecting && !state.reconnecting;
     const elapsed = useElapsed(isConnected ? state.since : undefined);
 
@@ -129,15 +215,21 @@ function ConnectionView({
 
     const [copiedIp, setCopiedIp] = useState(false);
 
-    // Active server lookup
+    const isAuto = selectedProxyMode === "auto";
     const activeProfile = profiles.find((p) => p.id === selectedProfileId);
     const activePing = activeProfile ? profilePings[activeProfile.id] : null;
+    const activeServerLabel = isAuto ? t("proxies.auto") : (activeProfile?.name || t("topbar.none"));
+
+    const domain = source?.domain || LOCAL;
+    const quickPickProfiles = source
+        ? profiles.filter((p) => profileDomain(p) === domain).slice(0, 6)
+        : [];
 
     const handleCopyIp = () => {
         if (!ipInfo?.ip) return;
         void navigator.clipboard.writeText(ipInfo.ip);
         setCopiedIp(true);
-        toast.success("IP copied", { id: "copy-ip", duration: 1800 });
+        toast.success(t("connection.ipCopied"), { id: "copy-ip", duration: 1800 });
         setTimeout(() => setCopiedIp(false), 2000);
     };
 
@@ -147,21 +239,18 @@ function ConnectionView({
           ? "max-w-5xl"
           : "max-w-3xl";
 
-    const alignClass = layout.cockpitAlign === "top" ? "mt-4 mb-auto" : "my-auto";
-
     const activeMetrics = (layout.telemetryOrder || ["download", "upload", "latency"])
         .filter((metric) => layout.telemetryVisible?.[metric] !== false);
 
     const renderTelemetryCard = (metric: string) => {
+        const cardClass = "rounded-xl bg-muted/30 p-2.5 sm:p-4 flex flex-col justify-between gap-1.5 sm:gap-2";
         if (metric === "download") {
             return (
-                <div key="download" className="rounded-xl border border-border/50 bg-muted/20 p-2.5 sm:p-4 backdrop-blur-xs flex flex-col justify-between gap-1.5 sm:gap-2 shadow-2xs">
-                    <div className="flex items-center text-[11px] sm:text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1 sm:gap-1.5 font-medium shrink-0">
-                            <ArrowDown size={13} className={isConnected && traffic.down_rate > 0 ? "text-status-connected animate-bounce shrink-0" : "shrink-0"} />
-                            <span>{t("connection.download")}</span>
-                        </span>
-                    </div>
+                <div key="download" className={cardClass}>
+                    <span className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-medium text-muted-foreground">
+                        <ArrowDown size={13} className={traffic.down_rate > 0 ? "text-status-connected shrink-0" : "shrink-0"} />
+                        {t("connection.download")}
+                    </span>
                     <div>
                         <span className="text-sm sm:text-2xl font-bold font-mono tracking-tight tnum block truncate">
                             {formatRate(traffic.down_rate)}
@@ -175,13 +264,11 @@ function ConnectionView({
         }
         if (metric === "upload") {
             return (
-                <div key="upload" className="rounded-xl border border-border/50 bg-muted/20 p-2.5 sm:p-4 backdrop-blur-xs flex flex-col justify-between gap-1.5 sm:gap-2 shadow-2xs">
-                    <div className="flex items-center text-[11px] sm:text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1 sm:gap-1.5 font-medium shrink-0">
-                            <ArrowUp size={13} className={isConnected && traffic.up_rate > 0 ? "text-primary animate-bounce shrink-0" : "shrink-0"} />
-                            <span>{t("connection.upload")}</span>
-                        </span>
-                    </div>
+                <div key="upload" className={cardClass}>
+                    <span className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-medium text-muted-foreground">
+                        <ArrowUp size={13} className={traffic.up_rate > 0 ? "text-primary shrink-0" : "shrink-0"} />
+                        {t("connection.upload")}
+                    </span>
                     <div>
                         <span className="text-sm sm:text-2xl font-bold font-mono tracking-tight tnum block truncate">
                             {formatRate(traffic.up_rate)}
@@ -195,26 +282,24 @@ function ConnectionView({
         }
         if (metric === "latency") {
             return (
-                <div key="latency" className="rounded-xl border border-border/50 bg-muted/20 p-2.5 sm:p-4 backdrop-blur-xs flex flex-col justify-between gap-1.5 sm:gap-2 shadow-2xs">
+                <div key="latency" className={cardClass}>
                     <div className="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground">
                         <span className="flex items-center gap-1 sm:gap-1.5 font-medium shrink-0">
                             <Signal size={13} className={activePing ? "text-status-connected shrink-0" : "shrink-0"} />
-                            <span>Latency</span>
+                            {t("connection.latency")}
                         </span>
-                        <PingWave active={isConnected} ping={activePing} />
+                        <PingWave active ping={activePing} />
                     </div>
                     <div>
                         <span className="text-sm sm:text-2xl font-bold font-mono tracking-tight tnum block truncate">
-                            {activePing !== null && activePing !== undefined ? `${activePing} ms` : isConnected ? "—" : "Offline"}
+                            {activePing !== null && activePing !== undefined ? `${activePing} ms` : "—"}
                         </span>
                         <span className="text-[10px] sm:text-[11px] text-muted-foreground block truncate">
                             {activePing && activePing < 100
-                                ? "Optimal signal"
+                                ? t("connection.latency.good")
                                 : activePing && activePing < 250
-                                  ? "Moderate latency"
-                                  : isConnected
-                                    ? "Measuring route…"
-                                    : "Standby"}
+                                  ? t("connection.latency.fair")
+                                  : t("connection.latency.measuring")}
                         </span>
                     </div>
                 </div>
@@ -227,77 +312,52 @@ function ConnectionView({
         if (activeMetrics.length === 0) return null;
         const colsClass = activeMetrics.length === 3 ? "grid-cols-3" : activeMetrics.length === 2 ? "grid-cols-2" : "grid-cols-1";
         return (
-            <div className={cn("grid gap-2 sm:gap-3", colsClass, layout.telemetryPlacement === "inside" && "mb-3")}>
+            <div className={cn("grid gap-2 sm:gap-3", colsClass)}>
                 {activeMetrics.map(renderTelemetryCard)}
             </div>
         );
     };
 
+    // The big line under the button says what pressing it will do, or what
+    // is happening now; the small line under it adds the detail.
+    const headline = isConnected
+        ? t("status.connected")
+        : isConnecting
+          ? t("status.connecting")
+          : isError
+            ? t("status.error")
+            : source
+              ? t("connection.hint.idle")
+              : t("connection.empty.title");
+
+    const subline = isConnected ? (
+        <span className="font-mono tnum">{elapsed}</span>
+    ) : state.reconnecting ? (
+        t("connection.reconnecting", { attempt: state.attempt ?? 1 })
+    ) : isConnecting ? (
+        t("connection.hint.connecting")
+    ) : isError ? (
+        <span className="text-status-error">{state.error || t("connection.hint.error")}</span>
+    ) : !source ? (
+        t("connection.empty.body")
+    ) : null;
+
     return (
         <div className="absolute inset-0 overflow-y-auto">
-            <div className="min-h-full flex flex-col px-4 py-8 sm:px-6">
-                <div className={cn("enter-stagger w-full flex flex-col gap-5 mx-auto transition-all duration-300", widthClass, alignClass)}>
-
-                    {/* 1. HERO COCKPIT COMMAND CARD */}
+            <div className="min-h-full flex flex-col px-4 py-5 sm:px-6">
                 <div
                     className={cn(
-                        "relative overflow-hidden rounded-2xl border p-6 sm:p-8 backdrop-blur-md transition-all duration-300",
-                        isConnected
-                            ? "border-status-connected/40 bg-card/75"
-                            : isConnecting
-                              ? "border-status-connecting/40 bg-card/75"
-                              : isError
-                                ? "border-status-error/40 bg-card/75"
-                                : "border-border/60 bg-card/50 shadow-xs"
+                        "enter-stagger w-full flex flex-1 flex-col gap-4 mx-auto",
+                        layout.cockpitAlign === "top" ? "justify-start" : "justify-center",
+                        widthClass
                     )}
                 >
-                    {/* Top Row: Tunnel Status Headline + Elapsed Timer + Engine Badge */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-5">
-                        <div>
-                            <h2 className="text-sm font-medium flex items-center gap-2">
-                                <span>
-                                    {isConnected
-                                        ? t("status.connected")
-                                        : isConnecting
-                                          ? t("status.connecting")
-                                          : isError
-                                            ? t("status.error")
-                                            : t("status.idle")}
-                                </span>
-                                {activeProfile && (
-                                    <span className="text-muted-foreground font-normal text-xs truncate max-w-[200px] sm:max-w-xs">
-                                        · {activeProfile.name}
-                                    </span>
-                                )}
-                            </h2>
-                            {isError ? (
-                                <p className="text-[11px] text-status-error mt-0.5">
-                                    {state.error || t("connection.hint.error")}
-                                </p>
-                            ) : state.reconnecting ? (
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
-                                    {t("connection.reconnecting", { attempt: state.attempt ?? 1 })}
-                                </p>
-                            ) : null}
-                        </div>
+                    {source?.kind === "subscription" ? <AnnounceBanner info={source.info} /> : null}
 
-                        <div className="flex items-center gap-2">
-                            {isConnected ? (
-                                <Badge variant="outline" className="font-mono text-xs gap-1.5 py-1 px-2.5 border-status-connected/40 bg-status-connected/10 text-foreground">
-                                    <Clock size={12} className="text-status-connected" />
-                                    <span>{elapsed}</span>
-                                </Badge>
-                            ) : null}
-
-                            <Badge variant="secondary" className="text-[11px] gap-1 px-2 py-0.5 font-normal">
-                                <Cpu size={12} className="text-muted-foreground" />
-                                <span className="capitalize">{core}</span>
-                            </Badge>
-                        </div>
-                    </div>
-
-                    {/* Center Area: Tactile Cockpit Power Controller */}
-                    <div className="my-8 flex flex-col items-center justify-center gap-4">
+                    {/* The button and what it will do. */}
+                    <div
+                        className="flex flex-col items-center justify-center gap-6 pt-4 pb-2"
+                    >
                         <button
                             type="button"
                             onClick={onToggle}
@@ -305,28 +365,25 @@ function ConnectionView({
                             aria-label={t(isConnected ? "connection.disconnect" : "connection.connect")}
                             aria-busy={busy}
                             className={cn(
-                                "group relative flex h-44 w-44 sm:h-48 sm:w-48 items-center justify-center rounded-full transition-transform duration-300 select-none",
+                                "group relative flex h-48 w-48 sm:h-56 sm:w-56 items-center justify-center rounded-full transition-transform duration-300 select-none",
                                 "focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-ring/50",
                                 !busy && "hover:scale-[1.03] active:scale-[0.98]",
                                 busy && "cursor-progress"
                             )}
                         >
-                            {/* Outer orbital track */}
+                            {/* Soft glow behind the button, in the state's colour. */}
                             <span
                                 className={cn(
-                                    "absolute inset-0 rounded-full border-2 transition-all duration-300",
+                                    "absolute -inset-6 rounded-full blur-3xl transition-opacity duration-500",
                                     isConnected
-                                        ? "border-status-connected/40"
-                                        : isConnecting
-                                          ? "border-status-connecting/30"
-                                          : isError
-                                            ? "border-status-error/40"
-                                            : "border-border/60 group-hover:border-primary/40"
+                                        ? "bg-status-connected/35 opacity-100"
+                                        : isError
+                                          ? "bg-status-error/20 opacity-100"
+                                          : "bg-primary/20 opacity-60 group-hover:opacity-100"
                                 )}
                                 aria-hidden="true"
                             />
 
-                            {/* Sweeping radar ring while connecting */}
                             {busy ? (
                                 <span
                                     className="absolute inset-0 rounded-full border-2 border-transparent border-t-status-connecting animate-sweep"
@@ -334,154 +391,197 @@ function ConnectionView({
                                 />
                             ) : null}
 
-                            {/* Connected breathing aura */}
                             {isConnected ? (
                                 <span
-                                    className="absolute inset-1 rounded-full border border-status-connected/30 animate-breathe"
+                                    className="absolute -inset-2 rounded-full border border-status-connected/40 animate-breathe"
                                     aria-hidden="true"
                                 />
                             ) : null}
 
-                            {/* Inner Tactile Push Core */}
+                            {/* Off is an outlined disc, on is a filled one. */}
                             <span
                                 className={cn(
-                                    "absolute inset-3 rounded-full flex items-center justify-center border transition-all duration-300",
+                                    "absolute inset-2 rounded-full flex items-center justify-center border-2 shadow-lg transition-all duration-300",
                                     isConnected
-                                        ? "bg-linear-to-tr from-status-connected to-status-connecting border-status-connected/50 text-primary-foreground"
+                                        ? "bg-linear-to-br from-status-connected to-status-connecting border-transparent text-primary-foreground"
                                         : isConnecting
                                           ? "bg-card border-status-connecting/40 text-status-connecting"
                                           : isError
-                                            ? "bg-card border-status-error/40 text-status-error"
-                                            : "bg-linear-to-b from-card to-muted/80 border-border text-foreground group-hover:border-primary/50 group-hover:shadow-xs"
+                                            ? "bg-card border-status-error/50 text-status-error"
+                                            : "bg-card border-primary/50 text-primary group-hover:border-primary"
                                 )}
                             >
                                 {busy ? (
-                                    <Loader2 size={52} strokeWidth={1.75} className="animate-spin text-status-connecting" />
+                                    <Loader2 size={64} strokeWidth={1.75} className="animate-spin" />
                                 ) : isError ? (
-                                    <TriangleAlert size={48} strokeWidth={1.75} className="text-status-error" />
+                                    <TriangleAlert size={60} strokeWidth={1.75} />
                                 ) : (
-                                    <Power
-                                        size={52}
-                                        strokeWidth={1.75}
-                                        className={cn(
-                                            "transition-transform duration-300 group-hover:scale-105",
-                                            isConnected ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary"
-                                        )}
-                                    />
+                                    <Power size={64} strokeWidth={2} className="transition-transform duration-300 group-hover:scale-105" />
                                 )}
                             </span>
                         </button>
 
-                        {/* Error / Alert feedback */}
-                        {isError && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-status-error font-medium">
-                                    {state.error || t("connection.hint.error")}
-                                </span>
-                                {!state.blocked && (
-                                    <Button size="sm" variant="ghost" onClick={onDismissError} className="h-7 text-xs">
-                                        {t("connection.dismiss")}
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-
-                        {state.blocked ? (
-                            <div className="flex items-center gap-1.5 rounded-full bg-status-error/15 px-3 py-1 text-xs text-status-error font-medium">
-                                <ShieldAlert size={14} />
-                                {t("connection.blocked")}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    {/* Real-time Telemetry & Speedometers Grid (Inside Mode) */}
-                    {layout.telemetryPlacement === "inside" ? renderTelemetryGrid() : null}
-
-                    {/* Bottom Row: Virtual IP & Privacy Pill Strip */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/30 px-4 py-2.5 text-xs">
-                        <div className="flex items-center gap-3">
-                            <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                                <ShieldCheck size={14} className={isConnected ? "text-status-connected" : "text-muted-foreground"} />
-                                {t("connection.publicIp")}:
-                            </span>
-                            <span className="font-mono font-medium tracking-tight">
-                                {!ipCheckEnabled
-                                    ? t("connection.ipOff")
-                                    : isCheckingIp
-                                      ? t("connection.checking")
-                                      : ipInfo?.ip || "—"}
-                            </span>
-                            {ipInfo?.ip ? (
-                                <button
-                                    type="button"
-                                    onClick={handleCopyIp}
-                                    title="Copy IP"
-                                    className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
-                                >
-                                    {copiedIp ? <Check size={12} className="text-status-connected" /> : <Copy size={12} />}
-                                </button>
+                        <div className="flex flex-col items-center gap-1.5 text-center">
+                            <div className="text-2xl sm:text-3xl font-semibold tracking-tight">{headline}</div>
+                            {subline ? <div className="text-sm text-muted-foreground">{subline}</div> : null}
+                            {isError && !state.blocked ? (
+                                <Button size="sm" variant="ghost" onClick={onDismissError} className="h-7 text-xs">
+                                    {t("connection.dismiss")}
+                                </Button>
                             ) : null}
-                            {ipInfo?.region ? (
-                                <Badge variant="secondary" className="text-[10px] font-normal py-0 px-1.5">
-                                    {ipInfo.region}
-                                </Badge>
+                            {state.blocked ? (
+                                <div className="mt-1 flex items-center gap-1.5 rounded-full bg-status-error/15 px-3 py-1 text-xs text-status-error font-medium">
+                                    <ShieldAlert size={14} />
+                                    {t("connection.blocked")}
+                                </div>
                             ) : null}
                         </div>
+                    </div>
 
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {/* Route: what the button connects with, and through which server. */}
+                    {source ? (
+                        <div className="flex items-stretch overflow-hidden rounded-2xl border border-border/60 bg-muted/30">
+                            <SourceSummary source={source} onOpen={() => onNavigateTab?.("configuration")} />
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        disabled={locked}
+                                        className={cn(
+                                            "flex max-w-[45%] shrink-0 items-center gap-2 border-s border-border/60 px-4 py-3 text-sm font-medium transition-colors",
+                                            "hover:bg-foreground/5 disabled:opacity-60 disabled:pointer-events-none"
+                                        )}
+                                    >
+                                        <Flag auto={isAuto} name={activeProfile?.name} size={20} />
+                                        <span className="truncate">{withoutFlagEmoji(activeServerLabel)}</span>
+                                        {activePing !== null && activePing !== undefined ? (
+                                            <span className="shrink-0 font-mono text-xs text-muted-foreground">{activePing}ms</span>
+                                        ) : null}
+                                        <ChevronDown size={14} className="shrink-0 opacity-60" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+                                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                        {t("proxies.title")}
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={onSelectAuto} className="flex items-center justify-between text-xs">
+                                        <span className="flex items-center gap-2">
+                                            <Zap size={14} className="text-primary" />
+                                            {t("proxies.auto")}
+                                        </span>
+                                        {isAuto ? <Check size={14} className="text-primary" /> : null}
+                                    </DropdownMenuItem>
+                                    {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
+                                    {quickPickProfiles.map((p) => {
+                                        const ping = profilePings[p.id];
+                                        return (
+                                            <DropdownMenuItem
+                                                key={p.id}
+                                                disabled={Boolean(unsupported[p.id])}
+                                                title={unsupported[p.id]}
+                                                onClick={() => onSelectProxy?.(p.id)}
+                                                className="flex items-center justify-between text-xs gap-2"
+                                            >
+                                                <Flag name={p.name} size={18} />
+                                                <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
+                                                {ping ? (
+                                                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">{ping}ms</span>
+                                                ) : null}
+                                                {!isAuto && selectedProfileId === p.id ? (
+                                                    <Check size={14} className="text-primary shrink-0" />
+                                                ) : null}
+                                            </DropdownMenuItem>
+                                        );
+                                    })}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => onNavigateTab?.("proxies")}
+                                        className="text-xs text-primary font-medium"
+                                    >
+                                        {t("proxies.sort.list")} →
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    ) : (
+                        <div className="flex justify-center">
+                            <Button onClick={onAddProfile} disabled={locked} className="h-11 gap-2 rounded-full px-6 text-sm font-semibold">
+                                <Plus size={17} />
+                                {t("connection.empty.action")}
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Live numbers only mean something while connected. */}
+                    {isConnected && activeMetrics.length > 0 ? (
+                        layout.telemetryPlacement === "below" ? (
+                            <div className="rounded-2xl bg-muted/30 p-4 sm:p-5">{renderTelemetryGrid()}</div>
+                        ) : (
+                            renderTelemetryGrid()
+                        )
+                    ) : null}
+
+                    {isConnected ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/30 px-4 py-2.5 text-xs">
+                            <div className="flex items-center gap-3">
+                                <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                                    <ShieldCheck size={14} className="text-status-connected" />
+                                    {t("connection.publicIp")}:
+                                </span>
+                                <span className="font-mono font-medium tracking-tight">
+                                    {!ipCheckEnabled
+                                        ? t("connection.ipOff")
+                                        : isCheckingIp
+                                          ? t("connection.checking")
+                                          : ipInfo?.ip || "—"}
+                                </span>
+                                {ipInfo?.ip ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyIp}
+                                        title={t("connection.copyIp")}
+                                        aria-label={t("connection.copyIp")}
+                                        className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                                    >
+                                        {copiedIp ? <Check size={12} className="text-status-connected" /> : <Copy size={12} />}
+                                    </button>
+                                ) : null}
+                                {ipInfo?.region ? (
+                                    <span className="rounded-md bg-muted px-1.5 text-[10px] text-muted-foreground">{ipInfo.region}</span>
+                                ) : null}
+                            </div>
                             {killSwitch ? (
-                                <span className="flex items-center gap-1 text-primary">
-                                    <Lock size={11} /> Kill Switch On
+                                <span className="flex items-center gap-1 text-[11px] text-primary">
+                                    <Lock size={11} /> {t("connection.killSwitchOn")}
                                 </span>
                             ) : null}
-                            <span>MTU: {mtu}</span>
-                            <span className="opacity-40">·</span>
-                            <span>DNS Secure</span>
                         </div>
-                    </div>
-                </div>
+                    ) : null}
 
-                {/* Real-time Telemetry & Speedometers (Below Mode) */}
-                {layout.telemetryPlacement === "below" && activeMetrics.length > 0 ? (
-                    <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-md p-4 sm:p-5 shadow-xs">
-                        {renderTelemetryGrid()}
-                    </div>
-                ) : null}
-
-                {/* Optional Quick Switcher Card on Dashboard */}
-                {layout.showQuickSwitch ? (
-                    <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur-md p-5 shadow-xs flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                                <Server size={18} className="text-primary" />
-                            </div>
-                            <div className="min-w-0">
-                                <div className="text-[11px] text-muted-foreground font-normal">Active Node</div>
-                                <div className="text-sm font-semibold truncate flex items-center gap-2">
-                                    <span className="truncate">{selectedProxyMode === "auto" ? t("proxies.auto") : (activeProfile?.name || t("topbar.none"))}</span>
-                                    {activePing !== null && activePing !== undefined ? (
-                                        <Badge variant="outline" className="text-[10px] font-mono py-0 px-1.5 text-muted-foreground shrink-0">
-                                            {activePing}ms
-                                        </Badge>
-                                    ) : null}
+                    {/* Optional quick switcher card, from the layout settings. */}
+                    {layout.showQuickSwitch ? (
+                        <div className="rounded-2xl bg-muted/50 p-5 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                    <Server size={18} className="text-primary" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[11px] text-muted-foreground font-normal">{t("connection.activeServer")}</div>
+                                    <div className="text-sm font-semibold truncate">{activeServerLabel}</div>
                                 </div>
                             </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onNavigateTab?.("proxies")}
+                                className="h-8 text-xs shrink-0"
+                            >
+                                {t("connection.change")} →
+                            </Button>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onNavigateTab?.("proxies")}
-                            className="h-8 text-xs shrink-0"
-                        >
-                            Change →
-                        </Button>
-                    </div>
-                ) : null}
+                    ) : null}
 
-                {/* 2. SPEED TEST (Embedded when connected) */}
-                {isConnected && layout.showSpeedTest ? (
-                    <SpeedTest />
-                ) : null}
+                    {isConnected && layout.showSpeedTest ? <SpeedTest /> : null}
                 </div>
             </div>
         </div>
