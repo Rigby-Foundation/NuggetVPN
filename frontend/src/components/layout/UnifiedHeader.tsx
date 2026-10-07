@@ -21,6 +21,7 @@ import { ConfigSource, ConnectionState, Profile, ProxyMode, TrafficSample } from
 import { Flag } from "@/components/ui/flag";
 import { useUnsupported } from "@/lib/core-support";
 import { withoutFlagEmoji } from "@/lib/flags";
+import { maximiseOnDoubleClick } from "@/components/layout/header-double-click";
 
 export interface NavTabItem {
     id: string;
@@ -120,6 +121,7 @@ export function UnifiedHeader({
                 "pt-[env(safe-area-inset-top,0px)]"
             )}
             dir={dir}
+            onDoubleClick={maximiseOnDoubleClick(onMaximize, platform)}
         >
             <div className={cn("flex h-14 w-full items-center justify-between", isMac && "pt-1")}>
                 {/* Left Area: Window Controls + Brand Beacon */}

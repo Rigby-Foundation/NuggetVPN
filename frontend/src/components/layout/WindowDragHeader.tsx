@@ -19,6 +19,7 @@ import { ConfigSource, ConnectionState, Profile, ProxyMode } from "@/types";
 import { Flag } from "@/components/ui/flag";
 import { useUnsupported } from "@/lib/core-support";
 import { withoutFlagEmoji } from "@/lib/flags";
+import { maximiseOnDoubleClick } from "@/components/layout/header-double-click";
 
 interface WindowDragHeaderProps {
     platform?: string;
@@ -98,6 +99,7 @@ export function WindowDragHeader({
                 isMac ? "h-11 pt-0.5" : "h-9"
             )}
             dir={dir}
+            onDoubleClick={maximiseOnDoubleClick(onMaximize, platform)}
         >
             {/* Left Area: Mac Window Controls and/or Brand */}
             <div className="flex items-center gap-3 shrink-0">

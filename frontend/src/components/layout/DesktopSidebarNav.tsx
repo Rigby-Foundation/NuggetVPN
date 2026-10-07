@@ -21,6 +21,7 @@ import { NAV_TABS } from "./UnifiedHeader";
 import { Flag } from "@/components/ui/flag";
 import { useUnsupported } from "@/lib/core-support";
 import { withoutFlagEmoji } from "@/lib/flags";
+import { maximiseOnDoubleClick } from "@/components/layout/header-double-click";
 
 interface DesktopSidebarNavProps {
     position: "left" | "right";
@@ -108,7 +109,7 @@ export function DesktopSidebarNav({
                 "drag-region flex items-center justify-between px-4 shrink-0",
                 !inset && "border-b border-border/40",
                 isMac ? "h-14 pt-1" : "h-13"
-            )}>
+            )} onDoubleClick={maximiseOnDoubleClick(onMaximize, platform)}>
                 <div className="flex items-center gap-2.5 min-w-0">
                     {isMac && position === "left" ? (
                         <div className="me-1">
