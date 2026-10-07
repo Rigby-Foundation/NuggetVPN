@@ -239,7 +239,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
     const t = useT();
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
-    const { setCenter, getZoom, fitView } = useReactFlow();
+    const { setCenter, getZoom, fitView, getNodes, getEdges } = useReactFlow();
     // The zoom, for CSS: a connector's catch area stays the same size on
     // screen however far the canvas is zoomed out. See App.css.
     const zoom = useStore((state) => state.transform[2]);
@@ -600,6 +600,51 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
         },
         [onChange, updateRule]
     );
+
+    /**
+     * Delete (or Backspace) removes what is selected: rules, servers and
+     * notes, and cuts selected wires. It is one change, so one undo brings
+     * it all back. The catch-all and the destinations can't be removed.
+     */
+    const removeSelected = useCallback(() => {
+        const selected = new Set(getNodes().filter((node) => node.selected).map((node) => node.id));
+        const cut = new Set(
+            getEdges()
+                .filter((edge) => edge.selected && edge.id !== "edge:default" && edge.source !== DEFAULT_NODE)
+                .filter((edge) => edge.deletable !== false && (edge.data as Record<string, unknown> | undefined)?.deletable !== false)
+                .map((edge) => (edge.id.startsWith("edge:") ? edge.id.slice("edge:".length) : edge.source))
+        );
+        const current = settingsRef.current;
+        const goneServers = serversRef.current.filter((id) => selected.has(serverNodeId(id)));
+        const goneRules = rulesRef.current.filter((rule) => selected.has(rule.id));
+        const goneComments = commentsRef.current.filter((comment) => selected.has(comment.id));
+        if (goneServers.length + goneRules.length + goneComments.length + cut.size === 0) return;
+
+        const layoutWithout = { ...layoutRef.current };
+        selected.forEach((id) => delete layoutWithout[id]);
+        onChange({
+            routing_rules: rulesRef.current
+                .filter((rule) => !selected.has(rule.id))
+                .map((rule) => (cut.has(rule.id) ? { ...rule, action: "" as RoutingAction, server: "" } : rule))
+                .map((rule) => (goneServers.includes(rule.server ?? "") ? { ...rule, server: "" } : rule)),
+            routing_comments: commentsRef.current.filter((comment) => !selected.has(comment.id)),
+            routing_servers: serversRef.current.filter((id) => !goneServers.includes(id)),
+            default_server: goneServers.includes(current.default_server ?? "") ? "" : current.default_server,
+            routing_layout: layoutWithout,
+        });
+    }, [getNodes, getEdges, onChange]);
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== "Delete" && event.key !== "Backspace") return;
+            const target = event.target as HTMLElement | null;
+            // In a field the key edits the text.
+            if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=menu], [role=listbox]")) return;
+            event.preventDefault();
+            removeSelected();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [removeSelected]);
 
     /** Clicking an edge with scissors cuts that connection. */
     const onEdgeClick = useCallback(
@@ -1112,11 +1157,13 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             // Inside a text field the keys undo the typing, as everywhere.
             if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]")) return;
             if (!(event.ctrlKey || event.metaKey)) return;
-            const key = event.key.toLowerCase();
-            if (key === "z" && !event.shiftKey) {
+            // The physical key, so the shortcuts work on any layout: on a
+            // Russian one, Z types "я" and Y "н".
+            const key = event.code;
+            if (key === "KeyZ" && !event.shiftKey) {
                 event.preventDefault();
                 undo();
-            } else if ((key === "z" && event.shiftKey) || key === "y") {
+            } else if ((key === "KeyZ" && event.shiftKey) || key === "KeyY") {
                 event.preventDefault();
                 redo();
             }
