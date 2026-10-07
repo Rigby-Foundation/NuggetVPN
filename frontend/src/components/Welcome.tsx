@@ -12,6 +12,7 @@ import {
   Split,
 } from "lucide-react";
 
+import { useAppearance } from "@/components/appearance-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { NavPosition } from "@/lib/appearance";
 import { LANGUAGES, LanguageChoice, MessageKey, useI18n } from "@/lib/i18n";
 import { THEME_PRESETS } from "@/lib/themes";
 import { cn } from "@/lib/utils";
@@ -56,6 +58,26 @@ const STARTER_THEMES = ["light", "paper", "frost", "dark", "slate", "stone", "co
 
 const STEPS = 4;
 
+/** Where the navigation goes, with a wireframe of each. */
+const NAV_CHOICES: { id: NavPosition; label: MessageKey }[] = [
+  { id: "bottom", label: "appearance.layout.navPosition.bottom" },
+  { id: "top", label: "appearance.layout.navPosition.top" },
+  { id: "sidebar-left", label: "appearance.layout.navPosition.sidebarLeft" },
+  { id: "sidebar-right", label: "appearance.layout.navPosition.sidebarRight" },
+];
+
+function NavWireframe({ id }: { id: NavPosition }) {
+  const bar = <div className={cn("rounded-[2px] bg-primary", id === "top" || id === "bottom" ? "h-2 w-full" : "h-full w-3")} />;
+  const content = <div className="flex-1 rounded-[2px] bg-muted-foreground/20" />;
+  const vertical = id === "top" || id === "bottom";
+  const first = id === "top" || id === "sidebar-left";
+  return (
+    <div className={cn("flex h-11 w-full gap-1 rounded-md border bg-muted/30 p-1", vertical ? "flex-col" : "flex-row")} aria-hidden="true">
+      {first ? <>{bar}{content}</> : <>{content}{bar}</>}
+    </div>
+  );
+}
+
 /** A miniature of a theme: its page, a raised surface, and the accent. */
 function Swatch({ background, surface, accent }: { background: string; surface: string; accent: string }) {
   return (
@@ -86,6 +108,7 @@ function Welcome({
   onFinish,
 }: WelcomeProps) {
   const { t, choice, setChoice } = useI18n();
+  const { prefs, setLayout } = useAppearance();
   const [step, setStep] = useState(0);
   const [link, setLink] = useState("");
   const [adding, setAdding] = useState(false);
@@ -263,6 +286,33 @@ function Welcome({
                   </button>
                 ))}
               </div>
+
+              {/* Phones keep their own navigation; this is for a window. */}
+              {isPhone ? null : (
+                <>
+                  <h2 className="mt-7 text-sm font-semibold">{t("appearance.layout.navPosition")}</h2>
+                  <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {NAV_CHOICES.map((choice) => {
+                      const active = prefs.layout.navPosition === choice.id;
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          onClick={() => setLayout({ navPosition: choice.id })}
+                          aria-pressed={active}
+                          className={cn(
+                            "rounded-xl border p-2 text-start transition-all",
+                            active ? "border-primary ring-1 ring-primary" : "border-border/60 hover:border-border"
+                          )}
+                        >
+                          <NavWireframe id={choice.id} />
+                          <div className="mt-1.5 truncate text-xs font-medium">{t(choice.label)}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </>
           ) : step === 2 ? (
             <>

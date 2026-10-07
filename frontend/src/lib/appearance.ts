@@ -390,7 +390,7 @@ export interface LayoutPrefs {
 }
 
 export const DEFAULT_LAYOUT: LayoutPrefs = {
-    navPosition: "top",
+    navPosition: "bottom",
     sidebarStyle: "attached",
     cockpitAlign: "center",
     telemetryPlacement: "inside",

@@ -50,6 +50,7 @@ import {
 
 import "./App.css";
 import { usePageVisible } from "@/hooks/use-page-visible";
+import { DEFAULT_LAYOUT } from "@/lib/appearance";
 
 /**
  * Settings are owned by Go, including their defaults and normalisation. This is
@@ -962,7 +963,7 @@ function App() {
     const isMac = platform === "macos";
     // A phone: no window to control, and the page is the whole screen.
     const isPhone = platform === "android" || platform === "ios";
-    const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || "top");
+    const navPosition = isMobile ? "top" : (appearance.prefs.layout?.navPosition || DEFAULT_LAYOUT.navPosition);
     const insetSidebar =
         (navPosition === "sidebar-left" || navPosition === "sidebar-right") &&
         appearance.prefs.layout?.sidebarStyle === "inset";
