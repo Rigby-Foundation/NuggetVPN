@@ -385,6 +385,18 @@ func buildInbounds(settings models.AppSettings, mixedPort int, bypass *Bypass) [
 	return inbounds
 }
 
+// proxiedDNS is how queries reach a resolver through a server: over TCP.
+//
+// The core's UDP client sends every query over one shared connection, and
+// through a proxy the first moments of that connection lose queries: a burst
+// sent while it is being set up mostly goes unanswered, and each lost query
+// costs the asker a 5-second timeout. Connecting fires exactly such a burst —
+// the system and every open app look their names up again — so the first
+// seconds of every connection crawled, and apps like Discord gave up and
+// reconnected. Over TCP each query gets a connection of its own until the
+// server is known to take several on one, so none is dropped.
+const proxiedDNS = "tcp"
+
 // buildDNS wires the resolver.
 //
 // Names resolve for real, through the tunnel, rather than through fake-IP.
@@ -398,7 +410,7 @@ func buildInbounds(settings models.AppSettings, mixedPort int, bypass *Bypass) [
 func (p *routePlan) buildDNS(splitTunnel bool, serverDomains []string) map[string]any {
 	settings := p.settings
 	servers := []map[string]any{
-		{"type": "udp", "tag": dnsProxyTag, "server": settings.DNS, "server_port": 53, "detour": ExitTag},
+		{"type": proxiedDNS, "tag": dnsProxyTag, "server": settings.DNS, "server_port": 53, "detour": ExitTag},
 		// No detour: this is the bootstrap used to resolve the proxy's own
 		// hostname, which cannot go through the tunnel it is dialing.
 		{"type": "udp", "tag": dnsDirectTag, "server": settings.DNS, "server_port": 53},
@@ -437,7 +449,7 @@ func (p *routePlan) buildDNS(splitTunnel bool, serverDomains []string) map[strin
 		}
 		tag := "dns-via-" + outbound
 		servers = append(servers, map[string]any{
-			"type": "udp", "tag": tag, "server": settings.DNS, "server_port": 53, "detour": outbound,
+			"type": proxiedDNS, "tag": tag, "server": settings.DNS, "server_port": 53, "detour": outbound,
 		})
 		viaTags[outbound] = tag
 		return tag
@@ -506,8 +518,13 @@ func dnsServer(tag string, parsed models.DNSServer, outbound string) map[string]
 	if parsed.Type == "local" {
 		return map[string]any{"type": "local", "tag": tag}
 	}
+	kind := parsed.Type
+	if kind == "udp" && outbound != DirectTag {
+		// Plain DNS through a server goes over TCP; see proxiedDNS.
+		kind = proxiedDNS
+	}
 	server := map[string]any{
-		"type":        parsed.Type,
+		"type":        kind,
 		"tag":         tag,
 		"server":      parsed.Server,
 		"server_port": parsed.Port,
