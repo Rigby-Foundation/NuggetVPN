@@ -52,6 +52,63 @@ jobs:
           path: bin/*.dmg
           if-no-files-found: error
 
+  ios:
+    name: iOS (unsigned .ipa)
+    # Unsigned: Nugget has no App Store or TestFlight distribution, so the
+    # .ipa is for people who sign apps with their own certificate. Their
+    # certificate must allow Network Extensions (packet tunnel) for the
+    # tunnel to start; a free Apple ID's does not.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Put Go tool binaries on PATH
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Wails CLI
+        id: wails-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3*
+          key: wails3-${{ runner.os }}-${{ runner.arch }}-${{ env.WAILS_VERSION }}
+
+      - name: Install Wails
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+
+      - name: Install frontend dependencies
+        run: bun install --cwd frontend --frozen-lockfile
+
+      - name: Point the Go build at the iOS entry point
+        # What `wails3 ios overlay:gen` writes, written by hand: running it
+        # would also regenerate build/ios/xcode/gen/main_ios.gen.go and drop
+        # the packet tunnel's exported functions.
+        shell: bash
+        run: |
+          printf '{"Replace":{"%s/main_ios.gen.go":"%s/build/ios/xcode/gen/main_ios.gen.go"}}' "$PWD" "$PWD" > build/ios/xcode/overlay.json
+
+      - name: Build .ipa
+        shell: bash
+        run: |
+          wails3 task ios:ipa
+          mv bin/NuggetVPN.ipa "bin/NuggetVPN-${{ github.ref_name }}-ios-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: bin/*.ipa
+          if-no-files-found: error
+
   linux:
     name: Linux (.deb / .rpm / .AppImage)
     runs-on: ubuntu-24.04
@@ -285,7 +342,7 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [macos, linux, windows, android]
+    needs: [macos, ios, linux, windows, android]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -310,5 +367,6 @@ jobs:
             artifacts/**/*.zip
             artifacts/**/*-installer.exe
             artifacts/**/*.apk
+            artifacts/**/*.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
