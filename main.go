@@ -44,7 +44,7 @@ var trayIcon []byte
 
 // version is stamped into the core service handshake so the GUI can detect a
 // service left behind by an older build.
-var version = "2.2.0"
+var version = "2.3.0"
 
 func main() {
 	// NuggetVPN status, connect, ...: control the running app and exit.
