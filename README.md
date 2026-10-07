@@ -1,6 +1,6 @@
 # NuggetVPN
 
-A fast, good-looking VPN client for Windows, macOS, Linux and Android, built with
+A fast, good-looking VPN client for Windows, macOS, Linux, Android and iOS, built with
 [Wails v3](https://v3.wails.io/) and [React 19](https://react.dev/).
 
 Every proxy core it can run is compiled **into** the app as a Go library.
@@ -28,6 +28,14 @@ there, the AppImage otherwise. Or download from
 [Releases](https://github.com/Rigby-Foundation/NuggetVPN/releases): on
 Windows, `…-silent-installer.exe` installs with no questions asked, and the
 regular installer takes `/S` for the same.
+
+> [!WARNING]
+> **iOS: you sign it yourself.** NuggetVPN is not on the App Store. Each
+> release has an unsigned `…-ios-unsigned.ipa` (iOS 15 and newer) for you to
+> sign with your own certificate, in a signing app or with TrollStore. The
+> certificate must allow VPN apps (Network Extensions, packet tunnel): one
+> from a free Apple ID doesn't, so with it the app installs but never
+> connects.
 
 ## Features
 
