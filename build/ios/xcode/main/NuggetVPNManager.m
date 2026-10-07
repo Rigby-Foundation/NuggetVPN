@@ -105,16 +105,84 @@
                 NSError *startError = nil;
                 NSDictionary *options = @{ @"config": configJSON ?: @"" };
                 BOOL started = [manager.connection startVPNTunnelWithOptions:options andReturnError:&startError];
-                if (!started && startError) {
+                if (!started) {
                     NSLog(@"[NuggetVPNManager] startVPNTunnel error: %@", startError);
-                    if (completion) completion(startError);
-                } else {
-                    NSLog(@"[NuggetVPNManager] VPN Tunnel start requested successfully");
-                    if (completion) completion(nil);
+                    if (completion) completion(startError ?: [NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-2 userInfo:@{NSLocalizedDescriptionKey: @"iOS refused to start the VPN"}]);
+                    return;
                 }
+                // Accepting the request is not connecting: the extension may
+                // still fail to bring the tunnel up. Report success only once
+                // iOS says the tunnel is connected, and the extension's own
+                // error otherwise.
+                [self waitForConnection:manager completion:completion];
             }];
         }];
     }];
+}
+
+/// Waits up to 30 s for the tunnel to reach Connected. A fall back to
+/// Disconnected or Invalid means the extension gave up; its reason comes from
+/// the system's record of the last disconnect.
+- (void)waitForConnection:(NETunnelProviderManager *)manager completion:(void (^)(NSError * _Nullable error))completion {
+    NEVPNConnection *connection = manager.connection;
+    __block BOOL finished = NO;
+    __block BOOL leftIdle = NO;
+    __block id observer = nil;
+    NSObject *lock = [NSObject new];
+
+    void (^finish)(NSError *) = ^(NSError *error) {
+        @synchronized (lock) {
+            if (finished) return;
+            finished = YES;
+        }
+        if (observer) [[NSNotificationCenter defaultCenter] removeObserver:observer];
+        if (completion) completion(error);
+    };
+
+    void (^failed)(void) = ^{
+        NSError *fallback = [NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-3 userInfo:@{NSLocalizedDescriptionKey: @"The VPN extension stopped before connecting. Its log lines start with [PacketTunnel] in Console."}];
+        if (@available(iOS 16.0, *)) {
+            [connection fetchLastDisconnectErrorWithCompletionHandler:^(NSError * _Nullable error) {
+                finish(error ?: fallback);
+            }];
+        } else {
+            finish(fallback);
+        }
+    };
+
+    void (^check)(void) = ^{
+        switch (connection.status) {
+            case NEVPNStatusConnected:
+                finish(nil);
+                break;
+            case NEVPNStatusConnecting:
+            case NEVPNStatusReasserting:
+                leftIdle = YES;
+                break;
+            case NEVPNStatusDisconnected:
+            case NEVPNStatusInvalid:
+                // The status is still Disconnected for a moment after the
+                // start request; only a fall back after leaving it counts.
+                if (leftIdle) failed();
+                break;
+            default:
+                break;
+        }
+    };
+
+    observer = [[NSNotificationCenter defaultCenter] addObserverForName:NEVPNStatusDidChangeNotification
+                                                                 object:connection
+                                                                  queue:[NSOperationQueue new]
+                                                             usingBlock:^(NSNotification * _Nonnull note) { check(); }];
+    check();
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        BOOL pending;
+        @synchronized (lock) { pending = !finished; }
+        if (!pending) return;
+        [connection stopVPNTunnel];
+        finish([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-4 userInfo:@{NSLocalizedDescriptionKey: @"The VPN did not connect within 30 seconds"}]);
+    });
 }
 
 - (void)stopWithCompletion:(void (^)(NSError * _Nullable error))completion {
@@ -177,7 +245,11 @@ char *NuggetVPN_StartTunnel(const char *configJSON) {
         dispatch_semaphore_signal(sem);
     }];
 
-    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC));
+    // waitForConnection gives up at 30 s; this is a backstop, and running
+    // out of it is a failure, never a success.
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 40 * NSEC_PER_SEC)) != 0) {
+        return strdup("The VPN did not report back in time");
+    }
     if (errorString) {
         return strdup([errorString UTF8String]);
     }

@@ -5,6 +5,7 @@ package ios
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 
 	box "github.com/sagernet/sing-box"
@@ -23,9 +24,17 @@ var (
 	traffic     *trafficcontrol.Manager
 )
 
+// extensionMemoryLimit keeps the Go heap well under what iOS allows a packet
+// tunnel extension (about 50 MB in all, code and Go's own overhead included).
+// Going over gets the extension killed without a word: the tunnel just
+// stops. A soft limit makes the collector work harder as it nears it instead.
+const extensionMemoryLimit = 32 << 20
+
 func StartTunnel(configJSON []byte, fd int) error {
 	tunnelRunMu.Lock()
 	defer tunnelRunMu.Unlock()
+
+	debug.SetMemoryLimit(extensionMemoryLimit)
 
 	if instance != nil {
 		_ = stopTunnelLocked()

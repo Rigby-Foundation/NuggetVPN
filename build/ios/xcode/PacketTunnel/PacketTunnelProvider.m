@@ -1,5 +1,99 @@
 #import <NetworkExtension/NetworkExtension.h>
+#include <sys/socket.h>
+#include <net/if.h>
 #import "NuggetVPN.h"
+
+// The utun control socket iOS made for this tunnel. Found the way WireGuard
+// and sing-box's own iOS app find it: the open descriptor whose
+// UTUN_OPT_IFNAME answers with a utun name. Reading it through the packet
+// flow's private keys breaks between iOS releases.
+#define NUGGET_SYSPROTO_CONTROL 2
+#define NUGGET_UTUN_OPT_IFNAME 2
+static int NuggetFindTunnelFD(void) {
+    char name[IFNAMSIZ];
+    for (int fd = 0; fd < 1024; fd++) {
+        socklen_t length = sizeof(name);
+        if (getsockopt(fd, NUGGET_SYSPROTO_CONTROL, NUGGET_UTUN_OPT_IFNAME, name, &length) == 0 && strncmp(name, "utun", 4) == 0) {
+            return fd;
+        }
+    }
+    return -1;
+}
+
+// An IPv4 netmask for a prefix length.
+static NSString *NuggetMask(int prefix) {
+    uint32_t mask = prefix <= 0 ? 0 : (prefix >= 32 ? 0xFFFFFFFF : (0xFFFFFFFFu << (32 - prefix)));
+    return [NSString stringWithFormat:@"%u.%u.%u.%u", (mask >> 24) & 0xFF, (mask >> 16) & 0xFF, (mask >> 8) & 0xFF, mask & 0xFF];
+}
+
+// The interface settings, from the config's tun inbound: the same address
+// and MTU sing-box is told, so iOS does not drop the packets sing-box sizes
+// for its own MTU, and the local networks the config keeps off the tunnel.
+static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configString) {
+    NSArray *v4Addresses = @[@"172.19.0.1"], *v4Masks = @[@"255.255.255.252"];
+    NSMutableArray<NSString *> *v6Addresses = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *v6Prefixes = [NSMutableArray array];
+    NSMutableArray<NEIPv4Route *> *v4Excluded = [NSMutableArray array];
+    NSMutableArray<NEIPv6Route *> *v6Excluded = [NSMutableArray array];
+    NSNumber *mtu = @(9000);
+
+    NSData *data = [configString dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *config = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    NSDictionary *tunInbound = nil;
+    if ([config isKindOfClass:[NSDictionary class]]) {
+        for (NSDictionary *inbound in config[@"inbounds"]) {
+            if ([inbound isKindOfClass:[NSDictionary class]] && [inbound[@"type"] isEqual:@"tun"]) {
+                tunInbound = inbound;
+                break;
+            }
+        }
+    }
+    if (tunInbound) {
+        if ([tunInbound[@"mtu"] isKindOfClass:[NSNumber class]] && [tunInbound[@"mtu"] intValue] > 0) {
+            mtu = tunInbound[@"mtu"];
+        }
+        NSMutableArray *addresses4 = [NSMutableArray array], *masks4 = [NSMutableArray array];
+        for (NSString *cidr in tunInbound[@"address"]) {
+            NSArray *parts = [cidr componentsSeparatedByString:@"/"];
+            if (parts.count != 2) continue;
+            if ([parts[0] containsString:@":"]) {
+                [v6Addresses addObject:parts[0]];
+                [v6Prefixes addObject:@([parts[1] intValue])];
+            } else {
+                [addresses4 addObject:parts[0]];
+                [masks4 addObject:NuggetMask([parts[1] intValue])];
+            }
+        }
+        if (addresses4.count > 0) { v4Addresses = addresses4; v4Masks = masks4; }
+        for (NSString *cidr in tunInbound[@"route_exclude_address"]) {
+            NSArray *parts = [cidr componentsSeparatedByString:@"/"];
+            if (parts.count != 2) continue;
+            if ([parts[0] containsString:@":"]) {
+                [v6Excluded addObject:[[NEIPv6Route alloc] initWithDestinationAddress:parts[0] networkPrefixLength:@([parts[1] intValue])]];
+            } else {
+                [v4Excluded addObject:[[NEIPv4Route alloc] initWithDestinationAddress:parts[0] subnetMask:NuggetMask([parts[1] intValue])]];
+            }
+        }
+    }
+
+    NEPacketTunnelNetworkSettings *settings = [[NEPacketTunnelNetworkSettings alloc] initWithTunnelRemoteAddress:@"127.0.0.1"];
+    NEIPv4Settings *ipv4 = [[NEIPv4Settings alloc] initWithAddresses:v4Addresses subnetMasks:v4Masks];
+    ipv4.includedRoutes = @[[NEIPv4Route defaultRoute]];
+    ipv4.excludedRoutes = v4Excluded;
+    settings.IPv4Settings = ipv4;
+    if (v6Addresses.count > 0) {
+        NEIPv6Settings *ipv6 = [[NEIPv6Settings alloc] initWithAddresses:v6Addresses networkPrefixLengths:v6Prefixes];
+        ipv6.includedRoutes = @[[NEIPv6Route defaultRoute]];
+        ipv6.excludedRoutes = v6Excluded;
+        settings.IPv6Settings = ipv6;
+    }
+    // Any server works: the config hijacks DNS on port 53 inside the tunnel.
+    NEDNSSettings *dns = [[NEDNSSettings alloc] initWithServers:@[@"1.1.1.1"]];
+    dns.matchDomains = @[@""];
+    settings.DNSSettings = dns;
+    settings.MTU = mtu;
+    return settings;
+}
 
 @interface PacketTunnelProvider : NEPacketTunnelProvider
 @end
@@ -26,16 +120,7 @@
         return;
     }
 
-    // Configure virtual network settings
-    NEPacketTunnelNetworkSettings *settings = [[NEPacketTunnelNetworkSettings alloc] initWithTunnelRemoteAddress:@"127.0.0.1"];
-
-    NEIPv4Settings *ipv4 = [[NEIPv4Settings alloc] initWithAddresses:@[@"172.19.0.1"] subnetMasks:@[@"255.255.255.0"]];
-    ipv4.includedRoutes = @[[NEIPv4Route defaultRoute]];
-    settings.IPv4Settings = ipv4;
-
-    NEDNSSettings *dns = [[NEDNSSettings alloc] initWithServers:@[@"1.1.1.1", @"8.8.8.8"]];
-    settings.DNSSettings = dns;
-    settings.MTU = @(4064);
+    NEPacketTunnelNetworkSettings *settings = NuggetSettingsFromConfig(configString);
 
     [self setTunnelNetworkSettings:settings completionHandler:^(NSError * _Nullable error) {
         if (error) {
@@ -44,18 +129,13 @@
             return;
         }
 
-        int tunFd = -1;
-        @try {
-            tunFd = [[self.packetFlow valueForKeyPath:@"_socket.fileDescriptor"] intValue];
-        } @catch (NSException *ex) {
-            NSLog(@"[PacketTunnel] Exception extracting tunFd: %@", ex);
-        }
-
+        int tunFd = NuggetFindTunnelFD();
         if (tunFd <= 0) {
+            // Older iOS releases exposed it on the packet flow.
             @try {
-                tunFd = [[self.packetFlow valueForKey:@"socket.fileDescriptor"] intValue];
+                tunFd = [[self.packetFlow valueForKeyPath:@"socket.fileDescriptor"] intValue];
             } @catch (NSException *ex) {
-                NSLog(@"[PacketTunnel] Exception fallback extracting tunFd: %@", ex);
+                NSLog(@"[PacketTunnel] No descriptor on the packet flow: %@", ex);
             }
         }
 

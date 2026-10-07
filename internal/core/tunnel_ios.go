@@ -15,8 +15,21 @@ void NuggetVPN_GetStats(long long *up, long long *down);
 import "C"
 import (
 	"errors"
+	"sync/atomic"
 	"time"
 	"unsafe"
+)
+
+// iosExpectUp is set while the app means the tunnel to be up: from a start
+// that iOS confirmed until the app stops it. A tunnel that goes down in
+// between went down by itself.
+var iosExpectUp atomic.Bool
+
+// NEVPNStatus values.
+const (
+	iosStatusConnecting  = 2
+	iosStatusConnected   = 3
+	iosStatusReasserting = 4
 )
 
 func StartTunnelIOS(configJSON []byte) error {
@@ -28,10 +41,12 @@ func StartTunnelIOS(configJSON []byte) error {
 		defer C.free(unsafe.Pointer(errStr))
 		return errors.New(C.GoString(errStr))
 	}
+	iosExpectUp.Store(true)
 	return nil
 }
 
 func StopTunnelIOS() error {
+	iosExpectUp.Store(false)
 	C.NuggetVPN_StopTunnel()
 	return nil
 }
@@ -50,11 +65,18 @@ func (c *Client) startStatsTickerIOS() {
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range ticker.C {
-			if !c.Running() {
-				continue
+			switch GetTunnelStatusIOS() {
+			case iosStatusConnected, iosStatusConnecting, iosStatusReasserting:
+				up, down := GetTunnelStatsIOS()
+				c.dispatchEvent(EventStats, "", "", true, up, down)
+			default:
+				// The extension stopped without being asked: it failed,
+				// iOS ended it (memory), or the VPN was turned off in
+				// Settings. Say so, so the app stops showing "connected".
+				if iosExpectUp.CompareAndSwap(true, false) {
+					c.dispatchEvent(EventState, "", "", false, 0, 0)
+				}
 			}
-			up, down := GetTunnelStatsIOS()
-			c.dispatchEvent(EventStats, "", "", true, up, down)
 		}
 	}()
 }
