@@ -8,6 +8,7 @@ const fa: Messages = {
     "common.add": "افزودن",
     "common.back": "بازگشت",
     "common.cancel": "لغو",
+    "common.close": "بستن",
     "common.continue": "ادامه",
     "common.off": "خاموش",
     "common.save": "ذخیره",

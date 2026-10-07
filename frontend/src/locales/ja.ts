@@ -6,6 +6,7 @@ const ja: Messages = {
     "common.add": "追加",
     "common.back": "戻る",
     "common.cancel": "キャンセル",
+    "common.close": "閉じる",
     "common.continue": "続ける",
     "common.off": "オフ",
     "common.save": "保存",

@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast, { ToastBar, Toaster } from "react-hot-toast";
+import { X } from "lucide-react";
 
 import { appWindow, errorMessage, eventPayload, EVENTS, invoke, listen, save, writeTextFile } from "@/lib/backend";
 
@@ -1019,7 +1020,30 @@ function App() {
                         overflowWrap: "anywhere",
                     },
                 }}
-            />
+            >
+                {/* Every toast can be closed, not only waited out. One still
+                    in progress (loading) closes itself when it finishes. */}
+                {(shown) => (
+                    <ToastBar toast={shown}>
+                        {({ icon, message }) => (
+                            <>
+                                {icon}
+                                {message}
+                                {shown.type !== "loading" ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => toast.dismiss(shown.id)}
+                                        aria-label={t("common.close")}
+                                        className="-me-1 shrink-0 self-start rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <X size={14} aria-hidden="true" />
+                                    </button>
+                                ) : null}
+                            </>
+                        )}
+                    </ToastBar>
+                )}
+            </Toaster>
             <AddModal
                 isOpen={isModalOpen}
                 initialLink={offeredLink}

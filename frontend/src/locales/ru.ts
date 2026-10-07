@@ -4,6 +4,7 @@ const ru: Messages = {
     "common.add": "Добавить",
     "common.back": "Назад",
     "common.cancel": "Отмена",
+    "common.close": "Закрыть",
     "common.continue": "Продолжить",
     "common.off": "Выключено",
     "common.save": "Сохранить",

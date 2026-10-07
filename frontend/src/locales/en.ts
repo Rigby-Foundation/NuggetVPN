@@ -10,6 +10,7 @@ const en = {
     "common.add": "Add",
     "common.back": "Back",
     "common.cancel": "Cancel",
+    "common.close": "Close",
     "common.continue": "Continue",
     "common.off": "Off",
     "common.save": "Save",

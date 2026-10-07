@@ -6,6 +6,7 @@ const zh: Messages = {
     "common.add": "添加",
     "common.back": "返回",
     "common.cancel": "取消",
+    "common.close": "关闭",
     "common.continue": "继续",
     "common.off": "关闭",
     "common.save": "保存",

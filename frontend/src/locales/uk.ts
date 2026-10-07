@@ -4,6 +4,7 @@ const uk: Messages = {
     "common.add": "Додати",
     "common.back": "Назад",
     "common.cancel": "Скасувати",
+    "common.close": "Закрити",
     "common.continue": "Продовжити",
     "common.off": "Вимкнено",
     "common.save": "Зберегти",
