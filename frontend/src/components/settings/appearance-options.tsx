@@ -36,7 +36,8 @@ import {
 } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
-import { hueTrack, Slider } from "@/components/settings/theme-editor";
+import { Slider } from "@/components/settings/theme-editor";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Switch } from "@/components/ui/switch";
 import {
     CardLayout,
@@ -467,25 +468,44 @@ export function MotionPicker() {
     );
 }
 
-/** Hues offered as one-tap accents; any other is on the slider. */
+/** Hues offered as one-tap accents, at PRESET_CHROMA; Custom picks any other. */
 const ACCENT_HUES = [25, 50, 70, 95, 145, 175, 210, 250, 285, 320, 350];
+const PRESET_CHROMA = 0.15;
+
+/** A CSS number the theme sets on <html>, or the fallback. */
+function themeNumber(name: string, fallback: number): number {
+    const value = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+    return Number.isFinite(value) ? value : fallback;
+}
 
 /**
  * The accent on its own, over whichever theme is on: the theme keeps its
- * surfaces and lightness, the accent its hue and vividness.
+ * surfaces and the accent's lightness, the accent sets hue and vividness.
  */
 export function AccentPicker() {
     const { prefs, setAccent } = useAppearance();
     const t = useT();
     const accent = prefs.accent;
-    const swatch = (h: number, c: number) => `oklch(0.72 ${c} ${h})`;
+    const isPreset = !!accent && accent.c === PRESET_CHROMA && ACCENT_HUES.includes(accent.h);
+    const [custom, setCustom] = useState(!!accent && !isPreset);
+    const lightness = themeNumber("--brand-l", 0.72);
+    const swatch = (h: number, c: number) => `oklch(${lightness} ${c} ${h})`;
+
+    const openCustom = () => {
+        setCustom(true);
+        // Start from the colour already showing, so nothing jumps.
+        if (!accent) setAccent({ h: Math.round(themeNumber("--brand-h", 70)), c: themeNumber("--brand-c", PRESET_CHROMA) });
+    };
 
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
                 <button
                     type="button"
-                    onClick={() => setAccent(null)}
+                    onClick={() => {
+                        setCustom(false);
+                        setAccent(null);
+                    }}
                     aria-pressed={!accent}
                     className={cn(
                         "h-9 rounded-full border px-3 text-xs font-medium transition-colors",
@@ -495,46 +515,52 @@ export function AccentPicker() {
                     {t("appearance.accent.theme")}
                 </button>
                 {ACCENT_HUES.map((h) => {
-                    const active = accent?.h === h;
+                    const active = !custom && isPreset && accent?.h === h;
                     return (
                         <button
                             key={h}
                             type="button"
-                            onClick={() => setAccent({ h, c: accent?.c ?? 0.15 })}
+                            onClick={() => {
+                                setCustom(false);
+                                setAccent({ h, c: PRESET_CHROMA });
+                            }}
                             aria-pressed={active}
                             aria-label={t("appearance.accent.hue", { hue: h })}
                             className={cn(
                                 "h-9 w-9 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110",
                                 active && "ring-2 ring-foreground"
                             )}
-                            style={{ background: swatch(h, accent?.c ?? 0.15) }}
+                            style={{ background: swatch(h, PRESET_CHROMA) }}
                         />
                     );
                 })}
-            </div>
-            {accent ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Slider
-                        label={t("appearance.accent.hueLabel")}
-                        value={accent.h}
-                        min={0}
-                        max={360}
-                        step={1}
-                        track={hueTrack(0.72, accent.c)}
-                        thumb={swatch(accent.h, accent.c)}
-                        onChange={(h) => setAccent({ ...accent, h })}
-                        format={(value) => `${Math.round(value)}°`}
+                <button
+                    type="button"
+                    onClick={openCustom}
+                    aria-pressed={custom}
+                    aria-label={t("appearance.accent.custom")}
+                    title={t("appearance.accent.custom")}
+                    className={cn(
+                        "grid h-9 w-9 place-items-center rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110",
+                        custom && "ring-2 ring-foreground"
+                    )}
+                    style={{ background: "conic-gradient(from 0deg, oklch(0.72 0.15 0), oklch(0.72 0.15 90), oklch(0.72 0.15 180), oklch(0.72 0.15 270), oklch(0.72 0.15 360))" }}
+                >
+                    <span
+                        aria-hidden="true"
+                        className="size-5 rounded-full border-2 border-background"
+                        style={{ background: custom && accent ? swatch(accent.h, accent.c) : "var(--background)" }}
                     />
-                    <Slider
-                        label={t("appearance.accent.vividness")}
-                        value={accent.c}
-                        min={0}
-                        max={0.25}
-                        step={0.005}
-                        track={`linear-gradient(to right, ${swatch(accent.h, 0)}, ${swatch(accent.h, 0.25)})`}
-                        thumb={swatch(accent.h, accent.c)}
-                        onChange={(c) => setAccent({ ...accent, c })}
-                        format={(value) => `${Math.round((value / 0.25) * 100)}%`}
+                </button>
+            </div>
+            {custom && accent ? (
+                <div className="max-w-sm">
+                    <ColorPicker
+                        h={accent.h}
+                        c={accent.c}
+                        l={lightness}
+                        maxChroma={0.25}
+                        onChange={(patch) => setAccent({ h: patch.h ?? accent.h, c: patch.c ?? accent.c })}
                     />
                 </div>
             ) : null}

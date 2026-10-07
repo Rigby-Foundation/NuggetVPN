@@ -2,6 +2,7 @@ import { CSSProperties, useEffect, useState } from "react";
 import { ImagePlus, Loader2, Moon, Sun, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -42,18 +43,11 @@ import { cn } from "@/lib/utils";
 /**
  * The custom theme editor.
  *
- * Colours are chosen as hue, tint and lightness on sliders, the same numbers
- * the presets are made of, rather than through a colour-picker popup. That
- * keeps the result coherent — a page, its cards and its borders always relate
- * the way they do in the built-in themes — and a slider cannot produce an
- * unreadable accent, because the accent's lightness is not one of them.
+ * Colours are picked in OKLCH, the space the presets are made of, and only
+ * the parts a theme varies are offered: the page's hue, tint and lightness,
+ * the accent's hue and vividness. The accent's lightness is fixed per mode,
+ * so no pick can make the text on a button unreadable.
  */
-
-/** A hue wheel unrolled, at the given lightness and chroma. */
-export function hueTrack(l: number, c: number): string {
-    const stops = [0, 60, 120, 180, 240, 300, 360].map((h) => `oklch(${l} ${c} ${h})`);
-    return `linear-gradient(to right, ${stops.join(", ")})`;
-}
 
 export function Slider({
     label,
@@ -319,38 +313,15 @@ export default function ThemeEditor({
                             <h4 className="text-xs font-medium text-muted-foreground">
                                 {t("editor.background")}
                             </h4>
-                            <Slider
-                                label={t("editor.hue")}
-                                value={h}
-                                min={0}
-                                max={360}
-                                step={1}
-                                format={(value) => `${value}°`}
-                                track={hueTrack(draft.mode === "dark" ? 0.35 : 0.9, 0.08)}
-                                thumb={`oklch(${l} ${c} ${h})`}
-                                onChange={(value) => setBackground({ h: value })}
-                            />
-                            <Slider
-                                label={t("editor.tint")}
-                                value={c}
-                                min={0}
-                                max={0.08}
-                                step={0.002}
-                                format={(value) => percent(value / 0.08)}
-                                track={`linear-gradient(to right, oklch(${l} 0 ${h}), oklch(${l} 0.08 ${h}))`}
-                                thumb={`oklch(${l} ${c} ${h})`}
-                                onChange={(value) => setBackground({ c: value })}
-                            />
-                            <Slider
-                                label={t(draft.mode === "dark" ? "editor.darkness" : "editor.brightness")}
-                                value={l}
-                                min={range.min}
-                                max={range.max}
-                                step={0.005}
-                                format={(value) => percent((value - range.min) / (range.max - range.min))}
-                                track={`linear-gradient(to right, oklch(${range.min} ${c} ${h}), oklch(${range.max} ${c} ${h}))`}
-                                thumb={`oklch(${l} ${c} ${h})`}
-                                onChange={(value) => setBackground({ l: value })}
+                            <ColorPicker
+                                h={h}
+                                c={c}
+                                l={l}
+                                maxChroma={0.08}
+                                fieldLightness={draft.mode === "dark" ? 0.45 : 0.88}
+                                lightnessRange={range}
+                                lightnessLabel={t(draft.mode === "dark" ? "editor.darkness" : "editor.brightness")}
+                                onChange={setBackground}
                             />
                         </section>
 
@@ -358,27 +329,13 @@ export default function ThemeEditor({
                             <h4 className="text-xs font-medium text-muted-foreground">
                                 {t("editor.accent")}
                             </h4>
-                            <Slider
-                                label={t("editor.hue")}
-                                value={draft.accent.h}
-                                min={0}
-                                max={360}
-                                step={1}
-                                format={(value) => `${value}°`}
-                                track={hueTrack(0.75, 0.15)}
-                                thumb={`oklch(0.75 ${draft.accent.c} ${draft.accent.h})`}
-                                onChange={(value) => setAccent({ h: value })}
-                            />
-                            <Slider
-                                label={t("editor.vividness")}
-                                value={draft.accent.c}
-                                min={0.02}
-                                max={0.22}
-                                step={0.005}
-                                format={(value) => percent((value - 0.02) / 0.2)}
-                                track={`linear-gradient(to right, oklch(0.75 0.02 ${draft.accent.h}), oklch(0.75 0.22 ${draft.accent.h}))`}
-                                thumb={`oklch(0.75 ${draft.accent.c} ${draft.accent.h})`}
-                                onChange={(value) => setAccent({ c: value })}
+                            <ColorPicker
+                                h={draft.accent.h}
+                                c={draft.accent.c}
+                                l={Number(customThemeKnobs(draft)["--brand-l"])}
+                                minChroma={0.02}
+                                maxChroma={0.22}
+                                onChange={setAccent}
                             />
                         </section>
 
