@@ -352,7 +352,7 @@ function HitsBadge({ count, accent }: { count: number; accent: string }) {
             aria-label={label}
         >
             <span
-                className={cn("h-1.5 w-1.5 rounded-full", count > 0 ? "animate-pulse" : "opacity-40")}
+                className={cn("h-1.5 w-1.5 rounded-full", count === 0 && "opacity-40")}
                 style={{ background: count > 0 ? accent : "var(--muted-foreground)" }}
                 aria-hidden="true"
             />

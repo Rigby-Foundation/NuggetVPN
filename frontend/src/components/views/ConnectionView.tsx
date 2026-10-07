@@ -106,7 +106,9 @@ function PingWave({ active, ping }: { active: boolean; ping: number | null | und
                         )}
                         style={{
                             height: active ? `${height}%` : "25%",
-                            animation: active ? `pulse 1.8s ease-in-out infinite` : "none",
+                            // A couple of pulses when the signal appears, then still; see
+                            // .animate-breathe in App.css.
+                            animation: active ? `pulse 1.8s ease-in-out 2` : "none",
                             animationDelay: animDelay,
                         }}
                     />

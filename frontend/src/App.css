@@ -377,8 +377,12 @@
     to { transform: rotate(360deg); }
 }
 
+/* A few breaths on connecting, then still. An animation that never ends
+   makes the window redraw sixty times a second for as long as it is open —
+   blurred panels included — which cost a fifth of a core on a Mac and far
+   more in WebView2 on Windows without GPU acceleration. */
 .animate-breathe {
-    animation: nugget-breathe calc(3.2s * var(--motion-scale, 1)) ease-in-out infinite;
+    animation: nugget-breathe calc(3.2s * var(--motion-scale, 1)) ease-in-out 3 both;
 }
 
 .animate-sweep {

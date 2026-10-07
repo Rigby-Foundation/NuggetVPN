@@ -500,7 +500,10 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 id: `edge:${rule.id}`,
                 source: rule.id,
                 target: targetOf(rule.action, rule.server),
-                animated: true,
+                // Only a route carrying connections right now moves. Every
+                // wire moving all the time kept the window redrawing even
+                // while disconnected.
+                animated: active(rule.id),
                 style: dashed(kindMeta(rule.kind).accent, active(rule.id)),
             }));
 
@@ -510,7 +513,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                       id: "edge:default",
                       source: DEFAULT_NODE,
                       target: targetOf(settings.default_action, settings.default_server),
-                      animated: true,
+                      animated: active(DEFAULT_HITS),
                       style: dashed("var(--routing-default)", active(DEFAULT_HITS)),
                       deletable: false,
                       data: { deletable: false },
