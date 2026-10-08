@@ -1,4 +1,4 @@
-//go:build !(darwin && !ios)
+//go:build !windows && !(darwin && !ios)
 
 package app
 
