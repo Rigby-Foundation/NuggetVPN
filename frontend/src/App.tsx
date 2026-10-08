@@ -1162,7 +1162,6 @@ function App() {
                         showControls={true}
                         showBrand={true}
                         showServerSelector={true}
-                        showServerPicker={activeTab !== "connection"}
                         sources={sources}
                         selectedSourceDomain={selection.domain}
                         selectedProfileId={selection.profileId}

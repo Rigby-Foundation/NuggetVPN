@@ -180,8 +180,6 @@ export function DesktopSidebarNav({
 
                 {/* Server Quick Selector Dropdown */}
                 <div className="flex items-center gap-1.5">
-                    {/* The home screen has its own server picker; two at once is one too many. */}
-                    {activeTab !== "connection" ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
@@ -243,7 +241,6 @@ export function DesktopSidebarNav({
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    ) : null}
 
                     <Tooltip delayDuration={350}>
                         <TooltipTrigger asChild>

@@ -188,8 +188,6 @@ export function UnifiedHeader({
                 ) : null}
 
                 {/* Quick Server Switcher Dropdown */}
-                {/* The home screen has its own server picker; two at once is one too many. */}
-                {activeTab !== "connection" ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -254,7 +252,6 @@ export function UnifiedHeader({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                ) : null}
 
                 {/* Add Profile / Config Modal Trigger */}
                 <Tooltip delayDuration={350}>

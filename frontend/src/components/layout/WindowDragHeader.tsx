@@ -32,7 +32,6 @@ interface WindowDragHeaderProps {
     flat?: boolean;
     showServerSelector?: boolean;
     /** Off on the home screen, which has its own picker; the add button stays. */
-    showServerPicker?: boolean;
 
     sources?: ConfigSource[];
     selectedSourceDomain?: string;
@@ -57,7 +56,6 @@ export function WindowDragHeader({
     showControls = true,
     showBrand = true,
     showServerSelector = false,
-    showServerPicker = true,
     sources = [],
     selectedSourceDomain = "",
     selectedProfileId = "",
@@ -128,8 +126,6 @@ export function WindowDragHeader({
             <div className="flex items-center gap-2 shrink-0">
                 {showServerSelector ? (
                     <>
-                        {/* The home screen has its own server picker; two at once is one too many. */}
-                        {showServerPicker ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
@@ -194,7 +190,6 @@ export function WindowDragHeader({
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                        ) : null}
 
                         {onAddProfile ? (
                             <Tooltip delayDuration={350}>
