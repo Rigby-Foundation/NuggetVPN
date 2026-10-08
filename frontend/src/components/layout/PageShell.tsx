@@ -5,10 +5,12 @@ import { useScrollMemory } from "@/lib/remember";
 import { cn } from "@/lib/utils";
 
 /**
- * Replaces a page's title with something else — the switcher of a screen made
- * of several pages, like Activity — without each page knowing it is in one.
+ * Set by a screen made of several pages, like Activity, whose switcher stands
+ * above them in place of a title: a page inside one drops its own title and
+ * keeps its description and buttons. The switcher is outside the page, so
+ * changing page replaces the page and leaves the switcher where it is.
  */
-export const PageHeadingContext = createContext<ReactNode>(null);
+export const SubPageContext = createContext(false);
 
 interface PageShellProps {
     title: string;
@@ -40,16 +42,16 @@ function PageShell({
     className,
     memoryKey,
 }: PageShellProps) {
-    const heading = useContext(PageHeadingContext);
+    const subPage = useContext(SubPageContext);
     const scrollRef = useScrollMemory(fill ? undefined : memoryKey);
     const header = (
         // On a narrow screen the buttons go on a row of their own: beside the
         // title they left the description a word per line.
-        <header className="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <header className={cn("flex flex-col gap-3 mb-5 sm:flex-row sm:justify-between sm:gap-4", subPage ? "sm:items-center" : "sm:items-start")}>
             <div className="min-w-0">
-                {heading ?? <h1 className="text-base font-semibold tracking-tight">{title}</h1>}
+                {subPage ? null : <h1 className="text-base font-semibold tracking-tight">{title}</h1>}
                 {description ? (
-                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                    <p className={cn("text-xs text-muted-foreground", !subPage && "mt-0.5")}>{description}</p>
                 ) : null}
             </div>
             {actions ? (
@@ -62,7 +64,7 @@ function PageShell({
     // another when the page opens. See "Entrance animations" in App.css.
     if (fill) {
         return (
-            <div className={cn("enter-stagger absolute inset-0 flex flex-col px-6 py-5", className)}>
+            <div className={cn("enter-stagger absolute inset-0 flex flex-col px-6 pb-5", subPage ? "pt-3" : "pt-5", className)}>
                 {header}
                 {children}
             </div>
@@ -72,7 +74,7 @@ function PageShell({
     return (
         <div className="absolute inset-0 overflow-hidden">
             <ScrollArea className="h-full" viewportRef={scrollRef}>
-                <div className={cn("enter-stagger px-6 py-5", className)}>
+                <div className={cn("enter-stagger px-6 pb-5", subPage ? "pt-3" : "pt-5", className)}>
                     {header}
                     {children}
                 </div>

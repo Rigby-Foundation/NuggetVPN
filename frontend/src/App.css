@@ -789,6 +789,14 @@
     animation: none;
 }
 
+/* A live list that has finished arriving: its rows move as it re-sorts, and a
+   moved element replays its animation. Switched off with an attribute, not by
+   removing the class — without the class, the block holding the list stops
+   matching :has(.enter-stagger) above and plays an entrance of its own. */
+.enter-stagger[data-settled] > * {
+    animation: none;
+}
+
 /* Someone who has asked the system for less motion gets a quick fade, all at
    once: movement and a sequence are both the part that causes trouble. */
 @media (prefers-reduced-motion: reduce) {

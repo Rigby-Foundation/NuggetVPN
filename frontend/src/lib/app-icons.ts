@@ -34,3 +34,43 @@ export function useFileIcons(paths: readonly (string | undefined)[]): ReadonlyMa
 
     return cache;
 }
+
+const PATHS_KEY = "nugget.programPaths";
+let programPaths: Record<string, string> | null = null;
+
+function loadPaths(): Record<string, string> {
+    if (programPaths) return programPaths;
+    try {
+        programPaths = JSON.parse(localStorage.getItem(PATHS_KEY) ?? "{}") ?? {};
+    } catch {
+        programPaths = {};
+    }
+    return programPaths!;
+}
+
+/**
+ * Remembers where each program seen on Connections lives, so Statistics —
+ * which keeps programs by name only — can show their icons too. Kept on this
+ * device; only names Connections has seen are known.
+ */
+export function rememberProgramPaths(rows: readonly { app?: string; app_path?: string }[]) {
+    const paths = loadPaths();
+    let changed = false;
+    for (const row of rows) {
+        if (row.app && row.app_path && paths[row.app] !== row.app_path) {
+            paths[row.app] = row.app_path;
+            changed = true;
+        }
+    }
+    if (!changed) return;
+    try {
+        localStorage.setItem(PATHS_KEY, JSON.stringify(paths));
+    } catch {
+        // Not remembered; icons still show on Connections.
+    }
+}
+
+/** Where a program by this name was last seen, if anywhere. */
+export function programPath(name: string): string | undefined {
+    return loadPaths()[name];
+}

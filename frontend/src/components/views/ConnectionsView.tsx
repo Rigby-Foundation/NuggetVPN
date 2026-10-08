@@ -1,14 +1,15 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { AppWindow, ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Cpu, Search, X, XCircle } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Search, X, XCircle } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
 import { kindMeta } from "@/components/routing/nodes";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
+import { AppIcon } from "@/components/ui/app-icon";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useFileIcons } from "@/lib/app-icons";
+import { rememberProgramPaths, useFileIcons } from "@/lib/app-icons";
 import { isSystemProgram, useShowSystem } from "@/lib/system-apps";
 import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
@@ -65,37 +66,35 @@ interface ConnectionsViewProps {
 function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const t = useT();
     const appLabels = useAppLabels();
-    const [rows, setRows] = useState<Row[]>([]);
+    // The last list is kept between visits (see live below), so arriving on
+    // Connections shows it at once instead of an empty list that fills in,
+    // and animates, a moment later.
+    const [rows, setRows] = useState<Row[]>(() => (connected ? live.rows : []));
     // Remembered across tabs, like the rest of the app's places.
     const [openApp, setOpenApp] = useRemembered<string | null>("connections.app", null);
     const [filter, setFilter] = useRemembered("connections.filter", "");
     const [sort, setSort] = useRemembered<{ key: SortKey; descending: boolean }>("connections.sort", { key: "down", descending: true });
     const [paused, setPaused] = useState(false);
     const visible = usePageVisible();
-    const previous = useRef(new Map<string, { bytes: number; at: number }>());
-    // Connections that closed a moment ago stay, dimmed, instead of the list
-    // jumping every second as short ones come and go. One the user closed
-    // goes at once.
-    const lastOpen = useRef(new Map<string, Row>());
-    const recent = useRef(new Map<string, Row>());
-    const dismissed = useRef(new Set<string>());
+    const { previous, lastOpen, recent, dismissed } = live;
     const [showSystem, setShowSystem] = useShowSystem();
-    // The rows rise in when the list opens, and then stay still: re-sorting
-    // moves rows, and a moved element replays its entrance.
-    const [settled, setSettled] = useState(false);
+    // The rows rise in when a list is opened, and then stay still: re-sorting
+    // moves rows, and a moved element replays its entrance. Keyed by the list
+    // shown, so opening another one animates in the same render rather than a
+    // render later, which played the entrance twice.
+    const listKey = openApp ?? "apps";
+    const [settledKey, setSettledKey] = useState<string | null>(null);
+    const settled = settledKey === listKey;
     useEffect(() => {
-        setSettled(false);
-        const timer = window.setTimeout(() => setSettled(true), 900);
+        const timer = window.setTimeout(() => setSettledKey(listKey), 900);
         return () => window.clearTimeout(timer);
-    }, [openApp]);
+    }, [listKey]);
     const scrollRef = useScrollMemory(`connections.${openApp ?? "apps"}`);
 
     useEffect(() => {
         if (!connected) {
             setRows([]);
-            previous.current.clear();
-            lastOpen.current.clear();
-            recent.current.clear();
+            live.clear();
             return;
         }
         if (paused || !visible) return;
@@ -122,7 +121,9 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                     if (seen.has(id) || now - (row.closedAt ?? 0) > RECENT_MS) recent.current.delete(id);
                 }
                 lastOpen.current = new Map(next.map((row) => [row.id, row]));
-                setRows([...next, ...recent.current.values()]);
+                live.rows = [...next, ...recent.current.values()];
+                rememberProgramPaths(next);
+                setRows(live.rows);
             } catch {
                 // A missed read is replaced by the next one.
             }
@@ -133,6 +134,8 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             cancelled = true;
             window.clearInterval(timer);
         };
+        // live is module state, not a dependency.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [connected, paused, visible]);
 
     const appName = (key: string) =>
@@ -368,11 +371,9 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                         it square over the border at the top. */}
                     <div
                         ref={scrollRef}
-                        key={openApp ?? "apps"}
-                        className={cn(
-                            !settled && "enter-stagger",
-                            "min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 text-xs custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]"
-                        )}
+                        key={listKey}
+                        data-settled={settled || undefined}
+                        className="enter-stagger min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 text-xs custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]"
                     >
                         {group ? (
                             <>
@@ -470,12 +471,27 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     );
 }
 
-/** A program's own icon where its file has one; a generic one otherwise. */
-function AppIcon({ icon, system }: { icon?: string; system?: boolean }) {
-    if (icon) return <img src={icon} alt="" className="h-4 w-4 shrink-0 object-contain" draggable={false} />;
-    const Icon = system ? Cpu : AppWindow;
-    return <Icon size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />;
-}
+/**
+ * What the screen reads between polls, kept outside the component: leaving
+ * Connections and coming back carries on from the same list, speeds and
+ * recently closed connections instead of starting over.
+ */
+const live = {
+    rows: [] as Row[],
+    previous: { current: new Map<string, { bytes: number; at: number }>() },
+    // Connections that closed a moment ago stay, dimmed, instead of the list
+    // jumping every second as short ones come and go. One the user closed
+    // goes at once.
+    lastOpen: { current: new Map<string, Row>() },
+    recent: { current: new Map<string, Row>() },
+    dismissed: { current: new Set<string>() },
+    clear() {
+        this.rows = [];
+        this.previous.current.clear();
+        this.lastOpen.current.clear();
+        this.recent.current.clear();
+    },
+};
 
 /** A column heading that sorts by its column; again reverses. */
 function SortButton({

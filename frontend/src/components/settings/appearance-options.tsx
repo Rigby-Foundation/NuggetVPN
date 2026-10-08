@@ -112,7 +112,7 @@ export function AppearanceHeroPreview({
         <div className="relative overflow-hidden rounded-2xl border bg-card/70 p-5 shadow-sm backdrop-blur-sm transition-all">
             {/* Top Header */}
             <div className="flex items-center gap-2 border-b border-border/50 pb-3">
-                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)] animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
                 <span className="text-xs font-semibold text-foreground/80">
                     Live Preview
                 </span>

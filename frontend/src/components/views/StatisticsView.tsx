@@ -5,6 +5,8 @@ import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from
 import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { AppIcon } from "@/components/ui/app-icon";
+import { programPath, useFileIcons } from "@/lib/app-icons";
 import { isSystemProgram, useShowSystem } from "@/lib/system-apps";
 import {
     Dialog,
@@ -266,6 +268,8 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
         if (system.up + system.down > 0) apps.push(system);
         return apps.sort((a, b) => b.up + b.down - (a.up + a.down));
     }, [usage, showSystem]);
+    // Icons for programs Connections has seen; see rememberProgramPaths.
+    const icons = useFileIcons(programs.slice(0, 40).map((program) => programPath(program.program)));
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
     const total = programs.reduce((sum, program) => ({ up: sum.up + program.up, down: sum.down + program.down }), { up: 0, down: 0 });
     const label = (program: string) =>
@@ -354,8 +358,12 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                         const size = program.up + program.down;
                                         return (
                                             <li key={program.program} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:gap-y-0">
-                                                <span className="truncate font-medium" title={program.program}>
-                                                    {label(program.program)}
+                                                <span className="flex min-w-0 items-center gap-2 font-medium" title={program.program}>
+                                                    <AppIcon
+                                                        icon={icons.get(programPath(program.program) ?? "")}
+                                                        system={program.program === SYSTEM_PROGRAM}
+                                                    />
+                                                    <span className="truncate">{label(program.program)}</span>
                                                 </span>
                                                 <span className="order-last col-span-full h-1.5 overflow-hidden rounded-full bg-muted sm:order-none sm:col-span-1">
                                                     <span className="block h-full rounded-full bg-primary/70" style={{ width: `${Math.max(1, (size / largest) * 100)}%` }} />
