@@ -10,7 +10,7 @@ Ensure you have the development environment set up as described in the [README.m
 
 - Go 1.24+
 - Bun (or Node.js)
-- The Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.117`
+- The Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28`
 - A working C toolchain for your OS
 
 There is no sidecar to download. sing-box is a Go module dependency and is compiled into the binary.

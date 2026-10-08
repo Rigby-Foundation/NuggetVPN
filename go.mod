@@ -8,7 +8,7 @@ require (
 	github.com/metacubex/mihomo v1.19.31
 	github.com/sagernet/sing v0.9.6-0.20260922013359-4ca3bebe0b8e
 	github.com/sagernet/sing-box v1.14.0
-	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
+	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	github.com/xtls/xray-core v1.260327.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
@@ -88,7 +88,6 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20260220084031-5adc3eb26f91 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.1 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/keybase/go-keychain v0.0.1 // indirect
@@ -225,7 +224,7 @@ require (
 	github.com/sagernet/sing-shadowsocks2 v0.2.1 // indirect
 	github.com/sagernet/sing-shadowtls v0.2.1 // indirect
 	github.com/sagernet/sing-snell v0.0.0-20260904135315-bc5a12ac736f // indirect
-	github.com/sagernet/sing-tun v0.9.4-0.20260917142847-fbc0c3dff312 // indirect
+	github.com/sagernet/sing-tun v0.9.4-0.20260917142847-fbc0c3dff312
 	github.com/sagernet/sing-usbip v0.0.0-20260817040617-28bd42667eca // indirect
 	github.com/sagernet/sing-vmess v0.2.8 // indirect
 	github.com/sagernet/smux v1.5.50-sing-box-mod.1 // indirect

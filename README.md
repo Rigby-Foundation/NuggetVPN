@@ -192,9 +192,9 @@ asks for is dropped before mihomo sees it.
 
 - **Go** 1.26 or newer.
 - **Bun** (or Node.js) for the frontend.
-- **Wails CLI** v3.0.0-alpha2.117:
+- **Wails CLI** v3.0.0-beta.28:
   ```bash
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.117
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
   ```
 - **Platform tools**:
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`).
@@ -343,7 +343,7 @@ xattr -cr /Applications/NuggetVPN.app
 
 ## Known limitations
 
-- **Wails v3 is still in alpha.** The app is pinned to `v3.0.0-alpha2.117`.
+- **Wails v3 is still in beta.** The app is pinned to `v3.0.0-beta.28`.
   Upgrade the CLI and the module together.
 - **Nothing is code-signed.** macOS builds are ad-hoc signed and Linux
   packages are unsigned.

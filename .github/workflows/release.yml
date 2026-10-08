@@ -5,7 +5,7 @@ on:
       - "v*"
 
 env:
-  WAILS_VERSION: v3.0.0-alpha2.117
+  WAILS_VERSION: v3.0.0-beta.28
 
 # Runners are GitHub-hosted.
 jobs:
