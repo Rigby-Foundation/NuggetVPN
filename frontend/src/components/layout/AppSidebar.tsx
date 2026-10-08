@@ -1,3 +1,4 @@
+import { NAV_TABS } from "@/lib/tabs";
 import { Activity, BarChart3, FileText, Power, Server, Settings, Signal, Waypoints } from "lucide-react";
 
 import {
@@ -24,15 +25,7 @@ interface AppSidebarProps {
     platform?: string;
 }
 
-export const TABS = [
-    { id: "connection", label: "nav.connection", icon: Power },
-    { id: "configuration", label: "nav.configuration", icon: Server },
-    { id: "proxies", label: "nav.proxies", icon: Signal },
-    { id: "routing", label: "nav.routing", icon: Waypoints },
-    { id: "connections", label: "nav.connections", icon: Activity },
-    { id: "statistics", label: "nav.statistics", icon: BarChart3 },
-    { id: "logs", label: "nav.logs", icon: FileText },
-] as const satisfies readonly { id: string; label: MessageKey; icon: unknown }[];
+export const TABS = NAV_TABS.filter((tab) => tab.id !== "settings");
 
 
 function AppSidebar({

@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowDown, ArrowUp, Search, X, XCircle } from "lucide-react";
+import { AppWindow, ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Search, X, XCircle } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
 import { kindMeta } from "@/components/routing/nodes";
 import { Button } from "@/components/ui/button";
+import { Flag } from "@/components/ui/flag";
 import { Input } from "@/components/ui/input";
 import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
+import { withoutFlagEmoji } from "@/lib/flags";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { useRemembered, useScrollMemory } from "@/lib/remember";
 import { cn } from "@/lib/utils";
 import { LiveConnection, Profile, RoutingRule } from "@/types";
 import { usePageVisible } from "@/hooks/use-page-visible";
@@ -18,16 +21,21 @@ import { usePageVisible } from "@/hooks/use-page-visible";
 const POLL_MS = 1000;
 /** GetConnections' rule for traffic no rule matched; see app.DefaultRuleHits. */
 const DEFAULT_RULE = "__default";
+/** The group for connections no program could be found for. */
+const NO_APP = "\u0000";
 
-type Sort = "recent" | "traffic" | "speed";
-const SORT_LABELS = {
-    recent: "connections.sort.recent",
-    traffic: "connections.sort.traffic",
-    speed: "connections.sort.speed",
-} as const;
+type SortKey = "name" | "count" | "down" | "up" | "rate";
 
 interface Row extends LiveConnection {
     /** Bytes per second since the previous read, both ways. */
+    rate: number;
+}
+
+interface AppGroup {
+    key: string;
+    rows: Row[];
+    down: number;
+    up: number;
     rate: number;
 }
 
@@ -38,19 +46,23 @@ interface ConnectionsViewProps {
 }
 
 /**
- * What is going through the tunnel right now: every open connection, the
- * program behind it, the routing rule that caught it and the server it went
- * through — the answer to "why is this site going direct?".
+ * What is going through the tunnel right now, by program: how many
+ * connections each has open, through which server, caught by which rule, and
+ * how much it moved. A program opens on its own list of hosts — the answer to
+ * "why is this site going direct?" one level down.
  */
 function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const t = useT();
     const appLabels = useAppLabels();
     const [rows, setRows] = useState<Row[]>([]);
-    const [filter, setFilter] = useState("");
-    const [sort, setSort] = useState<Sort>("recent");
+    // Remembered across tabs, like the rest of the app's places.
+    const [openApp, setOpenApp] = useRemembered<string | null>("connections.app", null);
+    const [filter, setFilter] = useRemembered("connections.filter", "");
+    const [sort, setSort] = useRemembered<{ key: SortKey; descending: boolean }>("connections.sort", { key: "down", descending: true });
     const [paused, setPaused] = useState(false);
     const visible = usePageVisible();
     const previous = useRef(new Map<string, { bytes: number; at: number }>());
+    const scrollRef = useScrollMemory(`connections.${openApp ?? "apps"}`);
 
     useEffect(() => {
         if (!connected) {
@@ -88,6 +100,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         };
     }, [connected, paused, visible]);
 
+    const appName = (key: string) => (key === NO_APP ? t("stats.unknownApp") : appLabels.get(key) || key.replace(/\.exe$/i, ""));
     const ruleLabel = (id: string, text?: string) => {
         if (id === DEFAULT_RULE) return t("routing.catchAll");
         // An external core's own description, where it maps to no rule.
@@ -97,42 +110,151 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         if (index < 0) return t("connections.oldRule");
         return `${index + 1}. ${t(kindMeta(rules[index].kind).label)}`;
     };
-    const via = (row: Row) => {
+    const viaName = (row: Row) => {
         if (row.route === "direct") return t("routing.action.direct");
         return profiles.find((profile) => profile.id === row.server)?.name ?? t("routing.action.proxy");
     };
+    const host = (row: Row) => row.host || row.destination;
 
-    const shown = useMemo(() => {
-        const needle = filter.trim().toLowerCase();
-        const matching = needle
-            ? rows.filter((row) =>
-                  [row.host, row.destination, row.app, row.protocol, ruleLabel(row.rule, row.rule_text), via(row)]
-                      .filter(Boolean)
-                      .some((field) => String(field).toLowerCase().includes(needle))
-              )
-            : rows;
-        const sorted = [...matching];
-        if (sort === "recent") sorted.sort((a, b) => b.started - a.started);
-        if (sort === "traffic") sorted.sort((a, b) => b.upload + b.download - (a.upload + a.download));
-        if (sort === "speed") sorted.sort((a, b) => b.rate - a.rate);
-        return sorted;
-        // ruleLabel and via only read rules, profiles and t.
+    const matches = (row: Row, needle: string) =>
+        [row.host, row.destination, row.app, row.protocol, ruleLabel(row.rule, row.rule_text), viaName(row)]
+            .filter(Boolean)
+            .some((field) => String(field).toLowerCase().includes(needle));
+
+    const groups = useMemo(() => {
+        const byApp = new Map<string, AppGroup>();
+        for (const row of rows) {
+            const key = row.app || NO_APP;
+            const group = byApp.get(key) ?? { key, rows: [], down: 0, up: 0, rate: 0 };
+            group.rows.push(row);
+            group.down += row.download;
+            group.up += row.upload;
+            group.rate += row.rate;
+            byApp.set(key, group);
+        }
+        return [...byApp.values()];
+    }, [rows]);
+
+    const needle = filter.trim().toLowerCase();
+    const direction = sort.descending ? -1 : 1;
+    const byKey = <T,>(value: (item: T) => number | string) => (a: T, b: T) => {
+        const x = value(a);
+        const y = value(b);
+        return (typeof x === "string" ? x.localeCompare(String(y)) : x - (y as number)) * direction;
+    };
+
+    // The program list, or the open program's connections.
+    const group = openApp !== null ? groups.find((item) => item.key === openApp) : undefined;
+    const shownGroups = useMemo(() => {
+        // A program matches by its name or by any of its connections.
+        const list = needle
+            ? groups.filter((item) => appName(item.key).toLowerCase().includes(needle) || item.rows.some((row) => matches(row, needle)))
+            : groups;
+        const value = (item: AppGroup) =>
+            ({ name: appName(item.key), count: item.rows.length, down: item.down, up: item.up, rate: item.rate })[sort.key];
+        return [...list].sort(byKey(value));
+        // appName, matches and byKey only read t, labels, rules and sort.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rows, filter, sort, rules, profiles, t]);
+    }, [groups, needle, sort, rules, profiles, t, appLabels]);
+    const shownRows = useMemo(() => {
+        if (!group) return [];
+        const list = needle ? group.rows.filter((row) => matches(row, needle)) : group.rows;
+        const value = (row: Row) =>
+            ({ name: host(row), count: -row.started, down: row.download, up: row.upload, rate: row.rate })[sort.key];
+        return [...list].sort(byKey(value));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [group, needle, sort, rules, profiles, t]);
 
-    const close = async (id?: string) => {
+    // A program whose connections have all closed has nothing to show.
+    useEffect(() => {
+        if (openApp !== null && rows.length > 0 && !group) setOpenApp(null);
+    }, [openApp, rows.length, group, setOpenApp]);
+
+    const close = async (ids?: string[]) => {
         try {
-            await invoke(id ? "close_connection" : "close_all_connections", id ? { id } : {});
-            setRows((current) => (id ? current.filter((row) => row.id !== id) : []));
+            if (ids) await Promise.all(ids.map((id) => invoke("close_connection", { id })));
+            else await invoke("close_all_connections", {});
+            setRows((current) => (ids ? current.filter((row) => !ids.includes(row.id)) : []));
         } catch (error) {
             toast.error(errorMessage(error), { id: "close-connection" });
         }
     };
 
+    const totals = rows.reduce((sum, row) => ({ up: sum.up + row.upload, down: sum.down + row.download }), { up: 0, down: 0 });
     const now = Date.now();
-    const totals = rows.reduce(
-        (sum, row) => ({ up: sum.up + row.upload, down: sum.down + row.download }),
-        { up: 0, down: 0 }
+    const toggleSort = (key: SortKey) =>
+        setSort((current) => (current.key === key ? { key, descending: !current.descending } : { key, descending: key !== "name" }));
+
+    // The routes, rules and networks of a set of connections, each once.
+    const distinct = <T,>(items: Row[], pick: (row: Row) => T) => [...new Set(items.map(pick))];
+    const viaCell = (items: Row[]) => {
+        const names = distinct(items, viaName);
+        if (names.length > 1) return <span className="text-muted-foreground">{t("connections.servers", { count: names.length })}</span>;
+        const direct = items[0]?.route === "direct";
+        return (
+            <span className={cn("flex min-w-0 items-center gap-1.5", direct && "text-muted-foreground")}>
+                {direct ? null : <Flag name={names[0]} size={14} className="shrink-0" />}
+                <span className="truncate">{withoutFlagEmoji(names[0] ?? "")}</span>
+            </span>
+        );
+    };
+    const ruleCell = (items: Row[]) => {
+        const ids = distinct(items, (row) => `${row.rule}\u0000${row.rule_text ?? ""}`);
+        if (ids.length > 1) return <span className="text-muted-foreground">{t("connections.rules", { count: ids.length })}</span>;
+        const row = items[0];
+        const rule = rules.find((item) => item.id === row.rule);
+        const meta = rule ? kindMeta(rule.kind) : null;
+        return (
+            <span className="flex min-w-0 items-center gap-1.5">
+                {meta ? <meta.icon size={12} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" /> : null}
+                <span className="truncate" title={row.rule_text}>{ruleLabel(row.rule, row.rule_text)}</span>
+            </span>
+        );
+    };
+    const networkCell = (items: Row[]) => (
+        <span className="flex gap-1">
+            {distinct(items, (row) => row.network.toLowerCase())
+                .sort()
+                .map((network) => (
+                    <span
+                        key={network}
+                        className={cn(
+                            "rounded px-1.5 py-px font-mono text-[10px] uppercase",
+                            network === "udp" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        )}
+                    >
+                        {network}
+                    </span>
+                ))}
+        </span>
+    );
+    const dataCells = (down: number, up: number, rate: number) => (
+        <>
+            <span className="text-end tabular-nums">
+                <span className="block">{formatBytes(down)}</span>
+                <span className={cn("block text-[10px]", rate > 0 ? "text-foreground" : "text-muted-foreground")}>{rate > 0 ? formatRate(rate) : ""}</span>
+            </span>
+            <span className="text-end tabular-nums text-muted-foreground">{formatBytes(up)}</span>
+        </>
+    );
+
+    // One grid for header and rows, so the columns line up. The rule and
+    // network columns go on a narrow window; the data stays.
+    const columns = "grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_5rem_4.5rem_2rem] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_5.5rem_5.5rem_4.5rem_2rem] items-center gap-x-3 px-3";
+    const header = (first: ReactNode) => (
+        <div className={cn(columns, "sticky top-0 z-10 border-b bg-card py-2 text-[11px] text-muted-foreground")}>
+            {first}
+            <span>{t("connections.col.via")}</span>
+            <span className="max-sm:hidden">{t("connections.col.rule")}</span>
+            <span className="max-sm:hidden">{t("connections.col.network")}</span>
+            <SortButton active={sort.key === "down"} descending={sort.descending} onClick={() => toggleSort("down")} end>
+                <ArrowDown size={11} aria-hidden="true" /> {t("connections.col.down")}
+            </SortButton>
+            <SortButton active={sort.key === "up"} descending={sort.descending} onClick={() => toggleSort("up")} end>
+                <ArrowUp size={11} aria-hidden="true" /> {t("connections.col.up")}
+            </SortButton>
+            <span />
+        </div>
     );
 
     return (
@@ -165,6 +287,15 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
+                        {group ? (
+                            <Button size="sm" variant="ghost" className="-ms-2 gap-1.5" onClick={() => setOpenApp(null)}>
+                                <ArrowLeft size={14} className="rtl:-scale-x-100" aria-hidden="true" />
+                                <span className="max-w-48 truncate font-semibold">{appName(group.key)}</span>
+                                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                    {t("connections.active", { count: group.rows.length })}
+                                </span>
+                            </Button>
+                        ) : null}
                         <div className="relative min-w-48 flex-1">
                             <Search size={14} className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                             <Input
@@ -175,108 +306,128 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                 className="h-8 ps-8 text-xs"
                             />
                         </div>
-                        <div className="flex rounded-lg bg-muted/60 p-0.5" role="radiogroup" aria-label={t("connections.sort")}>
-                            {(["recent", "traffic", "speed"] as const).map((option) => (
-                                <button
-                                    key={option}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={sort === option}
-                                    onClick={() => setSort(option)}
-                                    className={cn(
-                                        "rounded-md px-2.5 py-1 text-xs transition-colors",
-                                        sort === option ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    {t(SORT_LABELS[option])}
-                                </button>
-                            ))}
-                        </div>
+                        {group ? (
+                            <Button size="sm" variant="outline" onClick={() => void close(group.rows.map((row) => row.id))}>
+                                <XCircle size={14} className="me-2" aria-hidden="true" />
+                                {t("connections.closeApp")}
+                            </Button>
+                        ) : null}
                     </div>
 
                     {/* clip-path, not just overflow, holds the rounded corners: the
                         sticky header is a layer of its own, and the WebView drew
                         it square over the border at the top. */}
-                    <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]">
-                        {shown.length === 0 ? (
-                            <p className="p-6 text-center text-xs text-muted-foreground">
-                                {rows.length === 0 ? t("connections.none") : t("connections.noMatch")}
-                            </p>
+                    <div
+                        ref={scrollRef}
+                        key={openApp ?? "apps"}
+                        className="enter-stagger min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 text-xs custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]"
+                    >
+                        {group ? (
+                            <>
+                                {header(
+                                    <SortButton active={sort.key === "name"} descending={sort.descending} onClick={() => toggleSort("name")}>
+                                        {t("connections.col.site")}
+                                    </SortButton>
+                                )}
+                                {shownRows.length === 0 ? (
+                                    <p className="p-6 text-center text-muted-foreground">{t("connections.noMatch")}</p>
+                                ) : (
+                                    shownRows.map((row) => (
+                                        <div key={row.id} className={cn(columns, "group border-b border-border/50 py-1.5 last:border-b-0 hover:bg-muted/30")}>
+                                            <span className="min-w-0">
+                                                <span className="block truncate font-medium" title={host(row)}>{host(row)}</span>
+                                                <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr">
+                                                    {[row.protocol, row.host ? row.destination : "", formatDuration(Math.max(0, now - row.started))].filter(Boolean).join(" · ")}
+                                                </span>
+                                            </span>
+                                            {viaCell([row])}
+                                            <span className="min-w-0 max-sm:hidden">{ruleCell([row])}</span>
+                                            <span className="max-sm:hidden">{networkCell([row])}</span>
+                                            {dataCells(row.download, row.upload, row.rate)}
+                                            <button
+                                                type="button"
+                                                onClick={() => void close([row.id])}
+                                                aria-label={t("connections.close", { name: host(row) })}
+                                                title={t("connections.closeHint")}
+                                                className="justify-self-end rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100"
+                                            >
+                                                <X size={13} aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </>
                         ) : (
-                            // Below sm the table is laid out as cards: the site on top,
-                            // app and rule under it, then the server, with the data
-                            // on the right. Five columns left a phone a word per cell.
-                            <table className="w-full table-fixed text-xs max-sm:block">
-                                <thead className="max-sm:hidden sticky top-0 z-10 bg-card text-start text-[11px] text-muted-foreground">
-                                    <tr>
-                                        <th className="w-[30%] px-3 py-2 text-start font-medium">{t("connections.col.site")}</th>
-                                        <th className="w-[16%] px-2 py-2 text-start font-medium">{t("connections.col.app")}</th>
-                                        <th className="w-[17%] px-2 py-2 text-start font-medium">{t("connections.col.rule")}</th>
-                                        <th className="w-[15%] px-2 py-2 text-start font-medium">{t("connections.col.via")}</th>
-                                        <th className="w-[16%] px-2 py-2 text-end font-medium">{t("connections.col.traffic")}</th>
-                                        <th className="w-10 px-2 py-2" />
-                                    </tr>
-                                </thead>
-                                <tbody className="max-sm:block">
-                                    {shown.map((row) => {
-                                        const rule = rules.find((item) => item.id === row.rule);
-                                        const meta = rule ? kindMeta(rule.kind) : null;
-                                        return (
-                                            <tr key={row.id} className="group border-t border-border/60 hover:bg-muted/30 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-2 max-sm:first:border-t-0">
-                                                <td className="px-3 py-1.5 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:p-0">
-                                                    <span className="block truncate font-medium" title={row.host || row.destination}>
-                                                        {row.host || row.destination}
-                                                    </span>
-                                                    <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr">
-                                                        {[row.network, row.protocol, row.host ? row.destination : "", formatDuration(Math.max(0, now - row.started))]
-                                                            .filter(Boolean)
-                                                            .join(" · ")}
-                                                    </span>
-                                                </td>
-                                                <td className="px-2 py-1.5 max-sm:col-start-1 max-sm:row-start-2 max-sm:p-0">
-                                                    <span className="block truncate" title={row.app_path}>
-                                                        {(row.app && appLabels.get(row.app)) || row.app || <span className="text-muted-foreground">—</span>}
-                                                    </span>
-                                                </td>
-                                                <td className="px-2 py-1.5 max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0">
-                                                    <span className="flex items-center gap-1.5 truncate">
-                                                        {meta ? <meta.icon size={12} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" /> : null}
-                                                        <span className="truncate" title={row.rule_text}>{ruleLabel(row.rule, row.rule_text)}</span>
-                                                    </span>
-                                                </td>
-                                                <td className="px-2 py-1.5 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-3 max-sm:p-0 max-sm:text-muted-foreground">
-                                                    <span className={cn("block truncate", row.route === "direct" && "text-muted-foreground")}>{via(row)}</span>
-                                                </td>
-                                                <td className="px-2 py-1.5 text-end tabular-nums max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:p-0">
-                                                    <span className="block text-[11px]">
-                                                        <ArrowUp size={10} className="inline" aria-hidden="true" /> {formatBytes(row.upload)}{" "}
-                                                        <ArrowDown size={10} className="inline" aria-hidden="true" /> {formatBytes(row.download)}
-                                                    </span>
-                                                    <span className={cn("block text-[10px]", row.rate > 0 ? "text-foreground" : "text-muted-foreground")}>
-                                                        {formatRate(row.rate)}
-                                                    </span>
-                                                </td>
-                                                <td className="px-2 py-1.5 text-end max-sm:col-start-3 max-sm:row-start-3 max-sm:p-0">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => void close(row.id)}
-                                                        aria-label={t("connections.close", { name: row.host || row.destination })}
-                                                        title={t("connections.closeHint")}
-                                                        className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100"
-                                                    >
-                                                        <X size={13} aria-hidden="true" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <>
+                                {header(
+                                    <SortButton active={sort.key === "name"} descending={sort.descending} onClick={() => toggleSort("name")}>
+                                        {t("connections.col.app")}
+                                    </SortButton>
+                                )}
+                                {shownGroups.length === 0 ? (
+                                    <p className="p-6 text-center text-muted-foreground">
+                                        {rows.length === 0 ? t("connections.none") : t("connections.noMatch")}
+                                    </p>
+                                ) : (
+                                    shownGroups.map((item) => (
+                                        <button
+                                            key={item.key}
+                                            type="button"
+                                            onClick={() => setOpenApp(item.key)}
+                                            className={cn(columns, "w-full border-b border-border/50 py-2 text-start last:border-b-0 hover:bg-muted/30")}
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-muted px-1 font-mono text-[10px] tabular-nums">
+                                                    {item.rows.length}
+                                                </span>
+                                                <AppWindow size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                                                <span className="truncate font-medium" title={item.rows[0]?.app_path}>{appName(item.key)}</span>
+                                            </span>
+                                            {viaCell(item.rows)}
+                                            <span className="min-w-0 max-sm:hidden">{ruleCell(item.rows)}</span>
+                                            <span className="max-sm:hidden">{networkCell(item.rows)}</span>
+                                            {dataCells(item.down, item.up, item.rate)}
+                                            <ChevronRight size={14} className="justify-self-end text-muted-foreground rtl:-scale-x-100" aria-hidden="true" />
+                                        </button>
+                                    ))
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
             )}
         </PageShell>
+    );
+}
+
+/** A column heading that sorts by its column; again reverses. */
+function SortButton({
+    active,
+    descending,
+    onClick,
+    end,
+    children,
+}: {
+    active: boolean;
+    descending: boolean;
+    onClick: () => void;
+    end?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-sort={active ? (descending ? "descending" : "ascending") : undefined}
+            className={cn(
+                "flex min-w-0 items-center gap-0.5 font-medium transition-colors hover:text-foreground",
+                end && "justify-end",
+                active && "text-foreground"
+            )}
+        >
+            {children}
+            {active ? <span aria-hidden="true">{descending ? "▾" : "▴"}</span> : null}
+        </button>
     );
 }
 

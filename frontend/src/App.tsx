@@ -9,7 +9,6 @@ import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import Welcome from "@/components/Welcome";
 import { UnsupportedProvider } from "@/lib/core-support";
-import AppSidebar from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BottomDockNav } from "@/components/layout/BottomDockNav";
 import { DesktopSidebarNav } from "@/components/layout/DesktopSidebarNav";
@@ -25,6 +24,8 @@ import ProxiesView from "@/components/views/ProxiesView";
 import RoutingView from "@/components/views/RoutingView";
 import ConnectionsView from "@/components/views/ConnectionsView";
 import StatisticsView from "@/components/views/StatisticsView";
+import ActivityView from "@/components/views/ActivityView";
+import { NAV_TABS } from "@/lib/tabs";
 import { subscriptionAlert } from "@/components/subscription-usage";
 import SettingsView from "@/components/views/SettingsView";
 import { useTheme } from "@/components/theme-provider";
@@ -958,6 +959,36 @@ function App() {
         }
         startTransition(() => setActiveTab(tab));
     };
+    // Left and right arrows step through the screens in the order the
+    // navigation shows them. Not where the arrows already mean something: a
+    // field, a slider or switcher, an open menu or dialog, the routing canvas.
+    const changeTabRef = useRef(changeTab);
+    changeTabRef.current = changeTab;
+    const activeTabRef = useRef(activeTab);
+    activeTabRef.current = activeTab;
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+            const target = event.target as HTMLElement | null;
+            if (
+                target?.closest(
+                    'input, textarea, select, [contenteditable="true"], [role="slider"], [role="radiogroup"], [role="tablist"], [role="menu"], [role="listbox"], [role="dialog"], .react-flow'
+                )
+            ) {
+                return;
+            }
+            if (document.querySelector('[role="dialog"][data-state="open"], [role="menu"][data-state="open"]')) return;
+            const ids = NAV_TABS.map((tab) => tab.id);
+            const forward = (event.key === "ArrowRight") !== (document.documentElement.dir === "rtl");
+            const next = ids[ids.indexOf(activeTabRef.current) + (forward ? 1 : -1)];
+            if (!next) return;
+            event.preventDefault();
+            changeTabRef.current(next);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
     // On a phone, Back from any other tab returns to Connection before it
     // leaves the app.
     useBack(activeTab !== "connection", () => startTransition(() => setActiveTab("connection")));
@@ -1262,27 +1293,31 @@ function App() {
                                     />
                                 )}
 
-                                {activeTab === "connections" && (
-                                    <ConnectionsView
-                                        connected={connection.isConnected}
-                                        rules={settings.routing_rules ?? []}
-                                        profiles={profiles}
-                                    />
-                                )}
-
-                                {activeTab === "statistics" && (
-                                    <StatisticsView key="statistics" profiles={profiles} settings={settings} onSettingsChange={updateSetting} />
-                                )}
-
-                                {activeTab === "logs" && (
-                                    <LogsView
-                                        enabled={settings.logging_enabled !== false}
-                                        onEnable={() => updateSetting("logging_enabled", true)}
-                                        logs={logs}
-                                        logLimit={logLimit}
-                                        onLogLimitChange={changeLimit}
-                                        onDumpLogs={handleDumpLogs}
-                                        onClear={clearLogs}
+                                {activeTab === "activity" && (
+                                    <ActivityView
+                                        pages={{
+                                            statistics: (
+                                                <StatisticsView profiles={profiles} settings={settings} onSettingsChange={updateSetting} />
+                                            ),
+                                            connections: (
+                                                <ConnectionsView
+                                                    connected={connection.isConnected}
+                                                    rules={settings.routing_rules ?? []}
+                                                    profiles={profiles}
+                                                />
+                                            ),
+                                            logs: (
+                                                <LogsView
+                                                    enabled={settings.logging_enabled !== false}
+                                                    onEnable={() => updateSetting("logging_enabled", true)}
+                                                    logs={logs}
+                                                    logLimit={logLimit}
+                                                    onLogLimitChange={changeLimit}
+                                                    onDumpLogs={handleDumpLogs}
+                                                    onClear={clearLogs}
+                                                />
+                                            ),
+                                        }}
                                     />
                                 )}
 

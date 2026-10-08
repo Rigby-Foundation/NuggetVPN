@@ -4,6 +4,7 @@ import { Activity, Check, CheckSquare, Download, Link2, Pencil, RefreshCw, Searc
 
 import { useAppearance } from "@/components/appearance-provider";
 import PageShell from "@/components/layout/PageShell";
+import { useRemembered } from "@/lib/remember";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,9 +107,11 @@ function ProxiesView({
         [profiles, domain, isSubscription]
     );
 
-    const [query, setQuery] = useState("");
-    const [sort, setSort] = useState<Sort>("list");
-    const [starredOnly, setStarredOnly] = useState(false);
+    // Remembered across tabs with the scroll position, which only means
+    // something for the same list.
+    const [query, setQuery] = useRemembered("proxies.query", "");
+    const [sort, setSort] = useRemembered<Sort>("proxies.sort", "list");
+    const [starredOnly, setStarredOnly] = useRemembered("proxies.starred", false);
     const [testing, setTesting] = useState(false);
     const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
     const [exportingProfiles, setExportingProfiles] = useState<Profile[] | null>(null);
@@ -243,6 +246,7 @@ function ProxiesView({
 
     return (
         <PageShell
+            memoryKey="proxies"
             title={t("proxies.title")}
             description={
                 selecting

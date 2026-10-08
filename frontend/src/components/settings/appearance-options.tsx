@@ -49,6 +49,7 @@ import {
     fontsFor,
     LayoutPrefs,
     MOTION_SPEED_LIMITS,
+    MOTION_STAGGER_LIMITS,
     MOTIONS,
     NavPosition,
     RADII,
@@ -407,7 +408,7 @@ const MOTION_ICONS: Record<string, LucideIcon> = {
  * Cohesive controller for transition animations.
  */
 export function MotionPicker() {
-    const { prefs, setMotion, setMotionSpeed } = useAppearance();
+    const { prefs, setMotion, setMotionSpeed, setMotionStagger } = useAppearance();
     const t = useT();
 
     return (
@@ -451,7 +452,7 @@ export function MotionPicker() {
                 );
             })}
         </div>
-        <div className={cn(prefs.motion === "none" && "pointer-events-none opacity-50")}>
+        <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", prefs.motion === "none" && "pointer-events-none opacity-50")}>
             <Slider
                 label={t("appearance.motion.speed")}
                 value={prefs.motionSpeed}
@@ -462,6 +463,17 @@ export function MotionPicker() {
                 thumb="var(--primary)"
                 onChange={setMotionSpeed}
                 format={(value) => `${value.toFixed(2).replace(/\.?0+$/, "")}×`}
+            />
+            <Slider
+                label={t("appearance.motion.stagger")}
+                value={prefs.motionStagger}
+                min={MOTION_STAGGER_LIMITS.min}
+                max={MOTION_STAGGER_LIMITS.max}
+                step={MOTION_STAGGER_LIMITS.step}
+                track="linear-gradient(to right, var(--muted), var(--primary))"
+                thumb="var(--primary)"
+                onChange={setMotionStagger}
+                format={(value) => (value === 0 ? t("appearance.motion.stagger.none") : `${value} ms`)}
             />
         </div>
         </div>
@@ -924,17 +936,6 @@ export function LayoutPicker() {
                             );
                         })}
                     </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 p-3">
-                    <div className="space-y-0.5 pr-2">
-                        <span className="text-xs font-medium block">{t("appearance.layout.showQuickSwitch")}</span>
-                        <span className="text-[11px] text-muted-foreground block">{t("appearance.layout.showQuickSwitch.hint")}</span>
-                    </div>
-                    <Switch
-                        checked={layout.showQuickSwitch}
-                        onCheckedChange={(checked) => setLayout({ showQuickSwitch: checked })}
-                    />
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 p-3">

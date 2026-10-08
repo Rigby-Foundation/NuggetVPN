@@ -183,6 +183,9 @@ export const RADIUS_LIMITS = { min: 0, max: 1.75, step: 0.025 } as const;
 /** The range of the animation speed slider. */
 export const MOTION_SPEED_LIMITS = { min: 0.25, max: 3, step: 0.05 } as const;
 
+/** The gap between one element of a page appearing and the next, in ms. */
+export const MOTION_STAGGER_LIMITS = { min: 0, max: 80, step: 5, fallback: 20 } as const;
+
 export const RADII: RadiusOption[] = [
     { id: "small", label: "appearance.radius.small", value: "0.375rem" },
     { id: "medium", label: "appearance.radius.medium", value: "0.625rem" },
@@ -382,7 +385,6 @@ export interface LayoutPrefs {
     telemetryPlacement: TelemetryPlacement;
     telemetryOrder: TelemetryMetric[];
     telemetryVisible: Record<TelemetryMetric, boolean>;
-    showQuickSwitch: boolean;
     showSpeedTest: boolean;
     dashboardWidth: DashboardWidth;
     proxiesCardLayout: CardLayout;
@@ -400,7 +402,6 @@ export const DEFAULT_LAYOUT: LayoutPrefs = {
         upload: true,
         latency: true,
     },
-    showQuickSwitch: false,
     showSpeedTest: true,
     dashboardWidth: "normal",
     proxiesCardLayout: "list",
@@ -448,7 +449,6 @@ export function sanitizeLayout(raw: unknown): LayoutPrefs {
         telemetryPlacement,
         telemetryOrder,
         telemetryVisible,
-        showQuickSwitch: typeof val.showQuickSwitch === "boolean" ? val.showQuickSwitch : DEFAULT_LAYOUT.showQuickSwitch,
         showSpeedTest: typeof val.showSpeedTest === "boolean" ? val.showSpeedTest : DEFAULT_LAYOUT.showSpeedTest,
         dashboardWidth,
         proxiesCardLayout,
@@ -469,6 +469,8 @@ export interface AppearancePrefs {
     motion: string;
     /** How fast animations play: 2 is twice as fast, 0.5 half. */
     motionSpeed: number;
+    /** How long after one element of a page the next starts appearing, ms. */
+    motionStagger: number;
     /**
      * An accent hue and vividness over the theme's own, or null for the
      * theme's. Its lightness stays the theme's, which is what keeps the text
@@ -496,6 +498,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     radiusCustom: 0.625,
     motion: "fade",
     motionSpeed: 1,
+    motionStagger: MOTION_STAGGER_LIMITS.fallback,
     accent: null,
     layout: DEFAULT_LAYOUT,
     customThemes: [],
@@ -598,6 +601,7 @@ export function loadAppearance(): AppearancePrefs {
             radiusCustom: clamp(raw.radiusCustom, RADIUS_LIMITS.min, RADIUS_LIMITS.max, DEFAULT_APPEARANCE.radiusCustom),
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
             motionSpeed: clamp(raw.motionSpeed, MOTION_SPEED_LIMITS.min, MOTION_SPEED_LIMITS.max, 1),
+            motionStagger: clamp(raw.motionStagger, MOTION_STAGGER_LIMITS.min, MOTION_STAGGER_LIMITS.max, MOTION_STAGGER_LIMITS.fallback),
             accent:
                 raw.accent && typeof raw.accent === "object"
                     ? { h: clamp(raw.accent.h, 0, 360, 70), c: clamp(raw.accent.c, 0, 0.25, 0.15) }
@@ -650,6 +654,7 @@ export function applyAppearance(prefs: AppearancePrefs, script: Script) {
     root.dataset.motion = prefs.motion;
     // Durations are multiplied by this: faster means shorter.
     root.style.setProperty("--motion-scale", String(1 / (prefs.motionSpeed || 1)));
+    root.style.setProperty("--enter-step", `${prefs.motionStagger ?? MOTION_STAGGER_LIMITS.fallback}ms`);
 }
 
 /**

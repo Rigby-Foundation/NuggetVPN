@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from "lucide-react";
 
@@ -16,6 +16,8 @@ import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { useRemembered } from "@/lib/remember";
+import { Segmented } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 import { AppSettings, AppUsage, HealthSample, Profile, ServerHealth } from "@/types";
 import { usePageVisible } from "@/hooks/use-page-visible";
@@ -37,9 +39,9 @@ function programName(program: string): string {
     return program.replace(/\.exe$/i, "");
 }
 
-function Section({ icon: Icon, title, action, children }: { icon: typeof HeartPulse; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Section({ icon: Icon, title, action, children, className }: { icon: typeof HeartPulse; title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
     return (
-        <section className="rounded-xl border bg-card/60 p-4">
+        <section className={cn("rounded-xl border bg-card/60 p-4", className)}>
             <header className="mb-3 flex items-center gap-2">
                 <Icon size={15} className="text-muted-foreground" aria-hidden="true" />
                 <h3 className="flex-1 text-sm font-medium">{title}</h3>
@@ -198,15 +200,27 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     const t = useT();
     // On a phone traffic is counted by package; show the app it belongs to.
     const appLabels = useAppLabels();
-    const [days, setDays] = useState(1);
-    const [usage, setUsage] = useState<AppUsage | null>(null);
+    const [days, setDays] = useRemembered("statistics.days", 1);
+    // Kept with the period it was fetched for. Switching period showed the
+    // old period's data until the new arrived — a day's single bar drawn
+    // across the whole week chart — and a slow answer could overwrite a
+    // newer one.
+    const [usage, setUsage] = useState<{ days: number; data: AppUsage } | null>(null);
+    const daysRef = useRef(days);
+    daysRef.current = days;
+    // Until the chosen period's numbers arrive, the last ones stay, dimmed.
+    const stale = !!usage && usage.days !== days;
     const [health, setHealth] = useState<Record<string, ServerHealth>>({});
     const [confirmClear, setConfirmClear] = useState(false);
     const appStatsOn = settings.app_stats !== false;
     const healthOn = settings.server_health !== false;
 
     const load = useCallback(() => {
-        invoke<AppUsage>("get_app_usage", { days }).then(setUsage).catch(() => undefined);
+        invoke<AppUsage>("get_app_usage", { days })
+            .then((data) => {
+                if (daysRef.current === days) setUsage({ days, data });
+            })
+            .catch(() => undefined);
         invoke<Record<string, ServerHealth>>("get_server_health").then((value) => setHealth(value ?? {})).catch(() => undefined);
     }, [days]);
 
@@ -231,7 +245,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
             );
     }, [health, profiles]);
 
-    const programs = usage?.programs ?? [];
+    const programs = usage?.data.programs ?? [];
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
     const total = programs.reduce((sum, program) => ({ up: sum.up + program.up, down: sum.down + program.down }), { up: 0, down: 0 });
     const label = (program: string) => (program ? appLabels.get(program) || programName(program) : t("stats.unknownApp"));
@@ -260,28 +274,20 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     return (
         <>
             <PageShell
+                memoryKey="activity.statistics"
                 title={t("stats.title")}
                 description={t("stats.subtitle")}
-                className="max-w-4xl mx-auto space-y-4"
+                // Not centred: in Activity the switcher in the heading has to sit
+                // where it does on the other two pages, or it jumps on every switch.
+                className="space-y-4 [&>*:not(header)]:max-w-4xl"
                 actions={
                     <>
-                        <div className="flex rounded-lg bg-muted/50 p-0.5" role="tablist">
-                            {PERIODS.map((period) => (
-                                <button
-                                    key={period.days}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={days === period.days}
-                                    onClick={() => setDays(period.days)}
-                                    className={cn(
-                                        "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                                        days === period.days ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    {t(period.label)}
-                                </button>
-                            ))}
-                        </div>
+                        <Segmented<number>
+                            label={t("stats.period")}
+                            options={PERIODS.map((period) => ({ value: period.days, label: t(period.label) }))}
+                            value={days}
+                            onChange={setDays}
+                        />
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfirmClear(true)} aria-label={t("stats.clear")} title={t("stats.clear")}>
                             <Trash2 size={15} aria-hidden="true" />
                         </Button>
@@ -289,6 +295,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                 }
             >
                 <Section
+                    className={cn("transition-opacity", stale && "opacity-60")}
                     icon={AppWindow}
                     title={t("stats.apps")}
                     action={
@@ -308,7 +315,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                         </div>
                     ) : (
                         <>
-                            {days > 1 && usage ? <DayChart days={usage.days} /> : null}
+                            {days > 1 && usage && !stale ? <DayChart days={usage.data.days} /> : null}
                             {programs.length > 0 && total.up + total.down > 0 ? (
                                 <ShareChart slices={slices} total={total.up + total.down} />
                             ) : null}

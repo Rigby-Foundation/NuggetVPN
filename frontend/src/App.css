@@ -713,7 +713,8 @@
 :root {
     --enter-name: nugget-fade-in;
     --enter-duration: 300ms;
-    --enter-step: 35ms;
+    /* Overridden by the Appearance setting; see applyAppearance. */
+    --enter-step: 20ms;
     /* The animation speed setting: every duration is multiplied by it
        (applyAppearance sets it; 0.5 is twice as fast). Tailwind's default
        transition length follows it too. */

@@ -23,22 +23,8 @@ import { useUnsupported } from "@/lib/core-support";
 import { withoutFlagEmoji } from "@/lib/flags";
 import { maximiseOnDoubleClick } from "@/components/layout/header-double-click";
 
-export interface NavTabItem {
-    id: string;
-    label: MessageKey;
-    icon: typeof Power;
-}
-
-export const NAV_TABS: readonly NavTabItem[] = [
-    { id: "connection", label: "nav.connection", icon: Power },
-    { id: "proxies", label: "nav.proxies", icon: Signal },
-    { id: "configuration", label: "nav.configuration", icon: Server },
-    { id: "routing", label: "nav.routing", icon: Waypoints },
-    { id: "connections", label: "nav.connections", icon: Activity },
-    { id: "statistics", label: "nav.statistics", icon: BarChart3 },
-    { id: "logs", label: "nav.logs", icon: FileText },
-    { id: "settings", label: "nav.settings", icon: Settings },
-] as const;
+export { NAV_TABS } from "@/lib/tabs";
+import { NAV_TABS } from "@/lib/tabs";
 
 interface UnifiedHeaderProps {
     activeTab: string;
@@ -123,9 +109,13 @@ export function UnifiedHeader({
             dir={dir}
             onDoubleClick={maximiseOnDoubleClick(onMaximize, platform)}
         >
-            <div className={cn("flex h-14 w-full items-center justify-between", isMac && "pt-1")}>
+            {/* Three columns, the tabs in a middle one of their own: centred
+                between the sides, the tabs moved whenever a side changed
+                width — the live speed every second, the server picker on
+                leaving the home tab — and slid away from the pointer. */}
+            <div className={cn("grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center gap-2", isMac && "pt-1")}>
                 {/* Left Area: Window Controls + Brand Beacon */}
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-start">
                 {isMac ? (
                     <div className="me-1">
                         <MacWindowControls
@@ -147,7 +137,7 @@ export function UnifiedHeader({
 
             {/* Center Area: Segmented Modern Capsule Navigation */}
             <nav
-                className="hidden md:flex items-center gap-0.5 rounded-xl border border-border/50 bg-muted/40 p-1 backdrop-blur-xs shrink min-w-0 mx-1 sm:mx-2"
+                className="hidden md:flex items-center gap-0.5 rounded-xl border border-border/50 bg-muted/40 p-1 backdrop-blur-xs min-w-0"
                 aria-label={t("nav.menu")}
             >
                 {NAV_TABS.map((tab) => {
@@ -160,19 +150,18 @@ export function UnifiedHeader({
                                     type="button"
                                     onClick={() => onTabChange(tab.id)}
                                     aria-current={isActive ? "page" : undefined}
+                                    // Every tab the same shape, active or not: only the active
+                                    // one showing its name made the others shift on each click.
+                                    // Names appear for all of them once the window is wide enough.
                                     className={cn(
-                                        "flex items-center gap-1.5 rounded-lg text-xs transition-all duration-200 select-none shrink-0",
+                                        "flex items-center gap-1.5 rounded-lg p-1.5 xl:px-2.5 xl:py-1 text-xs transition-colors select-none shrink-0",
                                         isActive
-                                            ? "bg-background text-foreground shadow-xs font-medium px-2.5 py-1"
-                                            : "text-muted-foreground hover:bg-muted/40 hover:text-foreground p-1.5"
+                                            ? "bg-background text-foreground shadow-xs"
+                                            : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                                     )}
                                 >
                                     <Icon size={14} className={isActive ? "text-primary" : "text-muted-foreground"} />
-                                    {isActive ? (
-                                        <span className="truncate max-w-[120px]">{t(tab.label)}</span>
-                                    ) : (
-                                        <span className="hidden 2xl:inline truncate max-w-[100px]">{t(tab.label)}</span>
-                                    )}
+                                    <span className="hidden xl:inline truncate max-w-[110px]">{t(tab.label)}</span>
                                 </button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
@@ -184,7 +173,7 @@ export function UnifiedHeader({
             </nav>
 
             {/* Right Area: Telemetry, Quick Server Switcher, Quick Connect, and Window Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ms-auto md:ms-0">
+            <div className="col-start-3 flex items-center gap-1.5 sm:gap-2 min-w-0 justify-self-end">
                 {/* Live Speeds (when connected on wide screens) */}
                 {isConnected && (traffic.down_rate > 0 || traffic.up_rate > 0) ? (
                     <div className="hidden 2xl:flex items-center gap-2 rounded-lg border border-border/40 bg-muted/30 px-2 py-0.5 text-[11px] font-mono text-muted-foreground tnum">

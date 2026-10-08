@@ -12,7 +12,6 @@ import {
     Lock,
     Plus,
     Power,
-    Server,
     ShieldAlert,
     ShieldCheck,
     Signal,
@@ -34,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LOCAL, profileDomain } from "@/hooks/use-profiles";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
+import { useScrollMemory } from "@/lib/remember";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConfigSource, ConnectionState, IpInfo, Profile, ProxyMode, TrafficSample } from "@/types";
@@ -205,6 +205,7 @@ function ConnectionView({
     killSwitch = false,
 }: ConnectionViewProps) {
     const t = useT();
+    const scrollRef = useScrollMemory("connection");
     const unsupported = useUnsupported();
     const isConnected = state.status === "connected";
     const isConnecting = state.status === "connecting";
@@ -345,7 +346,7 @@ function ConnectionView({
     ) : null;
 
     return (
-        <div className="absolute inset-0 overflow-y-auto">
+        <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
             <div className="min-h-full flex flex-col px-4 py-5 sm:px-6">
                 <div
                     className={cn(
@@ -373,16 +374,20 @@ function ConnectionView({
                                 busy && "cursor-progress"
                             )}
                         >
-                            {/* Soft glow behind the button, in the state's colour. */}
+                            {/* Soft glow behind the button, in the state's colour. A
+                                gradient that is already transparent at its own edge,
+                                not a blur: a blur spread past the top of the scrolling
+                                area and was cut off there in a hard line. */}
                             <span
                                 className={cn(
-                                    "absolute -inset-6 rounded-full blur-3xl transition-opacity duration-500",
-                                    isConnected
-                                        ? "bg-status-connected/35 opacity-100"
-                                        : isError
-                                          ? "bg-status-error/20 opacity-100"
-                                          : "bg-primary/20 opacity-60 group-hover:opacity-100"
+                                    "absolute -inset-8 rounded-full transition-opacity duration-500",
+                                    isConnected || isError ? "opacity-100" : "opacity-60 group-hover:opacity-100"
                                 )}
+                                style={{
+                                    background: `radial-gradient(closest-side, color-mix(in oklab, ${
+                                        isConnected ? "var(--status-connected) 45%" : isError ? "var(--status-error) 30%" : "var(--primary) 30%"
+                                    }, transparent) 40%, transparent)`,
+                                }}
                                 aria-hidden="true"
                             />
 
@@ -557,29 +562,6 @@ function ConnectionView({
                                     <Lock size={11} /> {t("connection.killSwitchOn")}
                                 </span>
                             ) : null}
-                        </div>
-                    ) : null}
-
-                    {/* Optional quick switcher card, from the layout settings. */}
-                    {layout.showQuickSwitch ? (
-                        <div className="rounded-2xl bg-muted/50 p-5 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Server size={18} className="text-primary" />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[11px] text-muted-foreground font-normal">{t("connection.activeServer")}</div>
-                                    <div className="text-sm font-semibold truncate">{activeServerLabel}</div>
-                                </div>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onNavigateTab?.("proxies")}
-                                className="h-8 text-xs shrink-0"
-                            >
-                                {t("connection.change")} →
-                            </Button>
                         </div>
                     ) : null}
 

@@ -74,6 +74,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRemembered, useScrollMemory } from "@/lib/remember";
 import {
   Select,
   SelectContent,
@@ -332,9 +333,12 @@ function SettingsView({
   // setting carried over from another system acts as "keep in the tray".
   const closeOptions = platform === "macos" ? CLOSE_OPTIONS.filter((option) => option.id !== "hide") : CLOSE_OPTIONS;
   const closeAction = platform === "macos" && appSettings.close_action === "hide" ? "tray" : appSettings.close_action;
-  const [openId, setOpenId] = React.useState<SectionId | null>(null);
+  // Remembered across tabs: leaving Settings from inside a section and coming
+  // back returns to that section, scrolled where it was (see lib/remember).
+  const [openId, setOpenId] = useRemembered<SectionId | null>("settings.open", null);
   // Kept while a section is open, so Back returns to the same results.
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = useRemembered("settings.query", "");
+  const scrollRef = useScrollMemory(`settings.${openId ?? "list"}`);
   // Which way the last move went, so coming back animates in reverse.
   const [direction, setDirection] = React.useState<"forward" | "back">("forward");
 
@@ -355,12 +359,17 @@ function SettingsView({
       setOpenId(null);
     }
   }, [homeSignal]);
+  // A request to open a section is handled once: Settings is mounted again
+  // on every visit, and the same request would otherwise reopen its section
+  // over whichever one was left open.
+  const [handledOpen, setHandledOpen] = useRemembered("settings.openHandled", 0);
   React.useEffect(() => {
-    if (openSignal && SECTIONS.some((section) => section.id === openSignal.id)) {
+    if (openSignal && openSignal.n !== handledOpen && SECTIONS.some((section) => section.id === openSignal.id)) {
+      setHandledOpen(openSignal.n);
       setDirection("forward");
       setOpenId(openSignal.id as SectionId);
     }
-  }, [openSignal]);
+  }, [openSignal, handledOpen, setHandledOpen, setOpenId]);
   const { prefs: appearance, activeCustom } = useAppearance();
   const { t, choice, setChoice, language } = useI18n();
   const { plugins } = usePlugins();
@@ -1153,7 +1162,7 @@ function SettingsView({
         }
       >
         <div className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full" viewportRef={scrollRef}>
             {open ? (
               <div className="enter-stagger space-y-4 pe-1">{detail(open.id)}</div>
             ) : (
@@ -1180,7 +1189,7 @@ function SettingsView({
                   results.length === 0 ? (
                     <p className="px-1 text-sm text-muted-foreground">{t("settings.search.none")}</p>
                   ) : (
-                    <div className="grid gap-2 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                       {results.map((result) => row(SECTIONS.find((section) => section.id === result.id)!, result.match))}
                     </div>
                   )
@@ -1192,7 +1201,7 @@ function SettingsView({
                       return (
                         <section key={group.title} className="space-y-2">
                           <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(group.title)}</h3>
-                          <div className="grid gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
+                          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
                         </section>
                       );
                     })}

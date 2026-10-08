@@ -15,8 +15,10 @@ import {
     type Edge,
     type Node,
     type NodeChange,
+    type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useRemembered } from "@/lib/remember";
 
 import {
     ACTION_META,
@@ -249,7 +251,11 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
     // side panel — until the user pans or zooms, after which their view is
     // theirs.
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const userMovedRef = useRef(false);
+    // Coming back to Routing returns the view you left, per setup, rather
+    // than fitting the graph again (see lib/remember).
+    const viewportKey = `routing.viewport.${settings.active_routing_setup ?? ""}`;
+    const [savedViewport, setSavedViewport] = useRemembered<Viewport | null>(viewportKey, null);
+    const userMovedRef = useRef(savedViewport !== null);
     useEffect(() => {
         const element = wrapperRef.current;
         if (!element || typeof ResizeObserver !== "function") return;
@@ -684,13 +690,17 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 // Only a gesture has an event; programmatic moves do not.
                 if (event) userMovedRef.current = true;
             }}
+            onMoveEnd={(event, viewport) => {
+                if (userMovedRef.current) setSavedViewport(viewport);
+            }}
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onEdgeClick={onEdgeClick}
             // A dragged wire snaps to a connector this far away.
             connectionRadius={40}
-            fitView
+            fitView={savedViewport === null}
+            defaultViewport={savedViewport ?? undefined}
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.25}
             maxZoom={1.5}
@@ -745,7 +755,7 @@ function Palette({
     className?: string;
 }) {
     const t = useT();
-    const [tab, setTab] = useState<"add" | "order">("add");
+    const [tab, setTab] = useRemembered<"add" | "order">("routing.panel", "add");
     const available = profiles.filter((profile) => !placedServers.includes(profile.id));
     return (
         <aside className={cn("w-60 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto", className)}>

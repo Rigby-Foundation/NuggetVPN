@@ -203,6 +203,7 @@ function ConfigurationView({
 
     return (
         <PageShell
+            memoryKey="configuration"
             title={t("configuration.title")}
             description={
                 selecting ? t("configuration.bulk.hint") : t("configuration.description")
