@@ -55,6 +55,7 @@ import {
   LayoutPicker,
   AccentPicker,
   MotionPicker,
+  UnitsPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
 import { effectiveFont, fontLabel } from "@/lib/appearance";
@@ -531,6 +532,10 @@ function SettingsView({
             >
               <MotionPicker />
             </SettingsGroup>
+
+            <SettingsGroup title={t("appearance.units")} description={t("appearance.units.description")}>
+              <UnitsPicker />
+            </SettingsGroup>
           </>
         );
 
@@ -633,6 +638,17 @@ function SettingsView({
                     checked={appSettings.kill_switch}
                     onCheckedChange={(checked) => onSettingsChange("kill_switch", checked)}
                     aria-label={t("behaviour.killSwitch")}
+                  />
+                }
+              />
+              <SettingsField
+                label={t("behaviour.fallback")}
+                description={t("behaviour.fallback.description")}
+                control={
+                  <Switch
+                    checked={appSettings.server_fallback !== false}
+                    onCheckedChange={(checked) => onSettingsChange("server_fallback", checked)}
+                    aria-label={t("behaviour.fallback")}
                   />
                 }
               />

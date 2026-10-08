@@ -1,12 +1,15 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { AppWindow, ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Search, X, XCircle } from "lucide-react";
+import { AppWindow, ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Cpu, Search, X, XCircle } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
 import { kindMeta } from "@/components/routing/nodes";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/ui/flag";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { useFileIcons } from "@/lib/app-icons";
+import { isSystemProgram, useShowSystem } from "@/lib/system-apps";
 import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
 import { withoutFlagEmoji } from "@/lib/flags";
@@ -23,17 +26,25 @@ const POLL_MS = 1000;
 const DEFAULT_RULE = "__default";
 /** The group for connections no program could be found for. */
 const NO_APP = "\u0000";
+/** The group system programs fold into while "Show system" is off. */
+const SYSTEM = "\u0001system";
+/** How long a closed connection stays in the list, dimmed. */
+const RECENT_MS = 30_000;
 
 type SortKey = "name" | "count" | "down" | "up" | "rate";
 
 interface Row extends LiveConnection {
     /** Bytes per second since the previous read, both ways. */
     rate: number;
+    /** When it closed, for one kept a while after; see RECENT_MS. */
+    closedAt?: number;
 }
 
 interface AppGroup {
     key: string;
     rows: Row[];
+    /** Rows still open; the rest closed a moment ago. */
+    open: number;
     down: number;
     up: number;
     rate: number;
@@ -62,12 +73,29 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const [paused, setPaused] = useState(false);
     const visible = usePageVisible();
     const previous = useRef(new Map<string, { bytes: number; at: number }>());
+    // Connections that closed a moment ago stay, dimmed, instead of the list
+    // jumping every second as short ones come and go. One the user closed
+    // goes at once.
+    const lastOpen = useRef(new Map<string, Row>());
+    const recent = useRef(new Map<string, Row>());
+    const dismissed = useRef(new Set<string>());
+    const [showSystem, setShowSystem] = useShowSystem();
+    // The rows rise in when the list opens, and then stay still: re-sorting
+    // moves rows, and a moved element replays its entrance.
+    const [settled, setSettled] = useState(false);
+    useEffect(() => {
+        setSettled(false);
+        const timer = window.setTimeout(() => setSettled(true), 900);
+        return () => window.clearTimeout(timer);
+    }, [openApp]);
     const scrollRef = useScrollMemory(`connections.${openApp ?? "apps"}`);
 
     useEffect(() => {
         if (!connected) {
             setRows([]);
             previous.current.clear();
+            lastOpen.current.clear();
+            recent.current.clear();
             return;
         }
         if (paused || !visible) return;
@@ -87,7 +115,14 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                     return { ...connection, rate };
                 });
                 previous.current = seen;
-                setRows(next);
+                for (const [id, row] of lastOpen.current) {
+                    if (!seen.has(id) && !dismissed.current.has(id)) recent.current.set(id, { ...row, rate: 0, closedAt: now });
+                }
+                for (const [id, row] of recent.current) {
+                    if (seen.has(id) || now - (row.closedAt ?? 0) > RECENT_MS) recent.current.delete(id);
+                }
+                lastOpen.current = new Map(next.map((row) => [row.id, row]));
+                setRows([...next, ...recent.current.values()]);
             } catch {
                 // A missed read is replaced by the next one.
             }
@@ -100,7 +135,8 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         };
     }, [connected, paused, visible]);
 
-    const appName = (key: string) => (key === NO_APP ? t("stats.unknownApp") : appLabels.get(key) || key.replace(/\.exe$/i, ""));
+    const appName = (key: string) =>
+        key === SYSTEM ? t("connections.system") : key === NO_APP ? t("stats.unknownApp") : appLabels.get(key) || key.replace(/\.exe$/i, "");
     const ruleLabel = (id: string, text?: string) => {
         if (id === DEFAULT_RULE) return t("routing.catchAll");
         // An external core's own description, where it maps to no rule.
@@ -124,16 +160,17 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
     const groups = useMemo(() => {
         const byApp = new Map<string, AppGroup>();
         for (const row of rows) {
-            const key = row.app || NO_APP;
-            const group = byApp.get(key) ?? { key, rows: [], down: 0, up: 0, rate: 0 };
+            const key = !showSystem && isSystemProgram(row.app, row.app_path) ? SYSTEM : row.app || NO_APP;
+            const group = byApp.get(key) ?? { key, rows: [], open: 0, down: 0, up: 0, rate: 0 };
             group.rows.push(row);
+            if (!row.closedAt) group.open += 1;
             group.down += row.download;
             group.up += row.upload;
             group.rate += row.rate;
             byApp.set(key, group);
         }
         return [...byApp.values()];
-    }, [rows]);
+    }, [rows, showSystem]);
 
     const needle = filter.trim().toLowerCase();
     const direction = sort.descending ? -1 : 1;
@@ -151,7 +188,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             ? groups.filter((item) => appName(item.key).toLowerCase().includes(needle) || item.rows.some((row) => matches(row, needle)))
             : groups;
         const value = (item: AppGroup) =>
-            ({ name: appName(item.key), count: item.rows.length, down: item.down, up: item.up, rate: item.rate })[sort.key];
+            ({ name: appName(item.key), count: item.open, down: item.down, up: item.up, rate: item.rate })[sort.key];
         return [...list].sort(byKey(value));
         // appName, matches and byKey only read t, labels, rules and sort.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,13 +211,20 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         try {
             if (ids) await Promise.all(ids.map((id) => invoke("close_connection", { id })));
             else await invoke("close_all_connections", {});
+            const gone = ids ?? rows.map((row) => row.id);
+            gone.forEach((id) => {
+                dismissed.current.add(id);
+                recent.current.delete(id);
+            });
             setRows((current) => (ids ? current.filter((row) => !ids.includes(row.id)) : []));
         } catch (error) {
             toast.error(errorMessage(error), { id: "close-connection" });
         }
     };
 
-    const totals = rows.reduce((sum, row) => ({ up: sum.up + row.upload, down: sum.down + row.download }), { up: 0, down: 0 });
+    const openRows = rows.filter((row) => !row.closedAt);
+    const totals = openRows.reduce((sum, row) => ({ up: sum.up + row.upload, down: sum.down + row.download }), { up: 0, down: 0 });
+    const icons = useFileIcons(groups.map((item) => (item.key === SYSTEM ? undefined : item.rows[0]?.app_path)));
     const now = Date.now();
     const toggleSort = (key: SortKey) =>
         setSort((current) => (current.key === key ? { key, descending: !current.descending } : { key, descending: key !== "name" }));
@@ -232,7 +276,8 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         <>
             <span className="text-end tabular-nums">
                 <span className="block">{formatBytes(down)}</span>
-                <span className={cn("block text-[10px]", rate > 0 ? "text-foreground" : "text-muted-foreground")}>{rate > 0 ? formatRate(rate) : ""}</span>
+                {/* Always two lines, so a row never changes height as its speed comes and goes. */}
+                <span className={cn("block text-[10px]", rate > 0 ? "text-foreground" : "text-muted-foreground")}>{rate > 0 ? formatRate(rate) : "\u00a0"}</span>
             </span>
             <span className="text-end tabular-nums text-muted-foreground">{formatBytes(up)}</span>
         </>
@@ -263,7 +308,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             title={t("connections.title")}
             description={
                 connected
-                    ? t("connections.summary", { count: rows.length, up: formatBytes(totals.up), down: formatBytes(totals.down) })
+                    ? t("connections.summary", { count: openRows.length, up: formatBytes(totals.up), down: formatBytes(totals.down) })
                     : t("connections.offline")
             }
             actions={
@@ -292,7 +337,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                 <ArrowLeft size={14} className="rtl:-scale-x-100" aria-hidden="true" />
                                 <span className="max-w-48 truncate font-semibold">{appName(group.key)}</span>
                                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
-                                    {t("connections.active", { count: group.rows.length })}
+                                    {t("connections.active", { count: group.open })}
                                 </span>
                             </Button>
                         ) : null}
@@ -306,8 +351,12 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                 className="h-8 ps-8 text-xs"
                             />
                         </div>
+                        <label className="flex h-8 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                            <Switch checked={showSystem} onCheckedChange={setShowSystem} aria-label={t("connections.showSystem")} />
+                            {t("connections.showSystem")}
+                        </label>
                         {group ? (
-                            <Button size="sm" variant="outline" onClick={() => void close(group.rows.map((row) => row.id))}>
+                            <Button size="sm" variant="outline" onClick={() => void close(group.rows.filter((row) => !row.closedAt).map((row) => row.id))}>
                                 <XCircle size={14} className="me-2" aria-hidden="true" />
                                 {t("connections.closeApp")}
                             </Button>
@@ -320,7 +369,10 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                     <div
                         ref={scrollRef}
                         key={openApp ?? "apps"}
-                        className="enter-stagger min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 text-xs custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]"
+                        className={cn(
+                            !settled && "enter-stagger",
+                            "min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card/40 text-xs custom-scrollbar [clip-path:inset(0_round_var(--radius-lg))]"
+                        )}
                     >
                         {group ? (
                             <>
@@ -333,11 +385,24 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                     <p className="p-6 text-center text-muted-foreground">{t("connections.noMatch")}</p>
                                 ) : (
                                     shownRows.map((row) => (
-                                        <div key={row.id} className={cn(columns, "group border-b border-border/50 py-1.5 last:border-b-0 hover:bg-muted/30")}>
+                                        <div
+                                            key={row.id}
+                                            className={cn(columns, "group border-b border-border/50 py-1.5 transition-opacity last:border-b-0 hover:bg-muted/30", row.closedAt && "opacity-45")}
+                                        >
                                             <span className="min-w-0">
                                                 <span className="block truncate font-medium" title={host(row)}>{host(row)}</span>
                                                 <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr">
-                                                    {[row.protocol, row.host ? row.destination : "", formatDuration(Math.max(0, now - row.started))].filter(Boolean).join(" · ")}
+                                                    {row.closedAt
+                                                        ? t("connections.closed")
+                                                        : [
+                                                              // In System, which program it is.
+                                                              group.key === SYSTEM ? appName(row.app || NO_APP) : "",
+                                                              row.protocol,
+                                                              row.host ? row.destination : "",
+                                                              formatDuration(Math.max(0, now - row.started)),
+                                                          ]
+                                                              .filter(Boolean)
+                                                              .join(" · ")}
                                                 </span>
                                             </span>
                                             {viaCell([row])}
@@ -346,6 +411,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                             {dataCells(row.download, row.upload, row.rate)}
                                             <button
                                                 type="button"
+                                                hidden={!!row.closedAt}
                                                 onClick={() => void close([row.id])}
                                                 aria-label={t("connections.close", { name: host(row) })}
                                                 title={t("connections.closeHint")}
@@ -374,13 +440,17 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                             key={item.key}
                                             type="button"
                                             onClick={() => setOpenApp(item.key)}
-                                            className={cn(columns, "w-full border-b border-border/50 py-2 text-start last:border-b-0 hover:bg-muted/30")}
+                                            className={cn(
+                                                columns,
+                                                "w-full border-b border-border/50 py-2 text-start transition-opacity last:border-b-0 hover:bg-muted/30",
+                                                item.open === 0 && "opacity-45"
+                                            )}
                                         >
                                             <span className="flex min-w-0 items-center gap-2">
                                                 <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-muted px-1 font-mono text-[10px] tabular-nums">
-                                                    {item.rows.length}
+                                                    {item.open}
                                                 </span>
-                                                <AppWindow size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                                                <AppIcon icon={item.key === SYSTEM ? undefined : icons.get(item.rows[0]?.app_path ?? "")} system={item.key === SYSTEM} />
                                                 <span className="truncate font-medium" title={item.rows[0]?.app_path}>{appName(item.key)}</span>
                                             </span>
                                             {viaCell(item.rows)}
@@ -398,6 +468,13 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             )}
         </PageShell>
     );
+}
+
+/** A program's own icon where its file has one; a generic one otherwise. */
+function AppIcon({ icon, system }: { icon?: string; system?: boolean }) {
+    if (icon) return <img src={icon} alt="" className="h-4 w-4 shrink-0 object-contain" draggable={false} />;
+    const Icon = system ? Cpu : AppWindow;
+    return <Icon size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />;
 }
 
 /** A column heading that sorts by its column; again reverses. */

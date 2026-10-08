@@ -156,6 +156,10 @@ type AppSettings struct {
 	// FastestServer, in automatic mode, lets the core keep measuring the
 	// best servers and move traffic to whichever is fastest.
 	FastestServer bool `json:"fastest_server"`
+	// ServerFallback lets connecting move on to the subscription's other
+	// servers when the chosen one fails to start. Off, it stops at the one
+	// chosen (or ranked first). A pointer so older settings default to on.
+	ServerFallback *bool `json:"server_fallback"`
 	// Notifications shows a system notification when the connection drops
 	// and when it comes back. A pointer so older settings default to on.
 	Notifications *bool `json:"notifications"`
@@ -325,6 +329,10 @@ func (s *AppSettings) Normalize() {
 		enabled := true
 		s.AutoReconnect = &enabled
 	}
+	if s.ServerFallback == nil {
+		enabled := true
+		s.ServerFallback = &enabled
+	}
 	if s.SubscriptionAutoUpdate == nil {
 		enabled := true
 		s.SubscriptionAutoUpdate = &enabled
@@ -359,6 +367,11 @@ func (s AppSettings) LoggingOn() bool {
 		return DevBuild
 	}
 	return *s.LoggingEnabled
+}
+
+// ServerFallbackOn reports whether a failed server hands over to the next.
+func (s AppSettings) ServerFallbackOn() bool {
+	return s.ServerFallback == nil || *s.ServerFallback
 }
 
 // IPCheckOn reports whether the public-address lookup may run.

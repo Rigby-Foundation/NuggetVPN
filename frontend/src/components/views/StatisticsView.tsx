@@ -4,6 +4,8 @@ import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from
 
 import PageShell from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { isSystemProgram, useShowSystem } from "@/lib/system-apps";
 import {
     Dialog,
     DialogContent,
@@ -33,6 +35,9 @@ const PERIODS = [
     { days: 7, label: "stats.week" },
     { days: 30, label: "stats.month" },
 ] as const;
+
+/** The row system programs are added up into; not a real program name. */
+const SYSTEM_PROGRAM = "\u0001system";
 
 /** A program's file name without the extension Windows adds. */
 function programName(program: string): string {
@@ -245,10 +250,26 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
             );
     }, [health, profiles]);
 
-    const programs = usage?.data.programs ?? [];
+    // System programs fold into one row unless "Show system" is on — the
+    // same switch as on Connections (see lib/system-apps).
+    const [showSystem, setShowSystem] = useShowSystem();
+    const programs = useMemo(() => {
+        const all = usage?.data.programs ?? [];
+        if (showSystem) return all;
+        const system = { program: SYSTEM_PROGRAM, up: 0, down: 0 };
+        const apps = all.filter((program) => {
+            if (!isSystemProgram(program.program)) return true;
+            system.up += program.up;
+            system.down += program.down;
+            return false;
+        });
+        if (system.up + system.down > 0) apps.push(system);
+        return apps.sort((a, b) => b.up + b.down - (a.up + a.down));
+    }, [usage, showSystem]);
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
     const total = programs.reduce((sum, program) => ({ up: sum.up + program.up, down: sum.down + program.down }), { up: 0, down: 0 });
-    const label = (program: string) => (program ? appLabels.get(program) || programName(program) : t("stats.unknownApp"));
+    const label = (program: string) =>
+        program === SYSTEM_PROGRAM ? t("connections.system") : program ? appLabels.get(program) || programName(program) : t("stats.unknownApp");
     const ranked = [...programs].sort((a, b) => b.up + b.down - (a.up + a.down));
     const slices: Slice[] = ranked.slice(0, SLICES).map((program, index) => ({
         key: program.program,
@@ -299,11 +320,17 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                     icon={AppWindow}
                     title={t("stats.apps")}
                     action={
-                        programs.length > 0 ? (
-                            <span className="tnum text-[11px] text-muted-foreground">
-                                ↓ {formatBytes(total.down)} · ↑ {formatBytes(total.up)}
-                            </span>
-                        ) : null
+                        <span className="flex items-center gap-3">
+                            {programs.length > 0 ? (
+                                <span className="tnum text-[11px] text-muted-foreground">
+                                    ↓ {formatBytes(total.down)} · ↑ {formatBytes(total.up)}
+                                </span>
+                            ) : null}
+                            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Switch checked={showSystem} onCheckedChange={setShowSystem} aria-label={t("connections.showSystem")} />
+                                {t("connections.showSystem")}
+                            </label>
+                        </span>
                     }
                 >
                     {!appStatsOn ? (

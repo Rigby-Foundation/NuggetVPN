@@ -4,7 +4,6 @@ import {
     ArrowDown,
     ArrowUp,
     Check,
-    ChevronDown,
     Copy,
     Infinity as InfinityIcon,
     Layers,
@@ -16,29 +15,18 @@ import {
     ShieldCheck,
     Signal,
     TriangleAlert,
-    Zap,
 } from "lucide-react";
 
 import { AnnounceBanner } from "@/components/announce-banner";
 import { useAppearance } from "@/components/appearance-provider";
 import { SpeedTest } from "@/components/speed-test";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LOCAL, profileDomain } from "@/hooks/use-profiles";
 import { formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useScrollMemory } from "@/lib/remember";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConfigSource, ConnectionState, IpInfo, Profile, ProxyMode, TrafficSample } from "@/types";
 import { Flag } from "@/components/ui/flag";
-import { useUnsupported } from "@/lib/core-support";
 import { withoutFlagEmoji } from "@/lib/flags";
 
 interface ConnectionViewProps {
@@ -206,7 +194,6 @@ function ConnectionView({
 }: ConnectionViewProps) {
     const t = useT();
     const scrollRef = useScrollMemory("connection");
-    const unsupported = useUnsupported();
     const isConnected = state.status === "connected";
     const isConnecting = state.status === "connecting";
     const isError = state.status === "error";
@@ -222,11 +209,6 @@ function ConnectionView({
     const activeProfile = profiles.find((p) => p.id === selectedProfileId);
     const activePing = activeProfile ? profilePings[activeProfile.id] : null;
     const activeServerLabel = isAuto ? t("proxies.auto") : (activeProfile?.name || t("topbar.none"));
-
-    const domain = source?.domain || LOCAL;
-    const quickPickProfiles = source
-        ? profiles.filter((p) => profileDomain(p) === domain).slice(0, 6)
-        : [];
 
     const handleCopyIp = () => {
         if (!ipInfo?.ip) return;
@@ -340,7 +322,15 @@ function ConnectionView({
     ) : isConnecting ? (
         t("connection.hint.connecting")
     ) : isError ? (
-        <span className="text-status-error">{state.error || t("connection.hint.error")}</span>
+        state.reason === "adapter" || state.reason === "local" ? (
+            // A local failure is explained; the core's own words follow, small.
+            <span className="flex max-w-md flex-col items-center gap-1">
+                <span className="text-status-error">{t(state.reason === "adapter" ? "connection.error.adapter" : "connection.error.local")}</span>
+                <span className="text-[11px] text-muted-foreground">{state.error}</span>
+            </span>
+        ) : (
+            <span className="text-status-error">{state.error || t("connection.hint.error")}</span>
+        )
     ) : !source ? (
         t("connection.empty.body")
     ) : null;
@@ -449,66 +439,15 @@ function ConnectionView({
                     {source ? (
                         <div className="flex items-stretch overflow-hidden rounded-2xl border border-border/60 bg-muted/30">
                             <SourceSummary source={source} onOpen={() => onNavigateTab?.("configuration")} />
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button
-                                        type="button"
-                                        disabled={locked}
-                                        className={cn(
-                                            "flex max-w-[45%] shrink-0 items-center gap-2 border-s border-border/60 px-4 py-3 text-sm font-medium transition-colors",
-                                            "hover:bg-foreground/5 disabled:opacity-60 disabled:pointer-events-none"
-                                        )}
-                                    >
-                                        <Flag auto={isAuto} name={activeProfile?.name} size={20} />
-                                        <span className="truncate">{withoutFlagEmoji(activeServerLabel)}</span>
-                                        {activePing !== null && activePing !== undefined ? (
-                                            <span className="shrink-0 font-mono text-xs text-muted-foreground">{activePing}ms</span>
-                                        ) : null}
-                                        <ChevronDown size={14} className="shrink-0 opacity-60" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
-                                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                                        {t("proxies.title")}
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={onSelectAuto} className="flex items-center justify-between text-xs">
-                                        <span className="flex items-center gap-2">
-                                            <Zap size={14} className="text-primary" />
-                                            {t("proxies.auto")}
-                                        </span>
-                                        {isAuto ? <Check size={14} className="text-primary" /> : null}
-                                    </DropdownMenuItem>
-                                    {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
-                                    {quickPickProfiles.map((p) => {
-                                        const ping = profilePings[p.id];
-                                        return (
-                                            <DropdownMenuItem
-                                                key={p.id}
-                                                disabled={Boolean(unsupported[p.id])}
-                                                title={unsupported[p.id]}
-                                                onClick={() => onSelectProxy?.(p.id)}
-                                                className="flex items-center justify-between text-xs gap-2"
-                                            >
-                                                <Flag name={p.name} size={18} />
-                                                <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
-                                                {ping ? (
-                                                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">{ping}ms</span>
-                                                ) : null}
-                                                {!isAuto && selectedProfileId === p.id ? (
-                                                    <Check size={14} className="text-primary shrink-0" />
-                                                ) : null}
-                                            </DropdownMenuItem>
-                                        );
-                                    })}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() => onNavigateTab?.("proxies")}
-                                        className="text-xs text-primary font-medium"
-                                    >
-                                        {t("proxies.sort.list")} →
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            {/* The server, shown, not picked: the navigation's server
+                                picker is the one place to change it, on every screen. */}
+                            <div className="flex max-w-[45%] shrink-0 items-center gap-2 border-s border-border/60 px-4 py-3 text-sm font-medium">
+                                <Flag auto={isAuto} name={activeProfile?.name} size={20} />
+                                <span className="truncate">{withoutFlagEmoji(activeServerLabel)}</span>
+                                {activePing !== null && activePing !== undefined ? (
+                                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{activePing}ms</span>
+                                ) : null}
+                            </div>
                         </div>
                     ) : (
                         <div className="flex justify-center">

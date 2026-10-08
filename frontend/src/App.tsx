@@ -96,6 +96,7 @@ const PENDING_SETTINGS: AppSettings = {
     auto_reconnect: null,
     kill_switch: false,
     fastest_server: false,
+    server_fallback: null,
     notifications: null,
     clipboard_offer: null,
     update_check: null,

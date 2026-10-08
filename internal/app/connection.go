@@ -21,6 +21,9 @@ type ConnectionState struct {
 	ProfileID string `json:"profile_id,omitempty"`
 	Profile   string `json:"profile,omitempty"`
 	Error     string `json:"error,omitempty"`
+	// Reason names a failure the UI explains in the user's language, with
+	// Error as the detail: ReasonAdapter, ReasonLocal. Empty otherwise.
+	Reason string `json:"reason,omitempty"`
 	// Since is the unix millisecond timestamp the tunnel came up, so the UI can
 	// render a duration without keeping its own timer honest.
 	Since int64 `json:"since,omitempty"`
@@ -291,9 +294,13 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 
 		alternatives := alternativesFor(plan, profiles, settings, mode, profile.ID)
 		if err := a.startProfile(profile, profiles, settings, alternatives); err != nil {
-			a.recordEvent(profile.ID, stats.KindConnect, false)
 			lastErr = err
 			a.appendLog(fmt.Sprintf("%s failed: %v", profile.Name, err))
+			if reason, local := localFailure(err); local {
+				// Not the server's fault, so not counted against it either.
+				return a.failFor(err.Error(), reason)
+			}
+			a.recordEvent(profile.ID, stats.KindConnect, false)
 			if !plan.resilient {
 				return a.fail(err.Error())
 			}
@@ -354,8 +361,43 @@ func (a *App) Disconnect() (ConnectionState, error) {
 // fail records an error state and returns it as both value and error, so the
 // caller in the UI can render either.
 func (a *App) fail(message string) (ConnectionState, error) {
-	return a.setState(ConnectionState{Status: StatusError, Error: message}),
+	return a.failFor(message, "")
+}
+
+func (a *App) failFor(message, reason string) (ConnectionState, error) {
+	return a.setState(ConnectionState{Status: StatusError, Error: message, Reason: reason}),
 		fmt.Errorf("%s", message)
+}
+
+// Failures that are this computer's, not the server's.
+const (
+	// ReasonAdapter: the tunnel's network adapter could not be set up. On
+	// Windows, another VPN app's adapter is the usual cause.
+	ReasonAdapter = "adapter"
+	// ReasonLocal: something else local — permissions, a port in use.
+	ReasonLocal = "local"
+)
+
+// localFailure tells a start failure that is the computer's from one that
+// may be the server's. A local one fails the same way with every server, so
+// it is reported at once instead of being tried on the whole subscription:
+// nineteen fifteen-second attempts at an adapter that will not come up.
+func localFailure(err error) (reason string, local bool) {
+	text := strings.ToLower(err.Error())
+	for _, marker := range []string{"inbound/tun", "configure tun", "open interface", "wintun", "create adapter", "tun device", "utun"} {
+		if strings.Contains(text, marker) {
+			return ReasonAdapter, true
+		}
+	}
+	for _, marker := range []string{
+		"start inbound/", "address already in use", "only one usage of each socket address",
+		"access is denied", "permission denied", "operation not permitted", "requires elevation",
+	} {
+		if strings.Contains(text, marker) {
+			return ReasonLocal, true
+		}
+	}
+	return "", false
 }
 
 // connectionPlan is the ordered list of servers to try.
@@ -421,6 +463,9 @@ func (a *App) planConnection(
 		if len(order) == 0 {
 			return connectionPlan{}, fmt.Errorf("no proxy available for this configuration")
 		}
+		if !settings.ServerFallbackOn() {
+			return connectionPlan{order: order[:1]}, nil
+		}
 		return connectionPlan{order: order, resilient: true}, nil
 	}
 
@@ -431,7 +476,7 @@ func (a *App) planConnection(
 	// Manual selection inside a subscription still falls back to its siblings:
 	// subscription servers come and go, and a dead one should not strand the
 	// user. A single hand-added profile has no siblings to fall back to.
-	if mode == ModeManual && domain != "local" && !forcedExit {
+	if mode == ModeManual && domain != "local" && !forcedExit && settings.ServerFallbackOn() {
 		order := []string{selected}
 		for _, profile := range candidates {
 			if profile.ID != selected {

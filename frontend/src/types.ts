@@ -95,6 +95,7 @@ export interface AppSettings {
     auto_reconnect: boolean | null;
     kill_switch: boolean;
     fastest_server: boolean;
+    server_fallback: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
     notifications: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
@@ -136,6 +137,8 @@ export interface ConnectionState {
     profile_id?: string;
     profile?: string;
     error?: string;
+    /** A failure the UI explains itself: "adapter", "local"; see app.ReasonAdapter. */
+    reason?: string;
     /** Unix milliseconds the tunnel came up; absent unless connected. */
     since?: number;
     /** Bringing a dropped tunnel back; attempt counts the tries. */

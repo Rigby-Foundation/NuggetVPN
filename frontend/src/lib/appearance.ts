@@ -7,6 +7,7 @@
  * to Go at startup would show the default font and corners and then jump.
  */
 
+import { RateUnit, setUnits, SizeUnit } from "@/lib/format";
 import "@fontsource-variable/rubik";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/geologica";
@@ -471,6 +472,8 @@ export interface AppearancePrefs {
     motionSpeed: number;
     /** How long after one element of a page the next starts appearing, ms. */
     motionStagger: number;
+    /** How speeds and amounts of data are written; see lib/format. */
+    units: { rate: RateUnit; size: SizeUnit };
     /**
      * An accent hue and vividness over the theme's own, or null for the
      * theme's. Its lightness stays the theme's, which is what keeps the text
@@ -499,6 +502,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     motion: "fade",
     motionSpeed: 1,
     motionStagger: MOTION_STAGGER_LIMITS.fallback,
+    units: { rate: "bytes", size: "auto" },
     accent: null,
     layout: DEFAULT_LAYOUT,
     customThemes: [],
@@ -602,6 +606,10 @@ export function loadAppearance(): AppearancePrefs {
             motion: pick(MOTIONS, raw.motion, DEFAULT_APPEARANCE.motion),
             motionSpeed: clamp(raw.motionSpeed, MOTION_SPEED_LIMITS.min, MOTION_SPEED_LIMITS.max, 1),
             motionStagger: clamp(raw.motionStagger, MOTION_STAGGER_LIMITS.min, MOTION_STAGGER_LIMITS.max, MOTION_STAGGER_LIMITS.fallback),
+            units: {
+                rate: raw.units?.rate === "bits" ? "bits" : "bytes",
+                size: ["KB", "MB", "GB"].includes(raw.units?.size) ? raw.units.size : "auto",
+            },
             accent:
                 raw.accent && typeof raw.accent === "object"
                     ? { h: clamp(raw.accent.h, 0, 360, 70), c: clamp(raw.accent.c, 0, 0.25, 0.15) }
@@ -655,6 +663,7 @@ export function applyAppearance(prefs: AppearancePrefs, script: Script) {
     // Durations are multiplied by this: faster means shorter.
     root.style.setProperty("--motion-scale", String(1 / (prefs.motionSpeed || 1)));
     root.style.setProperty("--enter-step", `${prefs.motionStagger ?? MOTION_STAGGER_LIMITS.fallback}ms`);
+    setUnits(prefs.units ?? DEFAULT_APPEARANCE.units);
 }
 
 /**

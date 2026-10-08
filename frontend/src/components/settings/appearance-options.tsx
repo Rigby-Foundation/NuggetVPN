@@ -37,6 +37,8 @@ import {
 
 import { useAppearance } from "@/components/appearance-provider";
 import { Slider } from "@/components/settings/theme-editor";
+import { Segmented } from "@/components/ui/segmented";
+import { formatBytes, formatRate, RateUnit, SizeUnit } from "@/lib/format";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -1020,6 +1022,54 @@ export function LayoutPicker() {
                     <span>{t("appearance.layout.reset")}</span>
                 </button>
             </div>
+        </div>
+    );
+}
+
+/** How speeds and amounts of data are written, everywhere in the app. */
+export function UnitsPicker() {
+    const { prefs, setUnits } = useAppearance();
+    const t = useT();
+    const units = prefs.units;
+    const row = (label: string, example: string, control: ReactNode) => (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+                <span className="block text-xs font-medium">{label}</span>
+                <span className="block font-mono text-[11px] text-muted-foreground tabular-nums">{example}</span>
+            </div>
+            {control}
+        </div>
+    );
+    return (
+        <div className="space-y-4">
+            {row(
+                t("appearance.units.rate"),
+                `${formatRate(1_234_567)} · ${formatRate(8_400)}`,
+                <Segmented<RateUnit>
+                    label={t("appearance.units.rate")}
+                    value={units.rate}
+                    onChange={(rate) => setUnits({ ...units, rate })}
+                    options={[
+                        { value: "bytes", label: t("appearance.units.bytes") },
+                        { value: "bits", label: t("appearance.units.bits") },
+                    ]}
+                />
+            )}
+            {row(
+                t("appearance.units.size"),
+                `${formatBytes(31_400_000)} · ${formatBytes(512_000)}`,
+                <Segmented<SizeUnit>
+                    label={t("appearance.units.size")}
+                    value={units.size}
+                    onChange={(size) => setUnits({ ...units, size })}
+                    options={[
+                        { value: "auto", label: t("appearance.units.auto") },
+                        { value: "KB", label: "KB" },
+                        { value: "MB", label: "MB" },
+                        { value: "GB", label: "GB" },
+                    ]}
+                />
+            )}
         </div>
     );
 }

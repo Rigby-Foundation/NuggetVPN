@@ -47,7 +47,12 @@ export function useConnection() {
                     })
                 );
             } catch (error) {
-                setState({ status: "error", error: errorMessage(error) });
+                const message = errorMessage(error);
+                // The backend's state event for this failure carries a reason
+                // the rejected call does not; keep it.
+                setState((current) =>
+                    current.status === "error" && current.error === message ? current : { status: "error", error: message }
+                );
                 throw error;
             }
         },
