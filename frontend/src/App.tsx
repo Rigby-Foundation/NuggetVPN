@@ -142,7 +142,7 @@ function guessPlatform(): string {
     return "linux";
 }
 
-/** A toast's button: small, filled, beside its close button. */
+/** A toast's button: small and filled, on its own line under the message. */
 const TOAST_ACTION =
     "shrink-0 rounded-md bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25";
 
@@ -227,8 +227,8 @@ function App() {
                 announcedRef.current = info.latest;
                 toast(
                     (shown) => (
-                        <span className="flex w-full items-center gap-3 text-sm">
-                            <span className="min-w-0 flex-1">{t("updates.toast", { version: info.latest })}</span>
+                        <span className="flex w-full flex-col items-start gap-2 text-sm">
+                            <span className="min-w-0">{t("updates.toast", { version: info.latest })}</span>
                             <button
                                 type="button"
                                 className={TOAST_ACTION}
@@ -294,8 +294,8 @@ function App() {
             if (known) return;
             toast(
                 (shown) => (
-                    <span className="flex w-full items-center gap-3 text-sm">
-                        <span className="min-w-0 flex-1">
+                    <span className="flex w-full min-w-0 flex-col items-start gap-2 text-sm">
+                        <span className="w-full min-w-0">
                             <span className="block">{t("clipboard.found")}</span>
                             <span className="block max-w-56 truncate font-mono text-[11px] text-muted-foreground">{link}</span>
                         </span>
@@ -1070,7 +1070,7 @@ function App() {
                                         type="button"
                                         onClick={() => toast.dismiss(shown.id)}
                                         aria-label={t("common.close")}
-                                        className="-me-1 shrink-0 self-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        className="-me-1 shrink-0 self-start rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <X size={14} aria-hidden="true" />
                                     </button>
