@@ -142,9 +142,9 @@ function guessPlatform(): string {
     return "linux";
 }
 
-/** A toast's button: small and filled, on its own line under the message. */
+/** A toast's button: filled, across the whole toast under the message. */
 const TOAST_ACTION =
-    "shrink-0 rounded-md bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25";
+    "w-full rounded-md bg-primary/15 px-3 py-1.5 text-center text-xs font-medium text-primary transition-colors hover:bg-primary/25";
 
 function App() {
     const { theme, setTheme } = useTheme();
