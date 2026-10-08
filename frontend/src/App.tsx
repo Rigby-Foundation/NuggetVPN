@@ -142,6 +142,10 @@ function guessPlatform(): string {
     return "linux";
 }
 
+/** A toast's button: small, filled, beside its close button. */
+const TOAST_ACTION =
+    "shrink-0 rounded-md bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/25";
+
 function App() {
     const { theme, setTheme } = useTheme();
     const t = useT();
@@ -223,11 +227,11 @@ function App() {
                 announcedRef.current = info.latest;
                 toast(
                     (shown) => (
-                        <span className="flex items-center gap-3 text-sm">
-                            {t("updates.toast", { version: info.latest })}
+                        <span className="flex w-full items-center gap-3 text-sm">
+                            <span className="min-w-0 flex-1">{t("updates.toast", { version: info.latest })}</span>
                             <button
                                 type="button"
-                                className="font-medium text-primary"
+                                className={TOAST_ACTION}
                                 onClick={() => {
                                     toast.dismiss(shown.id);
                                     openSettingsSection("updates");
@@ -290,14 +294,14 @@ function App() {
             if (known) return;
             toast(
                 (shown) => (
-                    <span className="flex items-center gap-3 text-sm">
-                        <span className="min-w-0">
+                    <span className="flex w-full items-center gap-3 text-sm">
+                        <span className="min-w-0 flex-1">
                             <span className="block">{t("clipboard.found")}</span>
                             <span className="block max-w-56 truncate font-mono text-[11px] text-muted-foreground">{link}</span>
                         </span>
                         <button
                             type="button"
-                            className="shrink-0 font-medium text-primary"
+                            className={TOAST_ACTION}
                             onClick={() => {
                                 toast.dismiss(shown.id);
                                 openWithLink(link);
@@ -1036,6 +1040,7 @@ function App() {
         <main className="h-full overflow-hidden">
             <Toaster
                 position="top-center"
+                containerClassName="nugget-toasts"
                 containerStyle={{
                     top: "calc(env(safe-area-inset-top, 0px) + 64px)",
                     zIndex: 99999,
@@ -1065,7 +1070,7 @@ function App() {
                                         type="button"
                                         onClick={() => toast.dismiss(shown.id)}
                                         aria-label={t("common.close")}
-                                        className="-me-1 shrink-0 self-start rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        className="-me-1 shrink-0 self-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <X size={14} aria-hidden="true" />
                                     </button>

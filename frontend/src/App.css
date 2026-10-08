@@ -1069,3 +1069,10 @@
 :root[data-backdrop] [data-slot="sidebar-inner"] {
     background: transparent;
 }
+
+/* Toast text starts at the left. The library centres a toast's content,
+   which left a short message and its button floating in the middle of the
+   box with a gap on the left. */
+.nugget-toasts [role="status"] {
+    justify-content: flex-start;
+}
