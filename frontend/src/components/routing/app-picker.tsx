@@ -16,7 +16,11 @@ import { invoke } from "@/lib/backend";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/** An installed app; see app.InstalledApp. */
+/**
+ * An installed app; see app.InstalledApp. package is how a rule names it: the
+ * package on Android, the program's path on a computer (an .app bundle, an
+ * .exe), or on Linux the program a menu entry starts.
+ */
 export interface InstalledApp {
     package: string;
     label: string;
@@ -77,6 +81,7 @@ export function AppIcon({ packageName, size = 28 }: { packageName: string; size?
 }
 
 const SELF_PACKAGE = "org.rigbyfoundation.nuggetvpn";
+const SELF_LABELS = new Set(["NuggetVPN", "Nugget"]);
 
 /** The names of the apps a rule lists, for showing packages as apps. */
 export function useAppLabels(): Map<string, string> {
@@ -97,9 +102,10 @@ export function useAppLabels(): Map<string, string> {
 }
 
 /**
- * Choosing apps on a phone: the installed apps, searchable, with their icons.
- * Apps that came with the system are left out unless asked for; most of them
- * never touch the network the user cares about.
+ * Choosing apps: the installed apps, searchable, with their icons. Apps that
+ * came with the system are left out unless asked for; most of them never
+ * touch the network the user cares about. Entries already in the rule that
+ * are not in the list (a process name typed in) stay as they are.
  */
 export function AppPicker({
     open,
@@ -129,6 +135,8 @@ export function AppPicker({
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
         return (apps ?? [])
+            // Routing this app itself makes no sense.
+            .filter((app) => !SELF_LABELS.has(app.label) || chosen.has(app.package))
             .filter((app) => showSystem || !app.system || chosen.has(app.package))
             .filter((app) => !needle || app.label.toLowerCase().includes(needle) || app.package.toLowerCase().includes(needle))
             // Chosen apps first, so what is in the rule is in sight.
@@ -186,7 +194,9 @@ export function AppPicker({
                                             <AppIcon packageName={app.package} />
                                             <span className="min-w-0 flex-1">
                                                 <span className="block truncate text-sm">{app.label}</span>
-                                                <span className="block truncate font-mono text-[10px] text-muted-foreground">{app.package}</span>
+                                                <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={app.package}>
+                                                    {app.package}
+                                                </span>
                                             </span>
                                             <span
                                                 className={cn(

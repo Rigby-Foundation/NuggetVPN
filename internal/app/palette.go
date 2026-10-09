@@ -34,8 +34,9 @@ type InstalledApp struct {
 	System  bool   `json:"system"`
 }
 
-// ListInstalledApps lists the apps that can use the network, where the
-// system says (Android). Empty elsewhere, where programs are named by file.
+// ListInstalledApps lists the installed apps a routing rule can name: by
+// package on Android, by program path on macOS, Windows and Linux (see
+// installedapps_*.go). Empty on iOS, which routes the whole device.
 func (a *App) ListInstalledApps() []InstalledApp {
 	return installedApps()
 }

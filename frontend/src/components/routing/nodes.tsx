@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AppPicker, useAppLabels } from "@/components/routing/app-picker";
-import { isAndroid } from "@/lib/platform";
+import { isAndroid, isIOS } from "@/lib/platform";
 import { MessageKey, useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { RoutingAction, RoutingCondition, RoutingKind, RoutingSource, RuleListStatus } from "@/types";
@@ -442,16 +442,26 @@ const COLLAPSED_ROWS = 6;
 /** The most rows an expanded list draws at once; the filter narrows the rest. */
 const EXPANDED_ROWS = 100;
 
-function ValueRow({ value, detail, onRemove }: { value: string; detail?: string; onRemove: () => void }) {
+function ValueRow({ value, detail, named, onRemove }: { value: string; detail?: string; named?: boolean; onRemove: () => void }) {
     const t = useT();
     return (
         <div className="group flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
-            <span className="flex-1 min-w-0">
-                <span className="block truncate font-mono text-[11px]" title={value}>
-                    {value}
+            {named && detail ? (
+                // An app picked from the list: its name, and under it the path.
+                <span className="flex-1 min-w-0">
+                    <span className="block truncate text-[11px] font-medium">{detail}</span>
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={value}>
+                        {value}
+                    </span>
                 </span>
-                {detail ? <span className="block truncate text-[10px] text-muted-foreground">{detail}</span> : null}
-            </span>
+            ) : (
+                <span className="flex-1 min-w-0">
+                    <span className="block truncate font-mono text-[11px]" title={value}>
+                        {value}
+                    </span>
+                    {detail ? <span className="block truncate text-[10px] text-muted-foreground">{detail}</span> : null}
+                </span>
+            )}
             <button
                 type="button"
                 onClick={onRemove}
@@ -478,10 +488,13 @@ function ValueList({
     values,
     onChange,
     detail,
+    named,
 }: {
     values: string[];
     onChange: (values: string[]) => void;
     detail?: (value: string) => string | undefined;
+    /** Entries are apps: the name leads, the path goes under it. */
+    named?: boolean;
 }) {
     const t = useT();
     const [expanded, setExpanded] = useState(false);
@@ -489,7 +502,7 @@ function ValueList({
 
     const remove = (value: string) => onChange(values.filter((item) => item !== value));
     const row = (value: string) => (
-        <ValueRow key={value} value={value} detail={detail?.(value)} onRemove={() => remove(value)} />
+        <ValueRow key={value} value={value} detail={detail?.(value)} named={named} onRemove={() => remove(value)} />
     );
     const needle = filter.trim().toLowerCase();
     const matches = useMemo(
@@ -672,8 +685,10 @@ function EntryEditor({
     const [draft, setDraft] = useState("");
     const listDetail = useListDetail();
     const lists = useContext(RuleListsContext);
-    // On Android, apps are picked from the installed ones, by package.
-    const pickApps = kind === "apps" && isAndroid;
+    // Apps are picked from the installed ones: by package on Android, by
+    // program on a computer, where a name can still be typed in for anything
+    // the list does not have. iOS routes the whole device.
+    const pickApps = kind === "apps" && !isIOS;
     const [picking, setPicking] = useState(false);
     const appLabels = useAppLabels();
 
@@ -697,6 +712,30 @@ function EntryEditor({
 
     const choices = kind === "protocol" ? SNIFFABLE_PROTOCOLS : kind === "network" ? NETWORKS : null;
 
+    const textField = (
+        <div className="flex items-center gap-1.5 pt-1">
+            <Input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={onKeyDown}
+                onBlur={commit}
+                placeholder={meta.placeholder}
+                aria-label={t("routing.addTo", { name: t(meta.label) })}
+                className="h-7 text-[11px] font-mono nodrag"
+            />
+            <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={commit}
+                aria-label={t("routing.addTo", { name: t(meta.label) })}
+                className="h-7 w-7 shrink-0"
+            >
+                <Plus size={13} aria-hidden="true" />
+            </Button>
+        </div>
+    );
+
     return (
         <div className="space-y-1">
             {values.length === 0 ? (
@@ -706,11 +745,13 @@ function EntryEditor({
                     values={values}
                     onChange={onChange}
                     detail={kind === "ruleset" ? listDetail : pickApps ? (value) => appLabels.get(value) : undefined}
+                    named={pickApps && !isAndroid}
                 />
             )}
 
             {pickApps ? (
                 <>
+                    {isAndroid ? null : textField}
                     <Button
                         type="button"
                         size="sm"
@@ -725,27 +766,7 @@ function EntryEditor({
             ) : choices ? (
                 <ChoiceChips options={choices} values={values} onChange={onChange} />
             ) : (
-                <div className="flex items-center gap-1.5 pt-1">
-                    <Input
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        onKeyDown={onKeyDown}
-                        onBlur={commit}
-                        placeholder={meta.placeholder}
-                        aria-label={t("routing.addTo", { name: t(meta.label) })}
-                        className="h-7 text-[11px] font-mono nodrag"
-                    />
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={commit}
-                        aria-label={t("routing.addTo", { name: t(meta.label) })}
-                        className="h-7 w-7 shrink-0"
-                    >
-                        <Plus size={13} aria-hidden="true" />
-                    </Button>
-                </div>
+                textField
             )}
             {kind === "geosite" || kind === "geoip" ? (
                 <GeoSuggestions

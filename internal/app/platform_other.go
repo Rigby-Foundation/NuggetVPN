@@ -12,6 +12,8 @@ func systemPalette() string { return "" }
 
 func setSystemBars(string, bool) {}
 
-func installedApps() []InstalledApp { return []InstalledApp{} }
+// installedApps on a computer: the programs the system lists as installed,
+// each by the path a routing rule takes (see installedapps_*.go).
+func installedApps() []InstalledApp { return desktopApps() }
 
-func appIcon(string) string { return "" }
+func appIcon(path string) string { return desktopAppIcon(path) }
