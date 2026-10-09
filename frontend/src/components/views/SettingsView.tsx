@@ -55,6 +55,7 @@ import {
   LayoutPicker,
   AccentPicker,
   MotionPicker,
+  StatsChartPicker,
   UnitsPicker,
   RadiusPicker,
 } from "@/components/settings/appearance-options";
@@ -535,6 +536,10 @@ function SettingsView({
 
             <SettingsGroup title={t("appearance.units")} description={t("appearance.units.description")}>
               <UnitsPicker />
+            </SettingsGroup>
+
+            <SettingsGroup title={t("appearance.statsChart")} description={t("appearance.statsChart.description")}>
+              <StatsChartPicker />
             </SettingsGroup>
           </>
         );

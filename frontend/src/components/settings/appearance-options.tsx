@@ -56,6 +56,7 @@ import {
     NavPosition,
     RADII,
     RADIUS_LIMITS,
+    StatsChart,
     radiusValue,
     TelemetryMetric,
     TelemetryPlacement,
@@ -1027,6 +1028,23 @@ export function LayoutPicker() {
 }
 
 /** How speeds and amounts of data are written, everywhere in the app. */
+export function StatsChartPicker() {
+    const { prefs, setStatsChart } = useAppearance();
+    const t = useT();
+    return (
+        <Segmented<StatsChart>
+            label={t("appearance.statsChart")}
+            value={prefs.statsChart}
+            onChange={setStatsChart}
+            options={[
+                { value: "both", label: t("appearance.statsChart.both") },
+                { value: "share", label: t("appearance.statsChart.share") },
+                { value: "days", label: t("appearance.statsChart.days") },
+            ]}
+        />
+    );
+}
+
 export function UnitsPicker() {
     const { prefs, setUnits } = useAppearance();
     const t = useT();

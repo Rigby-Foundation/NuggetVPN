@@ -474,6 +474,8 @@ export interface AppearancePrefs {
     motionStagger: number;
     /** How speeds and amounts of data are written; see lib/format. */
     units: { rate: RateUnit; size: SizeUnit };
+    /** Which charts Statistics draws over its list of apps. */
+    statsChart: StatsChart;
     /**
      * An accent hue and vividness over the theme's own, or null for the
      * theme's. Its lightness stays the theme's, which is what keeps the text
@@ -495,6 +497,9 @@ export interface AppearancePrefs {
     pluginFonts: UserFont[];
 }
 
+export const STATS_CHARTS = ["both", "share", "days"] as const;
+export type StatsChart = (typeof STATS_CHARTS)[number];
+
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
     font: "google-sans",
     radius: "medium",
@@ -503,6 +508,7 @@ export const DEFAULT_APPEARANCE: AppearancePrefs = {
     motionSpeed: 1,
     motionStagger: MOTION_STAGGER_LIMITS.fallback,
     units: { rate: "bytes", size: "auto" },
+    statsChart: "both",
     accent: null,
     layout: DEFAULT_LAYOUT,
     customThemes: [],
@@ -610,6 +616,7 @@ export function loadAppearance(): AppearancePrefs {
                 rate: raw.units?.rate === "bits" ? "bits" : "bytes",
                 size: ["KB", "MB", "GB"].includes(raw.units?.size) ? raw.units.size : "auto",
             },
+            statsChart: STATS_CHARTS.includes(raw.statsChart) ? raw.statsChart : DEFAULT_APPEARANCE.statsChart,
             accent:
                 raw.accent && typeof raw.accent === "object"
                     ? { h: clamp(raw.accent.h, 0, 360, 70), c: clamp(raw.accent.c, 0, 0.25, 0.15) }

@@ -19,7 +19,8 @@ import {
 import { useAppLabels } from "@/components/routing/app-picker";
 import { errorMessage, invoke } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
-import { useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/lib/i18n";
+import { useAppearance } from "@/components/appearance-provider";
 import { useRemembered } from "@/lib/remember";
 import { Segmented } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
@@ -59,26 +60,57 @@ function Section({ icon: Icon, title, action, children, className }: { icon: typ
     );
 }
 
-/** Day by day, download over upload. */
+/** Day by day, received over sent, with the days named under the bars. */
 function DayChart({ days }: { days: AppUsage["days"] }) {
-    const t = useT();
+    const { t, language } = useI18n();
     const largest = Math.max(1, ...days.map((day) => day.up + day.down));
+    const date = (day: string) => new Date(day + "T12:00:00");
+    // A week names its days; a month numbers every fifth, counted back from
+    // today, with the month by the first number and wherever a new one starts.
+    const week = days.length <= 7;
+    let lastMonth = -1;
+    const labels = days.map((day, index) => {
+        const at = date(day.day);
+        if (week) return at.toLocaleDateString(language, { weekday: "short" });
+        if ((days.length - 1 - index) % 5 !== 0) return "";
+        const withMonth = at.getMonth() !== lastMonth;
+        lastMonth = at.getMonth();
+        return at.toLocaleDateString(language, withMonth ? { day: "numeric", month: "short" } : { day: "numeric" });
+    });
     return (
-        <div className="mb-4 flex h-24 items-end gap-[3px]" role="img" aria-label={t("stats.chart")}>
-            {days.map((day) => {
-                const total = day.up + day.down;
-                return (
-                    <div
-                        key={day.day}
-                        className="group relative flex h-full flex-1 flex-col justify-end"
-                        title={`${new Date(day.day + "T12:00:00").toLocaleDateString()} · ↓ ${formatBytes(day.down)} ↑ ${formatBytes(day.up)}`}
-                    >
-                        <div className="rounded-t-[3px] bg-primary/80" style={{ height: `${(day.down / largest) * 100}%` }} />
-                        <div className="bg-primary/35" style={{ height: `${(day.up / largest) * 100}%` }} />
-                        {total === 0 ? <div className="h-px bg-border" /> : null}
-                    </div>
-                );
-            })}
+        <div className="mb-4">
+            <div className="flex h-24 items-end gap-[3px]" role="img" aria-label={t("stats.chart")}>
+                {days.map((day) => {
+                    const total = day.up + day.down;
+                    return (
+                        <div
+                            key={day.day}
+                            className="group relative flex h-full flex-1 flex-col justify-end"
+                            title={`${date(day.day).toLocaleDateString(language)} · ↓ ${formatBytes(day.down)} ↑ ${formatBytes(day.up)}`}
+                        >
+                            <div className="rounded-t-[3px] bg-primary/80" style={{ height: `${(day.down / largest) * 100}%` }} />
+                            <div className="bg-primary/35" style={{ height: `${(day.up / largest) * 100}%` }} />
+                            {total === 0 ? <div className="h-px bg-border" /> : null}
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="mt-1 flex h-4 gap-[3px] text-[10px] text-muted-foreground" aria-hidden="true">
+                {labels.map((label, index) => (
+                    <span key={index} className="relative flex-1 text-center">
+                        {/* A month's labels may be wider than a bar; they overflow centred. */}
+                        <span className="absolute inset-x-[-2rem] truncate">{label}</span>
+                    </span>
+                ))}
+            </div>
+            <div className="mt-2 flex gap-4 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-primary/80" aria-hidden="true" />↓ {t("connections.col.down")}
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-primary/35" aria-hidden="true" />↑ {t("connections.col.up")}
+                </span>
+            </div>
         </div>
     );
 }
@@ -220,6 +252,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     const [health, setHealth] = useState<Record<string, ServerHealth>>({});
     const [confirmClear, setConfirmClear] = useState(false);
     const appStatsOn = settings.app_stats !== false;
+    const chart = useAppearance().prefs.statsChart;
     const healthOn = settings.server_health !== false;
 
     const load = useCallback(() => {
@@ -346,8 +379,11 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                         </div>
                     ) : (
                         <>
-                            {days > 1 && usage && !stale ? <DayChart days={usage.data.days} /> : null}
-                            {programs.length > 0 && total.up + total.down > 0 ? (
+                            {/* While another period loads, the last chart stays, dimmed
+                                with the rest, or an empty one holds its place: the chart
+                                going and coming back on every switch was a flash. */}
+                            {days > 1 && chart !== "share" ? <DayChart days={usage && usage.days > 1 ? usage.data.days : []} /> : null}
+                            {(chart !== "days" || days === 1) && programs.length > 0 && total.up + total.down > 0 ? (
                                 <ShareChart slices={slices} total={total.up + total.down} />
                             ) : null}
                             {programs.length === 0 ? (

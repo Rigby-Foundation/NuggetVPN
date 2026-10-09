@@ -46,6 +46,7 @@ interface AppearanceContext {
     setMotionSpeed: (speed: number) => void;
     setMotionStagger: (ms: number) => void;
     setUnits: (units: AppearancePrefs["units"]) => void;
+    setStatsChart: (statsChart: AppearancePrefs["statsChart"]) => void;
     /** An accent over the theme's; null goes back to the theme's. */
     setAccent: (accent: AppearancePrefs["accent"]) => void;
     setLayout: (layout: Partial<LayoutPrefs>) => void;
@@ -176,6 +177,7 @@ function Appearance({ children }: { children: ReactNode }) {
             setMotionSpeed: (motionSpeed) => update({ motionSpeed }),
             setMotionStagger: (motionStagger) => update({ motionStagger }),
             setUnits: (units) => update({ units }),
+            setStatsChart: (statsChart) => update({ statsChart }),
             setAccent: (accent) => update({ accent }),
             setLayout: (layoutPatch) => {
                 setPrefs((current) => ({

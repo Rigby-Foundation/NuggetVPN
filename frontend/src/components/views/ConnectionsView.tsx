@@ -29,14 +29,18 @@ const DEFAULT_RULE = "__default";
 const NO_APP = "\u0000";
 /** The group system programs fold into while "Show system" is off. */
 const SYSTEM = "\u0001system";
+/** One system program opened from that group: this, then its name. */
+const IN_SYSTEM = "\u0001system/";
 /** How long a closed connection stays in the list, dimmed. */
 const RECENT_MS = 30_000;
 
 type SortKey = "name" | "count" | "down" | "up" | "rate";
 
 interface Row extends LiveConnection {
-    /** Bytes per second since the previous read, both ways. */
+    /** Bytes per second since the previous read: both ways, and each. */
     rate: number;
+    rateDown: number;
+    rateUp: number;
     /** When it closed, for one kept a while after; see RECENT_MS. */
     closedAt?: number;
 }
@@ -49,6 +53,26 @@ interface AppGroup {
     down: number;
     up: number;
     rate: number;
+    rateDown: number;
+    rateUp: number;
+}
+
+/** Connections grouped by the key each one gets. */
+function groupRows(rows: Row[], keyOf: (row: Row) => string): AppGroup[] {
+    const byKey = new Map<string, AppGroup>();
+    for (const row of rows) {
+        const key = keyOf(row);
+        const group = byKey.get(key) ?? { key, rows: [], open: 0, down: 0, up: 0, rate: 0, rateDown: 0, rateUp: 0 };
+        group.rows.push(row);
+        if (!row.closedAt) group.open += 1;
+        group.down += row.download;
+        group.up += row.upload;
+        group.rate += row.rate;
+        group.rateDown += row.rateDown;
+        group.rateUp += row.rateUp;
+        byKey.set(key, group);
+    }
+    return [...byKey.values()];
 }
 
 interface ConnectionsViewProps {
@@ -104,18 +128,19 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                 const list = await invoke<LiveConnection[]>("get_connections");
                 if (cancelled) return;
                 const now = Date.now();
-                const seen = new Map<string, { bytes: number; at: number }>();
+                const seen = new Map<string, { down: number; up: number; at: number }>();
                 const next = (list ?? []).map((connection) => {
-                    const bytes = connection.upload + connection.download;
                     const before = previous.current.get(connection.id);
                     const seconds = before ? (now - before.at) / 1000 : 0;
-                    const rate = before && seconds > 0 ? Math.max(0, (bytes - before.bytes) / seconds) : 0;
-                    seen.set(connection.id, { bytes, at: now });
-                    return { ...connection, rate };
+                    const per = (bytes: number, was: number) => (before && seconds > 0 ? Math.max(0, (bytes - was) / seconds) : 0);
+                    const rateDown = per(connection.download, before?.down ?? 0);
+                    const rateUp = per(connection.upload, before?.up ?? 0);
+                    seen.set(connection.id, { down: connection.download, up: connection.upload, at: now });
+                    return { ...connection, rate: rateDown + rateUp, rateDown, rateUp };
                 });
                 previous.current = seen;
                 for (const [id, row] of lastOpen.current) {
-                    if (!seen.has(id) && !dismissed.current.has(id)) recent.current.set(id, { ...row, rate: 0, closedAt: now });
+                    if (!seen.has(id) && !dismissed.current.has(id)) recent.current.set(id, { ...row, rate: 0, rateDown: 0, rateUp: 0, closedAt: now });
                 }
                 for (const [id, row] of recent.current) {
                     if (seen.has(id) || now - (row.closedAt ?? 0) > RECENT_MS) recent.current.delete(id);
@@ -138,8 +163,14 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [connected, paused, visible]);
 
-    const appName = (key: string) =>
-        key === SYSTEM ? t("connections.system") : key === NO_APP ? t("stats.unknownApp") : appLabels.get(key) || key.replace(/\.exe$/i, "");
+    const appName = (key: string): string =>
+        key === SYSTEM
+            ? t("connections.system")
+            : key.startsWith(IN_SYSTEM)
+              ? appName(key.slice(IN_SYSTEM.length))
+              : key === NO_APP
+                ? t("stats.unknownApp")
+                : appLabels.get(key) || key.replace(/\.exe$/i, "");
     const ruleLabel = (id: string, text?: string) => {
         if (id === DEFAULT_RULE) return t("routing.catchAll");
         // An external core's own description, where it maps to no rule.
@@ -160,20 +191,16 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             .filter(Boolean)
             .some((field) => String(field).toLowerCase().includes(needle));
 
-    const groups = useMemo(() => {
-        const byApp = new Map<string, AppGroup>();
-        for (const row of rows) {
-            const key = !showSystem && isSystemProgram(row.app, row.app_path) ? SYSTEM : row.app || NO_APP;
-            const group = byApp.get(key) ?? { key, rows: [], open: 0, down: 0, up: 0, rate: 0 };
-            group.rows.push(row);
-            if (!row.closedAt) group.open += 1;
-            group.down += row.download;
-            group.up += row.upload;
-            group.rate += row.rate;
-            byApp.set(key, group);
-        }
-        return [...byApp.values()];
-    }, [rows, showSystem]);
+    const groups = useMemo(
+        () => groupRows(rows, (row) => (!showSystem && isSystemProgram(row.app, row.app_path) ? SYSTEM : row.app || NO_APP)),
+        [rows, showSystem]
+    );
+    // System, opened: its programs first, like the top list, and each of
+    // those opens on its own connections.
+    const systemGroups = useMemo(
+        () => groupRows(groups.find((item) => item.key === SYSTEM)?.rows ?? [], (row) => IN_SYSTEM + (row.app || NO_APP)),
+        [groups]
+    );
 
     const needle = filter.trim().toLowerCase();
     const direction = sort.descending ? -1 : 1;
@@ -183,19 +210,27 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         return (typeof x === "string" ? x.localeCompare(String(y)) : x - (y as number)) * direction;
     };
 
-    // The program list, or the open program's connections.
-    const group = openApp !== null ? groups.find((item) => item.key === openApp) : undefined;
+    // The program list, System's programs, or one program's connections.
+    const inSystem = openApp === SYSTEM;
+    const group =
+        openApp === null || inSystem
+            ? undefined
+            : openApp.startsWith(IN_SYSTEM)
+              ? systemGroups.find((item) => item.key === openApp)
+              : groups.find((item) => item.key === openApp);
+    const systemGroup = inSystem ? groups.find((item) => item.key === SYSTEM) : undefined;
+    const listed = inSystem ? systemGroups : groups;
     const shownGroups = useMemo(() => {
         // A program matches by its name or by any of its connections.
         const list = needle
-            ? groups.filter((item) => appName(item.key).toLowerCase().includes(needle) || item.rows.some((row) => matches(row, needle)))
-            : groups;
+            ? listed.filter((item) => appName(item.key).toLowerCase().includes(needle) || item.rows.some((row) => matches(row, needle)))
+            : listed;
         const value = (item: AppGroup) =>
             ({ name: appName(item.key), count: item.open, down: item.down, up: item.up, rate: item.rate })[sort.key];
         return [...list].sort(byKey(value));
         // appName, matches and byKey only read t, labels, rules and sort.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [groups, needle, sort, rules, profiles, t, appLabels]);
+    }, [listed, needle, sort, rules, profiles, t, appLabels]);
     const shownRows = useMemo(() => {
         if (!group) return [];
         const list = needle ? group.rows.filter((row) => matches(row, needle)) : group.rows;
@@ -205,10 +240,13 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [group, needle, sort, rules, profiles, t]);
 
-    // A program whose connections have all closed has nothing to show.
+    // A program whose connections have all closed has nothing to show; one
+    // opened from System goes back there while System has anything left.
+    const parent = openApp?.startsWith(IN_SYSTEM) && groups.some((item) => item.key === SYSTEM) ? SYSTEM : null;
+    const shownGroup = group ?? systemGroup;
     useEffect(() => {
-        if (openApp !== null && rows.length > 0 && !group) setOpenApp(null);
-    }, [openApp, rows.length, group, setOpenApp]);
+        if (openApp !== null && rows.length > 0 && !shownGroup) setOpenApp(parent);
+    }, [openApp, rows.length, shownGroup, parent, setOpenApp]);
 
     const close = async (ids?: string[]) => {
         try {
@@ -227,7 +265,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
 
     const openRows = rows.filter((row) => !row.closedAt);
     const totals = openRows.reduce((sum, row) => ({ up: sum.up + row.upload, down: sum.down + row.download }), { up: 0, down: 0 });
-    const icons = useFileIcons(groups.map((item) => (item.key === SYSTEM ? undefined : item.rows[0]?.app_path)));
+    const icons = useFileIcons(listed.map((item) => (item.key === SYSTEM ? undefined : item.rows[0]?.app_path)));
     const now = Date.now();
     const toggleSort = (key: SortKey) =>
         setSort((current) => (current.key === key ? { key, descending: !current.descending } : { key, descending: key !== "name" }));
@@ -275,30 +313,35 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                 ))}
         </span>
     );
-    const dataCells = (down: number, up: number, rate: number) => (
+    // Each way: how much in all, and under it how fast right now. Both
+    // columns always have both lines, so they line up and a row never
+    // changes height as its speed comes and goes.
+    const dataCell = (bytes: number, rate: number, dim?: boolean) => (
+        <span className="text-end tabular-nums">
+            <span className={cn("block", dim && "text-muted-foreground")}>{formatBytes(bytes)}</span>
+            <span className={cn("block text-[10px]", rate > 0 ? "text-primary" : "text-muted-foreground")}>{rate > 0 ? formatRate(rate) : "\u00a0"}</span>
+        </span>
+    );
+    const dataCells = (item: { download?: number; down?: number; upload?: number; up?: number; rateDown: number; rateUp: number }) => (
         <>
-            <span className="text-end tabular-nums">
-                <span className="block">{formatBytes(down)}</span>
-                {/* Always two lines, so a row never changes height as its speed comes and goes. */}
-                <span className={cn("block text-[10px]", rate > 0 ? "text-foreground" : "text-muted-foreground")}>{rate > 0 ? formatRate(rate) : "\u00a0"}</span>
-            </span>
-            <span className="text-end tabular-nums text-muted-foreground">{formatBytes(up)}</span>
+            {dataCell(item.download ?? item.down ?? 0, item.rateDown)}
+            {dataCell(item.upload ?? item.up ?? 0, item.rateUp, true)}
         </>
     );
 
     // One grid for header and rows, so the columns line up. The rule and
     // network columns go on a narrow window; the data stays.
-    const columns = "grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_5rem_4.5rem_2rem] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_5.5rem_5.5rem_4.5rem_2rem] items-center gap-x-3 px-3";
+    const columns = "grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_5.5rem_5.5rem_2rem] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1fr)_5rem_6rem_6rem_2rem] items-center gap-x-3 px-3";
     const header = (first: ReactNode) => (
         <div className={cn(columns, "sticky top-0 z-10 border-b bg-card py-2 text-[11px] text-muted-foreground")}>
             {first}
             <span>{t("connections.col.via")}</span>
             <span className="max-sm:hidden">{t("connections.col.rule")}</span>
             <span className="max-sm:hidden">{t("connections.col.network")}</span>
-            <SortButton active={sort.key === "down"} descending={sort.descending} onClick={() => toggleSort("down")} end>
+            <SortButton active={sort.key === "down"} descending={sort.descending} onClick={() => toggleSort("down")} end title={t("connections.col.hint")}>
                 <ArrowDown size={11} aria-hidden="true" /> {t("connections.col.down")}
             </SortButton>
-            <SortButton active={sort.key === "up"} descending={sort.descending} onClick={() => toggleSort("up")} end>
+            <SortButton active={sort.key === "up"} descending={sort.descending} onClick={() => toggleSort("up")} end title={t("connections.col.hint")}>
                 <ArrowUp size={11} aria-hidden="true" /> {t("connections.col.up")}
             </SortButton>
             <span />
@@ -335,12 +378,20 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        {group ? (
-                            <Button size="sm" variant="ghost" className="-ms-2 gap-1.5" onClick={() => setOpenApp(null)}>
+                        {shownGroup ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="-ms-2 gap-1.5"
+                                onClick={() => setOpenApp(openApp?.startsWith(IN_SYSTEM) ? SYSTEM : null)}
+                            >
                                 <ArrowLeft size={14} className="rtl:-scale-x-100" aria-hidden="true" />
-                                <span className="max-w-48 truncate font-semibold">{appName(group.key)}</span>
+                                {openApp?.startsWith(IN_SYSTEM) ? (
+                                    <span className="text-muted-foreground">{t("connections.system")} /</span>
+                                ) : null}
+                                <span className="max-w-48 truncate font-semibold">{appName(shownGroup.key)}</span>
                                 <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
-                                    {t("connections.active", { count: group.open })}
+                                    {t("connections.active", { count: shownGroup.open })}
                                 </span>
                             </Button>
                         ) : null}
@@ -358,10 +409,10 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                             <Switch checked={showSystem} onCheckedChange={setShowSystem} aria-label={t("connections.showSystem")} />
                             {t("connections.showSystem")}
                         </label>
-                        {group ? (
-                            <Button size="sm" variant="outline" onClick={() => void close(group.rows.filter((row) => !row.closedAt).map((row) => row.id))}>
+                        {shownGroup ? (
+                            <Button size="sm" variant="outline" onClick={() => void close(shownGroup.rows.filter((row) => !row.closedAt).map((row) => row.id))}>
                                 <XCircle size={14} className="me-2" aria-hidden="true" />
-                                {t("connections.closeApp")}
+                                {t("connections.closeApp", { name: appName(shownGroup.key) })}
                             </Button>
                         ) : null}
                     </div>
@@ -396,8 +447,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                                     {row.closedAt
                                                         ? t("connections.closed")
                                                         : [
-                                                              // In System, which program it is.
-                                                              group.key === SYSTEM ? appName(row.app || NO_APP) : "",
+
                                                               row.protocol,
                                                               row.host ? row.destination : "",
                                                               formatDuration(Math.max(0, now - row.started)),
@@ -409,7 +459,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                             {viaCell([row])}
                                             <span className="min-w-0 max-sm:hidden">{ruleCell([row])}</span>
                                             <span className="max-sm:hidden">{networkCell([row])}</span>
-                                            {dataCells(row.download, row.upload, row.rate)}
+                                            {dataCells(row)}
                                             <button
                                                 type="button"
                                                 hidden={!!row.closedAt}
@@ -451,13 +501,16 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                                                 <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-muted px-1 font-mono text-[10px] tabular-nums">
                                                     {item.open}
                                                 </span>
-                                                <AppIcon icon={item.key === SYSTEM ? undefined : icons.get(item.rows[0]?.app_path ?? "")} system={item.key === SYSTEM} />
+                                                <AppIcon
+                                                    icon={item.key === SYSTEM ? undefined : icons.get(item.rows[0]?.app_path ?? "")}
+                                                    system={item.key === SYSTEM || (inSystem && !item.rows[0]?.app_path)}
+                                                />
                                                 <span className="truncate font-medium" title={item.rows[0]?.app_path}>{appName(item.key)}</span>
                                             </span>
                                             {viaCell(item.rows)}
                                             <span className="min-w-0 max-sm:hidden">{ruleCell(item.rows)}</span>
                                             <span className="max-sm:hidden">{networkCell(item.rows)}</span>
-                                            {dataCells(item.down, item.up, item.rate)}
+                                            {dataCells(item)}
                                             <ChevronRight size={14} className="justify-self-end text-muted-foreground rtl:-scale-x-100" aria-hidden="true" />
                                         </button>
                                     ))
@@ -478,7 +531,7 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
  */
 const live = {
     rows: [] as Row[],
-    previous: { current: new Map<string, { bytes: number; at: number }>() },
+    previous: { current: new Map<string, { down: number; up: number; at: number }>() },
     // Connections that closed a moment ago stay, dimmed, instead of the list
     // jumping every second as short ones come and go. One the user closed
     // goes at once.
@@ -499,21 +552,24 @@ function SortButton({
     descending,
     onClick,
     end,
+    title,
     children,
 }: {
     active: boolean;
     descending: boolean;
     onClick: () => void;
     end?: boolean;
+    title?: string;
     children: ReactNode;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
+            title={title}
             aria-sort={active ? (descending ? "descending" : "ascending") : undefined}
             className={cn(
-                "flex min-w-0 items-center gap-0.5 font-medium transition-colors hover:text-foreground",
+                "flex min-w-0 items-center gap-0.5 font-medium transition-colors hover:text-foreground [&>svg]:shrink-0",
                 end && "justify-end",
                 active && "text-foreground"
             )}

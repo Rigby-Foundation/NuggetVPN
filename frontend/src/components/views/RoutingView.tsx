@@ -491,12 +491,14 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
     }, [rules, layout, inboundCounts, hiddenActions, onHideAction, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
-        // An edge carrying connections right now is drawn heavier, so the
-        // routes in use stand out from the ones merely configured.
+        // An edge carrying connections right now is drawn heavier and moves;
+        // one merely configured is fainter and still, so a still wire reads
+        // as idle rather than broken.
         const dashed = (stroke: string, active: boolean) => ({
             stroke,
             strokeWidth: active ? 2.5 : 1.5,
             strokeDasharray: "5 5",
+            opacity: active ? 1 : 0.5,
         });
         const active = (id: string) => (hits?.[id] ?? 0) > 0;
 
