@@ -363,10 +363,19 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                         <Button size="sm" variant="ghost" onClick={() => setPaused((value) => !value)}>
                             {t(paused ? "connections.resume" : "connections.pause")}
                         </Button>
-                        <Button size="sm" variant="outline" disabled={rows.length === 0} onClick={() => void close()}>
-                            <XCircle size={14} className="me-2" aria-hidden="true" />
-                            {t("connections.closeAll")}
-                        </Button>
+                        {/* One close button: everything, or, with a program open, that
+                            program's connections. Two side by side read as the same. */}
+                        {shownGroup ? (
+                            <Button size="sm" variant="outline" onClick={() => void close(shownGroup.rows.filter((row) => !row.closedAt).map((row) => row.id))}>
+                                <XCircle size={14} className="me-2" aria-hidden="true" />
+                                {t("connections.closeApp", { name: appName(shownGroup.key) })}
+                            </Button>
+                        ) : (
+                            <Button size="sm" variant="outline" disabled={rows.length === 0} onClick={() => void close()}>
+                                <XCircle size={14} className="me-2" aria-hidden="true" />
+                                {t("connections.closeAll")}
+                            </Button>
+                        )}
                     </>
                 ) : null
             }
@@ -409,12 +418,6 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
                             <Switch checked={showSystem} onCheckedChange={setShowSystem} aria-label={t("connections.showSystem")} />
                             {t("connections.showSystem")}
                         </label>
-                        {shownGroup ? (
-                            <Button size="sm" variant="outline" onClick={() => void close(shownGroup.rows.filter((row) => !row.closedAt).map((row) => row.id))}>
-                                <XCircle size={14} className="me-2" aria-hidden="true" />
-                                {t("connections.closeApp", { name: appName(shownGroup.key) })}
-                            </Button>
-                        ) : null}
                     </div>
 
                     {/* clip-path, not just overflow, holds the rounded corners: the
