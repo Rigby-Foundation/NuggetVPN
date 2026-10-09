@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useLogs } from "@/hooks/use-logs";
 import { LOCAL, profileDomain, reconcileSelection, useProfiles } from "@/hooks/use-profiles";
 import { useTraffic } from "@/hooks/use-traffic";
+import { useProliant } from "@/hooks/use-proliant";
 import { stripAnsi } from "@/lib/ansi";
 import { useBack } from "@/lib/back";
 import { useI18n, useT } from "@/lib/i18n";
@@ -152,6 +153,7 @@ function App() {
     const t = useT();
     const appearance = useAppearance();
     const isMobile = useIsMobile();
+    useProliant();
 
     const {
         profiles,
