@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from "lucide-react";
 
@@ -38,6 +38,15 @@ const PERIODS = [
     { days: 7, label: "stats.week" },
     { days: 30, label: "stats.month" },
 ] as const;
+
+/**
+ * What Statistics last read, kept outside the component: opening the page
+ * draws it at once, so the page's entrance plays with its content instead of
+ * the numbers popping in after it, and switching period never waits. Each
+ * period is read up front and refreshed while it is shown.
+ */
+const usageCache = new Map<number, AppUsage>();
+let healthCache: Record<string, ServerHealth> = {};
 
 /** The row system programs are added up into; not a real program name. */
 const SYSTEM_PROGRAM = "\u0001system";
@@ -210,7 +219,7 @@ function ShareChart({ slices, total }: { slices: Slice[]; total: number }) {
                     </span>
                 </div>
             </div>
-            <ul className="grid w-full min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+            <ul className="grid w-full min-w-0 max-w-2xl flex-1 grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
                 {slices.map((slice) => (
                     <li
                         key={slice.key}
@@ -240,29 +249,43 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     // On a phone traffic is counted by package; show the app it belongs to.
     const appLabels = useAppLabels();
     const [days, setDays] = useRemembered("statistics.days", 1);
-    // Kept with the period it was fetched for. Switching period showed the
-    // old period's data until the new arrived — a day's single bar drawn
-    // across the whole week chart — and a slow answer could overwrite a
-    // newer one.
-    const [usage, setUsage] = useState<{ days: number; data: AppUsage } | null>(null);
-    const daysRef = useRef(days);
-    daysRef.current = days;
-    // Until the chosen period's numbers arrive, the last ones stay, dimmed.
-    const stale = !!usage && usage.days !== days;
-    const [health, setHealth] = useState<Record<string, ServerHealth>>({});
+    const [, redraw] = useReducer((n: number) => n + 1, 0);
+    // The chosen period's numbers, or, only until a period is read for the
+    // first time, the last ones shown.
+    const shown = useRef<{ days: number; data: AppUsage } | null>(null);
+    const cached = usageCache.get(days);
+    if (cached) shown.current = { days, data: cached };
+    const usage = shown.current;
+    const health = healthCache;
     const [confirmClear, setConfirmClear] = useState(false);
     const appStatsOn = settings.app_stats !== false;
     const chart = useAppearance().prefs.statsChart;
     const healthOn = settings.server_health !== false;
 
-    const load = useCallback(() => {
-        invoke<AppUsage>("get_app_usage", { days })
+    const read = useCallback((period: number) => {
+        invoke<AppUsage>("get_app_usage", { days: period })
             .then((data) => {
-                if (daysRef.current === days) setUsage({ days, data });
+                usageCache.set(period, data);
+                redraw();
             })
             .catch(() => undefined);
-        invoke<Record<string, ServerHealth>>("get_server_health").then((value) => setHealth(value ?? {})).catch(() => undefined);
-    }, [days]);
+    }, []);
+    const load = useCallback(() => {
+        read(days);
+        invoke<Record<string, ServerHealth>>("get_server_health")
+            .then((value) => {
+                healthCache = value ?? {};
+                redraw();
+            })
+            .catch(() => undefined);
+    }, [days, read]);
+
+    // The other periods once, so switching to one draws it straight away.
+    useEffect(() => {
+        PERIODS.forEach((period) => period.days !== days && read(period.days));
+        // Only on opening; the shown period is kept fresh below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const visible = usePageVisible();
     useEffect(() => {
@@ -300,7 +323,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
         });
         if (system.up + system.down > 0) apps.push(system);
         return apps.sort((a, b) => b.up + b.down - (a.up + a.down));
-    }, [usage, showSystem]);
+    }, [usage?.data, showSystem]);
     // Icons for programs Connections has seen; see rememberProgramPaths.
     const icons = useFileIcons(programs.slice(0, 40).map((program) => programPath(program.program)));
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
@@ -323,6 +346,8 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
         setConfirmClear(false);
         try {
             await invoke("clear_statistics");
+            usageCache.clear();
+            PERIODS.forEach((period) => read(period.days));
             load();
         } catch (error) {
             toast.error(errorMessage(error), { id: "stats" });
@@ -337,7 +362,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                 description={t("stats.subtitle")}
                 // Not centred: in Activity the switcher in the heading has to sit
                 // where it does on the other two pages, or it jumps on every switch.
-                className="space-y-4 [&>*:not(header)]:max-w-4xl"
+                className="space-y-4"
                 actions={
                     <>
                         <Segmented<number>
@@ -353,7 +378,6 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                 }
             >
                 <Section
-                    className={cn("transition-opacity", stale && "opacity-60")}
                     icon={AppWindow}
                     title={t("stats.apps")}
                     action={
@@ -379,9 +403,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                         </div>
                     ) : (
                         <>
-                            {/* While another period loads, the last chart stays, dimmed
-                                with the rest, or an empty one holds its place: the chart
-                                going and coming back on every switch was a flash. */}
+                            {/* Until a period is first read, an empty chart holds its place. */}
                             {days > 1 && chart !== "share" ? <DayChart days={usage && usage.days > 1 ? usage.data.days : []} /> : null}
                             {(chart !== "days" || days === 1) && programs.length > 0 && total.up + total.down > 0 ? (
                                 <ShareChart slices={slices} total={total.up + total.down} />
