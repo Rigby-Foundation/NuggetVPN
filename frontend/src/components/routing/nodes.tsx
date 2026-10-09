@@ -212,10 +212,44 @@ export interface BoxData {
 }
 
 /**
+ * Whether a node's card fills the box React Flow gives it: once it has a
+ * saved size, and from the moment a resize starts. Waiting for the saved size
+ * left the card at its natural width while the frame was dragged out around
+ * it, and until the new size came back from settings after letting go.
+ */
+function useFill(box?: BoxData) {
+    const [resizing, setResizing] = useState(false);
+    return {
+        fill: !!box?.sized || resizing,
+        onResizeStart: () => setResizing(true),
+        // Back to the natural size: stop filling too, or the card would stay
+        // stretched to the box it no longer has.
+        onResetSize: box?.onResetSize
+            ? () => {
+                  setResizing(false);
+                  box.onResetSize?.();
+              }
+            : undefined,
+    };
+}
+
+/**
  * The resize frame, drawn while the node is selected. Resizing from the left
  * or top moves the node as well, which onResizeEnd reports along with the size.
  */
-function Resizer({ box, selected, accent, minWidth }: { box?: BoxData; selected?: boolean; accent: string; minWidth: number }) {
+function Resizer({
+    box,
+    selected,
+    accent,
+    minWidth,
+    onResizeStart,
+}: {
+    box?: BoxData;
+    selected?: boolean;
+    accent: string;
+    minWidth: number;
+    onResizeStart: () => void;
+}) {
     if (!box?.onResize) return null;
     return (
         <NodeResizer
@@ -224,6 +258,7 @@ function Resizer({ box, selected, accent, minWidth }: { box?: BoxData; selected?
             minHeight={90}
             color={accent}
             handleStyle={{ width: 9, height: 9, borderRadius: 3 }}
+            onResizeStart={onResizeStart}
             onResizeEnd={(_, params) => box.onResize?.(params)}
         />
     );
@@ -265,14 +300,15 @@ function NodeShell({
     const isHandle = (part: React.ReactNode) => isValidElement(part) && part.type === Handle;
     const handles = parts.filter(isHandle);
     const content = parts.filter((part) => !isHandle(part));
+    const { fill, onResizeStart, onResetSize } = useFill(box);
     return (
         <>
-        <Resizer box={box} selected={selected} accent={accent} minWidth={wide ? 260 : 200} />
+        <Resizer box={box} selected={selected} accent={accent} minWidth={wide ? 260 : 200} onResizeStart={onResizeStart} />
         <div
             className={cn(
                 // A resized node fills the box React Flow gives it, and its
                 // body scrolls when the box is shorter than the content.
-                box?.sized ? "flex h-full w-full flex-col" : wide ? "w-80" : "w-64",
+                fill ? "flex h-full w-full flex-col" : wide ? "w-80" : "w-64",
                 "rounded-xl border bg-card/95 backdrop-blur-sm shadow-lg overflow-hidden",
                 "transition-shadow",
                 selected ? "ring-2 ring-offset-2 ring-offset-background" : ""
@@ -304,10 +340,10 @@ function NodeShell({
                     </span>
                 </span>
                 {hits !== undefined ? <HitsBadge count={hits} accent={accent} /> : null}
-                {box?.sized && box.onResetSize ? (
+                {box?.sized && onResetSize ? (
                     <button
                         type="button"
-                        onClick={box.onResetSize}
+                        onClick={onResetSize}
                         aria-label={t("routing.resetSize")}
                         title={t("routing.resetSize")}
                         className="nodrag shrink-0 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -327,7 +363,7 @@ function NodeShell({
                 ) : null}
             </div>
 
-            {box?.sized ? (
+            {fill ? (
                 <div className="nowheel min-h-0 flex-1 overflow-y-auto">{content}</div>
             ) : (
                 content
@@ -864,14 +900,15 @@ export function CommentNode({ data, selected }: NodeProps) {
     const t = useT();
     const [draft, setDraft] = useState(text);
     useEffect(() => setDraft(text), [text]);
+    const { fill, onResizeStart, onResetSize } = useFill(box);
 
     return (
         <>
-        <Resizer box={box} selected={selected} accent="var(--muted-foreground)" minWidth={160} />
+        <Resizer box={box} selected={selected} accent="var(--muted-foreground)" minWidth={160} onResizeStart={onResizeStart} />
         <div
             className={cn(
                 // Resized, the text area takes whatever height the box has.
-                box.sized ? "flex h-full w-full flex-col" : "w-60",
+                fill ? "flex h-full w-full flex-col" : "w-60",
                 "rounded-xl border border-dashed bg-card/85 shadow-sm backdrop-blur-sm",
                 selected ? "ring-2 ring-ring/50" : ""
             )}
@@ -879,10 +916,10 @@ export function CommentNode({ data, selected }: NodeProps) {
             <div className="flex shrink-0 items-center gap-1.5 px-3 pt-2.5 text-muted-foreground">
                 <StickyNote size={13} aria-hidden="true" />
                 <span className="flex-1 text-xs font-medium">{t("routing.note")}</span>
-                {box.sized && box.onResetSize ? (
+                {box.sized && onResetSize ? (
                     <button
                         type="button"
-                        onClick={box.onResetSize}
+                        onClick={onResetSize}
                         aria-label={t("routing.resetSize")}
                         title={t("routing.resetSize")}
                         className="rounded p-1 hover:bg-muted hover:text-foreground"
@@ -911,7 +948,7 @@ export function CommentNode({ data, selected }: NodeProps) {
                 rows={3}
                 className={cn(
                     "nodrag nowheel mt-1 block w-full resize-none bg-transparent px-3 pb-3 text-xs leading-relaxed outline-none placeholder:text-muted-foreground/60",
-                    box.sized ? "min-h-0 flex-1" : "min-h-16 [field-sizing:content]"
+                    fill ? "min-h-0 flex-1" : "min-h-16 [field-sizing:content]"
                 )}
             />
         </div>
