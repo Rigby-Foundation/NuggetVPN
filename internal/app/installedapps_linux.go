@@ -14,9 +14,11 @@ import (
 // desktopIcons maps a listed app to the icon its .desktop file names.
 var desktopIcons sync.Map
 
-// desktopApps lists the applications in the desktop's menus: their .desktop
-// files, in the system, Flatpak and user folders. An app is chosen by the
-// program its Exec line starts — the name the routing rule matches.
+// desktopApps lists the applications in the desktop's menus — their .desktop
+// files, in the system, Flatpak and user folders — and the programs running
+// now, which covers AppImages and others no menu lists. A menu app is chosen
+// by the program its Exec line starts, a running one by its path; the
+// routing rule matches either.
 func desktopApps() []InstalledApp {
 	home, _ := os.UserHomeDir()
 	dirs := []string{
@@ -38,7 +40,44 @@ func desktopApps() []InstalledApp {
 			apps = append(apps, InstalledApp{Package: entry.exec, Label: entry.name})
 		}
 	}
-	return sortApps(apps)
+	return sortApps(withRunning(sortApps(apps), runningPrograms(home)))
+}
+
+// runningPrograms is the programs running now that this user can see the
+// executable of, each once. Those outside the home folder, /opt and mounted
+// drives — shells, daemons, the desktop's own parts — count as the system's.
+func runningPrograms(home string) []InstalledApp {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil
+	}
+	userPlaces := []string{"/opt/", "/media/", "/mnt/", "/run/media/", "/tmp/"}
+	if home != "" {
+		userPlaces = append(userPlaces, strings.TrimSuffix(home, "/")+"/")
+	}
+	seen := map[string]bool{}
+	programs := []InstalledApp{}
+	for _, entry := range entries {
+		if entry.Name()[0] < '0' || entry.Name()[0] > '9' {
+			continue
+		}
+		path, err := os.Readlink(filepath.Join("/proc", entry.Name(), "exe"))
+		if err != nil || path == "" || seen[path] {
+			continue
+		}
+		// A program replaced while running reads as "/path (deleted)".
+		path = strings.TrimSuffix(path, " (deleted)")
+		seen[path] = true
+		system := true
+		for _, place := range userPlaces {
+			if strings.HasPrefix(path, place) {
+				system = false
+				break
+			}
+		}
+		programs = append(programs, InstalledApp{Package: path, Label: filepath.Base(path), System: system})
+	}
+	return programs
 }
 
 type desktopEntry struct {

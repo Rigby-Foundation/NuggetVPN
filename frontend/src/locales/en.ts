@@ -310,6 +310,7 @@ const en = {
     "apps.description": "The apps this rule applies to.",
     "apps.search": "Search apps",
     "apps.system": "Show system apps",
+    "apps.running": "running",
     "apps.none": "No apps match.",
     "apps.chosen": { one: "{count} chosen", other: "{count} chosen" },
     "nav.more": "More",

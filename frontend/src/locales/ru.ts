@@ -303,6 +303,7 @@ const ru: Messages = {
     "apps.description": "Приложения, к которым относится это правило.",
     "apps.search": "Поиск приложений",
     "apps.system": "Показывать системные приложения",
+    "apps.running": "запущено",
     "apps.none": "Ничего не найдено.",
     "apps.chosen": { one: "Выбрано: {count}", few: "Выбрано: {count}", many: "Выбрано: {count}", other: "Выбрано: {count}" },
     "nav.more": "Ещё",

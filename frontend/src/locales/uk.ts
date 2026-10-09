@@ -303,6 +303,7 @@ const uk: Messages = {
     "apps.description": "Застосунки, до яких належить це правило.",
     "apps.search": "Пошук застосунків",
     "apps.system": "Показувати системні застосунки",
+    "apps.running": "запущено",
     "apps.none": "Нічого не знайдено.",
     "apps.chosen": { one: "Вибрано: {count}", few: "Вибрано: {count}", many: "Вибрано: {count}", other: "Вибрано: {count}" },
     "nav.more": "Ще",

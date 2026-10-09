@@ -295,6 +295,7 @@ const zh: Messages = {
     "apps.description": "此规则适用的应用。",
     "apps.search": "搜索应用",
     "apps.system": "显示系统应用",
+    "apps.running": "运行中",
     "apps.none": "没有匹配的应用。",
     "apps.chosen": { other: "已选 {count} 个" },
     "nav.more": "更多",

@@ -32,6 +32,9 @@ type InstalledApp struct {
 	Package string `json:"package"`
 	Label   string `json:"label"`
 	System  bool   `json:"system"`
+	// Running is true for a program running now; on a computer, one found
+	// only that way (a portable app, one nothing installed) is listed too.
+	Running bool `json:"running,omitempty"`
 }
 
 // ListInstalledApps lists the installed apps a routing rule can name: by

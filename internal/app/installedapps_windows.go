@@ -6,27 +6,25 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unsafe"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
 
-// desktopApps lists installed programs from the registry: the uninstall
+// desktopApps lists installed programs from the registry — the uninstall
 // entries (what Settings → Apps shows), by the program their icon comes from,
-// and App Paths, the programs Windows can start by name. A program is chosen
-// by its .exe path; the routing rule matches that path and the file name.
+// and App Paths, the programs Windows can start by name — and the programs
+// running now, which covers portable ones. A program is chosen by its .exe
+// path; the routing rule matches that path and the file name.
 func desktopApps() []InstalledApp {
-	systemRoot := strings.ToLower(os.Getenv("SystemRoot"))
 	apps := []InstalledApp{}
 	add := func(label, path string) {
 		path = programPath(path)
 		if path == "" {
 			return
 		}
-		if label == "" {
-			label = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-		}
-		system := systemRoot != "" && strings.HasPrefix(strings.ToLower(path), systemRoot+`\`)
-		apps = append(apps, InstalledApp{Package: path, Label: label, System: system})
+		apps = append(apps, windowsProgram(label, path))
 	}
 
 	for _, root := range []registry.Key{registry.LOCAL_MACHINE, registry.CURRENT_USER} {
@@ -48,7 +46,64 @@ func desktopApps() []InstalledApp {
 			add("", path)
 		})
 	}
-	return sortApps(apps)
+	return sortApps(withRunning(sortApps(apps), runningPrograms()))
+}
+
+// windowsProgram is a program by path, named by its file where nothing
+// better names it; one in the Windows folder counts as the system's.
+func windowsProgram(label, path string) InstalledApp {
+	if label == "" {
+		label = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+	systemRoot := strings.ToLower(os.Getenv("SystemRoot"))
+	system := systemRoot != "" && strings.HasPrefix(strings.ToLower(path), systemRoot+`\`)
+	return InstalledApp{Package: path, Label: label, System: system}
+}
+
+// runningPrograms is the programs running now, each once, by the path of
+// their .exe. Processes this user may not query (other users', protected
+// ones) are skipped; their paths cannot be read.
+func runningPrograms() []InstalledApp {
+	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return nil
+	}
+	defer windows.CloseHandle(snapshot)
+
+	seen := map[string]bool{}
+	programs := []InstalledApp{}
+	entry := windows.ProcessEntry32{Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{}))}
+	for err = windows.Process32First(snapshot, &entry); err == nil; err = windows.Process32Next(snapshot, &entry) {
+		path := processImage(entry.ProcessID)
+		if path == "" || seen[strings.ToLower(path)] {
+			continue
+		}
+		seen[strings.ToLower(path)] = true
+		programs = append(programs, windowsProgram("", path))
+	}
+	return programs
+}
+
+// processImage is the full path of a process's .exe, or "".
+func processImage(pid uint32) string {
+	if pid == 0 {
+		return ""
+	}
+	process, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return ""
+	}
+	defer windows.CloseHandle(process)
+	buffer := make([]uint16, windows.MAX_LONG_PATH)
+	size := uint32(len(buffer))
+	if err := windows.QueryFullProcessImageName(process, 0, &buffer[0], &size); err != nil {
+		return ""
+	}
+	path := windows.UTF16ToString(buffer[:size])
+	if !strings.EqualFold(filepath.Ext(path), ".exe") {
+		return ""
+	}
+	return path
 }
 
 // eachSubKey calls visit with every subkey of root\path it can open.

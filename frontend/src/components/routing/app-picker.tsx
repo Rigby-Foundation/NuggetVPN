@@ -25,6 +25,8 @@ export interface InstalledApp {
     package: string;
     label: string;
     system: boolean;
+    /** Running now; on a computer, possibly listed only for that reason. */
+    running?: boolean;
 }
 
 // Loaded once per run: the list does not change while the app is open often
@@ -32,8 +34,9 @@ export interface InstalledApp {
 let appsPromise: Promise<InstalledApp[]> | null = null;
 const icons = new Map<string, Promise<string>>();
 
-export function loadInstalledApps(): Promise<InstalledApp[]> {
-    if (!appsPromise) {
+/** The installed apps; fresh asks again, for what is running now. */
+export function loadInstalledApps(fresh = false): Promise<InstalledApp[]> {
+    if (!appsPromise || fresh) {
         appsPromise = invoke<InstalledApp[]>("list_installed_apps").then((apps) => apps ?? []).catch(() => {
             appsPromise = null;
             return [];
@@ -128,7 +131,9 @@ export function AppPicker({
         if (!open) return;
         setChosen(new Set(values));
         setQuery("");
-        void loadInstalledApps().then(setApps);
+        // Asked again on every opening: the list includes what is running,
+        // which changes.
+        void loadInstalledApps(true).then(setApps);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -193,7 +198,14 @@ export function AppPicker({
                                         >
                                             <AppIcon packageName={app.package} />
                                             <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-sm">{app.label}</span>
+                                                <span className="flex min-w-0 items-center gap-1.5">
+                                                    <span className="truncate text-sm">{app.label}</span>
+                                                    {app.running ? (
+                                                        <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium text-primary">
+                                                            {t("apps.running")}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
                                                 <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={app.package}>
                                                     {app.package}
                                                 </span>
