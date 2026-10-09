@@ -1086,8 +1086,8 @@
 }
 
 /* ------------------------------------------------------------------------
- * The ProLiant easter egg (hooks/use-proliant): every icon at 50 000 rpm,
- * one turn every 60 s / 50 000 = 1.2 ms. A screen draws a frame every ~8–16
+ * The ProLiant easter egg (hooks/use-proliant): every icon at 20 000 rpm,
+ * one turn every 60 s / 20 000 = 3 ms. A screen draws a frame every ~8–16
  * ms, so what shows is each icon at a new angle on every frame. Left out for
  * anyone who has asked the system for less motion.
  * ------------------------------------------------------------------------ */
@@ -1099,6 +1099,6 @@
 @media (prefers-reduced-motion: no-preference) {
     :root[data-proliant] svg.lucide,
     :root[data-proliant] img {
-        animation: nugget-proliant 1.2ms linear infinite !important;
+        animation: nugget-proliant 3ms linear infinite !important;
     }
 }
