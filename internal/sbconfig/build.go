@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
@@ -22,6 +23,9 @@ const (
 	dnsProxyTag  = "dns-proxy"
 	dnsDirectTag = "dns-direct"
 	dnsLocalTag  = "dns-local"
+	// dnsServersTag answers the servers' own hostnames from what the app
+	// looked up before the tunnel came up; see Request.Resolve.
+	dnsServersTag = "dns-servers"
 
 	tunAddress = "172.19.0.1/30"
 
@@ -64,6 +68,14 @@ type Request struct {
 	// another program (Xray) takes over talking to the servers. It then also
 	// owns the proxy chain, so Build does not build one.
 	Dial func(models.Profile) (link.Outbound, error)
+	// Resolve, when set, looks the servers' hostnames up before the core
+	// starts, with the system's own resolver, and returns the addresses it
+	// found (IPv4, as the config resolves). Those names are then answered
+	// from that list instead of asking settings.DNS directly over UDP: an
+	// ISP that blocks or intercepts plain DNS to public resolvers (common in
+	// Russia) left every server lookup hanging until it timed out, and every
+	// connection waiting on it. A name it has no answer for keeps the old way.
+	Resolve func(domains []string) map[string][]string
 	// ServerDomains returns server hostnames to resolve without the tunnel,
 	// for servers Build does not dial itself. Asked after every server has
 	// gone through Dial.
@@ -212,6 +224,15 @@ func Build(request Request) (Result, error) {
 	plan := newRoutePlan(settings, geo, request.RuleLists, outboundFor)
 	plan.bypass = request.Bypass != nil
 	plan.warnings = append(plan.warnings, serverWarnings...)
+	if request.Resolve != nil && len(serverDomains) > 0 {
+		plan.resolved = resolvedOnly(request.Resolve(serverDomains), serverDomains)
+		// A server dialed by name looks its own name up in that list.
+		for _, outbound := range outbounds {
+			if server, _ := outbound["server"].(string); len(plan.resolved[server]) > 0 {
+				outbound["domain_resolver"] = dnsServersTag
+			}
+		}
+	}
 	routeRules, owners, splitRuleCount := plan.buildRouteRules(serverDomains)
 	dns := plan.buildDNS(splitTunnel, serverDomains)
 
@@ -420,6 +441,16 @@ func (p *routePlan) buildDNS(splitTunnel bool, serverDomains []string) map[strin
 
 	rules := []map[string]any{
 		{"domain_suffix": localSuffixes, "server": dnsLocalTag},
+	}
+
+	// The servers' names the app already looked up are answered from that.
+	if len(p.resolved) > 0 {
+		predefined := map[string]any{}
+		for domain, addresses := range p.resolved {
+			predefined[domain] = addresses
+		}
+		servers = append(servers, map[string]any{"type": "hosts", "tag": dnsServersTag, "predefined": predefined})
+		rules = append(rules, map[string]any{"domain": sortedKeys(p.resolved), "server": dnsServersTag})
 	}
 
 	// The proxy's own hostname must resolve outside the tunnel, or the tunnel
@@ -635,6 +666,33 @@ func buildExperimental(request Request) map[string]any {
 
 // proxyServerDomains lists the hostnames the tunnel itself dials, so they can
 // be excluded from fake-IP resolution.
+// resolvedOnly keeps the answers for the names asked about that have at
+// least one IPv4 address.
+func resolvedOnly(found map[string][]string, asked []string) map[string][]string {
+	result := map[string][]string{}
+	for _, domain := range asked {
+		var addresses []string
+		for _, address := range found[domain] {
+			if ip := net.ParseIP(address); ip != nil && ip.To4() != nil {
+				addresses = append(addresses, ip.String())
+			}
+		}
+		if len(addresses) > 0 {
+			result[domain] = addresses
+		}
+	}
+	return result
+}
+
+func sortedKeys(values map[string][]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func proxyServerDomains(outbounds, endpoints []map[string]any) []string {
 	var domains []string
 	collect := func(entries []map[string]any) {

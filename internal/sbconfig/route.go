@@ -48,6 +48,9 @@ type routePlan struct {
 	lists    map[string]RuleList
 	// outboundFor maps a server profile id to the outbound that reaches it.
 	outboundFor map[string]string
+	// resolved holds the servers' addresses the app looked up before the
+	// core started, by hostname; see Request.Resolve.
+	resolved map[string][]string
 
 	sets     []map[string]any
 	declared map[string]bool
@@ -119,6 +122,13 @@ func (p *routePlan) buildRouteRules(serverDomains []string) (rules []map[string]
 	// Private ranges stay on the local network whatever the graph says;
 	// tunnelling them breaks LAN access and, with it, the user's printer.
 	add("", map[string]any{"ip_is_private": true, "outbound": DirectTag})
+
+	// A connection to a server by name that goes straight out (the engine
+	// dialing the servers, the app's own checks) resolves it from the app's
+	// lookup too, not from a resolver the network may block.
+	if len(p.resolved) > 0 {
+		add("", map[string]any{"domain": sortedKeys(p.resolved), "action": "resolve", "server": dnsServersTag})
+	}
 
 	// The proxy's own hostname must never be routed into the tunnel it is
 	// dialing, or the connection chases its own tail.

@@ -619,6 +619,7 @@ func (a *App) startProfile(
 		CustomGeo:     customGeo,
 		RuleLists:     lists,
 		Alternatives:  alternatives,
+		Resolve:       a.resolveServers,
 	}
 
 	// Another core than the built-in one: see cores.go.
