@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// serviceLogDir is where the service's output is kept.
+const serviceLogDir = "/Library/Application Support/NuggetVPN"
+
 // elevateAndRun launches the core service as root via the standard macOS
 // authorization prompt. The command is backgrounded so osascript returns as
 // soon as the user authorises it.
@@ -17,7 +20,14 @@ func elevateAndRun(executable string, args []string) error {
 	for _, arg := range args {
 		quoted = append(quoted, shellQuote(arg))
 	}
-	command := strings.Join(quoted, " ") + " >/dev/null 2>&1 &"
+	// The service's own output goes to a log beside the cores, with the
+	// previous run's kept: a service that dies takes its reason with it
+	// otherwise, and the app only sees the control connection close.
+	dir := shellQuote(serviceLogDir)
+	current := shellQuote(serviceLogDir + "/service.log")
+	previous := shellQuote(serviceLogDir + "/service.prev.log")
+	command := "mkdir -p " + dir + "; mv -f " + current + " " + previous + " 2>/dev/null; " +
+		strings.Join(quoted, " ") + " >" + current + " 2>&1 &"
 
 	script := fmt.Sprintf(
 		"do shell script %s with administrator privileges",

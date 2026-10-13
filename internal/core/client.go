@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -277,15 +278,13 @@ func (c *Client) disconnect() {
 
 // readLoop demultiplexes responses and events from the single connection.
 func (c *Client) readLoop(conn net.Conn) {
-	scanner := bufio.NewScanner(conn)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	// A decoder rather than a line scanner: a scanner gives up on a line over
+	// its limit, which a long list of connections can reach, and giving up
+	// read as the core having died.
+	decoder := json.NewDecoder(bufio.NewReader(conn))
+	var readErr error
 
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
+	for {
 		var envelope struct {
 			ID      uint64 `json:"id"`
 			Event   string `json:"event"`
@@ -301,8 +300,9 @@ func (c *Client) readLoop(conn net.Conn) {
 
 			Connections []ConnectionInfo `json:"connections"`
 		}
-		if err := json.Unmarshal(line, &envelope); err != nil {
-			continue
+		if err := decoder.Decode(&envelope); err != nil {
+			readErr = err
+			break
 		}
 
 		if envelope.Event != "" {
@@ -335,13 +335,51 @@ func (c *Client) readLoop(conn net.Conn) {
 	c.mu.Lock()
 	stillCurrent := c.conn == conn
 	c.mu.Unlock()
-	if stillCurrent {
-		c.disconnect()
-		// The core is gone, so whatever the UI last heard is now wrong: say so
-		// explicitly rather than leaving it showing a tunnel that no longer
-		// exists.
-		c.dispatchEvent(EventState, "", "", false, 0, 0)
+	if !stillCurrent {
+		return
 	}
+	c.disconnect()
+
+	// Losing the control connection is not the same as losing the tunnel:
+	// the service may well still be running it. Reattach and ask before
+	// telling the UI the tunnel dropped — a drop that was only the socket
+	// used to cost a full reconnect.
+	reason := "closed"
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		reason = readErr.Error()
+	}
+	c.dispatchEvent(EventLog, "WARN", "Lost the connection to the core service ("+reason+")", false, 0, 0)
+	if running, reached := c.reattach(); reached && running {
+		c.dispatchEvent(EventLog, "INFO", "Reconnected to the core service; the tunnel kept running", false, 0, 0)
+		return
+	}
+	// The core is gone, so whatever the UI last heard is now wrong: say so
+	// explicitly rather than leaving it showing a tunnel that no longer
+	// exists.
+	c.dispatchEvent(EventState, "", "", false, 0, 0)
+}
+
+// reattachTimeout bounds how long a lost control connection is retried
+// before the tunnel is taken to be gone.
+const reattachTimeout = 3 * time.Second
+
+// reattach opens a new control connection to a service that may still be
+// running, without launching one, and reports whether the tunnel is up.
+// reached is false when no service answered.
+func (c *Client) reattach() (running, reached bool) {
+	deadline := time.Now().Add(reattachTimeout)
+	for time.Now().Before(deadline) {
+		if err := c.connect(); err == nil {
+			if _, err := c.handshake(); err == nil {
+				if response, err := c.request(Request{Cmd: CmdStatus}); err == nil {
+					return response.Running, true
+				}
+			}
+			c.disconnect()
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	return false, false
 }
 
 func (c *Client) dispatchEvent(name, level, message string, running bool, up, down int64) {
