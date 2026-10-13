@@ -313,7 +313,17 @@ func (s *Service) handle(request Request) Response {
 			break
 		}
 		start := StartRequest{Core: request.Core, Config: config, Aux: request.Aux}
-		if err := s.instance.StartCore(start, s.broadcastLog); err != nil {
+		logf := func(message string) { s.broadcastLog("", message) }
+		if !s.instance.Running() {
+			removeStaleAdapter(logf)
+		}
+		err := s.instance.StartCore(start, s.broadcastLog)
+		// A leftover adapter appeared, or was missed: clear it and try once more.
+		if adapterNameTaken(err) && !s.instance.Running() {
+			removeStaleAdapter(logf)
+			err = s.instance.StartCore(start, s.broadcastLog)
+		}
+		if err != nil {
 			response.OK, response.Error = false, err.Error()
 		}
 		response.Running = s.instance.Running()
@@ -324,6 +334,10 @@ func (s *Service) handle(request Request) Response {
 			response.OK, response.Error = false, err.Error()
 		}
 		response.Running = s.instance.Running()
+		// Disconnected means no adapter left in Network Connections.
+		if !response.Running {
+			removeStaleAdapter(func(message string) { s.broadcastLog("", message) })
+		}
 		s.broadcastState(response.Running)
 
 	case CmdStatus:
