@@ -191,7 +191,9 @@ export function DesktopSidebarNav({
                                 >
                                     <span className="flex items-center gap-1.5 truncate min-w-0">
                                         <Server size={13} className={cn("shrink-0", isConnected ? "text-status-connected" : "text-muted-foreground")} />
-                                        <span className="truncate">{activeServerLabel}</span>
+                                        {/* The server's flag, drawn like everywhere else, not its emoji. */}
+                                        {!isAuto && activeProfile ? <Flag name={activeProfile.name} size={14} className="shrink-0" /> : null}
+                                        <span className="truncate">{isAuto ? activeServerLabel : withoutFlagEmoji(activeServerLabel)}</span>
                                     </span>
                                     <ChevronDown size={12} className="opacity-50 shrink-0 ms-1" />
                                 </Button>

@@ -198,7 +198,9 @@ export function UnifiedHeader({
                                 className="h-8 max-w-[190px] sm:max-w-[200px] md:max-w-[170px] lg:max-w-[220px] gap-1.5 px-2.5 text-xs font-normal border-border/60 hover:bg-muted/60 shrink-0"
                             >
                                 <Server size={13} className={cn("shrink-0", isConnected ? "text-status-connected" : "text-muted-foreground")} />
-                                <span className="truncate">{activeServerLabel}</span>
+                                {/* The server's flag, drawn like everywhere else, not its emoji. */}
+                                {!isAuto && activeProfile ? <Flag name={activeProfile.name} size={14} className="shrink-0" /> : null}
+                                <span className="truncate">{isAuto ? activeServerLabel : withoutFlagEmoji(activeServerLabel)}</span>
                                 {activePing !== null && activePing !== undefined ? (
                                     <span className="hidden xl:inline text-[10px] font-mono text-muted-foreground/80 shrink-0">
                                         {activePing}ms
