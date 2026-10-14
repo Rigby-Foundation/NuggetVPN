@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
+import { setUnits as setFormatUnits } from "@/lib/format";
 import {
     activeCustomTheme,
     AppearancePrefs,
@@ -91,6 +92,12 @@ function Appearance({ children }: { children: ReactNode }) {
     // The font follows the language as well as the choice: switching to a
     // language the chosen font does not cover changes the font in use.
     const script = scriptOf(useI18n().language);
+
+    // Numbers are formatted while rendering, so the units have to reach the
+    // formatter before anything below is drawn. In the effect below they
+    // arrived a render late: picking Bits showed the example in bytes, and
+    // the reverse.
+    setFormatUnits(prefs.units);
 
     useLayoutEffect(() => {
         applyAppearance(prefs, script);
