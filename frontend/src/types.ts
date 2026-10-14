@@ -35,6 +35,12 @@ export interface SubscriptionInfo {
     icon_url?: string;
     banner_image?: string;
     banner_color?: string;
+    /** The provider's suggestions, applied only once the user accepts them:
+     * how often to refresh (hours), and Android apps to keep out of the
+     * tunnel ("bypass") or in it alone ("proxy"). */
+    update_hours?: number;
+    apps_mode?: "bypass" | "proxy";
+    apps?: string[];
     updated_at: number;
 }
 
@@ -129,6 +135,8 @@ export interface AppSettings {
     app_stats: boolean | null;
     /** Null means never chosen; the backend treats that as on. */
     subscription_auto_update: boolean | null;
+    /** What the user said to each subscription's suggestions, by domain. */
+    subscription_choices?: Record<string, SubscriptionChoice> | null;
     close_action: CloseAction;
 }
 
@@ -472,4 +480,11 @@ export interface WifiState {
     ssid: string;
     hidden: boolean;
     unsupported: boolean;
+}
+
+/** See models.SubscriptionChoice. */
+export interface SubscriptionChoice {
+    answered?: string;
+    refresh_hours?: number;
+    apps_rule?: string;
 }

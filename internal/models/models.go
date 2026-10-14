@@ -51,6 +51,14 @@ type SubscriptionInfo struct {
 	IconURL     string `json:"icon_url,omitempty"`
 	BannerImage string `json:"banner_image,omitempty"`
 	BannerColor string `json:"banner_color,omitempty"`
+	// Suggestions the provider makes, which apply only once the user
+	// accepts them (see SubscriptionChoice): how often to refresh, in hours
+	// (profile-update-interval), and apps (Android packages) to keep out of
+	// the tunnel — AppsMode "bypass" — or to keep in it alone — "proxy"
+	// (per-app-proxy-mode, per-app-proxy-list-set).
+	UpdateHours int      `json:"update_hours,omitempty"`
+	AppsMode    string   `json:"apps_mode,omitempty"`
+	Apps        []string `json:"apps,omitempty"`
 	// UpdatedAt is when this was read, in unix seconds.
 	UpdatedAt int64 `json:"updated_at"`
 }
@@ -187,6 +195,10 @@ type AppSettings struct {
 	// GlobalShortcut connects and disconnects from anywhere, written as
 	// "Ctrl+Alt+V". Empty means none.
 	GlobalShortcut string `json:"global_shortcut"`
+	// SubscriptionChoices are, per subscription (by source domain), what the
+	// user said to its provider's suggestions. Nothing a provider suggests
+	// is applied without it.
+	SubscriptionChoices map[string]SubscriptionChoice `json:"subscription_choices,omitempty"`
 	// SubscriptionAutoUpdate refreshes subscriptions at start and on a timer.
 	// Off means never automatically, for every subscription — a refresh by
 	// hand still works. A pointer so older settings default to on.
@@ -387,4 +399,18 @@ func (s AppSettings) ServerFallbackOn() bool {
 // IPCheckOn reports whether the public-address lookup may run.
 func (s AppSettings) IPCheckOn() bool {
 	return s.IPCheckEnabled == nil || *s.IPCheckEnabled
+}
+
+// SubscriptionChoice is what the user decided about one subscription's
+// suggestions (see SubscriptionInfo.UpdateHours and Apps).
+type SubscriptionChoice struct {
+	// Answered identifies the suggestions the user was asked about, so they
+	// are asked again only when the provider suggests something new.
+	Answered string `json:"answered,omitempty"`
+	// RefreshHours is how often the subscription refreshes, when the user
+	// took the provider's interval; 0 for the app's own.
+	RefreshHours int `json:"refresh_hours,omitempty"`
+	// AppsRule is the routing rule made from the provider's app list, when
+	// the user took it, so a later list updates that rule.
+	AppsRule string `json:"apps_rule,omitempty"`
 }

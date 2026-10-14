@@ -124,6 +124,16 @@ func ParseSubscriptionInfoWithBody(headers http.Header, body string, now time.Ti
 	if value := pick(branding.BannerColor, "Banner-Color"); cssColor(value) {
 		info.BannerColor, found = value, true
 	}
+	// Suggestions, applied only if the user accepts them.
+	if hours, err := strconv.Atoi(strings.TrimSpace(headers.Get("Profile-Update-Interval"))); err == nil && hours >= 1 && hours <= 24*7 {
+		info.UpdateHours, found = hours, true
+	}
+	if apps := packageList(headers.Get("Per-App-Proxy-List-Set")); len(apps) > 0 {
+		switch mode := strings.ToLower(strings.TrimSpace(headers.Get("Per-App-Proxy-Mode"))); mode {
+		case "bypass", "proxy":
+			info.AppsMode, info.Apps, found = mode, apps, true
+		}
+	}
 	if !found {
 		return nil
 	}
@@ -162,6 +172,7 @@ func bodyDirectives(body string) map[string]string {
 		"support-url": true, "profile-web-page-url": true, "subscription-userinfo": true,
 		"community-url": true, "icon-url": true, "banner-image": true, "banner-color": true,
 		"banner-url": true, "beam-branding": true,
+		"profile-update-interval": true, "per-app-proxy-mode": true, "per-app-proxy-list-set": true,
 	}
 	result := map[string]string{}
 	for _, line := range strings.Split(decodeSubscriptionBody(body), "\n") {
@@ -195,6 +206,28 @@ func safeLink(value string) bool {
 		return parsed.Opaque != ""
 	}
 	return false
+}
+
+// packagePattern is an Android package name: dot-separated identifiers.
+var packagePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$`)
+
+// packageList reads a comma-separated list of Android packages, keeping the
+// well-formed ones, each once, at most 500.
+func packageList(raw string) []string {
+	var result []string
+	seen := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		name := strings.TrimSpace(part)
+		if !packagePattern.MatchString(name) || seen[name] {
+			continue
+		}
+		seen[name] = true
+		result = append(result, name)
+		if len(result) == 500 {
+			break
+		}
+	}
+	return result
 }
 
 // branding is the Beam-Branding header: the branding fields as base64 JSON.

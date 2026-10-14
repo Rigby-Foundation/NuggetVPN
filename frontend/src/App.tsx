@@ -8,6 +8,7 @@ import AddModal from "@/components/AddModal";
 import { useAppearance } from "@/components/appearance-provider";
 import Onboarding from "@/components/Onboarding";
 import Welcome from "@/components/Welcome";
+import { DEFAULT_REFRESH_HOURS, SubscriptionSuggestions } from "@/components/subscription-suggestions";
 import { UnsupportedProvider } from "@/lib/core-support";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BottomDockNav } from "@/components/layout/BottomDockNav";
@@ -121,7 +122,8 @@ const PENDING_SETTINGS: AppSettings = {
 };
 
 /** How often subscriptions refresh while the app runs, when that is on. */
-const SUBSCRIPTION_REFRESH_MS = 6 * 60 * 60 * 1000;
+/** How often subscriptions are checked for being due a refresh. */
+const SUBSCRIPTION_CHECK_MS = 5 * 60 * 1000;
 
 const IP_RECHECK_MS = 5 * 60 * 1000;
 
@@ -480,23 +482,44 @@ function App() {
     }, [appendLog, loadProfiles, refreshAll, saveSettings]);
 
     // ---- periodic subscription refresh ---------------------------------------
+    // Each subscription refreshes on its own schedule: every few hours, or as
+    // often as its provider asked if the user agreed (see
+    // SubscriptionSuggestions). A subscription is due once that long has
+    // passed since it was last read, or since the last try at it.
+    const refreshSchedule = useRef({ sources, choices: settings.subscription_choices, tried: new Map<string, number>() });
+    refreshSchedule.current.sources = sources;
+    refreshSchedule.current.choices = settings.subscription_choices;
     useEffect(() => {
         if (settings.subscription_auto_update === false) {
             return;
         }
-        const timer = setInterval(() => {
-            void refreshAll()
-                .then((summary) => {
-                    if (summary.refreshed || summary.failed) {
-                        appendLog([
-                            `Subscriptions refreshed: ${summary.refreshed} updated, ${summary.failed} failed.`,
-                        ]);
+        let running = false;
+        const tick = async () => {
+            if (running) return;
+            running = true;
+            try {
+                const { sources: list, choices, tried } = refreshSchedule.current;
+                const now = Date.now();
+                for (const source of list) {
+                    if (source.kind !== "subscription") continue;
+                    const hours = choices?.[source.domain]?.refresh_hours || DEFAULT_REFRESH_HOURS;
+                    const last = Math.max((source.info?.updated_at ?? 0) * 1000, tried.get(source.domain) ?? 0);
+                    if (now - last < hours * 3600_000) continue;
+                    tried.set(source.domain, now);
+                    try {
+                        const summary = await refreshDomain(source.domain);
+                        appendLog([`${source.domain}: refreshed on schedule (${summary.refreshed} updated).`]);
+                    } catch (error) {
+                        appendLog([`Scheduled refresh failed for ${source.domain}: ${errorMessage(error)}`]);
                     }
-                })
-                .catch((error) => appendLog([`Subscription refresh failed: ${errorMessage(error)}`]));
-        }, SUBSCRIPTION_REFRESH_MS);
+                }
+            } finally {
+                running = false;
+            }
+        };
+        const timer = setInterval(() => void tick(), SUBSCRIPTION_CHECK_MS);
         return () => clearInterval(timer);
-    }, [settings.subscription_auto_update, refreshAll, appendLog]);
+    }, [settings.subscription_auto_update, refreshDomain, appendLog]);
 
     // ---- remembering the selection -----------------------------------------
     useEffect(() => {
@@ -1093,6 +1116,12 @@ function App() {
                 onSaveProfile={handleAddProfile}
                 onImportSubscription={handleImportSubscription}
             />
+
+            {/* A subscription's suggested settings, asked once settings are
+                loaded (so an earlier answer counts) and setup is done. */}
+            {settings !== PENDING_SETTINGS && !showOnboarding ? (
+                <SubscriptionSuggestions sources={sources} settings={settings} onSave={saveSettings} />
+            ) : null}
 
             {showOnboarding === "welcome" ? (
                 <Welcome

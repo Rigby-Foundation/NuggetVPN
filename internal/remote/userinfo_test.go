@@ -3,6 +3,7 @@ package remote
 import (
 	"encoding/base64"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestParseSubscriptionInfo(t *testing.T) {
 		Upload: 1024, Download: 2048, Total: 10737418240, Expire: 1767225600,
 		Title: "Мой VPN", SupportURL: "https://t.me/provider", UpdatedAt: 100,
 	}
-	if *info != want {
+	if !reflect.DeepEqual(*info, want) {
 		t.Errorf("got %+v\nwant %+v", *info, want)
 	}
 	if ParseSubscriptionInfo(http.Header{}, time.Now()) != nil {
