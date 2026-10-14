@@ -1,6 +1,6 @@
-import { KeyboardEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardEvent, MouseEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Activity, Check, CheckSquare, Download, Link2, Pencil, RefreshCw, Search, Star, StarOff, Trash2, X, Zap } from "lucide-react";
+import { Activity, Check, CheckSquare, ChevronRight, Download, Link2, Pencil, RefreshCw, Search, Star, StarOff, Trash2, X, Zap } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
 import PageShell from "@/components/layout/PageShell";
@@ -74,6 +74,80 @@ function Tick({ checked }: { checked: boolean }) {
         >
             {checked ? <Check size={12} strokeWidth={3} /> : null}
         </span>
+    );
+}
+
+const COLLAPSED_KEY = "nugget.servers.collapsed";
+
+/** The groups the user folded, per subscription; kept on this device. */
+function loadCollapsed(domain: string): string[] {
+    try {
+        const all = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "{}") as Record<string, string[]>;
+        return Array.isArray(all[domain]) ? all[domain] : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveCollapsed(domain: string, groups: string[]) {
+    try {
+        const all = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "{}") as Record<string, string[]>;
+        all[domain] = groups;
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(all));
+    } catch {
+        // Folded for this run only.
+    }
+}
+
+/**
+ * One of the subscription's sections ("WiFi", "Белый интернет"): a heading
+ * that folds and unfolds its servers. The provider marks these with
+ * separator entries; they are headings here, never servers.
+ */
+function ServerGroup({
+    name,
+    count,
+    open,
+    onToggle,
+    grid,
+    children,
+}: {
+    name: string;
+    count: number;
+    open: boolean;
+    onToggle: () => void;
+    grid: boolean;
+    children: ReactNode;
+}) {
+    const t = useT();
+    return (
+        <section className={cn(grid && "col-span-full")}>
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                className="group/heading flex w-full items-center gap-2 rounded-lg px-1.5 py-2 text-start text-sm font-semibold transition-colors hover:bg-muted/40"
+            >
+                <ChevronRight
+                    size={15}
+                    aria-hidden="true"
+                    className={cn("shrink-0 text-muted-foreground transition-transform duration-200 rtl:-scale-x-100", open && "rotate-90 rtl:rotate-90")}
+                />
+                <span className="truncate">{name}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal tabular-nums text-muted-foreground">
+                    {t("connections.servers", { count })}
+                </span>
+                <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
+            </button>
+            {/* Grid rows animate the height without measuring it. */}
+            <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                <div className="min-h-0 overflow-hidden">
+                    <div className={cn("pt-1 pb-2", grid ? "grid gap-2 grid-cols-1 sm:grid-cols-2" : "space-y-2")} inert={!open}>
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }
 
@@ -156,6 +230,137 @@ function ProxiesView({
             return order.get(a.id)! - order.get(b.id)!;
         });
     }, [domainProfiles, query, starredOnly, sort, profilePings]);
+
+    // The subscription's own sections, in its order, each holding its servers
+    // as the list sorts them. A list with no sections is one nameless one.
+    const sections = useMemo(() => {
+        if (!shown.some((profile) => profile.group)) return [{ name: null as string | null, profiles: shown }];
+        const order = new Map<string, number>();
+        domainProfiles.forEach((profile) => {
+            const group = profile.group ?? "";
+            if (!order.has(group)) order.set(group, order.size);
+        });
+        const byGroup = new Map<string, Profile[]>();
+        for (const profile of shown) {
+            const group = profile.group ?? "";
+            byGroup.set(group, [...(byGroup.get(group) ?? []), profile]);
+        }
+        return [...byGroup.entries()]
+            .sort(([a], [b]) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
+            // Servers listed before the first separator have no heading.
+            .map(([group, profiles]) => ({ name: group || null, profiles }));
+    }, [shown, domainProfiles]);
+    const [collapsed, setCollapsed] = useState<string[]>(() => loadCollapsed(domain));
+    useEffect(() => setCollapsed(loadCollapsed(domain)), [domain]);
+    const toggleGroup = (name: string) =>
+        setCollapsed((current) => {
+            const next = current.includes(name) ? current.filter((item) => item !== name) : [...current, name];
+            saveCollapsed(domain, next);
+            return next;
+        });
+
+    // One server's card; the list draws it in its group, or on its own.
+    const renderCard = (profile: Profile) => {
+        const ping = profilePings[profile.id];
+        const selected =
+            selectedProxyMode === "manual" && selectedProfileId === profile.id;
+        const isPicked = picked.has(profile.id);
+        const blocked = unsupported[profile.id];
+        return (
+            <SelectableCard
+                key={profile.id}
+                selected={selecting ? isPicked : selected}
+                onSelect={(event) => handleCard(profile, event)}
+                label={`${profile.name}, ${profile.protocol}, ${blocked ?? pingLabel(t, ping)}`}
+                className={cn("group select-none", blocked && !selecting && "opacity-55 hover:border-border")}
+            >
+                <div className="p-3.5 flex items-center gap-3">
+                    {selecting ? <Tick checked={isPicked} /> : null}
+                    <Flag name={profile.name} size={34} />
+                    <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
+                        {/* Top row: Name & badge on left, Ping on right */}
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                            <div className="font-medium flex items-center gap-2 min-w-0">
+                                <span className="truncate">{withoutFlagEmoji(profile.name)}</span>
+                                {blocked ? (
+                                    <Badge variant="outline" title={blocked} className="shrink-0 text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
+                                        {t("core.needsOther")}
+                                    </Badge>
+                                ) : null}
+                                {selected && !selecting ? (
+                                    <Badge variant="secondary" className="gap-1 shrink-0 text-[10px] h-5 px-1.5 font-normal">
+                                        <Check size={11} aria-hidden="true" /> {t("proxies.selected")}
+                                    </Badge>
+                                ) : null}
+                            </div>
+                            <span className={cn("text-xs font-mono tnum shrink-0", pingTone(ping))}>
+                                {pingLabel(t, ping)}
+                            </span>
+                        </div>
+
+                        {/* Bottom row: Server & Protocol on left, Action buttons on right */}
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                            <span
+                                className="text-xs text-muted-foreground font-mono truncate"
+                                title={`${profile.server} (${profile.protocol})`}
+                            >
+                                {profile.server} · {profile.protocol}
+                            </span>
+
+                            {!selecting ? (
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setEditingProfile(profile);
+                                        }}
+                                        aria-label="Edit proxy"
+                                        title="Edit proxy"
+                                        className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                        <Pencil size={13} aria-hidden="true" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setExportTitle(profile.name);
+                                            setExportingProfiles([profile]);
+                                        }}
+                                        aria-label="Export proxy"
+                                        title="Export proxy"
+                                        className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                        <Download size={13} aria-hidden="true" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            void onSetFavorite([profile.id], !profile.favorite);
+                                        }}
+                                        aria-pressed={!!profile.favorite}
+                                        aria-label={t(profile.favorite ? "proxies.unstar" : "proxies.star", { name: profile.name })}
+                                        className={cn(
+                                            "rounded p-1 transition-colors hover:bg-muted",
+                                            profile.favorite
+                                                ? "text-status-connecting"
+                                                : "text-muted-foreground/70 hover:text-foreground"
+                                        )}
+                                    >
+                                        <Star size={13} className={profile.favorite ? "fill-current" : ""} aria-hidden="true" />
+                                    </button>
+                                </div>
+                            ) : profile.favorite ? (
+                                <Star size={13} className="shrink-0 fill-current text-status-connecting" aria-hidden="true" />
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            </SelectableCard>
+        );
+    };
 
     // Leaving the list or its servers disappearing clears the selection.
     useEffect(() => {
@@ -383,107 +588,23 @@ function ProxiesView({
                         <p className="text-xs text-muted-foreground py-8 text-center">{t("proxies.noMatch")}</p>
                     ) : (
                         <div className={cn("enter-stagger", cardLayout === "grid" ? "grid gap-2 grid-cols-1 sm:grid-cols-2" : "space-y-2")}>
-                            {shown.map((profile) => {
-                                const ping = profilePings[profile.id];
-                                const selected =
-                                    selectedProxyMode === "manual" && selectedProfileId === profile.id;
-                                const isPicked = picked.has(profile.id);
-                                const blocked = unsupported[profile.id];
-                                return (
-                                    <SelectableCard
-                                        key={profile.id}
-                                        selected={selecting ? isPicked : selected}
-                                        onSelect={(event) => handleCard(profile, event)}
-                                        label={`${profile.name}, ${profile.protocol}, ${blocked ?? pingLabel(t, ping)}`}
-                                        className={cn("group select-none", blocked && !selecting && "opacity-55 hover:border-border")}
+                            {sections.map((section) =>
+                                section.name === null ? (
+                                    section.profiles.map(renderCard)
+                                ) : (
+                                    <ServerGroup
+                                        key={section.name}
+                                        name={section.name}
+                                        count={section.profiles.length}
+                                        // A search shows what it found, wherever it is.
+                                        open={!!query.trim() || !collapsed.includes(section.name)}
+                                        onToggle={() => toggleGroup(section.name!)}
+                                        grid={cardLayout === "grid"}
                                     >
-                                        <div className="p-3.5 flex items-center gap-3">
-                                            {selecting ? <Tick checked={isPicked} /> : null}
-                                            <Flag name={profile.name} size={34} />
-                                            <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
-                                                {/* Top row: Name & badge on left, Ping on right */}
-                                                <div className="flex items-center justify-between gap-2 min-w-0">
-                                                    <div className="font-medium flex items-center gap-2 min-w-0">
-                                                        <span className="truncate">{withoutFlagEmoji(profile.name)}</span>
-                                                        {blocked ? (
-                                                            <Badge variant="outline" title={blocked} className="shrink-0 text-[10px] h-5 px-1.5 font-normal text-muted-foreground">
-                                                                {t("core.needsOther")}
-                                                            </Badge>
-                                                        ) : null}
-                                                        {selected && !selecting ? (
-                                                            <Badge variant="secondary" className="gap-1 shrink-0 text-[10px] h-5 px-1.5 font-normal">
-                                                                <Check size={11} aria-hidden="true" /> {t("proxies.selected")}
-                                                            </Badge>
-                                                        ) : null}
-                                                    </div>
-                                                    <span className={cn("text-xs font-mono tnum shrink-0", pingTone(ping))}>
-                                                        {pingLabel(t, ping)}
-                                                    </span>
-                                                </div>
-
-                                                {/* Bottom row: Server & Protocol on left, Action buttons on right */}
-                                                <div className="flex items-center justify-between gap-2 min-w-0">
-                                                    <span
-                                                        className="text-xs text-muted-foreground font-mono truncate"
-                                                        title={`${profile.server} (${profile.protocol})`}
-                                                    >
-                                                        {profile.server} · {profile.protocol}
-                                                    </span>
-
-                                                    {!selecting ? (
-                                                        <div className="flex items-center gap-1 shrink-0">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setEditingProfile(profile);
-                                                                }}
-                                                                aria-label="Edit proxy"
-                                                                title="Edit proxy"
-                                                                className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
-                                                            >
-                                                                <Pencil size={13} aria-hidden="true" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    setExportTitle(profile.name);
-                                                                    setExportingProfiles([profile]);
-                                                                }}
-                                                                aria-label="Export proxy"
-                                                                title="Export proxy"
-                                                                className="rounded p-1 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
-                                                            >
-                                                                <Download size={13} aria-hidden="true" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    void onSetFavorite([profile.id], !profile.favorite);
-                                                                }}
-                                                                aria-pressed={!!profile.favorite}
-                                                                aria-label={t(profile.favorite ? "proxies.unstar" : "proxies.star", { name: profile.name })}
-                                                                className={cn(
-                                                                    "rounded p-1 transition-colors hover:bg-muted",
-                                                                    profile.favorite
-                                                                        ? "text-status-connecting"
-                                                                        : "text-muted-foreground/70 hover:text-foreground"
-                                                                )}
-                                                            >
-                                                                <Star size={13} className={profile.favorite ? "fill-current" : ""} aria-hidden="true" />
-                                                            </button>
-                                                        </div>
-                                                    ) : profile.favorite ? (
-                                                        <Star size={13} className="shrink-0 fill-current text-status-connecting" aria-hidden="true" />
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </SelectableCard>
-                                );
-                            })}
+                                        {section.profiles.map(renderCard)}
+                                    </ServerGroup>
+                                )
+                            )}
                         </div>
                     )}
                 </div>

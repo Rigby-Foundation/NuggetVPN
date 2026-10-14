@@ -99,7 +99,7 @@ func (c *Client) ImportSubscription(
 			status, explainStatus(status, settings, preview(body, 180)))
 	}
 
-	imported := buildProfiles(SubscriptionLinks(body), sourceDomain, rawURL)
+	imported := buildProfiles(subscriptionEntries(body), sourceDomain, rawURL)
 	if len(imported) == 0 {
 		return nil, emptySubscription(sourceDomain, body, headers, time.Now())
 	}
@@ -177,7 +177,7 @@ func (c *Client) RefreshSubscriptions(
 			continue
 		}
 
-		fresh := buildProfiles(SubscriptionLinks(body), sourceDomain, subURL)
+		fresh := buildProfiles(subscriptionEntries(body), sourceDomain, subURL)
 		if len(fresh) == 0 {
 			if strict {
 				return profiles, summary, emptySubscription(sourceDomain, body, headers, time.Now())
@@ -208,9 +208,29 @@ func (c *Client) RefreshSubscriptions(
 
 // SubscriptionLinks decodes a subscription body and returns the usable links.
 func SubscriptionLinks(raw string) []string {
+	entries := subscriptionEntries(raw)
+	links := make([]string, len(entries))
+	for index, entry := range entries {
+		links[index] = entry.link
+	}
+	return links
+}
+
+// subscriptionEntry is a usable link and the section it is listed under.
+type subscriptionEntry struct {
+	link, group string
+}
+
+// subscriptionEntries decodes a subscription body into its usable links,
+// each with the section a separator before it opened. A separator is a
+// placeholder entry (see isPlaceholder) that marks itself as one: Remnawave
+// describes it so, or its name is drawn as a divider ("⬇️ — WiFi — ⬇️").
+// Other placeholders are messages and only skipped.
+func subscriptionEntries(raw string) []subscriptionEntry {
 	decoded := decodeSubscriptionBody(raw)
 
-	var links []string
+	var entries []subscriptionEntry
+	group := ""
 	for _, line := range strings.Split(decoded, "\n") {
 		candidate := strings.TrimSpace(line)
 		if candidate == "" || strings.HasPrefix(candidate, "#") {
@@ -221,11 +241,14 @@ func SubscriptionLinks(raw string) []string {
 			continue
 		}
 		if isPlaceholder(candidate) {
+			if name, ok := separatorName(candidate); ok {
+				group = name
+			}
 			continue
 		}
-		links = append(links, strings.ReplaceAll(candidate, "&amp;", "&"))
+		entries = append(entries, subscriptionEntry{link: strings.ReplaceAll(candidate, "&amp;", "&"), group: group})
 	}
-	return links
+	return entries
 }
 
 // decodeSubscriptionBody unwraps the base64 envelope most providers use,
@@ -288,9 +311,10 @@ func KeepIdentities(previous, fresh []models.Profile) []models.Profile {
 	return kept
 }
 
-func buildProfiles(links []string, sourceDomain, subURL string) []models.Profile {
-	profiles := make([]models.Profile, 0, len(links))
-	for _, rawLink := range links {
+func buildProfiles(entries []subscriptionEntry, sourceDomain, subURL string) []models.Profile {
+	profiles := make([]models.Profile, 0, len(entries))
+	for _, entry := range entries {
+		rawLink := entry.link
 		protocol := link.DetectProtocol(rawLink)
 		if protocol == "unknown" {
 			continue
@@ -306,6 +330,7 @@ func buildProfiles(links []string, sourceDomain, subURL string) []models.Profile
 			SubscriptionURL: subURL,
 			TotalUp:         &zero,
 			TotalDown:       &zero,
+			Group:           entry.group,
 		})
 	}
 	return profiles

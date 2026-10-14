@@ -19,6 +19,9 @@ type Profile struct {
 	TotalDown       *uint64 `json:"total_down"`
 	// Favorite pins the server to the top of its list.
 	Favorite bool `json:"favorite,omitempty"`
+	// Group is the section the subscription put the server under, from the
+	// separator entry before it ("WiFi", "Белый интернет"); "" for none.
+	Group string `json:"group,omitempty"`
 	// SubscriptionInfo is what the subscription said about itself when it
 	// was last fetched; the same for every profile of one subscription.
 	SubscriptionInfo *SubscriptionInfo `json:"subscription_info,omitempty"`

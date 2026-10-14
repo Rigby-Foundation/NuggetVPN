@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { ChevronDown, Plus, Server, Zap, Check } from "lucide-react";
 
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
@@ -159,26 +160,32 @@ export function WindowDragHeader({
                                         {isAuto ? <Check size={14} className="text-primary" /> : null}
                                     </DropdownMenuItem>
                                     {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
-                                    {quickPickProfiles.map((p) => {
+                                    {quickPickProfiles.map((p, index) => {
                                         const ping = profilePings[p.id];
                                         const isChosen = !isAuto && selectedProfileId === p.id;
+                                        // The subscription's section starts here: its name, once.
+                                        const heading = p.group && p.group !== quickPickProfiles[index - 1]?.group ? p.group : null;
                                         return (
-                                            <DropdownMenuItem
-                                                key={p.id}
-                                                disabled={Boolean(unsupported[p.id])}
-                                                title={unsupported[p.id]}
-                                                onClick={() => onSelectProxy?.(p.id)}
-                                                className="flex items-center justify-between text-xs gap-2"
-                                            >
-                                                <Flag name={p.name} size={18} />
-                                                <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
-                                                {ping ? (
-                                                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                                                        {ping}ms
-                                                    </span>
+                                            <Fragment key={p.id}>
+                                                {heading ? (
+                                                    <DropdownMenuLabel className="pt-2 text-[11px] font-semibold text-muted-foreground">{heading}</DropdownMenuLabel>
                                                 ) : null}
-                                                {isChosen ? <Check size={14} className="text-primary shrink-0" /> : null}
-                                            </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    disabled={Boolean(unsupported[p.id])}
+                                                    title={unsupported[p.id]}
+                                                    onClick={() => onSelectProxy?.(p.id)}
+                                                    className="flex items-center justify-between text-xs gap-2"
+                                                >
+                                                    <Flag name={p.name} size={18} />
+                                                    <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
+                                                    {ping ? (
+                                                        <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                                                            {ping}ms
+                                                        </span>
+                                                    ) : null}
+                                                    {isChosen ? <Check size={14} className="text-primary shrink-0" /> : null}
+                                                </DropdownMenuItem>
+                                            </Fragment>
                                         );
                                     })}
                                     <DropdownMenuSeparator />

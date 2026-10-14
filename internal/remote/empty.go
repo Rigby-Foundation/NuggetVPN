@@ -71,3 +71,49 @@ func isPlaceholder(link string) bool {
 		strings.Contains(link, "@0.0.0.0:") ||
 		strings.Contains(link, "00000000-0000-0000-0000-000000000000")
 }
+
+// separatorWords are what panels describe a separator entry as, in the
+// base64 serverDescription Remnawave appends to its name.
+var separatorWords = []string{"разделитель", "separator", "divider", "розділювач"}
+
+// dividerMarks draw a name as a divider rather than a message.
+const dividerMarks = "⬇⬆↓↑▼▲▽△—–─━═=-|·•*~_ \t\uFE0F"
+
+// separatorName reads a placeholder entry as a section heading: its name,
+// without the divider drawn around it ("⬇️ — WiFi — ⬇️" is "WiFi"). It is
+// a separator when Remnawave says so in its serverDescription, or when its
+// name is drawn as a divider; anything else is a message, not a heading.
+func separatorName(line string) (string, bool) {
+	_, fragment, found := strings.Cut(line, "#")
+	if !found {
+		return "", false
+	}
+	name := fragment
+	if unescaped, err := url.PathUnescape(fragment); err == nil {
+		name = unescaped
+	}
+	marked := false
+	if before, description, ok := strings.Cut(name, "?serverDescription="); ok {
+		name = before
+		if text := decodeText("base64:"+description, 200); text != "" {
+			lower := strings.ToLower(text)
+			for _, word := range separatorWords {
+				if strings.Contains(lower, word) {
+					marked = true
+				}
+			}
+		}
+	}
+	trimmed := strings.Trim(name, dividerMarks)
+	if trimmed == "" {
+		return "", false
+	}
+	if !marked && trimmed == strings.TrimSpace(name) {
+		// No divider drawn around it, and nothing says it is one.
+		return "", false
+	}
+	if len([]rune(trimmed)) > 60 {
+		trimmed = string([]rune(trimmed)[:60])
+	}
+	return trimmed, true
+}

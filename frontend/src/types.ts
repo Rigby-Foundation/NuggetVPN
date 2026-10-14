@@ -10,6 +10,8 @@ export interface Profile {
     total_down?: number;
     /** Pinned to the top of its list. */
     favorite?: boolean;
+    /** The section the subscription lists it under; see models.Profile.Group. */
+    group?: string;
     subscription_info?: SubscriptionInfo | null;
 }
 
