@@ -25,7 +25,7 @@ import { AppSettings } from "@/types";
  */
 const USER_AGENTS = [
     { value: "NuggetVPN/1.0", label: "NuggetVPN" },
-    { value: "Happ/3.13.0", label: "Happ" },
+    { value: "Happ/4.9.0", label: "Happ" },
     { value: "v2rayNG/1.9.16", label: "v2rayNG" },
     { value: "Streisand", label: "Streisand" },
     { value: "Hiddify/2.0.5", label: "Hiddify" },
@@ -121,7 +121,7 @@ function SubscriptionIdentity({
                                         event.target.value
                                     )
                                 }
-                                placeholder="Happ/3.13.0"
+                                placeholder="Happ/4.9.0"
                                 aria-label={t("identity.customLabel")}
                                 className="font-mono text-xs"
                             />

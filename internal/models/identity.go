@@ -25,7 +25,7 @@ const DefaultUserAgent = "NuggetVPN/1.0"
 
 // HappUserAgent presents as Happ, whose format is `Happ/<version>`. Providers
 // that allow-list clients almost always allow this one.
-const HappUserAgent = "Happ/3.13.0"
+const HappUserAgent = "Happ/4.9.0"
 
 // hwidPattern is the format Remnawave validates against from panel v3.0.0:
 // 10 to 64 characters, Latin letters, digits, "=" and "-".
@@ -71,6 +71,12 @@ func defaultDeviceOS() string {
 
 // normalizeIdentity fills in the subscription identity on first load.
 func (s *AppSettings) normalizeIdentity() {
+	// The Happ this app used to present as is one panels now turn away
+	// ("Happ is out of date, update to 4.1.0"), serving error entries instead
+	// of servers; anyone who picked it moves to the current one.
+	if strings.TrimSpace(s.SubscriptionUserAgent) == "Happ/3.13.0" {
+		s.SubscriptionUserAgent = HappUserAgent
+	}
 	if strings.TrimSpace(s.SubscriptionUserAgent) == "" {
 		s.SubscriptionUserAgent = DefaultUserAgent
 	}

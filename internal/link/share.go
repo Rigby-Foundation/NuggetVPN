@@ -190,6 +190,13 @@ func xrayOutbound(source map[string]any) map[string]any {
 		outbound["server_port"] = intValue(settings["port"])
 		if password := stringValue(settings["password"]); password != "" {
 			outbound["password"] = password
+		} else if stream, _ := source["streamSettings"].(map[string]any); stream != nil {
+			// Xray's own hysteria outbound keeps it with the transport.
+			if hysteria, _ := stream["hysteriaSettings"].(map[string]any); hysteria != nil {
+				if auth := stringValue(hysteria["auth"]); auth != "" {
+					outbound["password"] = auth
+				}
+			}
 		}
 	case "socks", "http":
 		server := first("servers")

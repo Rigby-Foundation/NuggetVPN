@@ -228,6 +228,10 @@ type subscriptionEntry struct {
 // Other placeholders are messages and only skipped.
 func subscriptionEntries(raw string) []subscriptionEntry {
 	decoded := decodeSubscriptionBody(raw)
+	// Whole Xray configs, as panels send Happ 4: read as their links.
+	if links, ok := link.XrayConfigsAsLinks(decoded); ok {
+		decoded = links
+	}
 
 	var entries []subscriptionEntry
 	group := ""
