@@ -130,6 +130,7 @@ const ja: Messages = {
     "usage.expired": "{date} に期限切れ",
     "usage.expires": { one: "{date} まで · 残り {count} 日", other: "{date} まで · 残り {count} 日" },
     "usage.support": "サポート",
+    "usage.community": "チャンネル",
     "usage.account": "アカウント",
     "announce.expand": "すべて表示",
     "announce.collapse": "1 行に折りたたむ",

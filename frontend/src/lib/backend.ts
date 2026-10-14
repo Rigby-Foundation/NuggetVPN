@@ -99,6 +99,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     install_update: { method: "InstallUpdate", args: [] },
     read_clipboard_link: { method: "ReadClipboardLink", args: [] },
     get_file_icons: { method: "GetFileIcons", args: ["paths"] },
+    get_branding_images: { method: "GetBrandingImages", args: ["urls"] },
 
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
     disconnect: { method: "Disconnect", args: [] },

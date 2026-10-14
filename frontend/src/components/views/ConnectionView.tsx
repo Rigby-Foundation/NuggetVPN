@@ -17,6 +17,7 @@ import {
     TriangleAlert,
 } from "lucide-react";
 
+import { ProviderLogo } from "@/components/provider-branding";
 import { AnnounceBanner } from "@/components/announce-banner";
 import { useAppearance } from "@/components/appearance-provider";
 import { SpeedTest } from "@/components/speed-test";
@@ -154,9 +155,15 @@ function SourceSummary({ source, onOpen }: { source: ConfigSource; onOpen?: () =
             onClick={onOpen}
             className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-foreground/5"
         >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Layers size={17} />
-            </span>
+            <ProviderLogo
+                info={info}
+                className="h-9 w-9 rounded-xl"
+                fallback={
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                        <Layers size={17} />
+                    </span>
+                }
+            />
             <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">{source.label}</span>
                 <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">

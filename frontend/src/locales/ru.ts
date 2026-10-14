@@ -133,6 +133,7 @@ const ru: Messages = {
     "usage.expired": "Истекла {date}",
     "usage.expires": { one: "До {date} · через {count} день", other: "До {date} · через {count} дней", few: "До {date} · через {count} дня", many: "До {date} · через {count} дней" },
     "usage.support": "Поддержка",
+    "usage.community": "Канал",
     "usage.account": "Кабинет",
     "announce.expand": "Показать полностью",
     "announce.collapse": "Свернуть в одну строку",

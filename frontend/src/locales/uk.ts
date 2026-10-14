@@ -133,6 +133,7 @@ const uk: Messages = {
     "usage.expired": "Закінчилася {date}",
     "usage.expires": { one: "До {date} · через {count} день", other: "До {date} · через {count} днів", few: "До {date} · через {count} дні", many: "До {date} · через {count} днів" },
     "usage.support": "Підтримка",
+    "usage.community": "Канал",
     "usage.account": "Кабінет",
     "announce.expand": "Показати повністю",
     "announce.collapse": "Згорнути в один рядок",

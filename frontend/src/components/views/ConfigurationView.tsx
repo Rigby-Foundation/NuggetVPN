@@ -5,6 +5,7 @@ import { useAppearance } from "@/components/appearance-provider";
 import PageShell from "@/components/layout/PageShell";
 import { ShareDialog } from "@/components/qr";
 import { SubscriptionUsage } from "@/components/subscription-usage";
+import { ProviderBanner, ProviderLogo } from "@/components/provider-branding";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -243,11 +244,15 @@ function ConfigurationView({
                             >
                                 {/* Usage wraps onto a row of its own, the card's full width:
                                     beside the buttons it had a phone's width to share. */}
-                                <div className="p-4 flex flex-wrap items-center gap-x-3">
+                                <div className="relative isolate p-4 flex flex-wrap items-center gap-x-3 overflow-hidden rounded-[inherit]">
+                                    {source.kind === "subscription" ? <ProviderBanner info={source.info} /> : null}
                                     {selecting ? <Tick checked={isPicked} /> : null}
                                     <span className="flex-1 min-w-0">
-                                        <span className="block font-medium truncate">
-                                            {source.label}
+                                        <span className="flex items-center gap-2 font-medium">
+                                            {source.kind === "subscription" ? (
+                                                <ProviderLogo info={source.info} className="h-6 w-6 rounded-md" fallback={null} />
+                                            ) : null}
+                                            <span className="truncate">{source.label}</span>
                                         </span>
                                         <span className="block text-xs text-muted-foreground font-mono mt-0.5 truncate">
                                             {source.kind === "subscription" && source.label !== source.domain

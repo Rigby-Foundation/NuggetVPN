@@ -56,9 +56,27 @@ export function AnnounceBanner({ info }: { info?: SubscriptionInfo }) {
 
     const iconButton = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground";
 
+    // The provider's colour (banner-color), where it sends one, in place of
+    // the theme's accent: tinted the same way, so text stays readable.
+    const tint = info?.banner_color ? ({ "--announce": info.banner_color } as React.CSSProperties) : undefined;
+
     return (
-        <div className="flex items-start gap-3 rounded-2xl border border-primary/25 bg-primary/[0.06] p-3 sm:p-4" role="status">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <div
+            className={cn(
+                "flex items-start gap-3 rounded-2xl border p-3 sm:p-4",
+                tint
+                    ? "border-[color-mix(in_oklab,var(--announce)_40%,transparent)] bg-[color-mix(in_oklab,var(--announce)_10%,transparent)]"
+                    : "border-primary/25 bg-primary/[0.06]"
+            )}
+            style={tint}
+            role="status"
+        >
+            <span
+                className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                    tint ? "bg-[color-mix(in_oklab,var(--announce)_20%,transparent)] text-[var(--announce)]" : "bg-primary/15 text-primary"
+                )}
+            >
                 <Info size={18} />
             </span>
             <p

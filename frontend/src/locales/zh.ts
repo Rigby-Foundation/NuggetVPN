@@ -130,6 +130,7 @@ const zh: Messages = {
     "usage.expired": "已于 {date} 到期",
     "usage.expires": { one: "{date} 到期 · 还剩 {count} 天", other: "{date} 到期 · 还剩 {count} 天" },
     "usage.support": "客服",
+    "usage.community": "频道",
     "usage.account": "账户",
     "announce.expand": "展开全部",
     "announce.collapse": "折叠为一行",

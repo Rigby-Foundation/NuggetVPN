@@ -27,6 +27,12 @@ export interface SubscriptionInfo {
     /** The provider's message to its users, and where it links to. */
     announce?: string;
     announce_url?: string;
+    community_url?: string;
+    /** The provider's branding: logo and card background (https URLs, read
+     * through get_branding_images), and the announcement's colour. */
+    icon_url?: string;
+    banner_image?: string;
+    banner_color?: string;
     updated_at: number;
 }
 

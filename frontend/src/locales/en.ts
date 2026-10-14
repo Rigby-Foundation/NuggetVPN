@@ -140,6 +140,7 @@ const en = {
     "usage.expired": "Expired {date}",
     "usage.expires": { one: "Expires {date} · in {count} day", other: "Expires {date} · in {count} days" },
     "usage.support": "Support",
+    "usage.community": "Channel",
     "usage.account": "Account",
     "announce.expand": "Show all",
     "announce.collapse": "Fold to one line",

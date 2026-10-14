@@ -132,6 +132,7 @@ const fa: Messages = {
     "usage.expired": "منقضی‌شده در {date}",
     "usage.expires": { one: "تا {date} · {count} روز مانده", other: "تا {date} · {count} روز مانده" },
     "usage.support": "پشتیبانی",
+    "usage.community": "کانال",
     "usage.account": "حساب",
     "announce.expand": "نمایش کامل",
     "announce.collapse": "جمع کردن در یک خط",

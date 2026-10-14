@@ -1,4 +1,4 @@
-import { ExternalLink, LifeBuoy } from "lucide-react";
+import { ExternalLink, LifeBuoy, Users } from "lucide-react";
 
 import { openExternal } from "@/lib/backend";
 import { formatBytes } from "@/lib/format";
@@ -77,6 +77,16 @@ export function SubscriptionUsage({ info }: { info: SubscriptionInfo }) {
                     >
                         <LifeBuoy size={11} aria-hidden="true" />
                         {t("usage.support")}
+                    </button>
+                ) : null}
+                {info.community_url ? (
+                    <button
+                        type="button"
+                        onClick={() => openExternal(info.community_url!)}
+                        className="flex items-center gap-1 hover:text-foreground"
+                    >
+                        <Users size={11} aria-hidden="true" />
+                        {t("usage.community")}
                     </button>
                 ) : null}
                 {info.web_page_url ? (

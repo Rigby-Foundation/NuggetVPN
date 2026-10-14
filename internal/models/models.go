@@ -41,6 +41,13 @@ type SubscriptionInfo struct {
 	// AnnounceURL is where it points, when it has a link.
 	Announce    string `json:"announce,omitempty"`
 	AnnounceURL string `json:"announce_url,omitempty"`
+	// CommunityURL is the provider's channel or community.
+	CommunityURL string `json:"community_url,omitempty"`
+	// The provider's branding: a logo, an image for the background of the
+	// subscription's card (both https), and a colour for its announcement.
+	IconURL     string `json:"icon_url,omitempty"`
+	BannerImage string `json:"banner_image,omitempty"`
+	BannerColor string `json:"banner_color,omitempty"`
 	// UpdatedAt is when this was read, in unix seconds.
 	UpdatedAt int64 `json:"updated_at"`
 }
