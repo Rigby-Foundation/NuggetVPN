@@ -3,17 +3,33 @@
 package core
 
 import (
+	"encoding/base64"
 	"fmt"
+	"html"
 	"os/exec"
 	"strings"
 )
 
-// serviceLogDir is where the service's output is kept.
+// serviceLogDir is where the service's output and its launchd job are kept.
 const serviceLogDir = "/Library/Application Support/NuggetVPN"
 
+// serviceLabel names the service's launchd job.
+const serviceLabel = "org.rigbyfoundation.nuggetvpn.core"
+
 // elevateAndRun launches the core service as root via the standard macOS
-// authorization prompt. The command is backgrounded so osascript returns as
-// soon as the user authorises it.
+// authorization prompt.
+//
+// The service runs as a launchd job of its own, not as a child of the
+// command the prompt runs. That command runs under
+// com.apple.security.authtrampoline, and a process started from it stays in
+// the trampoline's jetsam coalition: when macOS reclaims the idle trampoline
+// (JETSAM_REASON_MEMORY_IDLE_EXIT, about half an hour in, sooner under memory
+// pressure and on battery) it kills everything in the coalition, the service
+// and the tunnel with it, and the app could only start a new one behind
+// another password prompt. Under launchd the service is nobody's child, and
+// "Interactive" keeps it from being throttled or reclaimed as idle.
+//
+// If launchd will not take the job, the old way still runs it.
 func elevateAndRun(executable string, args []string) error {
 	quoted := make([]string, 0, len(args)+1)
 	quoted = append(quoted, shellQuote(executable))
@@ -26,8 +42,14 @@ func elevateAndRun(executable string, args []string) error {
 	dir := shellQuote(serviceLogDir)
 	current := shellQuote(serviceLogDir + "/service.log")
 	previous := shellQuote(serviceLogDir + "/service.prev.log")
+	plist := serviceLogDir + "/" + serviceLabel + ".plist"
+	job := base64.StdEncoding.EncodeToString(launchdJob(append([]string{executable}, args...), serviceLogDir+"/service.log"))
 	command := "mkdir -p " + dir + "; mv -f " + current + " " + previous + " 2>/dev/null; " +
-		strings.Join(quoted, " ") + " >" + current + " 2>&1 &"
+		// A job from an earlier run, finished or not, is replaced.
+		"launchctl bootout system/" + serviceLabel + " 2>/dev/null; " +
+		"echo " + job + " | base64 -D > " + shellQuote(plist) + " && chmod 644 " + shellQuote(plist) + " && " +
+		"launchctl bootstrap system " + shellQuote(plist) + " || { " +
+		strings.Join(quoted, " ") + " >" + current + " 2>&1 & }"
 
 	script := fmt.Sprintf(
 		"do shell script %s with administrator privileges",
@@ -58,4 +80,37 @@ func appleScriptString(value string) string {
 	escaped := strings.ReplaceAll(value, `\`, `\\`)
 	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
 	return `"` + escaped + `"`
+}
+
+// launchdJob is the service's launchd property list: run once now, never
+// restarted by launchd (the app starts it when it is needed, and it stops
+// itself when the app goes), its output in logPath.
+func launchdJob(arguments []string, logPath string) []byte {
+	var program strings.Builder
+	for _, argument := range arguments {
+		program.WriteString("\t\t<string>" + html.EscapeString(argument) + "</string>\n")
+	}
+	escapedLog := html.EscapeString(logPath)
+	return []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>` + serviceLabel + `</string>
+	<key>ProgramArguments</key>
+	<array>
+` + program.String() + `	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<false/>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>StandardOutPath</key>
+	<string>` + escapedLog + `</string>
+	<key>StandardErrorPath</key>
+	<string>` + escapedLog + `</string>
+</dict>
+</plist>
+`)
 }
