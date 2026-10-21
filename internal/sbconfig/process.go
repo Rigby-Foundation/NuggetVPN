@@ -32,6 +32,8 @@ func expandProcessNames(apps []string) []string {
 		names = append(names, fileName)
 
 		base := strings.TrimSuffix(fileName, ".app")
+		base = strings.TrimSuffix(base, ".xpc")
+		base = strings.TrimSuffix(base, ".appex")
 		base = strings.TrimSuffix(base, ".exe")
 		if base != fileName {
 			names = append(names, base)
@@ -52,7 +54,7 @@ func expandProcessNames(apps []string) []string {
 	return dedupe(names)
 }
 
-// extractProcessPaths resolves selected .app bundles down to the executables
+// extractProcessPaths resolves selected bundles (.app, .xpc, .appex) down to the executables
 // inside them, which is what sing-box's process_path rule matches.
 func extractProcessPaths(apps []string) []string {
 	var paths []string
@@ -72,13 +74,16 @@ func extractProcessPaths(apps []string) []string {
 			continue
 		}
 
-		if !strings.HasSuffix(trimmed, ".app") {
+		// A bundle — an app, or an XPC service or extension built into one —
+		// runs the executable in its Contents/MacOS.
+		suffix := filepath.Ext(trimmed)
+		if suffix != ".app" && suffix != ".xpc" && suffix != ".appex" {
 			push(trimmed)
 			continue
 		}
 
 		push(trimmed)
-		bundleName := strings.TrimSuffix(filepath.Base(trimmed), ".app")
+		bundleName := strings.TrimSuffix(filepath.Base(trimmed), suffix)
 		if bundleName != "" {
 			push(filepath.Join(trimmed, "Contents", "MacOS", bundleName))
 		}

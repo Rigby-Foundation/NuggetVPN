@@ -309,6 +309,7 @@ const zh: Messages = {
     "apps.search": "搜索应用",
     "apps.system": "显示系统应用",
     "apps.running": "运行中",
+    "apps.embedded": { other: "{count} 个内置应用" },
     "apps.none": "没有匹配的应用。",
     "apps.chosen": { other: "已选 {count} 个" },
     "nav.more": "更多",

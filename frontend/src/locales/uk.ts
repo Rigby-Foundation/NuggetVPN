@@ -317,6 +317,7 @@ const uk: Messages = {
     "apps.search": "Пошук застосунків",
     "apps.system": "Показувати системні застосунки",
     "apps.running": "запущено",
+    "apps.embedded": { one: "{count} вбудований застосунок", few: "{count} вбудовані застосунки", many: "{count} вбудованих застосунків", other: "{count} вбудованого застосунку" },
     "apps.none": "Нічого не знайдено.",
     "apps.chosen": { one: "Вибрано: {count}", few: "Вибрано: {count}", many: "Вибрано: {count}", other: "Вибрано: {count}" },
     "nav.more": "Ще",

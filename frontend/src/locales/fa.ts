@@ -311,6 +311,7 @@ const fa: Messages = {
     "apps.search": "جستجوی برنامه‌ها",
     "apps.system": "نمایش برنامه‌های سیستمی",
     "apps.running": "در حال اجرا",
+    "apps.embedded": { one: "{count} برنامهٔ داخلی", other: "{count} برنامهٔ داخلی" },
     "apps.none": "برنامه‌ای پیدا نشد.",
     "apps.chosen": { one: "{count} انتخاب شده", other: "{count} انتخاب شده" },
     "nav.more": "بیشتر",

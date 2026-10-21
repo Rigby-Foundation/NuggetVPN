@@ -35,6 +35,9 @@ type InstalledApp struct {
 	// Running is true for a program running now; on a computer, one found
 	// only that way (a portable app, one nothing installed) is listed too.
 	Running bool `json:"running,omitempty"`
+	// Parent is the app this one is built into (Teams' ModuleHost, an
+	// Electron app's helpers), by its Package; "" for a top-level app.
+	Parent string `json:"parent,omitempty"`
 }
 
 // ListInstalledApps lists the installed apps a routing rule can name: by

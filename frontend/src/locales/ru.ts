@@ -317,6 +317,7 @@ const ru: Messages = {
     "apps.search": "Поиск приложений",
     "apps.system": "Показывать системные приложения",
     "apps.running": "запущено",
+    "apps.embedded": { one: "{count} встроенное приложение", few: "{count} встроенных приложения", many: "{count} встроенных приложений", other: "{count} встроенного приложения" },
     "apps.none": "Ничего не найдено.",
     "apps.chosen": { one: "Выбрано: {count}", few: "Выбрано: {count}", many: "Выбрано: {count}", other: "Выбрано: {count}" },
     "nav.more": "Ещё",

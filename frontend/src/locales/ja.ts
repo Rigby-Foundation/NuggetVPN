@@ -309,6 +309,7 @@ const ja: Messages = {
     "apps.search": "アプリを検索",
     "apps.system": "システムアプリを表示",
     "apps.running": "実行中",
+    "apps.embedded": { other: "{count} 個の内蔵アプリ" },
     "apps.none": "一致するアプリはありません。",
     "apps.chosen": { other: "{count} 件選択" },
     "nav.more": "その他",

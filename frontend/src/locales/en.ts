@@ -324,6 +324,7 @@ const en = {
     "apps.search": "Search apps",
     "apps.system": "Show system apps",
     "apps.running": "running",
+    "apps.embedded": { one: "{count} built-in app", other: "{count} built-in apps" },
     "apps.none": "No apps match.",
     "apps.chosen": { one: "{count} chosen", other: "{count} chosen" },
     "nav.more": "More",

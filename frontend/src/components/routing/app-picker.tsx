@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Search } from "lucide-react";
+import { Check, ChevronDown, Loader2, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,8 @@ export interface InstalledApp {
     system: boolean;
     /** Running now; on a computer, possibly listed only for that reason. */
     running?: boolean;
+    /** The app this one is built into (macOS helpers, XPC services), by package. */
+    parent?: string;
 }
 
 // Loaded once per run: the list does not change while the app is open often
@@ -137,16 +139,36 @@ export function AppPicker({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
+    // Apps built into others (Teams' ModuleHost, an Electron app's helpers)
+    // are listed under their app, folded until asked for.
+    const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
+    const needle = query.trim().toLowerCase();
     const shown = useMemo(() => {
-        const needle = query.trim().toLowerCase();
-        return (apps ?? [])
+        const matches = (app: InstalledApp) =>
+            !needle || app.label.toLowerCase().includes(needle) || app.package.toLowerCase().includes(needle);
+        const usable = (apps ?? [])
             // Routing this app itself makes no sense.
             .filter((app) => !SELF_LABELS.has(app.label) || chosen.has(app.package))
-            .filter((app) => showSystem || !app.system || chosen.has(app.package))
-            .filter((app) => !needle || app.label.toLowerCase().includes(needle) || app.package.toLowerCase().includes(needle))
-            // Chosen apps first, so what is in the rule is in sight.
-            .sort((a, b) => Number(chosen.has(b.package)) - Number(chosen.has(a.package)));
-    }, [apps, chosen, query, showSystem]);
+            .filter((app) => showSystem || !app.system || chosen.has(app.package));
+        const tops = new Set(usable.filter((app) => !app.parent).map((app) => app.package));
+        const children = new Map<string, InstalledApp[]>();
+        const rows: { app: InstalledApp; children: InstalledApp[] }[] = [];
+        for (const app of usable) {
+            // One whose app is not listed stands on its own.
+            if (app.parent && tops.has(app.parent)) children.set(app.parent, [...(children.get(app.parent) ?? []), app]);
+        }
+        for (const app of usable) {
+            if (app.parent && tops.has(app.parent)) continue;
+            const inside = children.get(app.package) ?? [];
+            const found = matches(app) ? inside : inside.filter(matches);
+            if (!matches(app) && found.length === 0) continue;
+            rows.push({ app, children: needle ? found : inside });
+        }
+        const anyChosen = (row: { app: InstalledApp; children: InstalledApp[] }) =>
+            chosen.has(row.app.package) || row.children.some((child) => chosen.has(child.package));
+        // Chosen apps first, so what is in the rule is in sight.
+        return rows.sort((a, b) => Number(anyChosen(b)) - Number(anyChosen(a)));
+    }, [apps, chosen, needle, showSystem]);
 
     const toggle = (packageName: string) =>
         setChosen((current) => {
@@ -155,6 +177,47 @@ export function AppPicker({
             else next.add(packageName);
             return next;
         });
+
+    const row = (app: InstalledApp, nested = false) => {
+        const on = chosen.has(app.package);
+        return (
+            <button
+                type="button"
+                role="checkbox"
+                aria-checked={on}
+                onClick={() => toggle(app.package)}
+                className={cn(
+                    "flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors",
+                    nested && "ps-9",
+                    on ? "bg-primary/10" : "hover:bg-muted/50"
+                )}
+            >
+                <AppIcon packageName={app.package} size={nested ? 22 : 28} />
+                <span className="min-w-0 flex-1">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm">{app.label}</span>
+                        {app.running ? (
+                            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium text-primary">
+                                {t("apps.running")}
+                            </span>
+                        ) : null}
+                    </span>
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={app.package}>
+                        {app.package}
+                    </span>
+                </span>
+                <span
+                    className={cn(
+                        "grid h-5 w-5 shrink-0 place-items-center rounded-md border",
+                        on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"
+                    )}
+                    aria-hidden="true"
+                >
+                    {on ? <Check size={12} strokeWidth={3} /> : null}
+                </span>
+            </button>
+        );
+    };
 
     return (
         <Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
@@ -182,44 +245,41 @@ export function AppPicker({
                         <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t("apps.none")}</p>
                     ) : (
                         <ul>
-                            {shown.map((app) => {
-                                const on = chosen.has(app.package);
+                            {shown.map(({ app, children }) => {
+                                const open =
+                                    children.length > 0 &&
+                                    (unfolded.has(app.package) || !!needle || children.some((child) => chosen.has(child.package)));
                                 return (
                                     <li key={app.package}>
-                                        <button
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={on}
-                                            onClick={() => toggle(app.package)}
-                                            className={cn(
-                                                "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors",
-                                                on ? "bg-primary/10" : "hover:bg-muted/50"
-                                            )}
-                                        >
-                                            <AppIcon packageName={app.package} />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="flex min-w-0 items-center gap-1.5">
-                                                    <span className="truncate text-sm">{app.label}</span>
-                                                    {app.running ? (
-                                                        <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium text-primary">
-                                                            {t("apps.running")}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                                <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={app.package}>
-                                                    {app.package}
-                                                </span>
-                                            </span>
-                                            <span
-                                                className={cn(
-                                                    "grid h-5 w-5 shrink-0 place-items-center rounded-md border",
-                                                    on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"
-                                                )}
-                                                aria-hidden="true"
-                                            >
-                                                {on ? <Check size={12} strokeWidth={3} /> : null}
-                                            </span>
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <div className="min-w-0 flex-1">{row(app)}</div>
+                                            {children.length > 0 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setUnfolded((current) => {
+                                                            const next = new Set(current);
+                                                            if (next.has(app.package)) next.delete(app.package);
+                                                            else next.add(app.package);
+                                                            return next;
+                                                        })
+                                                    }
+                                                    aria-expanded={open}
+                                                    title={t("apps.embedded", { count: children.length })}
+                                                    className="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] tabular-nums text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                                >
+                                                    {children.length}
+                                                    <ChevronDown size={13} className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                        {open ? (
+                                            <ul aria-label={t("apps.embedded", { count: children.length })}>
+                                                {children.map((child) => (
+                                                    <li key={child.package}>{row(child, true)}</li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
                                     </li>
                                 );
                             })}
