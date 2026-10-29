@@ -5,6 +5,7 @@ import { TABS } from "@/components/layout/AppSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { safeAreaInsets } from "@/lib/platform";
 
 /** The screens with a place of their own in the bar; the rest are under More. */
 const PRIMARY = [
@@ -43,7 +44,7 @@ export function BottomNav({
         <>
             <nav
                 className="flex shrink-0 items-stretch gap-1 border-t bg-background px-2 pt-1"
-                style={{ paddingBottom: "max(0.25rem, env(safe-area-inset-bottom, 0px))" }}
+                style={{ paddingBottom: `max(0.25rem, ${safeAreaInsets.bottom})` }}
                 aria-label={t("nav.menu")}
             >
                 {PRIMARY.map((tab) => (

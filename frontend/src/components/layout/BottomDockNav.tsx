@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { safeAreaInsets } from "@/lib/platform";
 import { NAV_TABS } from "./UnifiedHeader";
 
 interface BottomDockNavProps {
@@ -14,7 +15,7 @@ export function BottomDockNav({ activeTab, onTabChange }: BottomDockNavProps) {
     return (
         <nav
             className="z-20 flex shrink-0 items-center justify-center border-t border-border/40 bg-card/75 backdrop-blur-md px-3 pt-2 select-none"
-            style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
+            style={{ paddingBottom: `max(0.5rem, ${safeAreaInsets.bottom})` }}
             aria-label={t("nav.menu")}
         >
             <div className="flex items-center gap-1 sm:gap-1.5 rounded-2xl border border-border/50 bg-muted/40 p-1 backdrop-blur-xs max-w-full overflow-x-auto shadow-xs">

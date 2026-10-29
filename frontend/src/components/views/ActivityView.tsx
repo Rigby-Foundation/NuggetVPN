@@ -33,7 +33,7 @@ export default function ActivityView({ pages }: { pages: Record<ActivityPage, Re
     return (
         <div className="absolute inset-0 flex flex-col">
             {/* The switcher stays put, like the navigation: only the page under it changes. */}
-            <div className="shrink-0 px-6 pt-5">{switcher}</div>
+            <div className="shrink-0 px-6 pt-3 sm:pt-5">{switcher}</div>
             <div className="relative min-h-0 flex-1">
                 <SubPageContext.Provider value={true}>
                     {/* Keyed so a page plays its entrance when switched to. */}

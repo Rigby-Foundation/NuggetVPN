@@ -135,8 +135,8 @@ function Onboarding({
 
   return (
     <div className="fixed inset-0 z-50 bg-background/40 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      <Card className="w-full max-w-md border-border/50 shadow-2xl my-auto">
-        <CardHeader className="text-center space-y-4 pb-8">
+      <Card className="w-full max-w-md border-border/50 shadow-2xl my-auto gap-4 py-4 sm:gap-6 sm:py-6">
+        <CardHeader className="text-center space-y-3 pb-0 sm:space-y-4 sm:pb-8">
           <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary">
             <Server size={32} />
           </div>
@@ -261,7 +261,7 @@ function Onboarding({
           )}
         </CardContent>
 
-        <CardFooter className="justify-center pt-0 pb-6 px-6">
+        <CardFooter className="justify-center pt-0 pb-0 sm:pb-6 px-6">
           <Button
             type="button"
             variant="ghost"

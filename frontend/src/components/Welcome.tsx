@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { NavPosition } from "@/lib/appearance";
 import { LANGUAGES, LanguageChoice, MessageKey, useI18n } from "@/lib/i18n";
 import { THEME_PRESETS } from "@/lib/themes";
+import { safeAreaInsets } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { AppSettings } from "@/types";
 
@@ -191,7 +192,13 @@ function Welcome({
       />
       <div className="drag-region absolute inset-x-0 top-0 h-10" aria-hidden="true" />
 
-      <div className="relative mx-auto flex min-h-full w-full max-w-xl flex-col px-6 pt-[calc(env(safe-area-inset-top,0px)+3rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+      <div
+        className="relative mx-auto flex min-h-full w-full max-w-xl flex-col px-6"
+        style={{
+          paddingTop: `calc(${safeAreaInsets.top} + ${isPhone ? "1rem" : "3rem"})`,
+          paddingBottom: `calc(${safeAreaInsets.bottom} + ${isPhone ? "1rem" : "1.5rem"})`,
+        }}
+      >
         {/* Progress, and the language — which matters from the first word. */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5" aria-label={t("welcome.step", { step: step + 1, total: STEPS })}>
@@ -221,7 +228,7 @@ function Welcome({
           </Select>
         </div>
 
-        <div key={step} className="enter-stagger my-auto py-10">
+        <div key={step} className={cn("enter-stagger", isPhone ? "py-6" : "my-auto py-10")}>
           {step === 0 ? (
             <>
               {/* The wordmark reads left to right in every language. */}
@@ -405,7 +412,7 @@ function Welcome({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", isPhone && "mt-auto")}>
           {step > 0 ? (
             <Button variant="ghost" onClick={back} className="h-12 gap-2 px-4 text-muted-foreground">
               <ArrowLeft size={17} className="rtl:-scale-x-100" />
