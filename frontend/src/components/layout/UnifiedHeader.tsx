@@ -105,7 +105,9 @@ export function UnifiedHeader({
         <header
             className={cn(
                 "drag-region relative z-30 flex flex-col w-full shrink-0 select-none border-b bg-card/70 px-3 sm:px-4 backdrop-blur-md transition-colors overflow-hidden",
-                "pt-[env(safe-area-inset-top,0px)]"
+                // Android's MainActivity already pads the WebView below the
+                // system bars; applying the safe area again doubles that gap.
+                platform === "android" ? "pt-0" : "pt-[env(safe-area-inset-top,0px)]"
             )}
             dir={dir}
             onDoubleClick={maximiseOnDoubleClick(onMaximize, platform)}
@@ -114,7 +116,7 @@ export function UnifiedHeader({
                 between the sides, the tabs moved whenever a side changed
                 width — the live speed every second, the server picker on
                 leaving the home tab — and slid away from the pointer. */}
-            <div className={cn("grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center gap-2", isMac && "pt-1")}>
+            <div className={cn("grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2", isPhone ? "h-12" : "h-14", isMac && "pt-1")}>
                 {/* Left Area: Window Controls + Brand Beacon */}
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-start">
                 {isMac ? (
