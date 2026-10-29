@@ -4,6 +4,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -13,10 +14,32 @@ func TestDesktopAppsListsBundlesWithIcons(t *testing.T) {
 	if len(apps) == 0 {
 		t.Skip("no applications on this machine")
 	}
+	byPath := make(map[string]InstalledApp, len(apps))
+	for _, app := range apps {
+		byPath[app.Package] = app
+	}
 	var finder bool
 	for _, app := range apps {
-		if !strings.HasSuffix(app.Package, ".app") || app.Label == "" {
+		if !filepath.IsAbs(app.Package) || app.Label == "" {
 			t.Fatalf("not a bundle: %+v", app)
+		}
+		switch filepath.Ext(app.Package) {
+		case ".app":
+		case ".xpc", ".appex":
+			if app.Parent == "" {
+				t.Fatalf("embedded bundle has no parent: %+v", app)
+			}
+		default:
+			t.Fatalf("unsupported bundle type: %+v", app)
+		}
+		if app.Parent != "" {
+			parent, ok := byPath[app.Parent]
+			if !ok || parent.Parent != "" {
+				t.Fatalf("embedded bundle has no listed top-level parent: %+v", app)
+			}
+			if !strings.HasPrefix(app.Package, filepath.Join(app.Parent, "Contents")+string(filepath.Separator)) {
+				t.Fatalf("embedded bundle is outside its parent: %+v", app)
+			}
 		}
 		if app.Label == "Safari" || app.Label == "App Store" {
 			finder = true
