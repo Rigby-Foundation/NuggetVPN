@@ -1,27 +1,16 @@
-import { Fragment } from "react";
-import { Activity, BarChart3, Check, ChevronDown, FileText, Plus, Power, Server, Settings, Signal, Waypoints, Zap } from "lucide-react";
+import { ServerPicker } from "./ServerPicker";
+import { ConnectionStatus } from "./ConnectionStatus";
+import { Plus } from "lucide-react";
 
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import { WindowControls } from "@/components/layout/WindowControls";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatRate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { LOCAL } from "@/hooks/use-profiles";
 import { ConfigSource, ConnectionState, Profile, ProxyMode, TrafficSample } from "@/types";
 import { NAV_TABS } from "./UnifiedHeader";
-import { Flag } from "@/components/ui/flag";
-import { useUnsupported } from "@/lib/core-support";
-import { withoutFlagEmoji } from "@/lib/flags";
 import { maximiseOnDoubleClick } from "@/components/layout/header-double-click";
 
 interface DesktopSidebarNavProps {
@@ -77,24 +66,10 @@ export function DesktopSidebarNav({
     traffic,
 }: DesktopSidebarNavProps) {
     const { t, dir } = useI18n();
-    const unsupported = useUnsupported();
     const isMac = platform === "macos";
     const isPhone = platform === "android" || platform === "ios";
 
     const isConnected = connectionState.status === "connected";
-    const isAuto = selectedProxyMode === "auto";
-    const activeProfile = profiles.find((p) => p.id === selectedProfileId);
-    const domain = selectedSourceDomain.trim() || LOCAL;
-
-    const activeServerLabel = isAuto
-        ? t("proxies.auto")
-        : (activeProfile?.name || t("topbar.none"));
-
-    const activePing = activeProfile ? profilePings[activeProfile.id] : null;
-
-    const availableProfiles = profiles.filter((p) => ((p.source_domain || "").trim() || LOCAL) === domain);
-    const quickPickProfiles = availableProfiles.slice(0, 6);
-
     return (
         <aside
             className={cn(
@@ -167,6 +142,7 @@ export function DesktopSidebarNav({
 
             {/* Bottom Footer: Speeds, Server Picker & Add Button */}
             <div className="p-3 border-t border-border/40 space-y-2 bg-card/40 shrink-0">
+                <ConnectionStatus state={connectionState} />
                 {/* Live Speeds pill */}
                 {isConnected && (traffic.down_rate > 0 || traffic.up_rate > 0) ? (
                     <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/40 px-2 py-1 text-[11px] font-mono text-muted-foreground tnum">
@@ -181,75 +157,12 @@ export function DesktopSidebarNav({
 
                 {/* Server Quick Selector Dropdown */}
                 <div className="flex items-center gap-1.5">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={locked}
-                                    className="h-8 flex-1 justify-between gap-1.5 px-2.5 text-xs font-normal border-border/60 hover:bg-muted/60 min-w-0"
-                                >
-                                    <span className="flex items-center gap-1.5 truncate min-w-0">
-                                        <Server size={13} className={cn("shrink-0", isConnected ? "text-status-connected" : "text-muted-foreground")} />
-                                        {/* The server's flag, drawn like everywhere else, not its emoji. */}
-                                        {!isAuto && activeProfile ? <Flag name={activeProfile.name} size={14} className="shrink-0" /> : null}
-                                        <span className="truncate">{isAuto ? activeServerLabel : withoutFlagEmoji(activeServerLabel)}</span>
-                                    </span>
-                                    <ChevronDown size={12} className="opacity-50 shrink-0 ms-1" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side={position === "left" ? "right" : "left"} align="end" className="w-64 max-h-80 overflow-y-auto">
-                                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                                    {t("proxies.title")}
-                                </DropdownMenuLabel>
-                                <DropdownMenuItem
-                                    onClick={onSelectAuto}
-                                    className="flex items-center justify-between text-xs"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <Zap size={14} className="text-primary" />
-                                        {t("proxies.auto")}
-                                    </span>
-                                    {isAuto ? <Check size={14} className="text-primary" /> : null}
-                                </DropdownMenuItem>
-                                {quickPickProfiles.length > 0 ? <DropdownMenuSeparator /> : null}
-                                {quickPickProfiles.map((p, index) => {
-                                    const ping = profilePings[p.id];
-                                    const isChosen = !isAuto && selectedProfileId === p.id;
-                                    // The subscription's section starts here: its name, once.
-                                    const heading = p.group && p.group !== quickPickProfiles[index - 1]?.group ? p.group : null;
-                                    return (
-                                        <Fragment key={p.id}>
-                                            {heading ? (
-                                                <DropdownMenuLabel className="pt-2 text-[11px] font-semibold text-muted-foreground">{heading}</DropdownMenuLabel>
-                                            ) : null}
-                                            <DropdownMenuItem
-                                                disabled={Boolean(unsupported[p.id])}
-                                                title={unsupported[p.id]}
-                                                onClick={() => onSelectProxy(p.id)}
-                                                className="flex items-center justify-between text-xs gap-2"
-                                            >
-                                                <Flag name={p.name} size={18} />
-                                                <span className="truncate flex-1">{withoutFlagEmoji(p.name)}</span>
-                                                {ping ? (
-                                                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                                                        {ping}ms
-                                                    </span>
-                                                ) : null}
-                                                {isChosen ? <Check size={14} className="text-primary shrink-0" /> : null}
-                                            </DropdownMenuItem>
-                                        </Fragment>
-                                    );
-                                })}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => onTabChange("proxies")}
-                                    className="text-xs text-primary font-medium"
-                                >
-                                    {t("proxies.sort.list")} →
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <ServerPicker
+                                profiles={profiles} profilePings={profilePings}
+                                selectedSourceDomain={selectedSourceDomain} selectedProfileId={selectedProfileId}
+                                selectedProxyMode={selectedProxyMode} connectionState={connectionState}
+                                locked={locked} onSelectProxy={onSelectProxy} onSelectAuto={onSelectAuto}
+                                onTabChange={onTabChange} side={position === "left" ? "right" : "left"} />
 
                     <Tooltip delayDuration={350}>
                         <TooltipTrigger asChild>

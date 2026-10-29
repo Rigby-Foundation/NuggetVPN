@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useState } from "react";
 import {
   ArrowLeft,
@@ -184,7 +185,10 @@ function Welcome({
     .filter((preset): preset is (typeof THEME_PRESETS)[number] => preset !== undefined);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+    <Dialog open>
+    <DialogContent showCloseButton={false} aria-describedby={undefined}
+      className="fixed inset-0 block h-dvh w-full max-w-none max-h-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-background p-0 sm:max-w-none">
+      <DialogTitle className="sr-only">{t("onboarding.title")}</DialogTitle>
       {/* A warm wash of the accent across the top. */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[55%] bg-[radial-gradient(ellipse_at_top,var(--primary)_0%,transparent_65%)] opacity-[0.12]"
@@ -439,7 +443,8 @@ function Welcome({
           )}
         </div>
       </div>
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }
 

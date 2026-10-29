@@ -73,7 +73,7 @@ export function SettingsGroup({
                 <header>
                     <h3 className="text-sm font-medium">{title}</h3>
                     {description ? (
-                        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                        <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</p>
                     ) : null}
                 </header>
             ) : null}
@@ -97,24 +97,24 @@ export function SettingsField({
 }) {
     if (stacked) {
         return (
-            <div className="space-y-2">
+            <div className="space-y-2" role="group" aria-label={label}>
                 <div>
                     <div className="text-sm font-medium">{label}</div>
                     {description ? (
-                        <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+                        <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</div>
                     ) : null}
                 </div>
-                {control}
+                <div className="max-w-xl">{control}</div>
             </div>
         );
     }
 
     return (
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4" role="group" aria-label={label}>
             <div className="min-w-0">
                 <div className="text-sm font-medium">{label}</div>
                 {description ? (
-                    <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+                    <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</div>
                 ) : null}
             </div>
             <div className="shrink-0">{control}</div>

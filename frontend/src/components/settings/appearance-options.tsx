@@ -859,6 +859,7 @@ export function LayoutPicker() {
                         <span className="text-[11px] text-muted-foreground block">{t("appearance.layout.showSpeedTest.hint")}</span>
                     </div>
                     <Switch
+                        aria-label={t("appearance.layout.showSpeedTest")}
                         checked={layout.showSpeedTest}
                         onCheckedChange={(checked) => setLayout({ showSpeedTest: checked })}
                     />

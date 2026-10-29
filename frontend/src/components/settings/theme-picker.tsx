@@ -1,3 +1,4 @@
+import { Segmented } from "@/components/ui/segmented";
 import { useState } from "react";
 import { Check, Laptop, Palette, Pencil, Plus, Sparkles, Sun, Moon } from "lucide-react";
 
@@ -227,41 +228,14 @@ function ThemePicker({ theme, setTheme }: Props) {
                 </div>
             </button>
 
-            {/* Filter Tabs Bar */}
-            <div
-                className="flex flex-wrap items-center gap-1 border-b border-border/50 pb-2.5"
-                role="tablist"
-                aria-label="Theme categories"
-            >
-                {(
-                    [
-                        { id: "all", label: "All Themes" },
-                        { id: "dark", label: t("picker.dark") },
-                        { id: "light", label: t("picker.light") },
-                        { id: "palettes", label: t("picker.palettes") },
-                        { id: "custom", label: t("picker.custom") },
-                    ] as const
-                ).map((tab) => {
-                    const active = currentTab === tab.id;
-                    return (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={active}
-                            onClick={() => setCurrentTab(tab.id)}
-                            className={cn(
-                                "rounded-lg px-2.5 py-1 text-xs font-medium transition-all",
-                                active
-                                    ? "bg-primary text-primary-foreground shadow-xs"
-                                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                            )}
-                        >
-                            {tab.label}
-                        </button>
-                    );
-                })}
-            </div>
+            <Segmented<TabKind> label={t("appearance.theme")} value={currentTab} onChange={setCurrentTab}
+                options={[
+                    { value: "all", label: t("picker.all") },
+                    { value: "dark", label: t("picker.dark") },
+                    { value: "light", label: t("picker.light") },
+                    { value: "palettes", label: t("picker.palettes") },
+                    { value: "custom", label: t("picker.custom") },
+                ]} />
 
             {/* Presets Grid */}
             {filteredPresets.length > 0 ? (

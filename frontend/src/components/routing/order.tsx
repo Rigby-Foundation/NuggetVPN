@@ -18,7 +18,9 @@ export function RuleOrder({
     profiles,
     onReorder,
     onFocus,
+    expanded = false,
 }: {
+    expanded?: boolean;
     rules: RoutingRule[];
     profiles: Profile[];
     onReorder: (rules: RoutingRule[]) => void;
@@ -38,13 +40,15 @@ export function RuleOrder({
 
     const summary = (rule: RoutingRule) => {
         if (rule.kind === "logical") {
-            const parts = (rule.conditions ?? []).map((condition) => t(SOURCE_META[condition.kind].label));
+            const parts = (rule.conditions ?? []).map((condition) => expanded
+                ? `${condition.invert ? `${t("routing.condition.not")} ` : ""}${t(SOURCE_META[condition.kind].label)}: ${(condition.values ?? []).join(", ") || t("routing.order.empty")}`
+                : t(SOURCE_META[condition.kind].label));
             return parts.join(rule.mode === "or" ? " / " : " + ") || t("routing.order.empty");
         }
         const values = rule.values ?? [];
         if (values.length === 0) return t("routing.order.empty");
-        const shown = values.slice(0, 2).join(", ");
-        return values.length > 2 ? `${shown} +${values.length - 2}` : shown;
+        const shown = (expanded ? values : values.slice(0, 2)).join(", ");
+        return !expanded && values.length > 2 ? `${shown} +${values.length - 2}` : shown;
     };
 
     const destination = (rule: RoutingRule) => {
@@ -94,6 +98,7 @@ export function RuleOrder({
                             }}
                             className={cn(
                                 "group flex items-center gap-1.5 rounded-lg border bg-background/60 px-1.5 py-1.5 transition-colors",
+                                expanded && "gap-3 p-3 sm:p-4",
                                 dragging === index && "opacity-40",
                                 over === index && dragging !== null && dragging !== index && "border-primary"
                             )}
@@ -108,20 +113,22 @@ export function RuleOrder({
                             >
                                 <meta.icon size={13} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" />
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-xs">
+                                    <span className={cn("block text-xs", expanded ? "break-words leading-relaxed" : "truncate")}>
+                                        {expanded ? <span className="mb-1 block text-sm font-medium">{t(meta.label)}</span> : null}
                                         {rule.invert ? `${t("routing.condition.not")} ` : ""}
                                         {summary(rule)}
                                     </span>
-                                    <span className="block truncate text-[10px] text-muted-foreground">→ {destination(rule)}</span>
+                                    <span className={cn("block text-muted-foreground", expanded ? "mt-1 text-xs" : "truncate text-[10px]")}>→ {destination(rule)}</span>
+                                    {expanded && rule.dns ? <span className="mt-1 block break-all text-xs text-muted-foreground">DNS: {rule.dns}</span> : null}
                                 </span>
                             </button>
-                            <span className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                            <span className="flex shrink-0 flex-col transition-opacity">
                                 <button
                                     type="button"
                                     disabled={index === 0}
                                     onClick={() => move(index, index - 1)}
                                     aria-label={t("routing.order.up")}
-                                    className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    className="rounded p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
                                 >
                                     <ArrowUp size={11} aria-hidden="true" />
                                 </button>
@@ -130,7 +137,7 @@ export function RuleOrder({
                                     disabled={index === rules.length - 1}
                                     onClick={() => move(index, index + 1)}
                                     aria-label={t("routing.order.down")}
-                                    className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    className="rounded p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
                                 >
                                     <ArrowDown size={11} aria-hidden="true" />
                                 </button>

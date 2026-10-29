@@ -1,3 +1,4 @@
+import { groupTrafficApps, SYSTEM_PROGRAM } from "@/lib/traffic-apps";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, AppWindow, ArrowDown, ArrowUp, HeartPulse, Trash2 } from "lucide-react";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AppIcon } from "@/components/ui/app-icon";
 import { programPath, useFileIcons } from "@/lib/app-icons";
-import { isSystemProgram, useShowSystem } from "@/lib/system-apps";
+import { useShowSystem } from "@/lib/system-apps";
 import {
     Dialog,
     DialogContent,
@@ -47,9 +48,6 @@ const PERIODS = [
  */
 const usageCache = new Map<number, AppUsage>();
 let healthCache: Record<string, ServerHealth> = {};
-
-/** The row system programs are added up into; not a real program name. */
-const SYSTEM_PROGRAM = "\u0001system";
 
 /** A program's file name without the extension Windows adds. */
 function programName(program: string): string {
@@ -258,6 +256,8 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     const usage = shown.current;
     const health = healthCache;
     const [confirmClear, setConfirmClear] = useState(false);
+    const [section, setSection] = useRemembered<"apps" | "health">("statistics.section", "apps");
+    const [showAll, setShowAll] = useState(false);
     const appStatsOn = settings.app_stats !== false;
     const chart = useAppearance().prefs.statsChart;
     const healthOn = settings.server_health !== false;
@@ -311,21 +311,9 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
     // System programs fold into one row unless "Show system" is on — the
     // same switch as on Connections (see lib/system-apps).
     const [showSystem, setShowSystem] = useShowSystem();
-    const programs = useMemo(() => {
-        const all = usage?.data.programs ?? [];
-        if (showSystem) return all;
-        const system = { program: SYSTEM_PROGRAM, up: 0, down: 0 };
-        const apps = all.filter((program) => {
-            if (!isSystemProgram(program.program)) return true;
-            system.up += program.up;
-            system.down += program.down;
-            return false;
-        });
-        if (system.up + system.down > 0) apps.push(system);
-        return apps.sort((a, b) => b.up + b.down - (a.up + a.down));
-    }, [usage?.data, showSystem]);
+    const programs = useMemo(() => groupTrafficApps(usage?.data.programs ?? [], showSystem), [usage?.data, showSystem]);
     // Icons for programs Connections has seen; see rememberProgramPaths.
-    const icons = useFileIcons(programs.slice(0, 40).map((program) => programPath(program.program)));
+    const icons = useFileIcons((showAll ? programs.slice(0, 80) : programs.slice(0, 8)).map((program) => programPath(program.iconProgram)));
     const largest = Math.max(1, ...programs.map((program) => program.up + program.down));
     const total = programs.reduce((sum, program) => ({ up: sum.up + program.up, down: sum.down + program.down }), { up: 0, down: 0 });
     const label = (program: string) =>
@@ -369,7 +357,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                             label={t("stats.period")}
                             options={PERIODS.map((period) => ({ value: period.days, label: t(period.label) }))}
                             value={days}
-                            onChange={setDays}
+                            onChange={(value) => { setDays(value); setShowAll(false); }}
                         />
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfirmClear(true)} aria-label={t("stats.clear")} title={t("stats.clear")}>
                             <Trash2 size={15} aria-hidden="true" />
@@ -377,7 +365,9 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                     </>
                 }
             >
-                <Section
+                <Segmented<"apps" | "health"> label={t("stats.title")} value={section} onChange={setSection}
+                    options={[{ value: "apps", label: t("stats.apps") }, { value: "health", label: t("stats.health") }]} />
+                {section === "apps" ? <Section
                     icon={AppWindow}
                     title={t("stats.apps")}
                     action={
@@ -412,13 +402,13 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                 <p className="text-xs text-muted-foreground">{t("stats.apps.empty")}</p>
                             ) : (
                                 <ul className="space-y-2">
-                                    {programs.slice(0, 40).map((program) => {
+                                    {(showAll ? programs : programs.slice(0, 8)).map((program) => {
                                         const size = program.up + program.down;
                                         return (
                                             <li key={program.program} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-xs sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:gap-y-0">
                                                 <span className="flex min-w-0 items-center gap-2 font-medium" title={program.program}>
                                                     <AppIcon
-                                                        icon={icons.get(programPath(program.program) ?? "")}
+                                                        icon={icons.get(programPath(program.iconProgram) ?? "")}
                                                         system={program.program === SYSTEM_PROGRAM}
                                                     />
                                                     <span className="truncate">{label(program.program)}</span>
@@ -441,11 +431,14 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                                     })}
                                 </ul>
                             )}
+                            {programs.length > 8 ? <Button variant="ghost" size="sm" className="mt-3 text-xs text-primary" onClick={() => setShowAll((value) => !value)}>
+                                {showAll ? t("stats.showLess") : t("stats.showAll", { count: programs.length })}
+                            </Button> : null}
                         </>
                     )}
-                </Section>
+                </Section> : null}
 
-                <Section icon={HeartPulse} title={t("stats.health")}>
+                {section === "health" ? <Section icon={HeartPulse} title={t("stats.health")}>
                     {!healthOn ? (
                         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                             {t("stats.health.off")}
@@ -489,7 +482,7 @@ function StatisticsView({ profiles, settings, onSettingsChange }: StatisticsView
                             <p className="mt-3 text-[11px] text-muted-foreground">{t("stats.health.hint")}</p>
                         </>
                     )}
-                </Section>
+                </Section> : null}
             </PageShell>
 
             {confirmClear ? (

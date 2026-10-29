@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { invoke } from "@/lib/backend";
@@ -134,7 +135,10 @@ function Onboarding({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/40 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <Dialog open>
+    <DialogContent showCloseButton={false} aria-describedby={undefined}
+      className="fixed inset-0 flex h-dvh w-full max-w-none max-h-none translate-x-0 translate-y-0 items-center justify-center overflow-y-auto rounded-none border-0 bg-background/40 p-4 backdrop-blur-2xl sm:max-w-none sm:p-6">
+      <DialogTitle className="sr-only">{t("welcome.sync")}</DialogTitle>
       <Card className="w-full max-w-md border-border/50 shadow-2xl my-auto gap-4 py-4 sm:gap-6 sm:py-6">
         <CardHeader className="text-center space-y-3 pb-0 sm:space-y-4 sm:pb-8">
           <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary">
@@ -273,7 +277,8 @@ function Onboarding({
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }
 

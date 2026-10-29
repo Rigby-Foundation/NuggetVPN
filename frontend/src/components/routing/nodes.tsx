@@ -1256,7 +1256,7 @@ export function LogicalNode({ data, selected }: NodeProps) {
  * border, and a custom type reusing the name inherits all of it.
  */
 export function CatchAllNode({ data, selected }: NodeProps) {
-    const { hits } = (data ?? {}) as { hits?: number };
+    const { hits, action, destination } = (data ?? {}) as { hits?: number; action?: RoutingAction; destination?: string };
     const t = useT();
     return (
         <NodeShell
@@ -1270,7 +1270,7 @@ export function CatchAllNode({ data, selected }: NodeProps) {
         >
             <div className="px-3.5 pb-3">
                 <p className="text-[11px] text-muted-foreground">
-                    {t("routing.catchAll.connect")}
+                    {action && ACTION_META[action] ? t("routing.catchAll.destination", { destination: destination || t(ACTION_META[action].label) }) : t("routing.catchAll.connect")}
                 </p>
             </div>
             <Handle

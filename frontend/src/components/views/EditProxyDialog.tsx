@@ -190,14 +190,14 @@ export function EditProxyDialog({
         <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? undefined : handleClose())}>
             <DialogContent className="sm:max-w-4xl lg:max-w-[940px] w-[95vw] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
                 {/* Header */}
-                <DialogHeader className="p-5 pb-3 border-b bg-card">
+                <DialogHeader className="p-4 pb-3 pe-10 border-b bg-card">
                     <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
                             <Server size={19} />
                         </span>
                         <div className="min-w-0 flex-1">
                             <DialogTitle className="text-base font-semibold truncate">
-                                Edit Proxy Server
+                                {t("server.edit")}
                             </DialogTitle>
                             <DialogDescription className="text-xs text-muted-foreground truncate">
                                 {activeProfile.source_domain && activeProfile.source_domain !== "local"
@@ -227,7 +227,7 @@ export function EditProxyDialog({
                 </DialogHeader>
 
                 {/* Body Content */}
-                <div className="flex-1 overflow-y-auto p-5">
+                <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
                     {error && (
                         <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
                             {error}
@@ -313,14 +313,12 @@ export function EditProxyDialog({
 
                                     {isVless && (
                                         <div className="space-y-1">
-                                            <Label className="text-[11px] text-muted-foreground">
-                                                Flow
-                                            </Label>
+                                            <Label htmlFor="edit-flow" className="text-[11px] text-muted-foreground">Flow</Label>
                                             <Select
                                                 value={form.flow || "none"}
                                                 onValueChange={(val) => updateField("flow", val === "none" ? "" : val)}
                                             >
-                                                <SelectTrigger className="h-8.5 text-xs font-mono w-full">
+                                                <SelectTrigger id="edit-flow" className="h-8.5 text-xs font-mono w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -348,14 +346,12 @@ export function EditProxyDialog({
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-[11px] text-muted-foreground">
-                                                    Security / Cipher
-                                                </Label>
+                                                <Label htmlFor="edit-vmess-security" className="text-[11px] text-muted-foreground">Security / Cipher</Label>
                                                 <Select
                                                     value={form.cipher || "auto"}
                                                     onValueChange={(val) => updateField("cipher", val)}
                                                 >
-                                                    <SelectTrigger className="h-8.5 text-xs font-mono w-full">
+                                                    <SelectTrigger id="edit-vmess-security" className="h-8.5 text-xs font-mono w-full">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -386,14 +382,12 @@ export function EditProxyDialog({
 
                                     {isSS && (
                                         <div className="space-y-1">
-                                            <Label className="text-[11px] text-muted-foreground">
-                                                Encryption Method
-                                            </Label>
+                                            <Label htmlFor="edit-cipher" className="text-[11px] text-muted-foreground">Encryption Method</Label>
                                             <Select
                                                 value={form.cipher || "aes-256-gcm"}
                                                 onValueChange={(val) => updateField("cipher", val)}
                                             >
-                                                <SelectTrigger className="h-8.5 text-xs font-mono w-full">
+                                                <SelectTrigger id="edit-cipher" className="h-8.5 text-xs font-mono w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -446,16 +440,14 @@ export function EditProxyDialog({
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                         <div className="space-y-1">
-                                            <Label className="text-[11px] text-muted-foreground">
-                                                Network Type
-                                            </Label>
+                                            <Label htmlFor="edit-network" className="text-[11px] text-muted-foreground">Network Type</Label>
                                             <Select
                                                 value={form.network}
                                                 onValueChange={(val: "tcp" | "ws" | "grpc" | "http" | "httpupgrade") =>
                                                     updateField("network", val)
                                                 }
                                             >
-                                                <SelectTrigger className="h-8.5 text-xs w-full">
+                                                <SelectTrigger id="edit-network" className="h-8.5 text-xs w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -524,16 +516,14 @@ export function EditProxyDialog({
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                         <div className="space-y-1">
-                                            <Label className="text-[11px] text-muted-foreground">
-                                                Security Mode
-                                            </Label>
+                                            <Label htmlFor="edit-tls" className="text-[11px] text-muted-foreground">Security Mode</Label>
                                             <Select
                                                 value={form.security}
                                                 onValueChange={(val: "none" | "tls" | "reality") =>
                                                     updateField("security", val)
                                                 }
                                             >
-                                                <SelectTrigger className="h-8.5 text-xs w-full">
+                                                <SelectTrigger id="edit-tls" className="h-8.5 text-xs w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -563,14 +553,12 @@ export function EditProxyDialog({
                                     {form.security !== "none" && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                             <div className="space-y-1">
-                                                <Label className="text-[11px] text-muted-foreground">
-                                                    uTLS Fingerprint
-                                                </Label>
+                                                <Label htmlFor="edit-fingerprint" className="text-[11px] text-muted-foreground">uTLS Fingerprint</Label>
                                                 <Select
                                                     value={form.fingerprint || "chrome"}
                                                     onValueChange={(val) => updateField("fingerprint", val)}
                                                 >
-                                                    <SelectTrigger className="h-8.5 text-xs w-full">
+                                                    <SelectTrigger id="edit-fingerprint" className="h-8.5 text-xs w-full">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -593,6 +581,7 @@ export function EditProxyDialog({
                                                     </p>
                                                 </div>
                                                 <Switch
+                                                    aria-label="Skip certificate verification"
                                                     checked={form.insecure}
                                                     onCheckedChange={(checked) => updateField("insecure", checked)}
                                                 />
@@ -724,7 +713,7 @@ export function EditProxyDialog({
                 </div>
 
                 {/* Footer */}
-                <DialogFooter className="p-4 border-t bg-card flex-row items-center justify-between gap-2 sm:justify-between">
+                <DialogFooter className="p-4 border-t bg-card flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
                     <div>
                         {onExport ? (
                             <Button

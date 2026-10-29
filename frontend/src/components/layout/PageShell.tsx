@@ -25,6 +25,7 @@ interface PageShellProps {
     className?: string;
     /** Remembers the scroll position under this name across tab switches. */
     memoryKey?: string;
+    width?: "standard" | "narrow" | "full";
 }
 
 /**
@@ -44,7 +45,9 @@ function PageShell({
     fill = false,
     className,
     memoryKey,
+    width = "standard",
 }: PageShellProps) {
+    const widthClass = width === "narrow" ? "max-w-4xl" : width === "standard" ? "max-w-6xl" : "";
     const subPage = useContext(SubPageContext);
     const scrollRef = useScrollMemory(fill ? undefined : memoryKey);
     const header = (
@@ -54,7 +57,7 @@ function PageShell({
             <div className="flex min-w-0 items-start gap-2">
                 {leading}
                 <div className="min-w-0">
-                    {subPage ? null : <h1 className="text-base font-semibold tracking-tight">{title}</h1>}
+                    {subPage ? null : <h1 className="text-lg font-semibold tracking-tight">{title}</h1>}
                     {description ? (
                         <p className={cn("text-xs text-muted-foreground", !subPage && "mt-0.5")}>{description}</p>
                     ) : null}
@@ -70,9 +73,11 @@ function PageShell({
     // another when the page opens. See "Entrance animations" in App.css.
     if (fill) {
         return (
-            <div className={cn("enter-stagger absolute inset-0 flex flex-col px-6 pb-3 sm:pb-5", subPage ? "pt-2 sm:pt-3" : "pt-3 sm:pt-5", className)}>
-                {header}
-                {children}
+            <div className={cn("enter-stagger absolute inset-0 flex flex-col px-4 sm:px-6 pb-3 sm:pb-5", subPage ? "pt-2 sm:pt-3" : "pt-3 sm:pt-5", className)}>
+                <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col", widthClass)}>
+                    {header}
+                    {children}
+                </div>
             </div>
         );
     }
@@ -80,7 +85,7 @@ function PageShell({
     return (
         <div className="absolute inset-0 overflow-hidden">
             <ScrollArea className="h-full" viewportRef={scrollRef}>
-                <div className={cn("enter-stagger px-6 pb-3 sm:pb-5", subPage ? "pt-2 sm:pt-3" : "pt-3 sm:pt-5", className)}>
+                <div className={cn("enter-stagger mx-auto w-full px-4 sm:px-6 pb-3 sm:pb-5", subPage ? "pt-2 sm:pt-3" : "pt-3 sm:pt-5", widthClass, className)}>
                     {header}
                     {children}
                 </div>

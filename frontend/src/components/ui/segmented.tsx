@@ -66,7 +66,7 @@ export function Segmented<T extends string | number>({
             role="radiogroup"
             aria-label={label}
             onKeyDown={move}
-            className={cn("relative inline-flex shrink-0 rounded-full bg-muted/60 p-0.5", className)}
+            className={cn("relative inline-flex max-w-full shrink-0 overflow-x-auto rounded-full bg-muted/60 p-0.5", className)}
         >
             <span
                 aria-hidden="true"
@@ -87,7 +87,7 @@ export function Segmented<T extends string | number>({
                         tabIndex={active ? 0 : -1}
                         onClick={() => onChange(option.value)}
                         className={cn(
-                            "relative z-10 flex items-center gap-1.5 rounded-full font-medium transition-colors",
+                            "relative z-10 flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full font-medium transition-colors",
                             size === "md" ? "px-3.5 py-1.5 text-sm" : "px-3 py-1 text-xs",
                             active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                         )}

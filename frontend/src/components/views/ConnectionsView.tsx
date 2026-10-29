@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Search, X, XCircle } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Search, Waypoints, X, XCircle } from "lucide-react";
 
 import PageShell from "@/components/layout/PageShell";
 import { kindMeta } from "@/components/routing/nodes";
@@ -381,8 +381,10 @@ function ConnectionsView({ connected, rules, profiles }: ConnectionsViewProps) {
             }
         >
             {!connected ? (
-                <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    {t("connections.offlineHint")}
+                <div className="mx-auto mt-10 flex w-full max-w-md flex-col items-center gap-3 rounded-xl border bg-card/40 p-8 text-center">
+                    <Waypoints size={28} className="text-muted-foreground" aria-hidden="true" />
+                    <h2 className="text-sm font-medium">{t("connections.offline")}</h2>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{t("connections.offlineHint")}</p>
                 </div>
             ) : (
                 <div className="flex min-h-0 flex-1 flex-col gap-3">

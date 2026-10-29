@@ -28,16 +28,17 @@ export function BottomDockNav({ activeTab, onTabChange }: BottomDockNavProps) {
                                 <button
                                     type="button"
                                     onClick={() => onTabChange(tab.id)}
+                                    aria-label={t(tab.label)}
                                     aria-current={isActive ? "page" : undefined}
                                     className={cn(
-                                        "flex items-center gap-1.5 rounded-xl text-xs transition-all duration-150 select-none shrink-0",
+                                        "flex items-center gap-1.5 rounded-xl text-xs transition-all duration-150 select-none shrink-0 px-3 py-2",
                                         isActive
-                                            ? "bg-background text-foreground shadow-xs font-semibold px-3 py-1.5"
-                                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-2.5 py-1.5"
+                                            ? "bg-background text-foreground shadow-xs font-semibold"
+                                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                                     )}
                                 >
                                     <Icon size={15} className={isActive ? "text-primary" : "text-muted-foreground"} />
-                                    <span className={cn("truncate", isActive ? "inline max-w-[100px]" : "hidden sm:inline max-w-[85px]")}>
+                                    <span className="hidden max-w-44 truncate sm:inline">
                                         {t(tab.label)}
                                     </span>
                                 </button>

@@ -125,7 +125,7 @@ function AddModal({
                 onClick={() => fileRef.current?.click()}
                 disabled={scanning}
                 title={t("add.qrHint")}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
               >
                 {scanning ? <Loader2 size={12} className="animate-spin" /> : <QrCode size={12} aria-hidden="true" />}
                 {t("add.qr")}
@@ -142,7 +142,9 @@ function AddModal({
                 }}
               />
             </div>
+            <p id="config-link-hint" className="text-xs leading-relaxed text-muted-foreground">{t("add.supportedFormats")}</p>
             <Textarea
+              aria-describedby="config-link-hint"
               id="config-link"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
@@ -191,7 +193,7 @@ function AddModal({
           <Button variant="secondary" onClick={handleClose}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleProcess} disabled={isLoading}>
+          <Button onClick={handleProcess} disabled={isLoading || !inputLink.trim()}>
             {isLoading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
             {isLoading
               ? t("common.working")

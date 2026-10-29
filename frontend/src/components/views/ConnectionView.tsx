@@ -1,9 +1,14 @@
+import { ServerPicker } from "@/components/layout/ServerPicker";
+import { ConnectionStatus } from "@/components/layout/ConnectionStatus";
+import { serverSelection } from "@/lib/server-selection";
+import { useUnsupported } from "@/lib/core-support";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
     ArrowDown,
     ArrowUp,
     Check,
+    ChevronRight,
     Copy,
     Infinity as InfinityIcon,
     Layers,
@@ -27,8 +32,6 @@ import { useScrollMemory } from "@/lib/remember";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ConfigSource, ConnectionState, IpInfo, Profile, ProxyMode, TrafficSample } from "@/types";
-import { Flag } from "@/components/ui/flag";
-import { withoutFlagEmoji } from "@/lib/flags";
 
 interface ConnectionViewProps {
     state: ConnectionState;
@@ -153,7 +156,7 @@ function SourceSummary({ source, onOpen }: { source: ConfigSource; onOpen?: () =
         <button
             type="button"
             onClick={onOpen}
-            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-foreground/5"
+            className="group/source flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-foreground/5"
         >
             <ProviderLogo
                 info={info}
@@ -164,9 +167,9 @@ function SourceSummary({ source, onOpen }: { source: ConfigSource; onOpen?: () =
                     </span>
                 }
             />
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{source.label}</span>
-                <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                     {meta.map((part, i) => (
                         <span key={i} className="flex items-center gap-1.5">
                             {i > 0 ? <span className="opacity-40">·</span> : null}
@@ -175,6 +178,7 @@ function SourceSummary({ source, onOpen }: { source: ConfigSource; onOpen?: () =
                     ))}
                 </span>
             </span>
+            <ChevronRight size={15} className="ms-auto shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>
     );
 }
@@ -205,6 +209,7 @@ function ConnectionView({
     const isConnecting = state.status === "connecting";
     const isError = state.status === "error";
     const busy = isConnecting && !state.reconnecting;
+    const disconnects = isConnected || state.reconnecting || state.blocked;
     const elapsed = useElapsed(isConnected ? state.since : undefined);
 
     const { prefs } = useAppearance();
@@ -212,10 +217,10 @@ function ConnectionView({
 
     const [copiedIp, setCopiedIp] = useState(false);
 
-    const isAuto = selectedProxyMode === "auto";
-    const activeProfile = profiles.find((p) => p.id === selectedProfileId);
+    const unsupported = useUnsupported();
+    const { displayed: activeProfile } = serverSelection({ profiles, pings: profilePings, domain: source?.domain ?? "local",
+        mode: selectedProxyMode, profileId: selectedProfileId, state, unsupported });
     const activePing = activeProfile ? profilePings[activeProfile.id] : null;
-    const activeServerLabel = isAuto ? t("proxies.auto") : (activeProfile?.name || t("topbar.none"));
 
     const handleCopyIp = () => {
         if (!ipInfo?.ip) return;
@@ -344,7 +349,7 @@ function ConnectionView({
 
     return (
         <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
-            <div className="min-h-full flex flex-col px-4 py-5 sm:px-6">
+            <div className="min-h-full flex flex-col px-4 py-6 sm:px-6 sm:py-10">
                 <div
                     className={cn(
                         "enter-stagger w-full flex flex-1 flex-col gap-4 mx-auto",
@@ -362,10 +367,11 @@ function ConnectionView({
                             type="button"
                             onClick={onToggle}
                             disabled={busy}
-                            aria-label={t(isConnected ? "connection.disconnect" : "connection.connect")}
+                            aria-label={t(disconnects ? "connection.disconnect" : "connection.connect")}
+                            title={t(disconnects ? "connection.disconnect" : "connection.connect")}
                             aria-busy={busy}
                             className={cn(
-                                "group relative flex h-48 w-48 sm:h-56 sm:w-56 items-center justify-center rounded-full transition-transform duration-300 select-none",
+                                "group relative flex h-40 w-40 sm:h-44 sm:w-44 items-center justify-center rounded-full transition-transform duration-300 select-none",
                                 "focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-ring/50",
                                 !busy && "hover:scale-[1.03] active:scale-[0.98]",
                                 busy && "cursor-progress"
@@ -425,7 +431,8 @@ function ConnectionView({
                             </span>
                         </button>
 
-                        <div className="flex flex-col items-center gap-1.5 text-center">
+                        <div className="flex flex-col items-center gap-2 text-center">
+                            {!isConnected && !isConnecting && !isError ? <ConnectionStatus state={state} /> : null}
                             <div className="text-2xl sm:text-3xl font-semibold tracking-tight">{headline}</div>
                             {subline ? <div className="text-sm text-muted-foreground">{subline}</div> : null}
                             {isError && !state.blocked ? (
@@ -433,6 +440,7 @@ function ConnectionView({
                                     {t("connection.dismiss")}
                                 </Button>
                             ) : null}
+                            {state.reconnecting || state.blocked ? <Button size="sm" variant="outline" onClick={onToggle}>{t("connection.disconnect")}</Button> : null}
                             {state.blocked ? (
                                 <div className="mt-1 flex items-center gap-1.5 rounded-full bg-status-error/15 px-3 py-1 text-xs text-status-error font-medium">
                                     <ShieldAlert size={14} />
@@ -444,17 +452,13 @@ function ConnectionView({
 
                     {/* Route: what the button connects with, and through which server. */}
                     {source ? (
-                        <div className="flex items-stretch overflow-hidden rounded-2xl border border-border/60 bg-muted/30">
+                        <div className="flex flex-col items-stretch overflow-hidden rounded-2xl border border-border/60 bg-muted/30 sm:flex-row">
                             <SourceSummary source={source} onOpen={() => onNavigateTab?.("configuration")} />
-                            {/* The server, shown, not picked: the navigation's server
-                                picker is the one place to change it, on every screen. */}
-                            <div className="flex max-w-[45%] shrink-0 items-center gap-2 border-s border-border/60 px-4 py-3 text-sm font-medium">
-                                <Flag auto={isAuto} name={activeProfile?.name} size={20} />
-                                <span className="truncate">{withoutFlagEmoji(activeServerLabel)}</span>
-                                {activePing !== null && activePing !== undefined ? (
-                                    <span className="shrink-0 font-mono text-xs text-muted-foreground">{activePing}ms</span>
-                                ) : null}
-                            </div>
+                            <ServerPicker prominent className="w-full shrink-0 border-t border-border/60 sm:w-[45%] sm:border-s sm:border-t-0"
+                                profiles={profiles} profilePings={profilePings} selectedSourceDomain={source.domain}
+                                selectedProfileId={selectedProfileId} selectedProxyMode={selectedProxyMode}
+                                connectionState={state} locked={locked} onSelectProxy={onSelectProxy}
+                                onSelectAuto={onSelectAuto} onTabChange={onNavigateTab} />
                         </div>
                     ) : (
                         <div className="flex justify-center">

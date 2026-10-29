@@ -29,6 +29,7 @@ function SelectableCard({
     className,
 }: SelectableCardProps) {
     const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key !== "Enter" && event.key !== " ") {
             return;
         }

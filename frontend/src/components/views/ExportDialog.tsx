@@ -1,3 +1,4 @@
+import { Segmented } from "@/components/ui/segmented";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Check, Copy, Download, FileCode, Loader2, Sparkles } from "lucide-react";
@@ -146,49 +147,27 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <FileCode size={18} className="text-primary" />
-                        <span>{title || "Export Configuration"}</span>
+                        <span>{title || t("server.export")}</span>
                     </DialogTitle>
                     <DialogDescription>
-                        Export proxy servers as ready-to-use sing-box, Clash, or Xray configuration files.
+                        {t("export.description")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {/* Format Switcher Tabs */}
-                <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted/60 p-1 border" role="tablist">
-                    {(["singbox", "clash", "xray"] as const).map((fmt) => {
-                        const cfg = FORMAT_CONFIG[fmt];
-                        const active = format === fmt;
-                        return (
-                            <button
-                                key={fmt}
-                                type="button"
-                                role="tab"
-                                aria-selected={active}
-                                onClick={() => setFormat(fmt)}
-                                className={cn(
-                                    "flex flex-col items-center justify-center py-2 px-3 rounded-lg text-xs transition-all",
-                                    active
-                                        ? "bg-background text-foreground font-semibold shadow-xs"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <span className="font-medium text-xs">{cfg.label}</span>
-                                <span className="text-[10px] opacity-70 font-mono">.{cfg.ext}</span>
-                            </button>
-                        );
-                    })}
-                </div>
+                <Segmented<ExportFormat> label={t("export.format")} value={format} onChange={setFormat}
+                    options={(["singbox", "clash", "xray"] as const).map((value) => ({ value, label: FORMAT_CONFIG[value].label }))} />
 
                 {/* Scope Options */}
-                <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3.5 py-2.5 text-xs">
+                <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 px-3.5 py-2.5 text-xs">
                     <div className="flex flex-col gap-0.5">
                         <Label htmlFor="full-config-toggle" className="text-xs font-medium cursor-pointer">
-                            Complete Client Configuration
+                            {t("export.full")}
                         </Label>
                         <span className="text-[11px] text-muted-foreground">
                             {fullConfig
-                                ? "Includes inbounds (mixed/socks/http), DNS hijacking and routing rules"
-                                : "Outputs only outbounds / proxies array to paste into an existing file"}
+                                ? t("export.fullHint")
+                                : t("export.serversHint")}
                         </span>
                     </div>
                     <Switch
@@ -199,7 +178,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                 </div>
 
                 {/* Live Code Preview Area */}
-                <div className="relative flex-1 min-h-[220px] max-h-[380px] rounded-xl border bg-muted/20 font-mono text-xs overflow-hidden flex flex-col shadow-inner">
+                <div className="relative flex-1 min-h-32 sm:min-h-[220px] max-h-[380px] rounded-xl border bg-muted/20 font-mono text-xs overflow-hidden flex flex-col shadow-inner">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/40 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1.5 font-medium">
                             <Sparkles size={12} className="text-primary" />
@@ -214,11 +193,11 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                         {loading ? (
                             <div className="flex h-full min-h-[180px] items-center justify-center gap-2 text-muted-foreground">
                                 <Loader2 size={18} className="animate-spin text-primary" />
-                                <span>Generating {FORMAT_CONFIG[format].label} configuration…</span>
+                                <span>{t("common.working")}</span>
                             </div>
                         ) : error ? (
                             <div className="flex h-full min-h-[180px] flex-col items-center justify-center p-4 text-center text-status-error text-xs">
-                                <span>Failed to generate configuration</span>
+                                <span>{t("export.failed")}</span>
                                 <span className="mt-1 font-mono text-[11px] text-muted-foreground">{error}</span>
                             </div>
                         ) : (
@@ -229,7 +208,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                     </div>
                 </div>
 
-                <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between pt-1">
+                <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between pt-1">
                     <Button variant="ghost" size="sm" onClick={handleClose} disabled={saving}>
                         {t("common.cancel")}
                     </Button>
@@ -243,7 +222,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                             className="gap-1.5"
                         >
                             {copied ? <Check size={14} className="text-status-connected" /> : <Copy size={14} />}
-                            <span>{copied ? "Copied" : "Copy to Clipboard"}</span>
+                            <span>{t(copied ? "export.copied" : "export.copy")}</span>
                         </Button>
 
                         <Button
@@ -254,7 +233,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                             className="gap-1.5"
                         >
                             {saving ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                            <span>Save to File…</span>
+                            <span>{t("export.save")}</span>
                         </Button>
                     </div>
                 </DialogFooter>

@@ -67,6 +67,7 @@ import {
   SettingsRow,
 } from "@/components/settings/shell";
 
+import { Segmented } from "@/components/ui/segmented";
 import { AppSettings, CloseAction, Profile } from "@/types";
 import { cn } from "@/lib/utils";
 import { THEME_PRESETS } from "@/lib/themes";
@@ -339,11 +340,19 @@ function SettingsView({
   const [openId, setOpenId] = useRemembered<SectionId | null>("settings.open", null);
   // Kept while a section is open, so Back returns to the same results.
   const [query, setQuery] = useRemembered("settings.query", "");
-  const scrollRef = useScrollMemory(`settings.${openId ?? "list"}`);
+  const [rememberedAppearanceTab, setAppearanceTab] = useRemembered<"theme" | "layout" | "font" | "motion" | "data">("settings.appearanceTab", "theme");
+  const appearanceTab = isPhone && rememberedAppearanceTab === "layout" ? "theme" : rememberedAppearanceTab;
+  const scrollRef = useScrollMemory(openId === "appearance" ? `settings.appearance.${appearanceTab}` : `settings.${openId ?? "list"}`);
   // Which way the last move went, so coming back animates in reverse.
   const [direction, setDirection] = React.useState<"forward" | "back">("forward");
 
   const navigate = (id: SectionId | null) => {
+    if (id === "appearance" && query.trim()) {
+      const needle = query.trim().toLocaleLowerCase();
+      const tabs = { layout: ["appearance.layout"], font: ["appearance.font", "appearance.corners", "appearance.radius"], motion: ["appearance.motion"], data: ["appearance.units", "appearance.statsChart"] } as const;
+      const hit = Object.entries(tabs).find(([, prefixes]) => ALL_KEYS.some((key) => prefixes.some((prefix) => key.startsWith(prefix)) && translate(language, key).toLocaleLowerCase().includes(needle)));
+      setAppearanceTab((hit?.[0] as typeof appearanceTab) ?? "theme");
+    }
     setDirection(id === null ? "back" : "forward");
     setOpenId(id);
   };
@@ -490,6 +499,15 @@ function SettingsView({
       case "appearance":
         return (
           <>
+            <Segmented<typeof appearanceTab> label={t("settings.appearance")} value={appearanceTab} onChange={setAppearanceTab}
+              options={[
+                { value: "theme", label: t("appearance.theme") },
+                ...(!isPhone ? [{ value: "layout" as const, label: t("appearance.layout") }] : []),
+                { value: "font", label: t("appearance.font") },
+                { value: "motion", label: t("appearance.motion") },
+                { value: "data", label: t("appearance.units") },
+              ]} />
+            {appearanceTab === "theme" ? <>
             <SettingsGroup
               title={t("appearance.theme")}
               description={t("appearance.theme.description")}
@@ -504,15 +522,17 @@ function SettingsView({
               <AccentPicker />
             </SettingsGroup>
 
-            {isPhone ? null : (
+            </> : null}
+            {appearanceTab === "layout" && !isPhone ? (
               <SettingsGroup
                 title={t("appearance.layout")}
                 description={t("appearance.layout.description")}
               >
                 <LayoutPicker />
               </SettingsGroup>
-            )}
+            ) : null}
 
+            {appearanceTab === "font" ? <>
             <SettingsGroup title={t("appearance.font")} description={t("appearance.font.description")}>
               <FontPicker />
             </SettingsGroup>
@@ -524,12 +544,14 @@ function SettingsView({
               <RadiusPicker />
             </SettingsGroup>
 
-            <SettingsGroup
+            </> : null}
+            {appearanceTab === "motion" ? <SettingsGroup
               title={t("appearance.motion")}
               description={t("appearance.motion.description")}
             >
               <MotionPicker />
-            </SettingsGroup>
+            </SettingsGroup> : null}
+            {appearanceTab === "data" ? <>
 
             <SettingsGroup title={t("appearance.units")} description={t("appearance.units.description")}>
               <UnitsPicker />
@@ -538,6 +560,7 @@ function SettingsView({
             <SettingsGroup title={t("appearance.statsChart")} description={t("appearance.statsChart.description")}>
               <StatsChartPicker />
             </SettingsGroup>
+            </> : null}
           </>
         );
 
@@ -750,7 +773,7 @@ function SettingsView({
                 description={t("connection.mtu.description")}
                 control={
                   <Input
-                    id="mtu"
+                    id="mtu" aria-label="MTU" className="max-w-36"
                     type="number"
                     value={appSettings.mtu}
                     onChange={(e) =>
@@ -768,7 +791,7 @@ function SettingsView({
                 description={t("connection.dns.description")}
                 control={
                   <Input
-                    id="dns"
+                    id="dns" aria-label={t("connection.dns")} className="max-w-md"
                     type="text"
                     value={appSettings.dns}
                     onChange={(e) => onSettingsChange("dns", e.target.value)}
@@ -785,8 +808,9 @@ function SettingsView({
         return (
           <>
             {tlsIgnored ? (
-              <div className="rounded-xl border border-status-connecting/40 bg-status-connecting/10 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-status-connecting/40 bg-status-connecting/10 px-4 py-3 text-sm">
                 {t("core.tlsIgnored", { core: t(appSettings.core === "xray" ? "core.xray" : "core.mihomo") })}
+                <Button variant="outline" size="sm" onClick={() => navigate("core")}>{t("settings.core")}</Button>
               </div>
             ) : null}
             <fieldset disabled={tlsIgnored} className={cn("min-w-0 space-y-4", tlsIgnored && "opacity-50")}>
@@ -1132,7 +1156,7 @@ function SettingsView({
                 </Button>
               </>
             ) : (
-              <Button className="w-full gap-2" onClick={onConnectSync}>
+              <Button className="w-full gap-2 sm:w-auto" onClick={onConnectSync}>
                 <RefreshCw size={16} /> {t("sync.connect")}
               </Button>
             )}
@@ -1164,8 +1188,13 @@ function SettingsView({
       <PageShell
         key={openId ?? "list"}
         fill
+        width={openId === "appearance" ? "standard" : "narrow"}
         title={open ? t(open.title) : t("nav.settings")}
         description={open ? t(open.blurb) : t("settings.description")}
+        actions={open ? <Select value={open.id} onValueChange={(id) => navigate(id as SectionId)}>
+          <SelectTrigger className="h-8 w-48 text-xs" aria-label={t("settings.section")}><SelectValue /></SelectTrigger>
+          <SelectContent>{SECTIONS.filter((section) => visible(section.id)).map((section) => <SelectItem key={section.id} value={section.id}>{t(section.title)}</SelectItem>)}</SelectContent>
+        </Select> : undefined}
         leading={
           open ? (
             <Button
@@ -1182,9 +1211,12 @@ function SettingsView({
         }
       >
         <div className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full" viewportRef={scrollRef} fadeEdges>
+          <ScrollArea key={openId === "appearance" ? appearanceTab : openId ?? "list"} className="h-full" viewportRef={scrollRef} fadeEdges>
             {open ? (
-              <div className="enter-stagger space-y-4 pe-3 pb-1">{detail(open.id)}</div>
+              <div className="enter-stagger space-y-4 pe-2 pb-5">
+                <p className="text-xs text-muted-foreground">{t("settings.savedAutomatically")}</p>
+                {detail(open.id)}
+              </div>
             ) : (
               <div className="enter-stagger space-y-4 pe-3 pb-1">
                 <div className="relative">
@@ -1209,7 +1241,7 @@ function SettingsView({
                   results.length === 0 ? (
                     <p className="px-1 text-sm text-muted-foreground">{t("settings.search.none")}</p>
                   ) : (
-                    <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                       {results.map((result) => row(SECTIONS.find((section) => section.id === result.id)!, result.match))}
                     </div>
                   )
@@ -1221,7 +1253,7 @@ function SettingsView({
                       return (
                         <section key={group.title} className="space-y-2">
                           <h3 className="px-1 text-xs font-medium text-muted-foreground">{t(group.title)}</h3>
-                          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">{sections.map((section) => row(section))}</div>
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{sections.map((section) => row(section))}</div>
                         </section>
                       );
                     })}

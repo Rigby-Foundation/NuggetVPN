@@ -1,3 +1,4 @@
+import { Segmented } from "@/components/ui/segmented";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Download, FileUp, Globe2, Info, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload, Plus } from "lucide-react";
@@ -417,7 +418,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 id: DEFAULT_NODE,
                 type: "catchall",
                 position: positioned(DEFAULT_NODE, 0),
-                data: { hits: hitsFor(DEFAULT_HITS) },
+                data: { hits: hitsFor(DEFAULT_HITS), action: settings.default_action, destination: settings.default_server ? profiles.find((p) => p.id === settings.default_server)?.name : undefined },
             },
             ...rules.map((rule, index) => ({
                 id: rule.id,
@@ -488,7 +489,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 },
             };
         });
-    }, [rules, layout, inboundCounts, hiddenActions, onHideAction, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
+    }, [settings.default_action, settings.default_server, rules, layout, inboundCounts, hiddenActions, onHideAction, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
         // An edge carrying connections right now is drawn heavier and moves;
@@ -1117,6 +1118,7 @@ const HISTORY_LIMIT = 100;
 
 function RoutingView({ settings, onChange: save, onReplace, profiles, connected }: RoutingViewProps) {
     const t = useT();
+    const [view, setView] = useRemembered<"graph" | "rules">("routing.view", "graph");
 
     // Undo and redo. Every change to the graph passes through onChange below,
     // which records the graph as it was; undo puts it back. Changes to
@@ -1342,8 +1344,10 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
     // The canvas hands back a focuser so adding a node from the palette brings
     // it into view instead of dropping it below the fold.
     const focusRef = useRef<((point: CanvasPoint) => void) | null>(null);
+    const pendingFocus = useRef<CanvasPoint | null>(null);
     const handleReady = useCallback((focus: (point: CanvasPoint) => void) => {
         focusRef.current = focus;
+        if (pendingFocus.current) { focus(pendingFocus.current); pendingFocus.current = null; }
     }, []);
 
     const addNote = useCallback(() => {
@@ -1430,7 +1434,11 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-6 pt-3 sm:pt-5 pb-3 shrink-0">
                 <div className="min-w-0">
                     <h1 className="sr-only">{t("nav.routing")}</h1>
-                    <SetupSwitcher settings={settings} onReplace={onReplace} />
+                    <div className="flex flex-wrap items-center gap-3">
+                        <SetupSwitcher settings={settings} onReplace={onReplace} />
+                        <Segmented<"graph" | "rules"> label={t("routing.view")} value={view} onChange={setView}
+                            options={[{ value: "graph", label: t("routing.view.graph") }, { value: "rules", label: t("routing.view.rules") }]} />
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                         {rules.length === 0
                             ? t("routing.summaryNone", { action: defaultLabel })
@@ -1515,6 +1523,21 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             ) : null}
 
             <div className="flex-1 min-h-0 mx-2 sm:mx-4 mb-2 sm:mb-4 flex gap-3">
+                {view === "rules" ? (
+                    <div className="mx-auto w-full max-w-5xl overflow-y-auto rounded-xl border bg-card/40 p-3 sm:p-5">
+                        <RuleOrder expanded rules={rules} profiles={profiles} onReorder={(next) => onChange({ routing_rules: next })}
+                            onFocus={(id) => {
+                                const index = rules.findIndex((rule) => rule.id === id);
+                                pendingFocus.current = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
+                                setView("graph");
+                            }} />
+                        <div className="mt-4 space-y-3 border-t pt-4">
+                            <h2 className="text-sm font-medium">{t("routing.catchAll")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("routing.catchAll.destination", { destination: settings.default_server ? profiles.find((p) => p.id === settings.default_server)?.name ?? defaultLabel : defaultLabel })}</p>
+                            <Button variant="outline" size="sm" onClick={() => setView("graph")}>{t("routing.view.graph")}</Button>
+                        </div>
+                    </div>
+                ) : <>
                 {/* The graph reads left to right in every language: sources
                     on the left, destinations on the right, the way the edges
                     are drawn. It is not mirrored in right-to-left layouts. */}
@@ -1619,6 +1642,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                         }
                     />
                 )}
+                </>}
             </div>
         </div>
     );
