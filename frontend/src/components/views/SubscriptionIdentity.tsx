@@ -26,6 +26,7 @@ import { AppSettings } from "@/types";
 const USER_AGENTS = [
     { value: "NuggetVPN/1.0", label: "NuggetVPN" },
     { value: "Happ/4.9.0", label: "Happ" },
+    { value: "Beam/2.0", label: "BEAM" },
     { value: "v2rayNG/1.9.16", label: "v2rayNG" },
     { value: "Streisand", label: "Streisand" },
     { value: "Hiddify/2.0.5", label: "Hiddify" },

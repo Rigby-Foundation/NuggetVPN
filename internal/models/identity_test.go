@@ -144,3 +144,12 @@ func TestUserAgentIsConfigurable(t *testing.T) {
 		t.Errorf("blank User-Agent fell back to %q, want %q", got, DefaultUserAgent)
 	}
 }
+
+func TestBeamUserAgentIsPreserved(t *testing.T) {
+	settings := DefaultSettings()
+	settings.SubscriptionUserAgent = "Beam/2.0"
+	settings.Normalize()
+	if got := settings.SubscriptionHeaders()["User-Agent"]; got != "Beam/2.0" {
+		t.Fatalf("User-Agent = %q, want Beam/2.0", got)
+	}
+}
