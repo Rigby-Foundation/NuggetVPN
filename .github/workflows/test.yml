@@ -188,6 +188,10 @@ jobs:
         if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
+      - name: Test frontend
+        working-directory: frontend
+        run: bun install --frozen-lockfile && bun test
+
       - name: Build
         if: runner.os != 'macOS'
         run: wails3 task build

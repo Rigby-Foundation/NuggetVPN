@@ -6,8 +6,8 @@ import (
 )
 
 // GetSystemPalette returns the system's own colour palette, which the
-// "system" theme follows where there is one: Android 12's Material You,
-// taken from the wallpaper. Null elsewhere.
+// "system" theme follows: Android 12's Material You tones, or a desktop
+// wallpaper colour. Null when the platform cannot provide either.
 func (a *App) GetSystemPalette() json.RawMessage {
 	palette := systemPalette()
 	if palette == "" || !json.Valid([]byte(palette)) {

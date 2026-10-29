@@ -2,13 +2,15 @@
 
 package app
 
+import "github.com/Rigby-Foundation/NuggetVPN/internal/wallpaper"
+
 // onAndroid is true in the Android build.
 const onAndroid = false
 
 func (a *App) startPlatform() {}
 
-// systemPalette is Android's Material You colours; there are none here.
-func systemPalette() string { return "" }
+// Desktop palettes use a colour extracted from the current wallpaper.
+func systemPalette() string { return wallpaper.Palette() }
 
 func setSystemBars(string, bool) {}
 

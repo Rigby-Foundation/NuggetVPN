@@ -314,7 +314,7 @@ const ja: Messages = {
     "apps.chosen": { other: "{count} 件選択" },
     "nav.more": "その他",
     "nav.menu": "メインメニュー",
-    "picker.systemMonet": "壁紙の色。ライト・ダークはスマートフォンに合わせます",
+    "picker.systemMonet": "壁紙の色。ライト・ダークはシステムに合わせます",
     "plugins.android": "Android では、プラグインはテーマ、フォント、ルーティング設定を追加します。プラグインのページはここでは動きません。",
     "nav.statistics": "統計",
     "speed.title": "速度テスト",

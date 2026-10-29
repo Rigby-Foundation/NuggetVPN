@@ -247,8 +247,8 @@ How it differs from the desktop:
   core's own sockets out of it, and reports the network in use.
 - **Cores:** the built-in core, and Xray behind it. Official sing-box and
   mihomo aren't available there yet.
-- **The "System" theme:** on Android 12 and later it follows the
-  wallpaper's colours (Material You).
+- **The "System" theme:** Android 12 and later use the wallpaper's Material
+  You colours. Desktop builds also follow wallpaper colours, as described below.
 - **Plugins:** they bring themes, fonts and routing setups, but their pages
   don't run. Android's WebView gives its native bridge to every frame, so a
   plugin page couldn't be kept apart from the app.
@@ -257,6 +257,15 @@ How it differs from the desktop:
 
 Release APKs are signed with the key from the `ANDROID_KEYSTORE_*` secrets;
 see `.github/workflows/release.yml`.
+
+### Wallpaper colours
+
+The System theme extracts colours from the primary display's wallpaper on
+Windows and macOS. Linux supports GNOME, KDE Plasma, Xfce, Cinnamon and MATE.
+Colours refresh on focus and every 30 seconds while System is selected,
+and light/dark mode follows the OS. GNOME timed XML wallpapers use the
+first still image. If a wallpaper cannot be read, System uses the default
+light/dark colours. A manually chosen accent still takes priority.
 
 ### Build tags are required
 

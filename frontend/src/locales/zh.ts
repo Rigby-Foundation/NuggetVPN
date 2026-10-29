@@ -314,7 +314,7 @@ const zh: Messages = {
     "apps.chosen": { other: "已选 {count} 个" },
     "nav.more": "更多",
     "nav.menu": "主菜单",
-    "picker.systemMonet": "取自壁纸的颜色，随手机切换浅色或深色",
+    "picker.systemMonet": "取自壁纸的颜色，随系统切换浅色或深色",
     "plugins.android": "在 Android 上，插件提供主题、字体和路由方案；插件页面不会在这里运行。",
     "nav.statistics": "统计",
     "speed.title": "测速",

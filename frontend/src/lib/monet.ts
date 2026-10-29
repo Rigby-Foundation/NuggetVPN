@@ -1,7 +1,6 @@
 /**
- * Material You on Android: the "system" theme takes its colours from the
- * wallpaper, the way the phone's own apps do, instead of plain black or
- * white.
+ * The "system" theme takes its colours from the wallpaper. Android provides
+ * Material You tones; desktop platforms provide an extracted seed colour.
  *
  * Android 12 and later derive tonal palettes from the wallpaper
  * (system_accent1_*, system_neutral1_*, …). The backend hands a few tones of
@@ -11,8 +10,8 @@
  */
 import { BACKGROUND_LIGHTNESS, CustomTheme } from "@/lib/appearance";
 
-/** What GetSystemPalette returns; see NuggetBridge.systemPalette. */
-export interface SystemPalette {
+/** Android tones from NuggetBridge.systemPalette. */
+interface AndroidPalette {
     dark: boolean;
     /** accent1 tones 100, 200, 500, 600. */
     accent1: string[];
@@ -21,6 +20,9 @@ export interface SystemPalette {
     /** neutral2 tones 100, 500, 800. */
     neutral2: string[];
 }
+
+/** Desktops extract a seed locally; the image never crosses the bridge. */
+export type SystemPalette = AndroidPalette | { seed: string };
 
 export const MONET_THEME_ID = "custom-monet";
 
@@ -56,23 +58,34 @@ function clamp(value: number, min: number, max: number): number {
  * accent1, vivid enough to read as the wallpaper's colour.
  */
 export function monetTheme(palette: SystemPalette): CustomTheme | null {
-    const mode = palette.dark ? "dark" : "light";
-    const surface = hexToOklch(palette.neutral2[1] ?? "");
-    const accent = hexToOklch(palette.accent1[2] ?? "");
+    const desktop = "seed" in palette;
+    const mode = !desktop && palette.dark ? "dark" : "light";
+    const surface = hexToOklch(desktop ? palette.seed : palette.neutral2[1] ?? "");
+    const accent = hexToOklch(desktop ? palette.seed : palette.accent1[2] ?? "");
     if (!surface || !accent) return null;
     const range = BACKGROUND_LIGHTNESS[mode];
     return {
         id: MONET_THEME_ID,
-        name: "Material You",
+        name: desktop ? "Wallpaper" : "Material You",
         mode,
         background: {
             h: surface.h,
             // Android's surfaces are only just tinted; a little more reads
             // as intended on a page this large.
-            c: clamp(surface.c * 0.6, 0.004, 0.03),
+            c: clamp(surface.c * 0.6, desktop ? 0 : 0.004, 0.03),
             l: mode === "dark" ? clamp(0.16, range.min, range.max) : clamp(0.975, range.min, range.max),
         },
-        accent: { h: accent.h, c: clamp(accent.c, 0.06, 0.2) },
+        accent: { h: accent.h, c: clamp(accent.c, desktop ? 0 : 0.06, 0.2) },
+    };
+}
+
+/** Keep wallpaper colours while the system switches between light and dark. */
+export function monetForMode(theme: CustomTheme | null, mode: "dark" | "light"): CustomTheme | null {
+    if (!theme) return null;
+    return {
+        ...theme,
+        mode,
+        background: { ...theme.background, l: mode === "dark" ? 0.16 : 0.975 },
     };
 }
 

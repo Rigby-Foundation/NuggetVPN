@@ -322,7 +322,7 @@ const ru: Messages = {
     "apps.chosen": { one: "Выбрано: {count}", few: "Выбрано: {count}", many: "Выбрано: {count}", other: "Выбрано: {count}" },
     "nav.more": "Ещё",
     "nav.menu": "Главное меню",
-    "picker.systemMonet": "Цвета ваших обоев, светлая или тёмная вместе с телефоном",
+    "picker.systemMonet": "Цвета ваших обоев, светлая или тёмная вместе с системой",
     "plugins.android": "На Android плагины добавляют темы, шрифты и настройки маршрутизации; их страницы здесь не работают.",
     "nav.statistics": "Статистика",
     "speed.title": "Тест скорости",

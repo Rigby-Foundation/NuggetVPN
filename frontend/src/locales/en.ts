@@ -329,7 +329,7 @@ const en = {
     "apps.chosen": { one: "{count} chosen", other: "{count} chosen" },
     "nav.more": "More",
     "nav.menu": "Main menu",
-    "picker.systemMonet": "Your wallpaper's colours, light or dark with the phone",
+    "picker.systemMonet": "Your wallpaper's colours, light or dark with the system",
     "plugins.android": "On Android, plugins bring their themes, fonts and routing setups; their pages don't run here.",
     "nav.statistics": "Statistics",
     "speed.title": "Speed test",

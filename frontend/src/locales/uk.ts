@@ -322,7 +322,7 @@ const uk: Messages = {
     "apps.chosen": { one: "Вибрано: {count}", few: "Вибрано: {count}", many: "Вибрано: {count}", other: "Вибрано: {count}" },
     "nav.more": "Ще",
     "nav.menu": "Головне меню",
-    "picker.systemMonet": "Кольори ваших шпалер, світла чи темна разом із телефоном",
+    "picker.systemMonet": "Кольори ваших шпалер, світла чи темна разом із системою",
     "plugins.android": "На Android плагіни додають теми, шрифти й налаштування маршрутизації; їхні сторінки тут не працюють.",
     "nav.statistics": "Статистика",
     "speed.title": "Тест швидкості",
