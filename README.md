@@ -192,10 +192,11 @@ asks for is dropped before mihomo sees it.
 
 - **Go** 1.26 or newer.
 - **Bun** (or Node.js) for the frontend.
-- **Wails CLI** v3.0.0-beta.28:
+- **Wails CLI** v3.0.0:
   ```bash
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
   ```
+  Keep the CLI, Go module and `@wailsio/runtime` on the same version.
 - **Platform tools**:
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`).
   - **Linux**: `libgtk-4-dev` and `libwebkitgtk-6.0-dev`. At runtime, `pkexec`
@@ -352,8 +353,6 @@ xattr -cr /Applications/NuggetVPN.app
 
 ## Known limitations
 
-- **Wails v3 is still in beta.** The app is pinned to `v3.0.0-beta.28`.
-  Upgrade the CLI and the module together.
 - **Nothing is code-signed.** macOS builds are ad-hoc signed and Linux
   packages are unsigned.
 - **Windows ships an NSIS installer only**, not MSIX.

@@ -5,7 +5,7 @@ on:
       - "v*"
 
 env:
-  WAILS_VERSION: v3.0.0-beta.28
+  WAILS_VERSION: v3.0.0
 
 # Runners are GitHub-hosted.
 jobs:
@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: "1.26.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: "1.26.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -117,7 +117,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: "1.26.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -177,7 +177,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: "1.26.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -265,7 +265,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: "1.26.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2

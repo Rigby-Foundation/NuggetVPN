@@ -8,9 +8,9 @@ Thank you for your interest in contributing to NuggetVPN! We welcome contributio
 
 Ensure you have the development environment set up as described in the [README.md](README.md). You will need:
 
-- Go 1.24+
+- Go 1.26+
 - Bun (or Node.js)
-- The Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28`
+- The Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
 - A working C toolchain for your OS
 
 There is no sidecar to download. sing-box is a Go module dependency and is compiled into the binary.
