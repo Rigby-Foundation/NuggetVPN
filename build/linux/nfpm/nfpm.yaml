@@ -5,7 +5,7 @@
 name: "nuggetvpn"
 arch: ${GOARCH}
 platform: "linux"
-version: "1.0.0"
+version: "2.4.0"
 section: "net"
 priority: "optional"
 maintainer: "Rigby Foundation <noreply@rigbyfoundation.org>"
