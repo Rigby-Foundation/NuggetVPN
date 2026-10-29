@@ -15,6 +15,8 @@ export const SubPageContext = createContext(false);
 interface PageShellProps {
     title: string;
     description?: ReactNode;
+    /** Navigation beside the title, including on narrow screens. */
+    leading?: ReactNode;
     /** Buttons shown on the right of the header row, or under it when narrow. */
     actions?: ReactNode;
     children: ReactNode;
@@ -36,6 +38,7 @@ interface PageShellProps {
 function PageShell({
     title,
     description,
+    leading,
     actions,
     children,
     fill = false,
@@ -48,11 +51,14 @@ function PageShell({
         // On a narrow screen the buttons go on a row of their own: beside the
         // title they left the description a word per line.
         <header className={cn("flex flex-col gap-3 mb-5 sm:flex-row sm:justify-between sm:gap-4", subPage ? "sm:items-center" : "sm:items-start")}>
-            <div className="min-w-0">
-                {subPage ? null : <h1 className="text-base font-semibold tracking-tight">{title}</h1>}
-                {description ? (
-                    <p className={cn("text-xs text-muted-foreground", !subPage && "mt-0.5")}>{description}</p>
-                ) : null}
+            <div className="flex min-w-0 items-start gap-2">
+                {leading}
+                <div className="min-w-0">
+                    {subPage ? null : <h1 className="text-base font-semibold tracking-tight">{title}</h1>}
+                    {description ? (
+                        <p className={cn("text-xs text-muted-foreground", !subPage && "mt-0.5")}>{description}</p>
+                    ) : null}
+                </div>
             </div>
             {actions ? (
                 <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>

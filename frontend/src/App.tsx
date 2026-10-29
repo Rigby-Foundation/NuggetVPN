@@ -1068,7 +1068,8 @@ function App() {
                 position="top-center"
                 containerClassName="nugget-toasts"
                 containerStyle={{
-                    top: "calc(env(safe-area-inset-top, 0px) + 64px)",
+                    // Android already insets the WebView below the system bars.
+                    top: platform === "android" ? "60px" : `calc(env(safe-area-inset-top, 0px) + ${isPhone ? 60 : 64}px)`,
                     zIndex: 99999,
                 }}
                 toastOptions={{

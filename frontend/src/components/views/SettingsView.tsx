@@ -1166,25 +1166,27 @@ function SettingsView({
         fill
         title={open ? t(open.title) : t("nav.settings")}
         description={open ? t(open.blurb) : t("settings.description")}
-        actions={
+        leading={
           open ? (
             <Button
               variant="ghost"
-              size="sm"
-              className="gap-1.5"
+              size="icon-lg"
+              className="-ms-2"
+              aria-label={t("nav.settings")}
+              title={t("nav.settings")}
               onClick={() => navigate(null)}
             >
-              <ArrowLeft size={14} className="rtl:-scale-x-100" /> {t("nav.settings")}
+              <ArrowLeft size={16} className="rtl:-scale-x-100" />
             </Button>
           ) : undefined
         }
       >
         <div className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full" viewportRef={scrollRef}>
+          <ScrollArea className="h-full" viewportRef={scrollRef} fadeEdges>
             {open ? (
-              <div className="enter-stagger space-y-4 pe-1">{detail(open.id)}</div>
+              <div className="enter-stagger space-y-4 pe-3 pb-1">{detail(open.id)}</div>
             ) : (
-              <div className="enter-stagger space-y-4 pe-1">
+              <div className="enter-stagger space-y-4 pe-3 pb-1">
                 <div className="relative">
                   <Search
                     size={14}
