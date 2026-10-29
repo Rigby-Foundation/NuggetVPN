@@ -26,9 +26,7 @@ import {
     Plus,
     RotateCcw,
     Server,
-    Shield,
     Signal,
-    Sparkles,
     Trash2,
     Upload,
     X,
@@ -90,92 +88,6 @@ const SCRIPT_NAMES: Record<string, string> = {
     jpan: "Japanese",
     arab: "Arabic",
 };
-
-/**
- * Live Hero Studio Preview
- * Gives users immediate, satisfying visual feedback of their chosen theme,
- * font, corner radius, and mode without needing to navigate away.
- */
-export function AppearanceHeroPreview({
-    theme,
-    setTheme,
-}: {
-    theme?: string;
-    setTheme?: (value: string) => void;
-}) {
-    const { prefs } = useAppearance();
-    const { t, language } = useI18n();
-    const script = scriptOf(language);
-    const activeFont = effectiveFont(prefs.font, script);
-    const radius = radiusValue(prefs);
-
-    return (
-        <div className="relative overflow-hidden rounded-2xl border bg-card/70 p-5 shadow-sm backdrop-blur-sm transition-all">
-            {/* Top Header */}
-            <div className="flex items-center gap-2 border-b border-border/50 pb-3">
-                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
-                <span className="text-xs font-semibold text-foreground/80">
-                    Live Preview
-                </span>
-            </div>
-
-            {/* Live Interactive Specimen Stage */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                {/* Visual Specimen Area */}
-                <div className="md:col-span-8 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-muted-foreground">
-                            {fontLabel(t, activeFont.id)}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">•</span>
-                        <span className="text-[11px] text-muted-foreground">
-                            Radius: {Math.round(parseFloat(radius) * 16)}px
-                        </span>
-                    </div>
-
-                    <p
-                        className="text-xl md:text-2xl font-semibold tracking-tight text-foreground leading-snug transition-all"
-                        style={{ fontFamily: sampleFont(activeFont.family) }}
-                    >
-                        {SPECIMEN_TEXT[script] ?? SPECIMEN_TEXT.latin}
-                    </p>
-
-                    <p
-                        className="text-xs text-muted-foreground/80 leading-relaxed"
-                        style={{ fontFamily: sampleFont(activeFont.family) }}
-                    >
-                        ABCDEFGHIJKLMNOPQRSTUVWXYZ • abcdefghijklmnopqrstuvwxyz • 0123456789
-                    </p>
-                </div>
-
-                {/* Simulated UI Micro-Component */}
-                <div className="md:col-span-4 flex flex-col gap-2.5 rounded-xl border bg-muted/30 p-3.5 shadow-inner">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                            <Shield size={13} className="text-primary" />
-                            <span>Protected</span>
-                        </span>
-                        <span className="font-mono text-[11px]">18 ms</span>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg bg-background/80 px-2.5 py-1.5 border text-xs">
-                        <span className="font-medium truncate">Zurich #04</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">WireGuard</span>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-95"
-                        style={{ borderRadius: radius }}
-                    >
-                        <Sparkles size={13} />
-                        <span>Interactive Accent</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 /**
  * Modern Typeface Specimen Gallery
