@@ -19,16 +19,10 @@
 import toast from "react-hot-toast";
 
 import { errorMessage, EVENTS, eventPayload, invoke, listen } from "@/lib/backend";
-import type { ConnectionState, PluginInfo, PluginPermission, Profile } from "@/types";
+import type { ConnectionState, PluginInfo, PluginPermission } from "@/types";
 
 /** What the host needs from the app to answer plugins. */
 export interface HostActions {
-    /** Connects, to a given server or to whatever is selected. */
-    connect: (serverId?: string) => Promise<void>;
-    disconnect: () => Promise<void>;
-    addServer: (name: string, link: string) => Promise<void>;
-    addSubscription: (url: string) => Promise<void>;
-    profiles: () => Profile[];
     state: () => ConnectionState;
     language: () => string;
     platform: () => string;
@@ -44,7 +38,6 @@ const frames = new Map<Window, Frame>();
 const plugins = new Map<string, PluginInfo>();
 let actions: HostActions | null = null;
 const lastToast = new Map<string, number>();
-const lastNotify = new Map<string, number>();
 
 /** Hands the host what it needs from the app; called on every render. */
 export function setHostActions(next: HostActions) {
@@ -169,91 +162,12 @@ const METHODS: Record<string, Method> = {
             return null;
         },
     },
-    "storage.get": {
-        run: (pluginId, params) => invoke("plugin_storage_get", { id: pluginId, key: text(params.key, 200) }),
-    },
-    "storage.set": {
-        run: (pluginId, params) =>
-            invoke("plugin_storage_set", { id: pluginId, key: text(params.key, 200), value: params.value ?? null }).then(() => null),
-    },
-
-    "vpn.status": { permission: "state", run: () => publicState(ready().state()) },
-    "vpn.traffic": { permission: "state", run: () => invoke("get_traffic") },
-    "vpn.connect": {
-        permission: "control",
-        run: async (_, params) => {
-            const server = text(params.server, 100);
-            if (server && !ready().profiles().some((profile) => profile.id === server)) {
-                throw new Error("there is no server with that id");
-            }
-            await ready().connect(server || undefined);
-            return publicState(ready().state());
-        },
-    },
-    "vpn.disconnect": {
-        permission: "control",
-        run: async () => {
-            await ready().disconnect();
-            return null;
-        },
-    },
-
-    "connections.list": { permission: "connections", run: () => invoke("get_connections") },
-
-    "servers.list": {
-        permission: "profiles",
-        // Never the links: they carry the credentials.
-        run: () =>
-            ready()
-                .profiles()
-                .map((profile) => ({
-                    id: profile.id,
-                    name: profile.name,
-                    protocol: profile.protocol,
-                    host: profile.server,
-                    favorite: !!profile.favorite,
-                    subscription: profile.source_domain ?? null,
-                })),
-    },
-    "servers.add": {
-        permission: "import",
-        run: async (_, params) => {
-            const link = text(params.link, 20000).trim();
-            if (!link) throw new Error("give a link");
-            await ready().addServer(text(params.name, 100), link);
-            return null;
-        },
-    },
-    "subscriptions.add": {
-        permission: "import",
-        run: async (_, params) => {
-            const url = text(params.url, 4000).trim();
-            if (!/^https?:\/\//i.test(url)) throw new Error("give an http or https link");
-            await ready().addSubscription(url);
-            return null;
-        },
-    },
-
-    "routing.addRule": {
-        permission: "routing",
-        run: async (pluginId, params) => {
-            const values = Array.isArray(params.values) ? params.values.map((value) => text(value, 500)).filter(Boolean) : [];
-            await invoke("add_plugin_rule", {
-                id: pluginId,
-                rule: { kind: text(params.kind, 40), values, action: text(params.action, 20), invert: params.invert === true },
-            });
-            return null;
-        },
-    },
-
-    notify: {
-        permission: "notifications",
-        run: async (pluginId, params) => {
-            throttle(lastNotify, pluginId, 10_000);
-            await invoke("plugin_notify", { id: pluginId, title: text(params.title, 100), body: text(params.body, 400) });
-            return null;
-        },
-    },
+    ...Object.fromEntries([
+        "storage.get", "storage.set", "vpn.status", "vpn.traffic", "vpn.connect", "vpn.disconnect",
+        "connections.list", "servers.list", "servers.add", "subscriptions.add", "routing.addRule", "notify", "backend.call",
+    ].map((method) => [method, {
+        run: (pluginId: string, params: Params) => invoke("plugin_call", { id: pluginId, method, raw: params }),
+    }])),
 };
 
 /** Which permission each event needs. */
@@ -261,6 +175,7 @@ const EVENT_PERMISSIONS: Record<string, PluginPermission | undefined> = {
     "vpn.state": "state",
     "vpn.traffic": "state",
     "app.theme": undefined,
+    "backend.event": undefined,
 };
 
 async function answer(target: Window, frame: Frame, id: number, method: string, params: Params) {
@@ -274,6 +189,8 @@ async function answer(target: Window, frame: Frame, id: number, method: string, 
                     : "this plugin is turned off"
             );
         }
+        // Even UI-only methods recheck integrity and enabled state in Go.
+        await invoke("plugin_call", { id: frame.pluginId, method: "app.info", raw: {} });
         const result = await entry.run(frame.pluginId, params);
         post(target, { id, result: result ?? null });
     } catch (error) {
@@ -317,6 +234,14 @@ export function startPluginHost(): () => void {
     const stopState = listen(EVENTS.state, (data) => {
         broadcast("vpn.state", publicState(eventPayload<ConnectionState>(data)), "state");
     });
+    const stopBackend = listen("plugin-backend-event", (payload) => {
+        const event = eventPayload<{ id: string; event: string; data: unknown }>(payload);
+        for (const [target, frame] of frames) {
+            if (frame.pluginId === event.id && frame.subscriptions.has("backend.event") && allowed(frame.pluginId)) {
+                post(target, { event: "backend.event", data: { event: event.event, data: event.data } });
+            }
+        }
+    });
     const stopTraffic = listen(EVENTS.traffic, (data) => {
         broadcast("vpn.traffic", eventPayload(data), "state");
     });
@@ -331,6 +256,7 @@ export function startPluginHost(): () => void {
         window.removeEventListener("message", onMessage);
         stopState();
         stopTraffic();
+        stopBackend();
         observer.disconnect();
         window.clearTimeout(pending);
     };

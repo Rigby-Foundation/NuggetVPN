@@ -302,7 +302,7 @@ export function RadiusPicker() {
             min={RADIUS_LIMITS.min}
             max={RADIUS_LIMITS.max}
             step={RADIUS_LIMITS.step}
-            track="linear-gradient(to right, var(--muted), var(--primary))"
+            track="var(--muted)"
             thumb="var(--primary)"
             onChange={setRadiusCustom}
             format={(value) => `${Math.round(value * 16)}px`}

@@ -53,16 +53,22 @@ func PluginFiles(next http.Handler) http.Handler {
 // PluginInfo is a plugin as the window sees it: its manifest with file names
 // turned into URLs.
 type PluginInfo struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Version     string   `json:"version"`
-	Author      string   `json:"author,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Homepage    string   `json:"homepage,omitempty"`
-	Icon        string   `json:"icon,omitempty"`
-	Enabled     bool     `json:"enabled"`
-	Permissions []string `json:"permissions"`
-	Network     []string `json:"network"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Version          string   `json:"version"`
+	Author           string   `json:"author,omitempty"`
+	Description      string   `json:"description,omitempty"`
+	Homepage         string   `json:"homepage,omitempty"`
+	Icon             string   `json:"icon,omitempty"`
+	Enabled          bool     `json:"enabled"`
+	Native           bool     `json:"native"`
+	BackendSupported bool     `json:"backend_supported"`
+	Checksum         string   `json:"checksum"`
+	ApprovedChecksum string   `json:"approved_checksum"`
+	ApprovalRequired bool     `json:"approval_required"`
+	Error            string   `json:"error,omitempty"`
+	Permissions      []string `json:"permissions"`
+	Network          []string `json:"network"`
 
 	Themes  []PluginTheme   `json:"themes"`
 	Fonts   []PluginFont    `json:"fonts"`
@@ -118,6 +124,7 @@ type PluginPreview struct {
 	// NewPermissions are the ones the user has not allowed before.
 	NewPermissions []string `json:"new_permissions"`
 	HasScript      bool     `json:"has_script"`
+	Review         bool     `json:"review"`
 }
 
 // pendingPlugin is a read plugin waiting for the user to allow it.
@@ -131,7 +138,7 @@ var (
 	pendingPlugins   = map[string]pendingPlugin{}
 )
 
-func pluginInfo(manifest plugins.Manifest, state plugins.State) PluginInfo {
+func pluginInfo(manifest plugins.Manifest, state plugins.State, checksum string) PluginInfo {
 	url := func(name string) string {
 		if name == "" {
 			return ""
@@ -143,8 +150,10 @@ func pluginInfo(manifest plugins.Manifest, state plugins.State) PluginInfo {
 		Author: manifest.Author, Description: manifest.Description, Homepage: manifest.Homepage,
 		Icon: url(manifest.Icon), Enabled: state.Enabled,
 		Permissions: append([]string{}, state.Granted...),
-		Network:     append([]string{}, manifest.Network...),
-		Themes:      []PluginTheme{}, Fonts: []PluginFont{}, Routing: []PluginRouting{},
+		Native:      manifest.Backend != nil, BackendSupported: manifest.Backend.Executable() != "",
+		Checksum: checksum, ApprovedChecksum: state.Checksum, ApprovalRequired: state.ApprovalRequired,
+		Network: append([]string{}, manifest.Network...),
+		Themes:  []PluginTheme{}, Fonts: []PluginFont{}, Routing: []PluginRouting{},
 		Background: url(manifest.Background),
 	}
 	if manifest.Panel != nil {
@@ -179,9 +188,21 @@ func pluginInfo(manifest plugins.Manifest, state plugins.State) PluginInfo {
 
 // ListPlugins lists the installed plugins.
 func (a *App) ListPlugins() []PluginInfo {
+	list := pluginsStore().List()
+	if a.pluginHost != nil {
+		a.pluginHost.Sync(pluginsStore(), list)
+	}
 	result := []PluginInfo{}
-	for _, plugin := range pluginsStore().List() {
-		result = append(result, pluginInfo(plugin.Manifest, plugin.State))
+	for _, plugin := range list {
+		info := pluginInfo(plugin.Manifest, plugin.State, plugin.Checksum)
+		info.Error = plugin.Error
+		if a.pluginHost != nil && info.Error == "" {
+			info.Error = a.pluginHost.Status(info.ID)
+		}
+		if info.Native && !info.BackendSupported {
+			info.Enabled = false
+		}
+		result = append(result, info)
 	}
 	return result
 }
@@ -221,6 +242,23 @@ func (a *App) previewPlugin(data []byte) (PluginPreview, error) {
 	if err != nil {
 		return PluginPreview{}, err
 	}
+	return a.previewPluginPackage(pkg, false)
+}
+
+// ReviewPlugin previews the current files without enabling them. InstallPlugin
+// subsequently installs exactly this snapshot, not files changed after review.
+func (a *App) ReviewPlugin(id string) (PluginPreview, error) {
+	pkg, err := pluginsStore().Snapshot(id)
+	if err != nil {
+		return PluginPreview{}, err
+	}
+	return a.previewPluginPackage(pkg, true)
+}
+
+func (a *App) previewPluginPackage(pkg *plugins.Package, review bool) (PluginPreview, error) {
+	if pkg.Manifest.Backend != nil && (!plugins.NativeAllowed() || pkg.Manifest.Backend.Executable() == "") {
+		return PluginPreview{}, errors.New("this native plugin does not support this desktop platform")
+	}
 	random := make([]byte, 16)
 	if _, err := rand.Read(random); err != nil {
 		return PluginPreview{}, err
@@ -239,15 +277,17 @@ func (a *App) previewPlugin(data []byte) (PluginPreview, error) {
 
 	preview := PluginPreview{
 		Token:          token,
-		Plugin:         pluginInfo(pkg.Manifest, plugins.State{Granted: pkg.Manifest.Permissions}),
+		Plugin:         pluginInfo(pkg.Manifest, plugins.State{Granted: pkg.Manifest.Permissions}, pkg.Checksum()),
 		NewPermissions: pluginsStore().NewPermissions(pkg),
 		HasScript:      pkg.Manifest.HasScript(),
+		Review:         review,
 	}
 	if preview.NewPermissions == nil {
 		preview.NewPermissions = []string{}
 	}
 	if existing, ok := pluginsStore().Get(pkg.Manifest.ID); ok {
 		preview.Installed = existing.Manifest.Version
+		preview.Plugin.ApprovedChecksum = existing.State.Checksum
 	}
 	return preview, nil
 }
@@ -262,16 +302,27 @@ func (a *App) InstallPlugin(token string) (PluginInfo, error) {
 	if !ok || time.Now().After(pending.expires) {
 		return PluginInfo{}, errors.New("choose the plugin file again")
 	}
+	if a.pluginHost != nil {
+		a.pluginHost.Stop(pending.pkg.Manifest.ID)
+	}
 	if err := pluginsStore().Install(pending.pkg); err != nil {
 		return PluginInfo{}, err
 	}
 	a.appendLog(fmt.Sprintf("Installed plugin %s %s", pending.pkg.Manifest.Name, pending.pkg.Manifest.Version))
 	plugin, _ := pluginsStore().Get(pending.pkg.Manifest.ID)
-	return pluginInfo(plugin.Manifest, plugin.State), nil
+	_ = a.ListPlugins()
+	return pluginInfo(plugin.Manifest, plugin.State, plugin.Checksum), nil
 }
 
 // RemovePlugin uninstalls a plugin and what it stored.
 func (a *App) RemovePlugin(id string) error {
+	// Prevent the supervisor from restarting the process while it is removed.
+	if err := pluginsStore().SetEnabled(id, false); err != nil {
+		return err
+	}
+	if a.pluginHost != nil {
+		a.pluginHost.Stop(id)
+	}
 	return pluginsStore().Remove(id)
 }
 
@@ -279,6 +330,9 @@ func (a *App) RemovePlugin(id string) error {
 func (a *App) SetPluginEnabled(id string, enabled bool) ([]PluginInfo, error) {
 	if err := pluginsStore().SetEnabled(id, enabled); err != nil {
 		return a.ListPlugins(), err
+	}
+	if !enabled && a.pluginHost != nil {
+		a.pluginHost.Stop(id)
 	}
 	return a.ListPlugins(), nil
 }
@@ -303,7 +357,7 @@ func (a *App) PluginStorageSet(id, key string, value json.RawMessage) error {
 // permission (none when empty).
 func activePlugin(id, permission string) (plugins.Installed, error) {
 	plugin, ok := pluginsStore().Get(id)
-	if !ok || !plugin.State.Enabled {
+	if !ok || !plugin.State.Enabled || plugin.State.ApprovalRequired || (plugin.Manifest.Backend != nil && plugin.Manifest.Backend.Executable() == "") {
 		return plugin, errors.New("that plugin is not installed or is turned off")
 	}
 	if permission == "" {

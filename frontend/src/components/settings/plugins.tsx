@@ -63,6 +63,7 @@ function contents(plugin: PluginInfo, t: ReturnType<typeof useT>): string {
     if (plugin.fonts.length) parts.push(t("plugins.has.fonts", { count: plugin.fonts.length }));
     if (plugin.routing.length) parts.push(t("plugins.has.routing", { count: plugin.routing.length }));
     if (plugin.panel) parts.push(t("plugins.has.panel"));
+    if (plugin.native) parts.push(t("plugins.has.native"));
     if (plugin.background) parts.push(t("plugins.has.background"));
     return parts.join(" · ");
 }
@@ -121,7 +122,7 @@ function InstallDialog({
                         <div className="min-w-0 text-start">
                             <DialogTitle className="truncate">{plugin.name}</DialogTitle>
                             <DialogDescription>
-                                {preview.installed
+                                {preview.installed && !preview.review
                                     ? t("plugins.install.update", { from: preview.installed, to: plugin.version })
                                     : t("plugins.install.version", { version: plugin.version })}
                                 {plugin.author ? ` · ${plugin.author}` : ""}
@@ -136,7 +137,19 @@ function InstallDialog({
                         <h4 className="text-xs font-medium">{t("plugins.install.asks")}</h4>
                         <PermissionList permissions={plugin.permissions} network={plugin.network} fresh={preview.installed ? fresh : undefined} />
                     </div>
-                    {preview.has_script ? (
+                    <div className="space-y-1 text-xs">
+                        <p className="font-medium">{t("plugins.checksum")}</p>
+                        <p className="break-all font-mono text-[11px] text-muted-foreground">{plugin.checksum}</p>
+                        {plugin.approved_checksum && plugin.approved_checksum !== plugin.checksum ? (
+                            <p className="text-amber-500">{t("plugins.checksum.changed")}</p>
+                        ) : null}
+                    </div>
+                    {plugin.native ? (
+                        <p className="flex items-start gap-2 text-xs text-amber-500">
+                            <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                            {t("plugins.install.native")}
+                        </p>
+                    ) : preview.has_script ? (
                         <p className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
                             <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
                             {t("plugins.install.script")}
@@ -149,7 +162,7 @@ function InstallDialog({
                     </Button>
                     <Button onClick={onInstall} disabled={busy}>
                         {busy ? <Loader2 size={14} className="me-2 animate-spin" aria-hidden="true" /> : null}
-                        {t(preview.installed ? "plugins.install.updateAction" : "plugins.install.action")}
+                        {t(preview.review ? "plugins.approve" : preview.installed ? "plugins.install.updateAction" : "plugins.install.action")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -161,6 +174,7 @@ function PluginCard({ plugin }: { plugin: PluginInfo }) {
     const t = useT();
     const { setPlugins, refresh } = usePlugins();
     const [open, setOpen] = useState(false);
+    const [review, setReview] = useState<PluginPreview | null>(null);
     const [confirmRemove, setConfirmRemove] = useState(false);
     const [busy, setBusy] = useState(false);
 
@@ -168,6 +182,30 @@ function PluginCard({ plugin }: { plugin: PluginInfo }) {
         setBusy(true);
         try {
             setPlugins(await invoke<PluginInfo[]>("set_plugin_enabled", { id: plugin.id, enabled }));
+        } catch (error) {
+            toast.error(errorMessage(error), { id: "plugin" });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const reviewFiles = async () => {
+        setBusy(true);
+        try {
+            setReview(await invoke<PluginPreview>("review_plugin", { id: plugin.id }));
+        } catch (error) {
+            toast.error(errorMessage(error), { id: "plugin" });
+        } finally {
+            setBusy(false);
+        }
+    };
+    const approve = async () => {
+        if (!review) return;
+        setBusy(true);
+        try {
+            await invoke("install_plugin", { token: review.token });
+            await refresh();
+            setReview(null);
         } catch (error) {
             toast.error(errorMessage(error), { id: "plugin" });
         } finally {
@@ -214,12 +252,21 @@ function PluginCard({ plugin }: { plugin: PluginInfo }) {
                 </button>
                 <Switch
                     checked={plugin.enabled}
-                    disabled={busy}
+                    disabled={busy || plugin.approval_required || (plugin.native && !plugin.backend_supported)}
                     onCheckedChange={(checked) => void toggle(checked)}
                     aria-label={t("plugins.enabled", { name: plugin.name })}
                 />
             </div>
 
+            {plugin.approval_required ? (
+                <div className="space-y-2 border-t p-3.5">
+                    <p className="text-xs text-amber-500">{t("plugins.checksum.blocked")}</p>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => void reviewFiles()}>{t("plugins.review")}</Button>
+                </div>
+            ) : null}
+            {plugin.error ? <p role="status" className="px-3.5 pb-3 text-xs text-destructive">{plugin.error}</p> : null}
+            {plugin.native && !plugin.backend_supported ? <p className="px-3.5 pb-3 text-xs text-muted-foreground">{t("plugins.unsupported")}</p> : null}
+            {review ? <InstallDialog preview={review} busy={busy} onCancel={() => setReview(null)} onInstall={() => void approve()} /> : null}
             {open ? (
                 <div className="space-y-4 border-t p-3.5">
                     <div className="space-y-2">
@@ -244,6 +291,7 @@ function PluginCard({ plugin }: { plugin: PluginInfo }) {
                     {plugin.themes.length > 0 || plugin.fonts.length > 0 ? (
                         <p className="text-[11px] text-muted-foreground">{t("plugins.lookHint")}</p>
                     ) : null}
+                    <p className="break-all font-mono text-[11px] text-muted-foreground">{t("plugins.checksum")}: {plugin.checksum}</p>
                     {plugin.homepage ? <p className="break-all font-mono text-[11px] text-muted-foreground">{plugin.homepage}</p> : null}
                     <div className="flex justify-end">
                         <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive" disabled={busy} onClick={() => setConfirmRemove(true)}>
@@ -257,7 +305,7 @@ function PluginCard({ plugin }: { plugin: PluginInfo }) {
             {plugin.enabled && plugin.panel ? (
                 <div className="border-t">
                     {plugin.panel_title ? <h4 className="px-3.5 pt-3 text-xs font-medium text-muted-foreground">{plugin.panel_title}</h4> : null}
-                    <PluginFrame key={plugin.version} plugin={plugin} url={plugin.panel} title={plugin.panel_title || plugin.name} />
+                    <PluginFrame key={plugin.checksum} plugin={plugin} url={plugin.panel} title={plugin.panel_title || plugin.name} />
                 </div>
             ) : null}
 

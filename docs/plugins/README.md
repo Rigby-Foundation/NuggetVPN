@@ -10,8 +10,13 @@ root. It can bring:
 | **Routing setups** | Routing → From plugins |
 | **A page** | Under the plugin, in Settings → Plugins |
 | **A background page** | Nowhere: it runs, unseen, while the plugin is on |
+| **A native backend (desktop)** | A separate user process, optionally paired with a JS page |
 
 A plugin with only themes, fonts and routing setups runs no code at all.
+Plugins without a native backend use the page sandbox described below.
+Native and hybrid plugins require approval to run a program with the user’s
+file and network access; see [native backends](native.md).
+
 Pages are plain HTML and JavaScript. They run in a sandbox and reach the app
 through a small message API, and only for what the user allowed when
 installing.
@@ -66,6 +71,7 @@ A minimal plugin that only adds a theme:
 
 - [plugin.json reference](manifest.md): every field.
 - [Themes, fonts and routing setups](content.md): content plugins.
+- [Native and hybrid plugins](native.md): desktop backends, RPC, checksums and approval.
 - [Writing pages](pages.md): the SDK, styling, sizing, storage.
 - [API reference](api.md): every method and event.
 - [Permissions and the sandbox](security.md): what a plugin can and can't

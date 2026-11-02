@@ -26,6 +26,7 @@ Installing a plugin with the same `id` as one already installed updates it:
 
 - its files are replaced;
 - its storage is kept;
+- the install dialog shows the checksum, and approval pins those exact files;
 - if the new version asks for permissions the old one didn't have, the
   install prompt marks them and the user has to allow them again.
 
@@ -35,6 +36,10 @@ have.
 
 Never change the `id`: a plugin with a new id is a different plugin, with
 none of the old one's storage.
+
+Native plugins must build and package an executable for each supported
+desktop target. See [native and hybrid plugins](native.md). The packager prints
+the same content checksum the client stores; it is not a hash of the ZIP file.
 
 ## Sharing
 

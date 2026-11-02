@@ -1,13 +1,15 @@
 # Permissions and the sandbox
 
-A VPN client sees everything a computer sends, so plugins are built to be
-safe to install. They can add to the app, but never reach past what the user
-allowed.
+Plugins without a native backend run their pages in a browser sandbox.
+Native and hybrid desktop plugins also run an executable with the user’s OS
+access and require explicit approval. App permissions restrict calls through
+NuggetVPN; they do not sandbox native filesystem or network access.
+See [native backends and checksum approval](native.md).
 
 ## Permissions
 
 The install prompt lists every permission a plugin asks for, and every host
-it may contact. An update that asks for more marks the new ones and asks
+its pages may contact. Native processes have the user’s OS access. An update that asks for more marks the new ones and asks
 again.
 
 | Permission | Lets the plugin |
@@ -47,13 +49,15 @@ The page can only talk to the app by message. The app checks every call
 against the plugin's permissions, and checks again in Go for anything that
 changes something.
 
-## What plugins can never do
+## What sandboxed pages cannot do
 
-- Read server links, settings, logs or anything else on disk.
-- Change the core's configuration directly, or run native code.
-- Reach this computer or the local network: `localhost`, IP addresses and
+- Read files directly or retrieve server credentials through the app API.
+- Change the core's configuration directly or launch programs directly. Hybrid
+  pages can call their own approved backend, which may expose native access.
+- Contact this computer or the local network directly: `localhost`, IP addresses and
   local names can't be listed in `network`.
 - Run anything in the privileged part of the app, which holds the tunnel.
+  Native backends also run outside that service.
 - Pass themselves off as the app. Toasts and notifications always carry the
   plugin's name, and rules a plugin adds get a note saying so.
 
@@ -63,6 +67,7 @@ changes something.
   nothing. A status widget needs `state`. Be wary of a plugin that wants
   `routing` or `import` without a good reason: `routing` can send traffic
   outside the VPN, and `import` can add servers someone else controls.
-- **After installing:** turning a plugin off stops its pages at once.
+- **After installing:** turning a plugin off stops its pages and native backend.
+  Changed plugin files revoke approval until the user reviews their checksum.
   Removing it deletes its files and storage, but rules it added stay in
   Routing, marked with its name.

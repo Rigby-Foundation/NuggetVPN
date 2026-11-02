@@ -47,6 +47,13 @@ saying which. So does a method called while the plugin is turned off.
 | `action` | `proxy` (through the VPN), `direct`, or `block`. |
 | `invert` | Match everything the values don't. |
 
+## Native backends (desktop)
+
+`backend.call` takes `{ method, params? }` and returns the result from the
+calling plugin’s backend. A plugin cannot call another plugin’s backend.
+`backend.event` delivers `{ event, data }` emitted by that backend.
+See [native backends](native.md) for the JSON-lines protocol and native app calls.
+
 ## Events
 
 | Event | Permission | Data |

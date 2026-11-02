@@ -25,6 +25,7 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
@@ -53,7 +54,8 @@ const (
 
 // App is bound to the frontend; every exported method is callable from JS.
 type App struct {
-	ctx context.Context
+	ctx        context.Context
+	pluginHost *plugins.NativeHost
 
 	// app and window are resolved during ServiceStartup.
 	app    *application.App
@@ -76,6 +78,8 @@ type App struct {
 	// connectMu serialises Connect and Disconnect so two clicks cannot race a
 	// half-finished failover sweep.
 	connectMu sync.Mutex
+	// proxyPort is the loopback port retained by localProxyPort while the core runs.
+	proxyPort atomic.Int32
 
 	core   *core.Client
 	remote *remote.Client
@@ -155,6 +159,7 @@ func New(version string, icon []byte, notifier *notifications.NotificationServic
 		notifier: notifier,
 		version:  version,
 	}
+	service.initPluginHost()
 	service.settings.Normalize()
 	service.settings.LaunchAtStartup = autostart.Enabled()
 	service.loggingOn.Store(service.settings.LoggingOn())
@@ -201,12 +206,16 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	} else {
 		a.startCommandLine()
 	}
+	a.startPlugins(ctx)
 	return nil
 }
 
 // ServiceShutdown stops the tunnel and the privileged service when the GUI
 // exits, so no root process is left holding the system routes.
 func (a *App) ServiceShutdown() error {
+	if a.pluginHost != nil {
+		a.pluginHost.Close()
+	}
 	a.flushUsage()
 	_ = a.statsStore().Save()
 	a.stopCommandLine()
@@ -222,6 +231,7 @@ func (a *App) ServiceShutdown() error {
 }
 
 func (a *App) emit(name string, payload ...any) {
+	a.publishNativeEvent(name, payload)
 	if a.app == nil {
 		return
 	}

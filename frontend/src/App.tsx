@@ -674,28 +674,9 @@ function App() {
     // What plugins reach the app through; see lib/plugin-host. Read through a
     // ref, so the host always sees the current state without re-rendering.
     const { language } = useI18n();
-    const pluginState = useRef({ profiles, connection, selection, language, platform, addProfile, importSubscription, appendLog });
-    pluginState.current = { profiles, connection, selection, language, platform, addProfile, importSubscription, appendLog };
+    const pluginState = useRef({ connection, language, platform });
+    pluginState.current = { connection, language, platform };
     const pluginActions = useRef<HostActions>({
-        connect: async (serverId) => {
-            const { profiles: list, connection: current, selection: selected } = pluginState.current;
-            const target = serverId ? list.find((profile) => profile.id === serverId) : undefined;
-            if (target) {
-                await current.connect(profileDomain(target), "manual", target.id);
-            } else {
-                await current.connect(selected.domain, selected.mode, selected.profileId);
-            }
-        },
-        disconnect: () => pluginState.current.connection.disconnect(),
-        addServer: async (name, link) => {
-            await pluginState.current.addProfile(name, link);
-            pluginState.current.appendLog([`A plugin added "${name || link.slice(0, 40)}".`]);
-        },
-        addSubscription: async (url) => {
-            await pluginState.current.importSubscription(url);
-            pluginState.current.appendLog(["A plugin added a subscription."]);
-        },
-        profiles: () => pluginState.current.profiles,
         state: () => pluginState.current.connection.state,
         language: () => pluginState.current.language,
         platform: () => pluginState.current.platform,

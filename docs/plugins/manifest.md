@@ -55,11 +55,18 @@ Every plugin has a `plugin.json` at the root of its zip.
 
 See [writing pages](pages.md).
 
+## Native backend (desktop)
+
+`backend` is optional: `{ "api": 1, "executables": { "darwin/arm64": "bin/backend" } }`.
+Each platform entry names a packaged executable. Add a panel for a hybrid
+plugin, or omit pages for a native-only plugin. Android and iOS are excluded.
+See [native and hybrid plugins](native.md) for supported targets and protocol.
+
 ## Access
 
 | Field | |
 | --- | --- |
-| `permissions` | What the plugin's pages may do. See [permissions](security.md#permissions). Ask only for what you use; the install prompt lists every one. |
+| `permissions` | What pages and backends may do through the app API. See [permissions](security.md#permissions). Ask only for what you use; the install prompt lists every one. |
 | `network` | Host names your pages may contact, over `https` and `wss`, like `api.example.com` or `*.example.com`. Nothing else is reachable. IP addresses, `localhost` and local names (`.local`, `.lan`, `.internal`, `.home.arpa`) are refused. Only allowed for plugins with a page. |
 
 ## Files

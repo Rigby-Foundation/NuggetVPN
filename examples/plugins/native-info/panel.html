@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="/plugins/_sdk/nugget.js"></script>
+<style>
+body { margin: 0; padding: 14px; color: var(--foreground); font: 13px var(--font, system-ui); }
+button { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius, 6px); background: var(--card); color: inherit; cursor: pointer; }
+pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<button id="refresh">Read system info</button>
+<pre id="result" role="status">Ready.</pre>
+<script>
+const button = document.getElementById("refresh");
+const output = document.getElementById("result");
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  try {
+    const info = await nugget.call("backend.call", { method: "system.info" });
+    output.textContent = `${info.os} / ${info.architecture}\n${info.cpus} logical CPUs`;
+  } catch (error) { output.textContent = error.message; }
+  finally { button.disabled = false; nugget.fit(); }
+});
+</script>
+</body>
+</html>

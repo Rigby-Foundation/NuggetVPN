@@ -2,7 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 
 import { useAppearance } from "@/components/appearance-provider";
 import { CustomTheme, PLUGIN_THEME_PREFIX, sanitizeTheme, UserFont } from "@/lib/appearance";
-import { invoke } from "@/lib/backend";
+import { eventPayload, invoke, listen } from "@/lib/backend";
 import { HostActions, registerFrame, setHostActions, setHostPlugins, startPluginHost } from "@/lib/plugin-host";
 import { cn } from "@/lib/utils";
 import { PluginInfo } from "@/types";
@@ -70,9 +70,16 @@ export function PluginsProvider({ actions, children }: { actions: HostActions; c
 
     useEffect(() => {
         const stop = startPluginHost();
+        const changed = listen("plugins-changed", (data) => {
+            const list = eventPayload<PluginInfo[]>(data);
+            if (Array.isArray(list)) setPlugins(list);
+        });
         void refresh();
-        return stop;
-    }, [refresh]);
+        return () => {
+            changed();
+            stop();
+        };
+    }, [refresh, setPlugins]);
 
     const value = useMemo(() => ({ plugins, setPlugins, refresh }), [plugins, setPlugins, refresh]);
     const background = plugins.filter((plugin) => plugin.enabled && plugin.background);
@@ -83,7 +90,7 @@ export function PluginsProvider({ actions, children }: { actions: HostActions; c
             {/* Out of sight and out of the tab order; still running. */}
             <div aria-hidden="true" className="pointer-events-none fixed -start-[9999px] top-0 h-px w-px overflow-hidden">
                 {background.map((plugin) => (
-                    <PluginFrame key={plugin.id + plugin.version} plugin={plugin} url={plugin.background!} title={plugin.name} hidden />
+                    <PluginFrame key={plugin.id + plugin.checksum} plugin={plugin} url={plugin.background!} title={plugin.name} hidden />
                 ))}
             </div>
         </Context.Provider>

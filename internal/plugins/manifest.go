@@ -6,9 +6,8 @@
 // sandboxed frames, which reach the app only through a small message API and
 // only for what the user allowed at install.
 //
-// Nothing from a plugin runs outside those frames, and nothing reaches the
-// privileged core service: every change a plugin can ask for goes through the
-// same paths, and the same checks, as the user doing it by hand.
+// Optional desktop backends run as separate, trusted user processes. They
+// never run inside the GUI or privileged core service.
 package plugins
 
 import (
@@ -18,6 +17,7 @@ import (
 	"net"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -79,10 +79,32 @@ type Manifest struct {
 	// Background is a page kept running, unseen, while the plugin is on.
 	Background string `json:"background,omitempty"`
 
+	// Backend is an optional desktop executable, communicating over JSON lines.
+	Backend *Backend `json:"backend,omitempty"`
+
 	Permissions []string `json:"permissions,omitempty"`
 	// Network lists the hosts the plugin's pages may contact. Nothing else
-	// is reachable from them.
+	// is reachable from pages; native processes use the user’s OS access.
 	Network []string `json:"network,omitempty"`
+}
+
+// Backend describes the versioned native protocol and platform executables.
+// Keys are GOOS/GOARCH, for example darwin/arm64 or windows/amd64.
+type Backend struct {
+	API         int               `json:"api"`
+	Executables map[string]string `json:"executables"`
+}
+
+// NativeAllowed is deliberately limited to desktop platforms.
+func NativeAllowed() bool {
+	return runtime.GOOS == "windows" || runtime.GOOS == "linux" || (runtime.GOOS == "darwin" && !mobileBuild)
+}
+
+func (b *Backend) Executable() string {
+	if b == nil || !NativeAllowed() {
+		return ""
+	}
+	return b.Executables[runtime.GOOS+"/"+runtime.GOARCH]
 }
 
 // Theme is a custom theme, in the shape the theme editor makes.
@@ -229,6 +251,24 @@ func ParseManifest(data []byte, files map[string]bool) (Manifest, error) {
 		}
 	}
 
+	if manifest.Backend != nil {
+		if manifest.Backend.API != 1 || len(manifest.Backend.Executables) == 0 {
+			return manifest, errors.New("a backend needs api 1 and at least one executable")
+		}
+		for target, file := range manifest.Backend.Executables {
+			osName, arch, ok := strings.Cut(target, "/")
+			if !ok || (osName != "darwin" && osName != "linux" && osName != "windows") || (arch != "amd64" && arch != "arm64" && !(osName == "linux" && arch == "386")) {
+				return manifest, fmt.Errorf("unsupported backend target %q", target)
+			}
+			if !filePattern.MatchString(file) || strings.Contains(file, "..") || !files[file] {
+				return manifest, fmt.Errorf("backend executable %q is not a safe file in the plugin", file)
+			}
+			if osName == "windows" && !strings.HasSuffix(strings.ToLower(file), ".exe") {
+				return manifest, errors.New("Windows backend executables must end in .exe")
+			}
+		}
+	}
+
 	seen := map[string]bool{}
 	for _, permission := range manifest.Permissions {
 		known := false
@@ -261,7 +301,7 @@ func ParseManifest(data []byte, files map[string]bool) (Manifest, error) {
 
 // HasScript reports whether the plugin runs any code.
 func (m Manifest) HasScript() bool {
-	return m.Panel != nil || m.Background != ""
+	return m.Panel != nil || m.Background != "" || m.Backend != nil
 }
 
 // isLocal reports whether a host names this computer or the local network,

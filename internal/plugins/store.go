@@ -104,13 +104,17 @@ type State struct {
 	Enabled bool `json:"enabled"`
 	// Granted are the permissions the user allowed. A plugin update asking
 	// for more has to be allowed again.
-	Granted []string `json:"granted"`
+	Granted          []string `json:"granted"`
+	Checksum         string   `json:"checksum,omitempty"`
+	ApprovalRequired bool     `json:"approval_required,omitempty"`
 }
 
 // Installed is an installed plugin.
 type Installed struct {
 	Manifest Manifest
 	State    State
+	Checksum string
+	Error    string
 }
 
 // Store keeps the installed plugins under one directory:
@@ -176,15 +180,13 @@ func (s *Store) List() []Installed {
 		if !entry.IsDir() || !Valid(entry.Name()) {
 			continue
 		}
-		manifest, err := s.readManifest(entry.Name())
-		if err != nil {
+		id := entry.Name()
+		state, ok := states[id]
+		if !ok {
 			continue
 		}
-		state, ok := states[manifest.ID]
-		if !ok {
-			continue // half installed, or removed from the record
-		}
-		result = append(result, Installed{Manifest: manifest, State: state})
+		plugin := s.inspect(id, state, states)
+		result = append(result, plugin)
 	}
 	sort.Slice(result, func(a, b int) bool {
 		return strings.ToLower(result[a].Manifest.Name) < strings.ToLower(result[b].Manifest.Name)
@@ -194,44 +196,60 @@ func (s *Store) List() []Installed {
 
 // Get returns one installed plugin.
 func (s *Store) Get(id string) (Installed, bool) {
-	for _, plugin := range s.List() {
-		if plugin.Manifest.ID == id {
-			return plugin, true
-		}
+	if !Valid(id) {
+		return Installed{}, false
 	}
-	return Installed{}, false
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	states := s.readState()
+	state, ok := states[id]
+	if !ok {
+		return Installed{}, false
+	}
+	return s.inspect(id, state, states), true
 }
 
-// readManifest re-reads an installed plugin's manifest, checking it again
-// against the files actually on disk.
-func (s *Store) readManifest(id string) (Manifest, error) {
-	dir := s.pluginDir(id)
-	data, err := os.ReadFile(filepath.Join(dir, ManifestName))
-	if err != nil {
-		return Manifest{}, err
+// inspect checks a single plugin and persists any trust transition. s.mu is held.
+func (s *Store) inspect(id string, state State, states map[string]State) Installed {
+	pkg, err := s.readPackage(id)
+	plugin := Installed{Manifest: Manifest{ID: id, Name: id}, State: state}
+	if err == nil {
+		plugin.Manifest = pkg.Manifest
+		plugin.Checksum = pkg.Checksum()
+	} else {
+		plugin.Error = err.Error()
 	}
-	present := map[string]bool{}
-	_ = filepath.WalkDir(dir, func(file string, entry os.DirEntry, err error) error {
-		if err == nil && entry.Type().IsRegular() {
-			if relative, err := filepath.Rel(dir, file); err == nil {
-				present[filepath.ToSlash(relative)] = true
-			}
+	// Existing content/JS plugins are pinned on their first load. Native code
+	// always requires an explicit install/review approval.
+	if err == nil && state.Checksum == "" && !state.ApprovalRequired && pkg.Manifest.Backend == nil {
+		state.Checksum = plugin.Checksum
+		states[id] = state
+		if err := s.writeState(states); err != nil {
+			state.Enabled = false
+			plugin.Error = err.Error()
 		}
-		return nil
-	})
-	manifest, err := ParseManifest(data, present)
-	if err != nil {
-		return manifest, err
 	}
-	if manifest.ID != id {
-		return manifest, errors.New("the plugin's folder does not match its id")
+	if err != nil || state.Checksum != plugin.Checksum || state.Checksum == "" {
+		state.Enabled = false
+		state.ApprovalRequired = true
+		if old := states[id]; old.Enabled != state.Enabled || old.ApprovalRequired != state.ApprovalRequired {
+			states[id] = state
+			_ = s.writeState(states)
+		}
 	}
-	return manifest, nil
+	plugin.State = state
+	return plugin
 }
 
 // Install puts a plugin in place, replacing an older version, with the
 // permissions it asks for granted and itself turned on.
 func (s *Store) Install(pkg *Package) error {
+	if !Valid(pkg.Manifest.ID) {
+		return errors.New("not a plugin id")
+	}
+	if pkg.Manifest.Backend != nil && (!NativeAllowed() || pkg.Manifest.Backend.Executable() == "") {
+		return errors.New("this native plugin does not support this desktop platform")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := pkg.Manifest.ID
@@ -264,7 +282,7 @@ func (s *Store) Install(pkg *Package) error {
 	_ = os.RemoveAll(old)
 
 	states := s.readState()
-	states[id] = State{Enabled: true, Granted: append([]string{}, pkg.Manifest.Permissions...)}
+	states[id] = State{Enabled: true, Granted: append([]string{}, pkg.Manifest.Permissions...), Checksum: pkg.Checksum()}
 	return s.writeState(states)
 }
 
@@ -281,6 +299,7 @@ func (s *Store) Remove(id string) error {
 		return err
 	}
 	_ = os.Remove(s.dataPath(id))
+	_ = os.RemoveAll(filepath.Join(s.dir, "native-data", id))
 	return os.RemoveAll(s.pluginDir(id))
 }
 
@@ -292,6 +311,16 @@ func (s *Store) SetEnabled(id string, enabled bool) error {
 	state, ok := states[id]
 	if !ok {
 		return errors.New("that plugin is not installed")
+	}
+	if enabled {
+		pkg, err := s.readPackage(id)
+		if err != nil || state.ApprovalRequired || state.Checksum == "" || pkg.Checksum() != state.Checksum {
+			state.Enabled = false
+			state.ApprovalRequired = true
+			states[id] = state
+			_ = s.writeState(states)
+			return errors.New("the plugin changed; review and approve its checksum before loading it")
+		}
 	}
 	state.Enabled = enabled
 	states[id] = state
@@ -319,10 +348,18 @@ func (s *Store) NewPermissions(pkg *Package) []string {
 
 // ReadFile returns a file inside an installed plugin.
 func (s *Store) ReadFile(id, name string) ([]byte, error) {
-	if !Valid(id) || !filePattern.MatchString(name) || strings.Contains(name, "..") {
+	if !filePattern.MatchString(name) || strings.Contains(name, "..") {
 		return nil, os.ErrNotExist
 	}
-	return os.ReadFile(filepath.Join(s.pluginDir(id), filepath.FromSlash(name)))
+	pkg, err := s.VerifiedPackage(id)
+	if err != nil {
+		return nil, err
+	}
+	content, ok := pkg.Files[name]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return content, nil
 }
 
 // ---------------------------------------------------------------------------

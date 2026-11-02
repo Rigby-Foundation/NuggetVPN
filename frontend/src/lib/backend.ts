@@ -83,6 +83,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     set_system_bars: { method: "SetSystemBars", args: ["color", "light"] },
     list_installed_apps: { method: "ListInstalledApps", args: [] },
     get_app_icon: { method: "GetAppIcon", args: ["packageName"] },
+    plugin_call: { method: "PluginCall", args: ["id", "method", "raw"] },
+    review_plugin: { method: "ReviewPlugin", args: ["id"] },
     list_plugins: { method: "ListPlugins", args: [] },
     pick_plugin: { method: "PickPlugin", args: [] },
     install_plugin: { method: "InstallPlugin", args: ["token"] },

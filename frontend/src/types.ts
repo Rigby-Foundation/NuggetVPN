@@ -391,6 +391,12 @@ export interface PluginInfo {
     homepage?: string;
     icon?: string;
     enabled: boolean;
+    native: boolean;
+    backend_supported: boolean;
+    checksum: string;
+    approved_checksum: string;
+    approval_required: boolean;
+    error?: string;
     permissions: PluginPermission[];
     network: string[];
     themes: PluginTheme[];
@@ -418,6 +424,7 @@ export interface PluginPreview {
     installed?: string;
     new_permissions: PluginPermission[];
     has_script: boolean;
+    review: boolean;
 }
 
 /** One entry of the routing schedule; see models.ScheduleEntry. */

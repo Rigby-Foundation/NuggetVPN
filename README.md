@@ -90,10 +90,13 @@ regular installer takes `/S` for the same.
 ### Plugins
 
 Plugins can bring themes, fonts and routing setups, and add pages of their
-own. A plugin’s code runs in a sandbox, sealed off from the app and your
-files, and can only do what you allow when you install it. See
-[docs/plugins](docs/plugins/README.md) to write one, and
-[`examples/plugins/glance`](examples/plugins/glance) for an example.
+own. Pages run in a sandbox and use a permission-checked app API. On desktop,
+plugins can also include a native backend, with or without a JS page. Native
+code runs as your user and requires explicit approval. The client pins each
+plugin’s checksum and disables changed files until you approve them again.
+See [docs/plugins](docs/plugins/README.md), the
+[JS example](examples/plugins/glance), and the
+[native/hybrid guide](docs/plugins/native.md).
 
 ### Everything else
 
@@ -324,7 +327,8 @@ go build -tags "$(make -s tags)" .
   routing format.
 - **`internal/autostart/`**: launch at login.
 - **`internal/plugins/`**: reading, installing and serving plugins, the
-  sandbox policy for their pages, and the SDK (`sdk/nugget.js`). The window
+  sandbox policy for their pages, checksum approval, native process supervision,
+  and the SDK (`sdk/nugget.js`). The window
   side is `frontend/src/lib/plugin-host.ts`.
 - **`cmd/nuggetplugin/`**: builds a `.nuggetplugin` from a folder.
 - **`internal/storage/`**, **`internal/models/`**: persistence and shared

@@ -38,6 +38,10 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("%s %s: %s (%d KB)\n", pkg.Manifest.Name, pkg.Manifest.Version, output, (len(data)+1023)/1024)
+	fmt.Printf("SHA-256: %s\n", pkg.Checksum())
+	if pkg.Manifest.Backend != nil {
+		fmt.Println("native backend: requires user-account file and network access")
+	}
 	if len(pkg.Manifest.Permissions) > 0 || len(pkg.Manifest.Network) > 0 {
 		fmt.Printf("asks for: %s\n", strings.Join(append(pkg.Manifest.Permissions, pkg.Manifest.Network...), ", "))
 	}

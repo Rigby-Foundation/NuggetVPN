@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { invoke } from "@/lib/backend";
+import { eventPayload, invoke, listen } from "@/lib/backend";
 import { ConfigSource, Profile, ProxyMode, RefreshSummary, SubscriptionInfo } from "@/types";
 
 /** Profiles added by hand are grouped under this pseudo-domain. */
@@ -129,6 +129,11 @@ export function useProfiles() {
     const load = useCallback(async () => {
         return apply(await invoke<Profile[]>("get_profiles"));
     }, [apply]);
+
+    useEffect(() => listen("profiles-changed", (data) => {
+        const next = eventPayload<Profile[]>(data);
+        if (Array.isArray(next)) apply(next);
+    }), [apply]);
 
     const addProfile = useCallback(
         async (name: string, link: string) => {
