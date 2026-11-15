@@ -197,6 +197,9 @@ export function parseProxyLink(raw: string, fallbackName = ""): ProxyFormState {
                 state.security = v.tls === "tls" ? "tls" : "none";
                 state.sni = v.sni || "";
                 state.fingerprint = v.fp || "chrome";
+                state.alpn = v.alpn || "";
+                state.insecure = v.insecure === true || v.insecure === "1" || v.allowInsecure === true;
+                if (state.network === "grpc") state.serviceName = (v.path || "").replace(/^\//, "");
                 return state;
             } catch {
                 // Try URI format below
@@ -231,6 +234,7 @@ export function parseProxyLink(raw: string, fallbackName = ""): ProxyFormState {
             state.flow = params.get("flow") || "";
         } else if (scheme === "trojan" || scheme === "hysteria2" || scheme === "hy2") {
             state.password = decodeURIComponent(url.username || url.password || "");
+            if ((scheme === "hysteria2" || scheme === "hy2") && url.username && url.password) state.password += `:${decodeURIComponent(url.password)}`;
         } else if (scheme === "ss") {
             let userPart = url.username;
             if (url.password) {
@@ -258,7 +262,7 @@ export function parseProxyLink(raw: string, fallbackName = ""): ProxyFormState {
         const sec = (params.get("security") || "").toLowerCase();
         if (sec === "reality") {
             state.security = "reality";
-        } else if (sec === "tls" || scheme === "trojan" || scheme === "hysteria2" || scheme === "tuic") {
+        } else if (sec === "tls" || scheme === "trojan" || scheme === "hysteria2" || scheme === "hy2" || scheme === "https" || scheme === "tuic") {
             state.security = "tls";
         } else {
             state.security = "none";
@@ -408,7 +412,9 @@ export function serializeProxyConfig(state: ProxyFormState): string {
             net: state.network || "tcp",
             type: "none",
             host: state.host || "",
-            path: state.path || "",
+            path: state.network === "grpc" ? state.serviceName : state.path || "",
+            alpn: state.alpn || "",
+            allowInsecure: state.insecure,
             tls: state.security === "tls" ? "tls" : "",
             sni: state.sni || "",
             fp: state.fingerprint || "chrome",
@@ -419,7 +425,13 @@ export function serializeProxyConfig(state: ProxyFormState): string {
     // Trojan
     if (proto === "trojan") {
         const params = new URLSearchParams();
-        params.set("security", state.security === "none" ? "none" : "tls");
+        params.set("security", state.security);
+        if (state.security === "reality") {
+            if (state.publicKey) params.set("pbk", state.publicKey);
+            if (state.shortId) params.set("sid", state.shortId);
+            if (state.spiderX) params.set("spx", state.spiderX);
+        }
+        if (state.insecure) params.set("insecure", "1");
         if (state.sni) params.set("sni", state.sni);
         if (state.alpn) params.set("alpn", state.alpn);
         if (state.fingerprint) params.set("fp", state.fingerprint);
@@ -448,6 +460,7 @@ export function serializeProxyConfig(state: ProxyFormState): string {
         if (state.obfs) params.set("obfs", state.obfs);
         if (state.obfsPassword) params.set("obfs-password", state.obfsPassword);
         if (state.ports) params.set("mport", state.ports);
+        if (state.alpn) params.set("alpn", state.alpn);
         if (state.upMbps) params.set("upmbps", state.upMbps);
         if (state.downMbps) params.set("downmbps", state.downMbps);
 
@@ -475,4 +488,37 @@ export function serializeProxyConfig(state: ProxyFormState): string {
 
     // Fallback: if we don't recognize the protocol, return rawLink if unmodified or build URL
     return state.rawLink || `vless://${encodeURIComponent(state.uuid)}@${host}:${port}${nameFragment}`;
+}
+
+/** Only expose structured editing when every option can survive a round trip. */
+export function canEditProxyForm(raw: string): boolean {
+    const text = raw.trim();
+    if (text.startsWith("{") || text.startsWith("[")) return false;
+    if (text.startsWith("vmess://")) {
+        try {
+            const value = JSON.parse(safeBase64Decode(text.slice(8)));
+            const supported = new Set(["v", "ps", "add", "port", "id", "aid", "scy", "net", "type", "host", "path", "tls", "sni", "alpn", "fp", "allowInsecure", "insecure"]);
+            return Object.keys(value).every((key) => supported.has(key)) &&
+                ["", "none"].includes(value.type ?? "") &&
+                ["tcp", "ws", "grpc", "httpupgrade"].includes(value.net || "tcp") &&
+                Number(value.aid || 0) === 0;
+        } catch { return false; }
+    }
+    try {
+        const url = new URL(text);
+        if (!["vless:", "trojan:", "ss:", "socks:", "socks5:", "http:", "https:", "hysteria2:", "hy2:"].includes(url.protocol)) return false;
+        const supported = new Set(["type", "security", "sni", "peer", "host", "path", "serviceName", "alpn", "fp", "allowInsecure", "insecure", "flow", "pbk", "sid", "spx", "encryption", "obfs", "obfs-password", "ports", "mport", "upmbps", "downmbps"]);
+        if ([...url.searchParams.keys()].some((key) => !supported.has(key))) return false;
+        if (["ss:", "http:", "https:", "socks:", "socks5:"].includes(url.protocol)) return !url.search;
+        if (["hy2:", "hysteria2:"].includes(url.protocol)) {
+            const hy2 = new Set(["sni", "peer", "insecure", "alpn", "obfs", "obfs-password", "mport", "ports", "upmbps", "downmbps"]);
+            return [...url.searchParams.keys()].every((key) => hy2.has(key));
+        }
+        const network = url.searchParams.get("type") || "tcp";
+        if (!["tcp", "ws", "grpc", "httpupgrade"].includes(network)) return false;
+        if ((url.searchParams.get("encryption") || "none") !== "none") return false;
+        if ((url.searchParams.get("path") || "").includes("?")) return false;
+        if ((url.searchParams.get("security") || "tls") === "reality" && !["vless:", "trojan:"].includes(url.protocol)) return false;
+        return true;
+    } catch { return false; }
 }

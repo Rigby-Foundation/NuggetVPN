@@ -43,6 +43,7 @@ import {
     parseProxyLink,
     ProxyFormState,
     serializeProxyConfig,
+    canEditProxyForm,
 } from "@/lib/proxy-config";
 import { Profile } from "@/types";
 
@@ -100,7 +101,7 @@ export function EditProxyDialog({
             const parsed = parseProxyLink(initialLink, profile.name);
             setForm(parsed);
             setRawInput(initialLink);
-            setActiveTab("form");
+            setActiveTab(canEditProxyForm(initialLink) ? "form" : "raw");
             setError("");
         }
     }, [profile, isOpen]);
@@ -128,6 +129,7 @@ export function EditProxyDialog({
     };
 
     const handleTabChange = (tab: string) => {
+        if (tab === "form" && !canEditProxyForm(rawInput)) return;
         if (tab === "form" && activeTab === "raw") {
             try {
                 const parsed = parseProxyLink(rawInput, form.name || activeProfile.name);
@@ -183,7 +185,6 @@ export function EditProxyDialog({
     const isTrojan = proto === "trojan";
     const isSS = proto === "ss" || proto === "shadowsocks";
     const isHy2 = proto === "hysteria2" || proto === "hy2";
-    const isTuic = proto === "tuic";
     const isSocksOrHttp = proto === "socks" || proto === "socks5" || proto === "http" || proto === "https";
 
     return (
@@ -214,7 +215,7 @@ export function EditProxyDialog({
                         className="w-full pt-3"
                     >
                         <TabsList className="grid grid-cols-2 h-9 w-full">
-                            <TabsTrigger value="form" className="text-xs gap-1.5 py-1.5">
+                            <TabsTrigger value="form" disabled={!canEditProxyForm(rawInput)} className="text-xs gap-1.5 py-1.5">
                                 <Sliders size={13} />
                                 <span>{t("nav.settings")}</span>
                             </TabsTrigger>
@@ -296,7 +297,7 @@ export function EditProxyDialog({
                                         <span>{t("ui.credentials")}</span>
                                     </div>
 
-                                    {(isVless || isVmess || isTuic) && (
+                                    {(isVless || isVmess) && (
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-uuid" className="text-[11px] text-muted-foreground">
                                                 {t("ui.userId")}
@@ -311,7 +312,7 @@ export function EditProxyDialog({
                                         </div>
                                     )}
 
-                                    {isVless && (
+                                    {isVless && form.network === "tcp" && form.security !== "none" && (
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-flow" className="text-[11px] text-muted-foreground">{t("ui.flow")}</Label>
                                             <Select
@@ -331,20 +332,6 @@ export function EditProxyDialog({
 
                                     {isVmess && (
                                         <div className="grid grid-cols-2 gap-2.5">
-                                            <div className="space-y-1">
-                                                <Label htmlFor="edit-alterid" className="text-[11px] text-muted-foreground">
-                                                    AlterId
-                                                </Label>
-                                                <Input
-                                                    id="edit-alterid"
-                                                    type="number"
-                                                    value={form.alterId || 0}
-                                                    onChange={(e) =>
-                                                        updateField("alterId", parseInt(e.target.value, 10) || 0)
-                                                    }
-                                                    className="h-8.5 font-mono text-xs"
-                                                />
-                                            </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-vmess-security" className="text-[11px] text-muted-foreground">{t("ui.encryption")}</Label>
                                                 <Select
@@ -432,7 +419,7 @@ export function EditProxyDialog({
                                 </div>
 
                                 {/* Transport & Network */}
-                                <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
+                                {(isVless || isVmess || isTrojan) && <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Network size={14} className="text-primary" />
                                         <span>{t("routing.source.network")}</span>
@@ -455,7 +442,6 @@ export function EditProxyDialog({
                                                     <SelectItem value="ws">WebSocket (ws)</SelectItem>
                                                     <SelectItem value="grpc">gRPC</SelectItem>
                                                     <SelectItem value="httpupgrade">HTTPUpgrade</SelectItem>
-                                                    <SelectItem value="http">HTTP / H2</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -473,7 +459,7 @@ export function EditProxyDialog({
                                                     className="h-8.5 font-mono text-xs"
                                                 />
                                             </div>
-                                        ) : (
+                                        ) : form.network !== "tcp" ? (
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-path" className="text-[11px] text-muted-foreground">
                                                     {t("ui.path")}
@@ -486,7 +472,7 @@ export function EditProxyDialog({
                                                     className="h-8.5 font-mono text-xs"
                                                 />
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
 
                                     {(form.network === "ws" || form.network === "httpupgrade" || form.network === "http") && (
@@ -503,12 +489,12 @@ export function EditProxyDialog({
                                             />
                                         </div>
                                     )}
-                                </div>
+                                </div>}
                             </div>
 
                             {/* RIGHT COLUMN: Security, TLS & Reality */}
                             <div className="space-y-4">
-                                <div className="rounded-xl border bg-card/60 p-4 space-y-3.5 shadow-xs">
+                                {(isVless || isVmess || isTrojan || isHy2) && <div className="rounded-xl border bg-card/60 p-4 space-y-3.5 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Shield size={14} className="text-primary" />
                                         <span>{t("ui.tlsSecurity")}</span>
@@ -519,6 +505,7 @@ export function EditProxyDialog({
                                             <Label htmlFor="edit-tls" className="text-[11px] text-muted-foreground">{t("ui.securityMode")}</Label>
                                             <Select
                                                 value={form.security}
+                                                disabled={isHy2}
                                                 onValueChange={(val: "none" | "tls" | "reality" | null) =>
                                                     updateField("security", val ?? "tls")
                                                 }
@@ -529,7 +516,7 @@ export function EditProxyDialog({
                                                 <SelectContent>
                                                     <SelectItem value="none">{t("ui.noSecurity")}</SelectItem>
                                                     <SelectItem value="tls">TLS</SelectItem>
-                                                    <SelectItem value="reality">Reality</SelectItem>
+                                                    {(isVless || isTrojan) && <SelectItem value="reality">Reality</SelectItem>}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -552,7 +539,7 @@ export function EditProxyDialog({
 
                                     {form.security !== "none" && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                            <div className="space-y-1">
+                                            {!isHy2 && <div className="space-y-1">
                                                 <Label htmlFor="edit-fingerprint" className="text-[11px] text-muted-foreground">{t("ui.fingerprint")}</Label>
                                                 <Select
                                                     value={form.fingerprint || "chrome"}
@@ -569,9 +556,9 @@ export function EditProxyDialog({
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                            </div>
+                                            </div>}
 
-                                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-1.5">
+                                            {form.security === "tls" && <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-1.5">
                                                 <div className="space-y-0.5">
                                                     <Label className="text-[11px] font-medium cursor-pointer">
                                                         {t("ui.skipCertCheck")}
@@ -585,7 +572,7 @@ export function EditProxyDialog({
                                                     checked={form.insecure}
                                                     onCheckedChange={(checked) => updateField("insecure", checked)}
                                                 />
-                                            </div>
+                                            </div>}
                                         </div>
                                     )}
 
@@ -636,7 +623,7 @@ export function EditProxyDialog({
                                             </div>
                                         </div>
                                     )}
-                                </div>
+                                </div>}
 
                                 {isHy2 && (
                                     <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">

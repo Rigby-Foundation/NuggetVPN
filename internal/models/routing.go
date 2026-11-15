@@ -56,7 +56,7 @@ const maxConditions = 100
 
 // Protocols the core can identify by sniffing a connection.
 var sniffableProtocols = []string{
-	"tls", "http", "quic", "dns", "stun", "bittorrent", "dtls", "ssh", "rdp", "ntp",
+	"tls", "http", "quic", "bittorrent",
 }
 
 // SniffableProtocols lists what a protocol rule may match, for the UI.
@@ -185,6 +185,9 @@ func (c RoutingCondition) Domains() bool {
 func ValidRuleSetURL(value string) bool {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" {
+		return false
+	}
+	if strings.HasSuffix(strings.ToLower(parsed.Path), ".srs") || strings.HasSuffix(strings.ToLower(parsed.Path), ".mrs") {
 		return false
 	}
 	return parsed.Scheme == "https" || parsed.Scheme == "http"

@@ -230,6 +230,9 @@ func parseVMess(raw string) (Outbound, error) {
 	setIfNotEmpty(params, "sni", stringValue(config["sni"]))
 	setIfNotEmpty(params, "alpn", stringValue(config["alpn"]))
 	setIfNotEmpty(params, "fp", stringValue(config["fp"]))
+	if boolValue(config["allowInsecure"]) || boolValue(config["insecure"]) {
+		params.Set("insecure", "1")
+	}
 
 	tlsMode := strings.ToLower(stringValue(config["tls"]))
 	if tlsOpts := buildTLS(params, server, false, tlsMode == "tls" || tlsMode == "reality"); tlsOpts != nil {
@@ -418,6 +421,9 @@ func parseHysteria2(u *url.URL) (Outbound, error) {
 	}
 	if down := intParam(params, "downmbps", "down_mbps", "down"); down > 0 {
 		outbound["down_mbps"] = down
+	}
+	if ports := firstParam(params, "mport", "ports"); ports != "" {
+		outbound["server_ports"] = splitList(ports)
 	}
 	return outbound, nil
 }
@@ -687,6 +693,7 @@ func buildTLS(params url.Values, host string, reality bool, enabled bool) map[st
 			"enabled":    true,
 			"public_key": firstParam(params, "pbk", "public-key", "public_key"),
 			"short_id":   firstParam(params, "sid", "short-id", "short_id"),
+			"spider_x":   firstParam(params, "spx", "spiderX"),
 		}
 		// Reality pins the server key itself; `insecure` is meaningless here.
 		return tlsOpts
@@ -721,8 +728,10 @@ func normalizeTransport(value string) string {
 		// the name it shipped under first and is still what older share links
 		// carry.
 		return "xhttp"
-	default:
+	case "", "tcp", "raw":
 		return ""
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
 	}
 }
 
@@ -826,6 +835,9 @@ func buildTransport(transportType string, params url.Values, host string) map[st
 		}
 		return transport
 	}
+	if transportType != "" {
+		return map[string]any{"type": transportType}
+	}
 	return nil
 }
 
@@ -833,12 +845,7 @@ func buildTransport(transportType string, params url.Values, host string) map[st
 // share link fails the config with a clear message instead of being sent to
 // the server as a mode it does not implement.
 func normalizeXHTTPMode(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "auto", "packet-up", "stream-up", "stream-one":
-		return strings.ToLower(strings.TrimSpace(value))
-	default:
-		return ""
-	}
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 // applySNISpoof lets the user override the TLS server name globally.

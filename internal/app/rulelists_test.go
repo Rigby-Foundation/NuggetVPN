@@ -54,3 +54,19 @@ func TestErrorPageIsNotAList(t *testing.T) {
 		t.Errorf("an HTML page parsed as %d entries", count)
 	}
 }
+
+func TestRuleProgramsAreNotFlattenedIntoBroaderLists(t *testing.T) {
+	for _, program := range []string{
+		`{"rules":[{"domain":["example.com"],"ip_cidr":["1.1.1.1/32"]}]}`,
+		`{"rules":[{"domain":["example.com"],"invert":true}]}`,
+		`{"rules":[{"domain":["example.com"],"process_name":["Firefox"]}]}`,
+		`{"rules":[{"domain":["example.com"]},{"port":[443]}]}`,
+	} {
+		if parsed := parseRuleList([]byte(program)); parsed.count() != 0 {
+			t.Errorf("unsupported condition was lost from %s", program)
+		}
+	}
+	if parsed := parseRuleList([]byte(`{"rules":[{"domain":["example.com"]},{"ip_cidr":["1.1.1.1/32"]}]}`)); parsed.count() != 2 {
+		t.Fatal("supported separate domain/IP lists were rejected")
+	}
+}

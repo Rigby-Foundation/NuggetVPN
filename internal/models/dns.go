@@ -9,8 +9,7 @@ import (
 
 // DNSServer is a parsed resolver address.
 type DNSServer struct {
-	// Type is the core's server type: "udp", "tcp", "tls", "quic", "https",
-	// "h3" or "local".
+	// Type is a resolver transport routed through the Xray tunnel.
 	Type   string
 	Server string
 	Port   int
@@ -20,25 +19,19 @@ type DNSServer struct {
 
 // defaultDNSPorts are the well-known ports, used when an address has none.
 var defaultDNSPorts = map[string]int{
-	"udp": 53, "tcp": 53, "tls": 853, "quic": 853, "https": 443, "h3": 443,
+	"udp": 53, "tcp": 53, "https": 443,
 }
 
 // ParseDNSServer reads the resolver addresses the UI accepts:
 //
 //	1.1.1.1  or  1.1.1.1:53          plain DNS
-//	udp:// tcp:// tls:// quic://      with an address and optional port
+//	udp:// tcp://                    with an address and optional port
 //	https://dns.google/dns-query      DNS over HTTPS
-//	h3://dns.google/dns-query         DNS over HTTP/3
-//	local                             the system's resolver
 func ParseDNSServer(value string) (DNSServer, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return DNSServer{}, false
 	}
-	if strings.EqualFold(value, "local") || strings.EqualFold(value, "system") {
-		return DNSServer{Type: "local"}, true
-	}
-
 	if !strings.Contains(value, "://") {
 		value = "udp://" + value
 	}
@@ -47,9 +40,6 @@ func ParseDNSServer(value string) (DNSServer, bool) {
 		return DNSServer{}, false
 	}
 	scheme := strings.ToLower(parsed.Scheme)
-	if scheme == "http3" {
-		scheme = "h3"
-	}
 	port, known := defaultDNSPorts[scheme]
 	if !known {
 		return DNSServer{}, false
@@ -68,7 +58,7 @@ func ParseDNSServer(value string) (DNSServer, bool) {
 	}
 
 	server := DNSServer{Type: scheme, Server: host, Port: port}
-	if scheme == "https" || scheme == "h3" {
+	if scheme == "https" {
 		server.Path = parsed.EscapedPath()
 		if server.Path == "" || server.Path == "/" {
 			server.Path = "/dns-query"

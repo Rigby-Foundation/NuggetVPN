@@ -124,7 +124,7 @@ func (a *App) prepareRuleLists(settings models.AppSettings, force bool) (map[str
 		if force || statErr != nil || time.Since(stat.ModTime()) > ruleListMaxAge {
 			if err := a.downloadRuleList(address, cache); err != nil {
 				if statErr != nil {
-					warnings = append(warnings, fmt.Sprintf("Rule list %s could not be downloaded (%v); rules using it are skipped.", address, err))
+					warnings = append(warnings, fmt.Sprintf("Rule list %s could not be downloaded (%v); rules using it cannot be applied.", address, err))
 					continue
 				}
 				warnings = append(warnings, fmt.Sprintf("Rule list %s could not be updated (%v); using the copy from %s.", address, err, stat.ModTime().Format("2006-01-02")))
@@ -138,7 +138,7 @@ func (a *App) prepareRuleLists(settings models.AppSettings, force bool) (map[str
 		}
 		entries := parseRuleList(data)
 		if entries.count() == 0 {
-			warnings = append(warnings, fmt.Sprintf("Rule list %s has nothing this app recognises as a domain or an address; rules using it are skipped.", address))
+			warnings = append(warnings, fmt.Sprintf("Rule list %s is not a supported list of domains or addresses; rules using it cannot be applied.", address))
 			continue
 		}
 		list, err := writeRuleList(address, entries)
@@ -281,6 +281,22 @@ func parseRuleList(data []byte) ruleListEntries {
 	if json.Unmarshal(data, &source) == nil && len(source.Rules) > 0 {
 		var result ruleListEntries
 		for _, rule := range source.Rules {
+			// This importer handles lists, not arbitrary rule programs. Never
+			// flatten an AND, inversion or process condition into a broader list.
+			hasDomains, hasIPs := false, false
+			for key := range rule {
+				switch key {
+				case "domain", "domain_suffix", "domain_keyword", "domain_regex":
+					hasDomains = true
+				case "ip_cidr":
+					hasIPs = true
+				default:
+					return ruleListEntries{}
+				}
+			}
+			if hasDomains && hasIPs {
+				return ruleListEntries{}
+			}
 			for key, target := range map[string]*[]string{"domain": &result.domain, "domain_suffix": &result.suffix, "domain_keyword": &result.keyword, "domain_regex": &result.regex, "ip_cidr": &result.cidr} {
 				var entries []string
 				if json.Unmarshal(rule[key], &entries) == nil {

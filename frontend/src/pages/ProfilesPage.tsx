@@ -46,6 +46,7 @@ export default function ProfilesPage() {
         </div>
       }
       profiles={vpn.profiles}
+      unsupportedProfiles={vpn.unsupportedProfiles}
       profilePings={vpn.profilePings}
       selectedSourceDomain={vpn.selection.domain}
       selectedProxyMode={vpn.selection.mode}

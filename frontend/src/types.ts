@@ -52,7 +52,6 @@ export interface AppSettings {
     tls_fragment_size: string;
     tls_fragment_sleep: string;
     tls_mixed_sni_case: boolean;
-    tls_padding: boolean;
     sni_spoof_enabled: boolean;
     sni_spoof_value: string;
     /** Null means the user has never chosen; the backend treats that as on. */

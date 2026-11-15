@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, RefreshCw } from "lucide-react";
+import { DEFAULT_USER_AGENT } from "@/app/default-settings";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,8 +25,7 @@ import { AppSettings } from "@/types";
  * `Happ/<version>` is the format Happ itself sends.
  */
 const USER_AGENTS = [
-    // Keep the established wire identity for subscription provider compatibility.
-    { value: "NuggetVPN/1.0", label: "Kage" },
+    { value: DEFAULT_USER_AGENT, label: "Kage" },
     { value: "Happ/4.9.0", label: "Happ" },
     { value: "Beam/2.0", label: "BEAM" },
     { value: "v2rayNG/1.9.16", label: "v2rayNG" },
@@ -106,7 +106,7 @@ function SubscriptionIdentity({
                             <SelectContent>
                                 {USER_AGENTS.map((agent) => (
                                     <SelectItem key={agent.value} value={agent.value}>
-                                        {agent.value === "NuggetVPN/1.0"
+                                        {agent.value === DEFAULT_USER_AGENT
                                             ? t("identity.defaultAgent", { name: agent.label })
                                             : agent.label}
                                     </SelectItem>

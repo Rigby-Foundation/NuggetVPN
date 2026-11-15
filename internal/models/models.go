@@ -91,7 +91,6 @@ type AppSettings struct {
 	TLSFragmentSize  string `json:"tls_fragment_size"`
 	TLSFragmentSleep string `json:"tls_fragment_sleep"`
 	TLSMixedSNICase  bool   `json:"tls_mixed_sni_case"`
-	TLSPadding       bool   `json:"tls_padding"`
 	SNISpoofEnabled  bool   `json:"sni_spoof_enabled"`
 	SNISpoofValue    string `json:"sni_spoof_value"`
 	// IPCheckEnabled governs the public-address lookup, which is a request to a

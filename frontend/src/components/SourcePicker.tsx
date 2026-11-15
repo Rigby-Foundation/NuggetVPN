@@ -29,7 +29,7 @@ export function ImportProfilesButton({
         onClick={() => setOpen(true)}
         aria-label={t("add.addProfile")}
         title={t("add.addProfile")}
-        className={compact ? "size-10 p-0" : undefined}
+        className={compact ? "size-10 shrink-0 p-0" : undefined}
       >
         <Plus className="size-4" aria-hidden="true" />
         {!compact && t("add.addProfile")}
@@ -54,7 +54,7 @@ export function SourcePicker({
   disabled?: boolean;
   displayDomain?: string;
 }) {
-  const { profiles, sources, selection, setSelection } = useVpn();
+  const { profiles, sources, selection, setSelection, unsupportedProfiles } = useVpn();
   const t = useT();
   const [open, setOpen] = useState(false);
   const subscriptions = sources.filter(
@@ -83,18 +83,18 @@ export function SourcePicker({
       <PopoverTrigger
         disabled={disabled}
         aria-label={t("ui.profileLabel", { name: current.label })}
-        className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-border/60 bg-card/70 px-2.5 py-2 text-left transition-colors enabled:hover:bg-accent/50"
+        className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-2.5 text-left transition-colors enabled:hover:bg-accent/50"
       >
         <ProviderLogo
           info={current.info}
-          className="size-8 rounded-lg"
+          className="size-7 rounded-lg"
           fallback={null}
         />
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-semibold">
+          <span className="block truncate text-[13px] leading-tight font-semibold">
             {current.label}
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="block truncate text-xs leading-tight text-muted-foreground">
             {current.detail}
           </span>
         </span>
@@ -122,7 +122,7 @@ export function SourcePicker({
                       profileId:
                         option.key === LOCAL
                           ? (profiles.find(
-                              (profile) => profileDomain(profile) === LOCAL,
+                              (profile) => profileDomain(profile) === LOCAL && !unsupportedProfiles[profile.id],
                             )?.id ?? "")
                           : "",
                     },

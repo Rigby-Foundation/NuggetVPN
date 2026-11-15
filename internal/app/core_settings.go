@@ -18,7 +18,6 @@ func coreSettingsSignature(settings models.AppSettings) string {
 		FragmentSize  string
 		FragmentSleep string
 		MixedSNI      bool
-		Padding       bool
 		SNISpoof      bool
 		SNI           string
 		Logging       bool
@@ -34,7 +33,7 @@ func coreSettingsSignature(settings models.AppSettings) string {
 		MTU: settings.MTU, DNS: settings.DNS,
 		Fragment: settings.TLSFragment, FragmentSize: settings.TLSFragmentSize,
 		FragmentSleep: settings.TLSFragmentSleep, MixedSNI: settings.TLSMixedSNICase,
-		Padding: settings.TLSPadding, SNISpoof: settings.SNISpoofEnabled, SNI: settings.SNISpoofValue,
+		SNISpoof: settings.SNISpoofEnabled, SNI: settings.SNISpoofValue,
 		Logging: settings.LoggingOn(), Rules: settings.UsableRules(),
 		DefaultAction: settings.DefaultAction, DefaultServer: settings.DefaultServer,
 		GeoFiles: settings.GeoFiles, ChainEnabled: settings.ProxyChainEnabled,

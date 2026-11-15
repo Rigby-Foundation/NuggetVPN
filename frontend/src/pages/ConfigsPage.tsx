@@ -71,6 +71,7 @@ export default function ConfigsPage() {
       <ConfigurationView
         sources={vpn.sources}
         profiles={vpn.profiles}
+        unsupportedProfiles={vpn.unsupportedProfiles}
         selectedSource={vpn.selection.domain}
         selectedProfileId={vpn.selection.profileId}
         refreshingSourceDomain={refreshing}

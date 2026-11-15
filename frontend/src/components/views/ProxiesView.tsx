@@ -69,6 +69,7 @@ import { ExportDialog } from "./ExportDialog";
 interface ProxiesViewProps {
   sourceControl?: ReactNode;
   profiles: Profile[];
+  unsupportedProfiles?: Record<string, string>;
   profilePings: Record<string, number | null>;
   selectedSourceDomain: string;
   selectedProxyMode: ProxyMode;
@@ -203,6 +204,7 @@ function ServerGroup({
 function ProxiesView({
   sourceControl,
   profiles,
+  unsupportedProfiles = {},
   profilePings,
   selectedSourceDomain,
   selectedProxyMode,
@@ -247,6 +249,7 @@ function ProxiesView({
 
   const { best } = serverSelection({
     profiles,
+    unsupported: unsupportedProfiles,
     pings: profilePings,
     domain,
     mode: selectedProxyMode,
@@ -323,6 +326,8 @@ function ProxiesView({
           type="button"
           onClick={(event) => handleCard(profile, event)}
           aria-pressed={pressed}
+          disabled={!selecting && !!unsupportedProfiles[profile.id]}
+          title={unsupportedProfiles[profile.id]}
           className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:gap-3 sm:px-4"
         >
           {selecting && <Tick checked={pressed} />}
@@ -341,7 +346,7 @@ function ProxiesView({
               )}
             </span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              {profile.protocol.toUpperCase()}
+              {unsupportedProfiles[profile.id] ? t("ui.xrayUnsupported") : profile.protocol.toUpperCase()}
               {profile.server && profile.server !== "Auto"
                 ? ` · ${profile.server}`
                 : ""}
@@ -404,7 +409,7 @@ function ProxiesView({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  disabled={busy || testing}
+                  disabled={busy || testing || !!unsupportedProfiles[profile.id]}
                   onClick={() => void run(() => onTest([profile.id]))}
                 >
                   <Activity size={14} />
@@ -771,7 +776,7 @@ function ProxiesView({
             <Button
               size="sm"
               variant="ghost"
-              disabled={busy || picked.size === 0}
+              disabled={busy || picked.size === 0 || pickedIds.some((id) => !!unsupportedProfiles[id])}
               onClick={() => void run(() => onAddToChain(pickedIds))}
             >
               <Link2 size={14} className="me-1.5" aria-hidden="true" />

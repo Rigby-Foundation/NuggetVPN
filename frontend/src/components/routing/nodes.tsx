@@ -1,3 +1,4 @@
+export { validDnsAddress } from "@/lib/dns";
 import { Children, createContext, isValidElement, KeyboardEvent, useContext, useEffect, useMemo, useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import {
@@ -133,11 +134,9 @@ export function kindMeta(kind: RoutingKind) {
 }
 
 /** Rule kinds whose matches have domain names a DNS server can resolve. */
-export const DOMAIN_KINDS: RoutingKind[] = ["domains", "domain_regex", "geosite", "ruleset", "logical"];
-
 /** What a protocol rule may match; the core detects these by sniffing. */
 export const SNIFFABLE_PROTOCOLS = [
-    "tls", "http", "quic", "dns", "stun", "bittorrent", "dtls", "ssh", "rdp", "ntp",
+    "tls", "http", "quic", "bittorrent",
 ] as const;
 
 /** What a network rule may match. */
@@ -181,27 +180,6 @@ export const ACTION_META: Record<
  * Accepts the resolver addresses the backend does (models.ParseDNSServer),
  * so a typo is flagged while typing rather than silently ignored on connect.
  */
-export function validDnsAddress(value: string): boolean {
-    const text = value.trim();
-    if (!text) return false;
-    if (/^(local|system)$/i.test(text)) return true;
-    let parsed: URL;
-    try {
-        parsed = new URL(text.includes("://") ? text : `udp://${text}`);
-    } catch {
-        return false;
-    }
-    const scheme = parsed.protocol.replace(/:$/, "").toLowerCase();
-    if (!["udp", "tcp", "tls", "quic", "https", "h3", "http3"].includes(scheme)) return false;
-    if (parsed.username || parsed.password) return false;
-    const host = parsed.hostname.replace(/^\[|\]$/g, "");
-    if (!host) return false;
-    const ip = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
-    if (!ip && !/^([a-z0-9-]{1,63}\.)+[a-z0-9-]{1,63}$/i.test(host)) return false;
-    const path = parsed.pathname;
-    const web = scheme === "https" || scheme === "h3" || scheme === "http3";
-    return web || path === "" || path === "/";
-}
 
 /** Shared chrome: an accent bar, an icon, a title and a subtitle. */
 /** What every node gets from the canvas to be resizable. */

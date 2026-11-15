@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Shield,
   SlidersHorizontal,
+  Terminal,
   Trash2,
   Waypoints,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
 import { SettingsField, SettingsGroup } from "@/components/settings/shell";
 import { BackupPanel } from "@/components/settings/backup";
 import { FontSettings } from "@/components/settings/fonts";
+import { LogsPanel } from "@/components/settings/logs";
 import { UpdatesPanel } from "@/components/settings/updates";
 import { PluginsPanel } from "@/components/settings/plugins";
 import { ShortcutRecorder } from "@/components/settings/shortcut";
@@ -59,6 +61,7 @@ import { withoutFlagEmoji } from "@/lib/flags";
 import { LOCAL, profileDomain } from "@/hooks/use-profiles";
 import { groupProfiles } from "@/lib/server-selection";
 import { useRemembered } from "@/lib/remember";
+import { validDnsAddress } from "@/lib/dns";
 import type { AppSettings, CloseAction, Profile } from "@/types";
 
 const sections = [
@@ -103,6 +106,7 @@ const sections = [
   { id: "privacy", icon: Eye, key: "settings.privacy", group: "data" },
   { id: "sync", icon: RefreshCw, key: "settings.sync", group: "data" },
   { id: "backup", icon: Archive, key: "settings.backup", group: "data" },
+  { id: "logs", icon: Terminal, key: "settings.logs", group: "advanced" },
   { id: "plugins", icon: Puzzle, key: "settings.plugins", group: "advanced" },
 ] as const;
 type SectionId = (typeof sections)[number]["id"];
@@ -119,8 +123,9 @@ const searchTerms: Partial<Record<SectionId, MessageKey[]>> = {
     "shortcut.title",
   ],
   connection: ["connection.dns", "connection.mtu.description"],
-  tls: ["tls.fragmentation.title", "tls.sniSpoof", "tls.padding.title"],
+  tls: ["tls.fragmentation.title", "tls.sniSpoof", "tls.mixedCase.title"],
   subscriptions: ["behaviour.autoUpdate", "identity.userAgent"],
+  logs: ["logs.export", "privacy.logs"],
   privacy: [
     "privacy.ipCheck",
     "privacy.logs",
@@ -197,6 +202,10 @@ export default function SettingsPage() {
           type={type}
           value={String(settings[key] ?? "")}
           onCommit={(value) => {
+            if (key === "dns" && !validDnsAddress(value)) {
+              toast.error(t("routing.dns.invalid"));
+              return;
+            }
             if (type !== "number") patchSettings({ [key]: value });
             else if (value && Number.isInteger(Number(value)))
               patchSettings({ [key]: Number(value) });
@@ -376,11 +385,6 @@ export default function SettingsPage() {
               t("tls.mixedCase.description"),
             )}
             {toggle(
-              "tls_padding",
-              t("tls.padding.title"),
-              t("tls.padding.description"),
-            )}
-            {toggle(
               "sni_spoof_enabled",
               t("tls.sniSpoof"),
               t("tls.sniSpoof.description"),
@@ -395,11 +399,12 @@ export default function SettingsPage() {
       const exitId = settings.proxy_chain_exit || vpn.selection.profileId;
       const chainOptions = vpn.profiles.filter(
         (profile) =>
+          !vpn.unsupportedProfiles[profile.id] &&
           !settings.proxy_chain.includes(profile.id) &&
           profile.id !== exitId,
       );
       const exitOptions = vpn.profiles.filter(
-        (profile) => !settings.proxy_chain.includes(profile.id),
+        (profile) => !vpn.unsupportedProfiles[profile.id] && !settings.proxy_chain.includes(profile.id),
       );
       const selectedChain = chainOptions.find((profile) => profile.id === chainId);
       const selectedExit = vpn.profiles.find(
@@ -603,6 +608,9 @@ export default function SettingsPage() {
       detail = (
         <UpdatesPanel appSettings={settings} onSettingsChange={update} />
       );
+      break;
+    case "logs":
+      detail = <LogsPanel enabled={settings.logging_enabled === true} onEnable={() => update("logging_enabled", true)} />;
       break;
     case "plugins":
       detail = <PluginsPanel />;

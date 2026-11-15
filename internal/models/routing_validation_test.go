@@ -8,6 +8,11 @@ func TestRuleEditorRejectsInvalidEntries(t *testing.T) {
 		{Kind: SourceIP, Values: []string{"999.1.1.1"}, Action: ActionDirect},
 		{Kind: SourceDomainRegex, Values: []string{"(?=ads)"}, Action: ActionBlock},
 		{Kind: SourceLogical, Action: ActionProxy},
+		{Kind: SourceProtocol, Values: []string{"dns"}, Action: ActionBlock},
+		{Kind: SourceRuleSet, Values: []string{"https://example.com/list.srs"}, Action: ActionBlock},
+		{Kind: SourceDomains, Values: []string{"example.com"}, Invert: true, DNS: "1.1.1.1", Action: ActionProxy},
+		{Kind: SourceGeoSite, Values: []string{"google"}, DNS: "1.1.1.1", Action: ActionProxy},
+		{Kind: SourceDomains, Values: []string{"example.com"}, DNS: "tls://one.one.one.one", Action: ActionProxy},
 	} {
 		if ValidateRoutingRule(rule) == nil {
 			t.Errorf("invalid rule accepted: %+v", rule)

@@ -5,8 +5,8 @@ A fast, good-looking VPN client for Windows, macOS, Linux, Android and iOS, buil
 
 Previously named NuggetVPN. Existing profiles, preferences, backups, plugins,
 and `nuggetvpn://` import links remain compatible. The repository, bundle
-identifier, data directories, and subscription User-Agent retain their existing
-names for compatibility.
+identifier and data directories retain their existing names for compatibility.
+The default subscription User-Agent is `Kage/3.0.0`.
 
 Every proxy core it can run is compiled **into** the app as a Go library.
 There is no bundled executable, nothing is downloaded at runtime, and
@@ -47,7 +47,7 @@ regular installer takes `/S` for the same.
 ### Connecting
 
 - **Native Xray**: VLESS (including **Reality** and XTLS Vision), VMess,
-  Trojan, Shadowsocks, WireGuard, SOCKS and HTTP, with supported TCP,
+  Trojan, Shadowsocks, Hysteria 2, WireGuard, SOCKS5 and HTTP, with supported TCP,
   WebSocket, gRPC, HTTPUpgrade and **XHTTP** transports. See [Core](#core).
 - **Subscriptions**, with data usage and expiry shown when the provider
   reports them. Share links (`vless://`, `vmess://`, `ss://` and others),
@@ -58,8 +58,6 @@ regular installer takes `/S` for the same.
 - **Kill switch** and **automatic reconnect**.
 - **Server health**: servers are checked in the background, and in
   automatic mode the ones that keep failing are tried last.
-- **Wi-Fi rules**: connect on networks you don't trust, disconnect on ones
-  you do.
 - **QR codes** for sharing a server. `nuggetvpn://` links and links copied
   to the clipboard are offered for import.
 
@@ -68,7 +66,11 @@ regular installer takes `/S` for the same.
 - **A routing graph** on its own tab. You match traffic by application,
   domain, IP/CIDR, port, protocol, regex, GeoIP/GeoSite or a downloaded rule
   list. Each match goes through the tunnel, straight out, or nowhere.
-- **Combined rules** (AND / OR / NOT), and a **server and DNS per rule**.
+- **Combined rules** (AND / OR / NOT), a **server per rule**, and custom
+  DNS for non-inverted domain rules (UDP, TCP or HTTPS).
+- **Protocol matching** for HTTP, TLS, QUIC and unencrypted BitTorrent.
+  Rule lists accept plain text and domain/IP JSON; binary SRS/MRS lists
+  and arbitrary rule programs are not supported.
 - **Rule order** you can see and change. Undo and redo are available.
 - **Ready-made setups**, custom geo files, notes, and `.vflow` files for
   sharing a whole routing setup.

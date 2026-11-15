@@ -45,6 +45,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     export_configs: { method: "ExportConfigs", args: ["ids", "format", "full"] },
 
     get_settings: { method: "GetSettings", args: [] },
+    unsupported_profiles: { method: "UnsupportedProfiles", args: [] },
     save_settings: { method: "SaveSettings", args: ["settings"] },
     regenerate_hwid: { method: "RegenerateHWID", args: [] },
 
@@ -129,6 +130,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
 
     get_current_platform: { method: "GetCurrentPlatform", args: [] },
     open_logs_folder: { method: "OpenLogsFolder", args: [] },
+    get_logs: { method: "GetLogs", args: [] },
+    export_logs: { method: "ExportLogs", args: [] },
     select_applications: { method: "SelectApplications", args: [] },
     show_save_dialog: { method: "ShowSaveDialog", args: ["defaultFilename"] },
     write_text_file: { method: "WriteTextFile", args: ["path", "contents"] },

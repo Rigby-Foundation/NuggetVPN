@@ -26,3 +26,20 @@ func TestLegacyCoreSelectionIsIgnoredAndNotWrittenBack(t *testing.T) {
 		}
 	}
 }
+
+func TestLegacyTLSPaddingIsIgnoredAndNotWrittenBack(t *testing.T) {
+	var settings AppSettings
+	if err := json.Unmarshal([]byte(`{"tls_padding":true,"dns":"1.1.1.1"}`), &settings); err != nil {
+		t.Fatal(err)
+	}
+	settings.Normalize()
+	data, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved map[string]json.RawMessage
+	_ = json.Unmarshal(data, &saved)
+	if _, exists := saved["tls_padding"]; exists {
+		t.Fatal("unsupported TLS padding survived migration")
+	}
+}

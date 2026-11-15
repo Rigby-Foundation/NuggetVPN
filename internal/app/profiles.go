@@ -9,6 +9,7 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,10 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 	if trimmed == "" {
 		return nil, fmt.Errorf("a config link is required")
 	}
+	profiles, settings := a.snapshot()
+	if err := checkProfile(settings, models.Profile{ConfigLink: trimmed}); err != nil {
+		return nil, fmt.Errorf("invalid Xray config: %w", err)
+	}
 
 	resolved := strings.TrimSpace(name)
 	if resolved == "" {
@@ -56,7 +61,6 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 	}
 	zero := uint64(0)
 
-	profiles, _ := a.snapshot()
 	profiles = append(profiles, models.Profile{
 		ID:           uuid.NewString(),
 		Name:         resolved,
@@ -184,6 +188,9 @@ func (a *App) UpdateProfile(id, name, configLink string) ([]models.Profile, erro
 	if err != nil {
 		return nil, fmt.Errorf("invalid config link: %w", err)
 	}
+	if err := checkProfile(settings, models.Profile{ConfigLink: trimmedLink}); err != nil {
+		return nil, fmt.Errorf("invalid Xray config: %w", err)
+	}
 
 	resolvedName := strings.TrimSpace(name)
 	if resolvedName == "" {
@@ -249,5 +256,8 @@ func (a *App) ExportConfigs(ids []string, format string, full bool) (string, err
 		return "", fmt.Errorf("no profiles to export")
 	}
 
+	if link.NormalizeFormat(format) == link.FormatXray {
+		return xrayconfig.Export(targets, settings, full)
+	}
 	return link.Export(targets, settings, format, full)
 }

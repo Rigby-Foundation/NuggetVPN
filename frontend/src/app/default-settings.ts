@@ -1,5 +1,7 @@
 import type { AppSettings } from "@/types";
 
+export const DEFAULT_USER_AGENT = "Kage/3.0.0";
+
 export const pendingSettings: AppSettings = {
   mtu: 9000,
   dns: "1.1.1.1",
@@ -7,7 +9,6 @@ export const pendingSettings: AppSettings = {
   tls_fragment_size: "100-200",
   tls_fragment_sleep: "10-20",
   tls_mixed_sni_case: false,
-  tls_padding: false,
   sni_spoof_enabled: false,
   sni_spoof_value: "",
   ip_check_enabled: true,
@@ -16,7 +17,7 @@ export const pendingSettings: AppSettings = {
   auth_token: null,
   skip_auth: false,
   pending_sync_upload: false,
-  subscription_user_agent: "NuggetVPN/1.0",
+  subscription_user_agent: DEFAULT_USER_AGENT,
   hwid_enabled: true,
   hwid: "",
   device_os: "",

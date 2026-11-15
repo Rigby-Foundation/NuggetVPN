@@ -31,6 +31,8 @@ import {
 } from "@/components/routing/guide";
 import { useRemembered } from "@/lib/remember";
 import { cn } from "@/lib/utils";
+import { isIOS } from "@/lib/platform";
+import { useVpn } from "@/app/vpn-context";
 import type { Profile, RoutingAction, RoutingKind } from "@/types";
 export interface ToolboxProps {
   onAddSource: (kind: RoutingKind) => void;
@@ -45,7 +47,7 @@ export interface ToolboxProps {
   orderPanel: ReactNode;
   className?: string;
 }
-const kinds: RoutingKind[] = [
+const kinds = ([
   "apps",
   "domains",
   "ip",
@@ -56,7 +58,7 @@ const kinds: RoutingKind[] = [
   "protocol",
   "network",
   "logical",
-];
+] satisfies RoutingKind[]).filter((kind) => !isIOS || kind !== "apps");
 export function RoutingToolbox({
   onAddSource,
   onAddNote,
@@ -71,10 +73,11 @@ export function RoutingToolbox({
   className,
 }: ToolboxProps) {
   const t = useT();
+  const { unsupportedProfiles } = useVpn();
   const [tab, setTab] = useRemembered("routing.toolbox", "build");
   const [query, setQuery] = useState("");
   const available = profiles.filter(
-    (profile) => !placedServers.includes(profile.id),
+    (profile) => !placedServers.includes(profile.id) && !unsupportedProfiles[profile.id],
   );
   return (
     <aside

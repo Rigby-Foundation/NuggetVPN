@@ -12,13 +12,12 @@ import {
 import {
   EntryEditor,
   SOURCE_META,
-  DOMAIN_KINDS,
   validDnsAddress,
 } from "@/components/routing/nodes";
 import { useT, type MessageKey } from "@/lib/i18n";
 import { RULE_GUIDE } from "@/components/routing/guide";
 import { errorMessage, invoke } from "@/lib/backend";
-import { hasNativeRuntime } from "@/lib/platform";
+import { hasNativeRuntime, isIOS } from "@/lib/platform";
 import type { RoutingCondition, RoutingRule, RoutingSource } from "@/types";
 
 type DomainMode = "domain" | "exact" | "subdomains" | "regex" | "advanced";
@@ -359,7 +358,7 @@ function LogicalFields({
                 <SelectValue>{t(RULE_GUIDE[condition.kind].title)}</SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
-                {(Object.keys(SOURCE_META) as RoutingSource[]).map((kind) => (
+                {(Object.keys(SOURCE_META) as RoutingSource[]).filter((kind) => !isIOS || kind !== "apps").map((kind) => (
                   <SelectItem key={kind} value={kind}>
                     {t(RULE_GUIDE[kind].title)}
                   </SelectItem>
@@ -529,9 +528,7 @@ export function InlineRuleFields({
           onChange={(values) => void update({ values })}
         />
       )}
-      {DOMAIN_KINDS.includes(draft.kind) &&
-        !draft.invert &&
-        !["block", "drop"].includes(rule.action) && (
+      {((draft.kind === "domains" && !draft.invert) || draft.dns) && (
           <details className="text-[11px] text-muted-foreground">
             <summary className="cursor-pointer py-1">
               {t("routing.ui.customDns")}
@@ -550,6 +547,7 @@ export function InlineRuleFields({
                 if (event.key === "Enter") event.currentTarget.blur();
               }}
             />
+            <p className="mt-2 leading-relaxed">{t("routing.dns.hint")}</p>
           </details>
         )}
       {error && (

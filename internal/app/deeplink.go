@@ -24,8 +24,8 @@ const importLinkEventName = "import-link"
 
 // shareSchemes are the share-link schemes profiles can be added from.
 var shareSchemes = []string{
-	"vless://", "vmess://", "trojan://", "ss://", "hysteria://", "hy://", "hysteria2://", "hy2://",
-	"tuic://", "wireguard://", "wg://", "socks://", "socks4://", "socks5://", "ssh://",
+	"vless://", "vmess://", "trojan://", "ss://", "hysteria2://", "hy2://",
+	"wireguard://", "wg://", "socks://", "socks5://",
 }
 
 // ImportableLink reports whether text is something the Add dialog takes: a

@@ -35,6 +35,9 @@ func ValidateRoutingRule(rule RoutingRule) error {
 		}
 	}
 	if strings.TrimSpace(rule.DNS) != "" {
+		if rule.Kind != SourceDomains || rule.Invert {
+			return fmt.Errorf("custom DNS is only available for non-inverted domain rules; clear the DNS override first")
+		}
 		if _, ok := ParseDNSServer(rule.DNS); !ok {
 			return fmt.Errorf("enter a valid DNS resolver")
 		}

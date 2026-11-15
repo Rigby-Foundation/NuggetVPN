@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
@@ -30,6 +31,9 @@ func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, err
 
 func (a *App) saveSettings(settings models.AppSettings, promptReload bool) (models.AppSettings, error) {
 	settings.Normalize()
+	if _, ok := models.ParseDNSServer(settings.DNS); !ok {
+		return a.GetSettings(), fmt.Errorf("unsupported DNS resolver; use an IP address, udp://, tcp:// or https://")
+	}
 
 	// Only a change is applied, compared with the last state read from the
 	// system. Several saves come from inside the app with its own copy of the

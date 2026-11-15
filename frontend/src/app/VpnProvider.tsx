@@ -72,6 +72,15 @@ function useVpnData() {
     Record<string, number | null>
   >({});
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+  const [unsupportedProfiles, setUnsupportedProfiles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!loaded || !hasNativeRuntime()) return;
+    let cancelled = false;
+    void invoke<Record<string, string>>("unsupported_profiles")
+      .then((result) => { if (!cancelled) setUnsupportedProfiles(result ?? {}); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [loaded, profiles, settings.sni_spoof_enabled, settings.sni_spoof_value]);
   const [selectionIntent, setSelectionIntent] = useState(0);
   const lastSelectionIntent = useRef(0);
   const selectConnection = useCallback(
@@ -156,6 +165,12 @@ function useVpnData() {
             settings: next,
           });
           if (revision.current === version) replaceSettings(saved);
+        }).catch(async (cause) => {
+          if (revision.current === version) {
+            const stored = await invoke<AppSettings>("get_settings").catch(() => null);
+            if (stored && revision.current === version) replaceSettings(stored);
+          }
+          throw cause;
         });
       queue.current = request.catch(() => undefined);
       return request.finally(() => {
@@ -319,6 +334,7 @@ function useVpnData() {
   return useMemo(
     () => ({
       ...profileState,
+      unsupportedProfiles,
       setSelection: selectConnection,
       settings,
       loaded,
@@ -340,6 +356,7 @@ function useVpnData() {
     }),
     [
       profileState,
+      unsupportedProfiles,
       selectConnection,
       settings,
       loaded,

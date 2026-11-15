@@ -2,11 +2,15 @@
 package xrayconfig
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"net"
 	"strconv"
+	"strings"
+
+	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/xtls/xray-core/infra/conf"
 )
 
 func convert(source link.Outbound) (map[string]any, error) {
@@ -31,6 +35,9 @@ func convert(source link.Outbound) (map[string]any, error) {
 		}, nil
 
 	case "vmess":
+		if num(source["alter_id"]) != 0 {
+			return nil, fmt.Errorf("Xray only supports VMess AEAD (alterId must be 0)")
+		}
 		security := str(source["security"])
 		if security == "" {
 			security = "auto"
@@ -42,7 +49,7 @@ func convert(source link.Outbound) (map[string]any, error) {
 		return map[string]any{
 			"protocol": "vmess",
 			"settings": map[string]any{"vnext": []any{map[string]any{"address": server, "port": port, "users": []any{
-				map[string]any{"id": str(source["uuid"]), "alterId": num(source["alter_id"]), "security": security},
+				map[string]any{"id": str(source["uuid"]), "security": security},
 			}}}},
 			"streamSettings": stream,
 		}, nil
@@ -69,7 +76,51 @@ func convert(source link.Outbound) (map[string]any, error) {
 			}}},
 		}, nil
 
+	case "hysteria2":
+		stream, err := streamSettings(source)
+		if err != nil {
+			return nil, err
+		}
+		if stream["security"] != "tls" {
+			return nil, fmt.Errorf("Hysteria 2 requires TLS")
+		}
+		stream["network"] = "hysteria"
+		stream["hysteriaSettings"] = map[string]any{"version": 2, "auth": str(source["password"])}
+		mask := map[string]any{}
+		var udp []any
+		if obfs, _ := source["obfs"].(map[string]any); obfs != nil && str(obfs["type"]) != "" {
+			if str(obfs["type"]) != "salamander" {
+				return nil, fmt.Errorf("Xray does not support Hysteria 2 obfuscation %q", str(obfs["type"]))
+			}
+			udp = append(udp, map[string]any{"type": "salamander", "settings": map[string]any{"password": str(obfs["password"])}})
+		}
+		if ports := texts(source["server_ports"]); len(ports) > 0 {
+			udp = append(udp, map[string]any{"type": "udphop", "settings": map[string]any{"mode": "intervalremote", "remotePorts": strings.Join(ports, ",")}})
+		}
+		if len(udp) > 0 {
+			mask["udp"] = udp
+		}
+		if up, down := num(source["up_mbps"]), num(source["down_mbps"]); up > 0 || down > 0 {
+			quic := map[string]any{"congestion": "brutal"}
+			if up > 0 {
+				quic["brutalUp"] = strconv.Itoa(up) + "mbps"
+			}
+			if down > 0 {
+				quic["brutalDown"] = strconv.Itoa(down) + "mbps"
+			}
+			mask["quicParams"] = quic
+		}
+		if len(mask) > 0 {
+			stream["finalmask"] = mask
+		}
+		return map[string]any{
+			"protocol": "hysteria", "settings": map[string]any{"version": 2, "address": server, "port": port}, "streamSettings": stream,
+		}, nil
+
 	case "socks", "http":
+		if str(source["type"]) == "socks" && str(source["version"]) != "" && str(source["version"]) != "5" {
+			return nil, fmt.Errorf("Xray only supports SOCKS5 outbounds")
+		}
 		entry := map[string]any{"address": server, "port": port}
 		if user := str(source["username"]); user != "" {
 			entry["users"] = []any{map[string]any{"user": user, "pass": str(source["password"])}}
@@ -94,6 +145,9 @@ func convert(source link.Outbound) (map[string]any, error) {
 			if key := str(peer["pre_shared_key"]); key != "" {
 				entry["preSharedKey"] = key
 			}
+			if keepalive := num(peer["persistent_keepalive_interval"]); keepalive > 0 {
+				entry["keepAlive"] = keepalive
+			}
 			if ips := texts(peer["allowed_ips"]); len(ips) > 0 {
 				entry["allowedIPs"] = ips
 			}
@@ -106,6 +160,12 @@ func convert(source link.Outbound) (map[string]any, error) {
 		}
 		if mtu := num(source["mtu"]); mtu > 0 {
 			settings["mtu"] = mtu
+		}
+		for _, peer := range list(source["peers"]) {
+			if reserved := peer["reserved"]; reserved != nil {
+				settings["reserved"] = reserved
+				break
+			}
 		}
 		return map[string]any{"protocol": "wireguard", "settings": settings}, nil
 	}
@@ -145,6 +205,9 @@ func streamSettings(source link.Outbound) (map[string]any, error) {
 			return nil, fmt.Errorf("Xray no longer has the HTTP/2 transport this server uses")
 		case "quic":
 			return nil, fmt.Errorf("Xray no longer has the QUIC transport this server uses")
+		case "", "tcp", "raw":
+		default:
+			return nil, fmt.Errorf("this client cannot map transport %q to native Xray", str(transport["type"]))
 		}
 	}
 
@@ -163,6 +226,7 @@ func streamSettings(source link.Outbound) (map[string]any, error) {
 				"fingerprint": fingerprint,
 				"publicKey":   str(reality["public_key"]),
 				"shortId":     str(reality["short_id"]),
+				"spiderX":     str(reality["spider_x"]),
 			}
 		} else {
 			settings := map[string]any{"serverName": str(tls["server_name"])}
@@ -291,6 +355,18 @@ func Check(profile models.Profile, settings models.AppSettings) error {
 	if err != nil {
 		return err
 	}
-	_, err = convert(source)
+	outbound, err := convert(source)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(outbound)
+	if err != nil {
+		return err
+	}
+	var native conf.OutboundDetourConfig
+	if err = json.Unmarshal(data, &native); err != nil {
+		return err
+	}
+	_, err = native.Build()
 	return err
 }

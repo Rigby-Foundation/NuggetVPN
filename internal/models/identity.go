@@ -21,7 +21,18 @@ import (
 
 // DefaultUserAgent identifies this app honestly, and is what a provider that
 // does not care will see.
-const DefaultUserAgent = "NuggetVPN/1.0"
+const DefaultUserAgent = "Kage/3.0.0"
+
+func subscriptionUserAgent(value string) string {
+	switch agent := strings.TrimSpace(value); agent {
+	case "", "NuggetVPN/1.0":
+		return DefaultUserAgent
+	case "Happ/3.13.0":
+		return HappUserAgent
+	default:
+		return agent
+	}
+}
 
 // HappUserAgent presents as Happ, whose format is `Happ/<version>`. Providers
 // that allow-list clients almost always allow this one.
@@ -74,12 +85,7 @@ func (s *AppSettings) normalizeIdentity() {
 	// The Happ this app used to present as is one panels now turn away
 	// ("Happ is out of date, update to 4.1.0"), serving error entries instead
 	// of servers; anyone who picked it moves to the current one.
-	if strings.TrimSpace(s.SubscriptionUserAgent) == "Happ/3.13.0" {
-		s.SubscriptionUserAgent = HappUserAgent
-	}
-	if strings.TrimSpace(s.SubscriptionUserAgent) == "" {
-		s.SubscriptionUserAgent = DefaultUserAgent
-	}
+	s.SubscriptionUserAgent = subscriptionUserAgent(s.SubscriptionUserAgent)
 	if s.HWIDEnabled == nil {
 		// On by default: a panel with the device limit switched on answers 404
 		// without the header, which reads as a broken subscription rather than
@@ -109,10 +115,7 @@ func (s AppSettings) HWIDOn() bool {
 // show the user something more useful than an opaque id in its device list.
 func (s AppSettings) SubscriptionHeaders() map[string]string {
 	headers := map[string]string{
-		"User-Agent": strings.TrimSpace(s.SubscriptionUserAgent),
-	}
-	if headers["User-Agent"] == "" {
-		headers["User-Agent"] = DefaultUserAgent
+		"User-Agent": subscriptionUserAgent(s.SubscriptionUserAgent),
 	}
 	if !s.HWIDOn() {
 		return headers

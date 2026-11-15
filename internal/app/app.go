@@ -96,8 +96,9 @@ type App struct {
 	// take it; see TakePendingLink.
 	pendingLink string
 
-	logMu   sync.Mutex
-	logFile *os.File
+	logMu      sync.Mutex
+	logFile    *os.File
+	recentLogs logBuffer
 	// loggingOn mirrors settings.LoggingOn, readable from any goroutine
 	// without taking mu — log lines are written from inside locked sections.
 	loggingOn atomic.Bool

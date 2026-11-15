@@ -61,6 +61,7 @@ interface ConfigurationViewProps {
   selectedProfileId: string;
   refreshingSourceDomain: string;
   profiles?: Profile[];
+  unsupportedProfiles?: Record<string, string>;
   onSelectSource: (source: ConfigSource) => void;
   onOpenSource: (source: ConfigSource) => void;
   onDeleteSources: (sources: ConfigSource[]) => Promise<void>;
@@ -105,6 +106,7 @@ function ConfigurationView({
   selectedProfileId,
   refreshingSourceDomain,
   profiles,
+  unsupportedProfiles = {},
   onSelectSource,
   onOpenSource,
   onDeleteSources,
@@ -488,6 +490,8 @@ function ConfigurationView({
                   <button
                     type="button"
                     aria-pressed={selected}
+                    disabled={!selecting && !!unsupportedProfiles[source.profileId ?? ""]}
+                    title={unsupportedProfiles[source.profileId ?? ""]}
                     onClick={(event) => handleCard(source, event)}
                     className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-start focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4"
                   >

@@ -64,7 +64,7 @@ export const RULE_GUIDE = {
     title: "routing.source.protocol",
     short: "routing.source.protocol.hint",
     description: "routing.ui.protocolHint",
-    example: "quic, dns, bittorrent",
+    example: "http, tls, quic, bittorrent",
     group: "advanced",
   },
   network: {

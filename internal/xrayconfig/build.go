@@ -58,8 +58,8 @@ func ListTag(address string) string {
 func Build(request Request) (Result, error) {
 	settings := request.Settings
 	settings.Normalize()
-	if settings.TLSPadding {
-		return Result{}, fmt.Errorf("custom TLS padding is not supported by native Xray; disable it before connecting")
+	if err := validateRoutingCapabilities(settings.RoutingRules); err != nil {
+		return Result{}, err
 	}
 	request.Settings = settings
 	result := Result{ServerFor: map[string]string{}}

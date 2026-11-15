@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
@@ -120,7 +121,7 @@ func downloadBranding(raw string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	request.Header.Set("User-Agent", "NuggetVPN")
+	request.Header.Set("User-Agent", models.DefaultUserAgent)
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, "", err

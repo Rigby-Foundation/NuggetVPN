@@ -91,7 +91,7 @@ func (a *App) latestRelease() (release, error) {
 		return release{}, err
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "NuggetVPN/"+a.version)
+	request.Header.Set("User-Agent", "Kage/"+a.version)
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return release{}, fmt.Errorf("could not reach GitHub: %w", err)
@@ -169,7 +169,7 @@ func (a *App) download(link, target string, size int64) error {
 	if err != nil {
 		return err
 	}
-	request.Header.Set("User-Agent", "NuggetVPN/"+a.version)
+	request.Header.Set("User-Agent", "Kage/"+a.version)
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)

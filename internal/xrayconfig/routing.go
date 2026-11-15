@@ -19,6 +19,32 @@ type routeCompiler struct {
 	count        int
 }
 
+// Check raw values before UsableRules cleans them. A legacy unsupported
+// protocol must fail explicitly rather than silently removing a block rule
+// or broadening an inverted/logical rule.
+func validateRoutingCapabilities(rules []models.RoutingRule) error {
+	for _, rule := range rules {
+		if rule.Action == "" {
+			continue
+		}
+		conditions := rule.Conditions
+		if rule.Kind != models.SourceLogical {
+			conditions = []models.RoutingCondition{rule.Matcher()}
+		}
+		for _, condition := range conditions {
+			for _, value := range condition.Values {
+				if condition.Kind == models.SourceProtocol && strings.TrimSpace(value) != "" && !models.ValidProtocol(value) {
+					return fmt.Errorf("rule %s: Xray cannot detect protocol %q; choose HTTP, TLS, QUIC or BitTorrent", rule.ID, value)
+				}
+				if condition.Kind == models.SourceRuleSet && strings.TrimSpace(value) != "" && !models.ValidRuleSetURL(value) {
+					return fmt.Errorf("rule %s: use a plain-text or domain/IP JSON rule list; binary SRS/MRS lists are not supported", rule.ID)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func luaString(value string) string {
 	for n := 1; ; n++ {
 		eq := strings.Repeat("=", n)

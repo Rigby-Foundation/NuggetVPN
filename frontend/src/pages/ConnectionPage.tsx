@@ -195,7 +195,7 @@ export default function ConnectionPage() {
               data-page-part="1"
               disabled={locked || !vpn.loaded}
               aria-label={t("serverPicker.label", { name: serverName })}
-              className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-border/60 bg-card/70 px-3 py-2 transition-colors hover:bg-accent/50 sm:max-w-[52%]"
+              className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-3 transition-colors enabled:hover:bg-accent/50 sm:max-w-[52%]"
             >
               <Flag
                 name={
@@ -248,8 +248,9 @@ export default function ConnectionPage() {
                         key={profile.id}
                         name={profile.name}
                         detail={
-                          profile.description || profile.protocol.toUpperCase()
+                          vpn.unsupportedProfiles[profile.id] || profile.description || profile.protocol.toUpperCase()
                         }
+                        disabled={!!vpn.unsupportedProfiles[profile.id]}
                         selected={
                           selection.mode === "manual" &&
                           profile.id === selected?.id
@@ -485,20 +486,24 @@ function ServerOption({
   detail,
   auto,
   selected,
+  disabled,
   onSelect,
 }: {
   name: string;
   detail: string;
   auto?: boolean;
   selected: boolean;
+  disabled?: boolean;
   onSelect: () => void;
 }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
+      disabled={disabled}
+      title={disabled ? detail : undefined}
       onClick={onSelect}
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${selected ? "bg-accent" : "hover:bg-accent/60"}`}
+      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:opacity-50 ${selected ? "bg-accent" : "enabled:hover:bg-accent/60"}`}
     >
       <Flag name={name} auto={auto} size={25} />
       <span className="min-w-0 flex-1">

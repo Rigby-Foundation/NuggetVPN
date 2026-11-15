@@ -30,19 +30,16 @@ func TestParseDNSServer(t *testing.T) {
 	for input, want := range map[string]DNSServer{
 		"1.1.1.1":                      {Type: "udp", Server: "1.1.1.1", Port: 53},
 		"8.8.8.8:5353":                 {Type: "udp", Server: "8.8.8.8", Port: 5353},
-		"tls://one.one.one.one":        {Type: "tls", Server: "one.one.one.one", Port: 853},
+		"tcp://one.one.one.one":        {Type: "tcp", Server: "one.one.one.one", Port: 53},
 		"https://dns.google/dns-query": {Type: "https", Server: "dns.google", Port: 443, Path: "/dns-query"},
 		"https://1.1.1.1":              {Type: "https", Server: "1.1.1.1", Port: 443, Path: "/dns-query"},
-		"h3://dns.example/q":           {Type: "h3", Server: "dns.example", Port: 443, Path: "/q"},
-		"quic://dns.adguard-dns.com":   {Type: "quic", Server: "dns.adguard-dns.com", Port: 853},
-		"local":                        {Type: "local"},
 	} {
 		got, ok := ParseDNSServer(input)
 		if !ok || got != want {
 			t.Errorf("ParseDNSServer(%q) = %+v, %v; want %+v", input, got, ok, want)
 		}
 	}
-	for _, bad := range []string{"", "ftp://x.example", "dnsserver", "1.1.1.1:99999", "udp://1.1.1.1/path"} {
+	for _, bad := range []string{"", "ftp://x.example", "dnsserver", "1.1.1.1:99999", "udp://1.1.1.1/path", "tls://one.one.one.one", "h3://dns.example/q", "http3://dns.example/q", "quic://dns.adguard-dns.com", "local", "system"} {
 		if _, ok := ParseDNSServer(bad); ok {
 			t.Errorf("ParseDNSServer(%q) should fail", bad)
 		}

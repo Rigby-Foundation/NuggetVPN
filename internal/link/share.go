@@ -261,6 +261,7 @@ func xrayTLS(settings map[string]any, reality bool) map[string]any {
 			"enabled":    true,
 			"public_key": defaultString(stringValue(settings["publicKey"]), stringValue(settings["password"])),
 			"short_id":   stringValue(settings["shortId"]),
+			"spider_x":   stringValue(settings["spiderX"]),
 		}
 	}
 	return tls
@@ -308,6 +309,9 @@ func xrayTransport(stream map[string]any) map[string]any {
 		return transport
 	case "quic":
 		return map[string]any{"type": "quic"}
+	}
+	if network != "" {
+		return map[string]any{"type": network}
 	}
 	return nil
 }

@@ -40,6 +40,9 @@ var assets embed.FS
 //go:embed build/appicon.png
 var appIcon []byte
 
+//go:embed build/darwin/dockicon.png
+var macOSDockIcon []byte
+
 //go:embed build/trayicon.png
 var trayIcon []byte
 
@@ -134,10 +137,17 @@ func runGUI() {
 		}
 	}
 
+	windowIcon := appIcon
+	if runtime.GOOS == "darwin" {
+		// Wails sets this image directly on the Dock tile, so its corners
+		// must already be transparent.
+		windowIcon = macOSDockIcon
+	}
+
 	wailsApp := application.New(application.Options{
 		Name:        "Kage",
 		Description: "Modern, lightweight VPN client with an embedded Xray core",
-		Icon:        appIcon,
+		Icon:        windowIcon,
 		Services:    services,
 		Windows: application.WindowsOptions{
 			WebviewUserDataPath: webviewDataPath,
