@@ -10,12 +10,12 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
 
-// registerURLScheme makes nuggetvpn:// links open this app, for the current
+// registerURLScheme makes import links open this app, for the current
 // user — no administrator rights needed, and nothing left for another user.
 // Written on every start, so moving the app keeps the links working. Only
 // release builds do it: a development build would point the scheme at a
 // binary that is about to be rebuilt.
-func registerURLScheme() {
+func (a *App) registerURLScheme() {
 	if models.DevBuild {
 		return
 	}
@@ -23,7 +23,12 @@ func registerURLScheme() {
 	if err != nil {
 		return
 	}
-	root, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\Classes\`+URLScheme, registry.SET_VALUE)
+	registerWindowsProtocol(URLScheme, self)
+	registerWindowsProtocol(legacyURLScheme, self)
+}
+
+func registerWindowsProtocol(scheme, self string) {
+	root, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\Classes\`+scheme, registry.SET_VALUE)
 	if err != nil {
 		return
 	}

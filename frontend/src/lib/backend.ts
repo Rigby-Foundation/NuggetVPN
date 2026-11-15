@@ -189,7 +189,7 @@ export const EVENTS = {
     traffic: "vpn-traffic",
     /** Settings changed outside the window, such as from the tray. */
     settings: "settings-changed",
-    /** A nuggetvpn:// link to offer in the Add dialog. */
+    /** A link is waiting to be opened in the Add dialog. */
     importLink: "import-link",
     updateProgress: "update-progress",
     speedProgress: "speed-progress",

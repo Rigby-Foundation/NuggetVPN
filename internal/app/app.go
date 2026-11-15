@@ -92,7 +92,7 @@ type App struct {
 	pendingDown   uint64
 	lastPersisted time.Time
 
-	// pendingLink is a nuggetvpn:// link received before the window could
+	// pendingLink is an import link received before the window could
 	// take it; see TakePendingLink.
 	pendingLink string
 
@@ -194,7 +194,7 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.core.OnState(a.handleCoreState)
 	a.core.OnStats(a.handleCoreStats)
 	a.prepareNotifications()
-	registerURLScheme()
+	a.registerURLScheme()
 	_, startup := a.snapshot()
 	if startup.GlobalShortcut != "" {
 		if err := a.registerHotkey(startup.GlobalShortcut); err != nil {

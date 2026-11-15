@@ -47,6 +47,8 @@ static void SwizzleWailsViewController(void) {
 @property (strong, nonatomic) UIWindow *window;
 @end
 
+extern void KageIOSOpenURL(const char *url);
+
 @implementation WailsSceneDelegate
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
     if (![scene isKindOfClass:[UIWindowScene class]]) return;
@@ -71,6 +73,13 @@ static void SwizzleWailsViewController(void) {
         self.window.rootViewController.view.backgroundColor = themeBg;
     }
     [self.window makeKeyAndVisible];
+    [self scene:scene openURLContexts:connectionOptions.URLContexts];
+}
+
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts {
+    for (UIOpenURLContext *context in URLContexts) {
+        KageIOSOpenURL(context.URL.absoluteString.UTF8String);
+    }
 }
 @end
 

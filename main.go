@@ -177,7 +177,7 @@ func runGUI() {
 		},
 	})
 
-	// macOS opens nuggetvpn:// links through an event rather than arguments.
+	// macOS delivers import URLs as application events.
 	wailsApp.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
 		app.ReceiveLaunchArgs(service, []string{event.Context().URL()})
 	})

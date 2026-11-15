@@ -6,18 +6,19 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// nuggetvpn:// links and copied links
+// App links and copied links
 // ---------------------------------------------------------------------------
 
 // URLScheme is the app's own link scheme: a subscription page can offer a
-// "Add to NuggetVPN" button pointing at
+// "Add to Kage" button pointing at
 //
-//	nuggetvpn://import?url=<the subscription or share link, URL-encoded>
-//	nuggetvpn://import/<the same, URL-encoded>
+//	kage://import?url=<the subscription or share link, URL-encoded>
+//	kage://import/<the same, URL-encoded>
 //
 // "add", "install-config" and "install-sub" work in place of "import", the
 // names other clients use.
-const URLScheme = "nuggetvpn"
+const URLScheme = "kage"
+const legacyURLScheme = "nuggetvpn"
 
 // importLinkEventName carries a link the app was asked to import.
 const importLinkEventName = "import-link"
@@ -45,10 +46,11 @@ func ImportableLink(text string) bool {
 	return err == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Host != ""
 }
 
-// ParseDeepLink extracts the link a nuggetvpn:// URL asks to import.
+// ParseDeepLink extracts the target of a Kage or legacy NuggetVPN import link.
 func ParseDeepLink(raw string) (string, bool) {
 	raw = strings.TrimSpace(raw)
-	if !strings.HasPrefix(strings.ToLower(raw), URLScheme+"://") {
+	scheme, _, found := strings.Cut(raw, "://")
+	if !found || (!strings.EqualFold(scheme, URLScheme) && !strings.EqualFold(scheme, legacyURLScheme)) {
 		return "", false
 	}
 	parsed, err := url.Parse(raw)
@@ -62,7 +64,7 @@ func ParseDeepLink(raw string) (string, bool) {
 	}
 	target := parsed.Query().Get("url")
 	if target == "" {
-		// nuggetvpn://import/<encoded link>
+		// kage://import/<encoded link>
 		path := strings.TrimPrefix(parsed.EscapedPath(), "/")
 		if decoded, err := url.PathUnescape(path); err == nil {
 			target = decoded
@@ -76,7 +78,7 @@ func ParseDeepLink(raw string) (string, bool) {
 }
 
 // receiveLinks looks through launch arguments or a launch URL for a
-// nuggetvpn:// link and hands it to the window. The link is never imported
+// supported import link and hands it to the window. The link is never imported
 // here: the window shows it in the Add dialog, and the user confirms.
 func (a *App) receiveLinks(candidates ...string) {
 	for _, candidate := range candidates {
@@ -94,7 +96,7 @@ func (a *App) receiveLinks(candidates ...string) {
 }
 
 // ReceiveLaunchArgs hands a launch's arguments or URL to the app: a second
-// launch's arguments are how a nuggetvpn:// link reaches the copy already
+// launch's arguments are how an import link reaches the copy already
 // running. A function rather than a method, so it is not callable from the
 // window.
 func ReceiveLaunchArgs(a *App, args []string) {

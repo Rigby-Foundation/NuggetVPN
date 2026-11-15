@@ -129,10 +129,14 @@ install_linux() {
 [Desktop Entry]
 Type=Application
 Name=Kage
-Exec=$bin/Kage.AppImage
+Exec="$bin/Kage.AppImage" %u
 Terminal=false
 Categories=Network;
+MimeType=x-scheme-handler/kage;x-scheme-handler/nuggetvpn;
 EOF
+        if have update-desktop-database; then
+            update-desktop-database "$HOME/.local/share/applications" || true
+        fi
         say "Installed to $bin/Kage.AppImage (needs libfuse2 to run)."
         case ":$PATH:" in *":$bin:"*) ;; *) say "Add $bin to your PATH to run it from a terminal." ;; esac
     fi

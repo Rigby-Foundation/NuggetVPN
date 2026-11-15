@@ -8,7 +8,7 @@ Terminal=false
 Type=Application
 Icon=Kage
 Categories=Utility;
-MimeType=x-scheme-handler/nuggetvpn;
+MimeType=x-scheme-handler/kage;x-scheme-handler/nuggetvpn;
 StartupWMClass=Kage
 
  

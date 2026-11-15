@@ -37,11 +37,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- nuggetvpn:// links: import a server or subscription. -->
+            <!-- Import a server or subscription from a Kage link. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kage" />
                 <data android:scheme="nuggetvpn" />
             </intent-filter>
         </activity>

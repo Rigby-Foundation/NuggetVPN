@@ -33,6 +33,7 @@
 				<string>org.rigbyfoundation.nuggetvpn</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
+					<string>kage</string>
 					<string>nuggetvpn</string>
 				</array>
 			</dict>

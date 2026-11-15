@@ -48,7 +48,7 @@ func TestCallReachesTheHandler(t *testing.T) {
 }
 
 func TestIsCommand(t *testing.T) {
-	for arg, want := range map[string]bool{"status": true, "connect": true, "help": true, "nuggetvpn://import": false, "--core-service": false} {
+	for arg, want := range map[string]bool{"status": true, "connect": true, "help": true, "kage://import": false, "nuggetvpn://import": false, "--core-service": false} {
 		if IsCommand([]string{arg}) != want {
 			t.Errorf("%s: %v", arg, !want)
 		}
@@ -85,4 +85,3 @@ func TestIsTCP(t *testing.T) {
 		}
 	}
 }
-

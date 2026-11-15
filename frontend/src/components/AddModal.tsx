@@ -22,7 +22,7 @@ interface AddModalProps {
   onClose: () => void;
   onSaveProfile: (name: string, link: string) => Promise<void>;
   onImportSubscription: (url: string) => Promise<void>;
-  /** A link to start with: from a nuggetvpn:// link or the clipboard. */
+  /** A link to start with, such as the target of a kage:// URL. */
   initialLink?: string;
 }
 
