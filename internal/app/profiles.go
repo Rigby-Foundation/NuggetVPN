@@ -25,16 +25,21 @@ func (a *App) snapshot() ([]models.Profile, models.AppSettings) {
 }
 
 func (a *App) replaceProfiles(profiles []models.Profile) []models.Profile {
-	for i := range profiles {
-		link.NormalizeProfileMetadata(&profiles[i])
-	}
 	a.mu.Lock()
-	a.profiles = profiles
-	snapshot := make([]models.Profile, len(profiles))
-	copy(snapshot, profiles)
+	snapshot := a.replaceProfilesLocked(profiles)
 	a.mu.Unlock()
 
 	_ = storage.SaveProfiles(snapshot)
+	return snapshot
+}
+
+func (a *App) replaceProfilesLocked(profiles []models.Profile) []models.Profile {
+	for i := range profiles {
+		link.NormalizeProfileMetadata(&profiles[i])
+	}
+	a.profiles = profiles
+	snapshot := make([]models.Profile, len(profiles))
+	copy(snapshot, profiles)
 	return snapshot
 }
 

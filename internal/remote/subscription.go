@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -77,133 +78,122 @@ func (c *Client) getWithHeaders(
 	return string(body), response.StatusCode, response.Header, nil
 }
 
-// ImportSubscription fetches a subscription and appends its profiles.
-func (c *Client) ImportSubscription(
-	ctx context.Context,
-	profiles []models.Profile,
-	settings models.AppSettings,
-	rawURL string,
-) ([]models.Profile, error) {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Host == "" {
-		return nil, fmt.Errorf("invalid subscription URL")
-	}
-	sourceDomain := parsed.Hostname()
+// A source is identified by its full URL, including the path and query.
+type subscriptionSource struct {
+	domain, url string
+}
 
-	body, status, headers, err := c.getWithHeaders(ctx, rawURL, settings)
+// Replacement is the result of a fetch, applied to the current profiles
+// after the network request finishes.
+type Replacement struct {
+	source  subscriptionSource
+	fresh   []models.Profile
+	refresh bool
+}
+
+// FetchSubscription retrieves the servers at a subscription URL.
+func (c *Client) FetchSubscription(ctx context.Context, settings models.AppSettings, rawURL string) (Replacement, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" || parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return Replacement{}, fmt.Errorf("invalid subscription URL")
+	}
+	source := subscriptionSource{domain: parsed.Hostname(), url: rawURL}
+	return c.fetchSubscription(ctx, settings, source)
+}
+
+func (c *Client) fetchSubscription(ctx context.Context, settings models.AppSettings, source subscriptionSource) (Replacement, error) {
+	body, status, headers, err := c.getWithHeaders(ctx, source.url, settings)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subscription: %w", err)
+		return Replacement{}, fmt.Errorf("failed to fetch subscription: %w", err)
 	}
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("subscription server returned %d: %s",
+		return Replacement{}, fmt.Errorf("subscription server returned %d: %s",
 			status, explainStatus(status, settings, preview(body, 180)))
 	}
 
-	imported := buildProfiles(subscriptionEntries(body), sourceDomain, rawURL)
-	if len(imported) == 0 {
-		return nil, emptySubscription(sourceDomain, body, headers, time.Now())
+	fresh := buildProfiles(subscriptionEntries(body), source.domain, source.url)
+	if len(fresh) == 0 {
+		return Replacement{}, emptySubscription(source.domain, body, headers, time.Now())
 	}
-	attachInfo(imported, ParseSubscriptionInfoWithBody(headers, body, time.Now()))
-	return append(profiles, imported...), nil
+	attachInfo(fresh, ParseSubscriptionInfoWithBody(headers, body, time.Now()))
+	return Replacement{source: source, fresh: fresh}, nil
 }
 
-// RefreshSubscriptions re-fetches saved subscriptions and replaces their
-// profiles. Passing a domain restricts the refresh to that source and turns
-// failures into hard errors so the UI can explain what went wrong.
-func (c *Client) RefreshSubscriptions(
+// FetchSubscriptions re-fetches each saved subscription URL. Passing a domain
+// restricts the scan to that host and reports errors to the caller.
+func (c *Client) FetchSubscriptions(
 	ctx context.Context,
 	profiles []models.Profile,
 	settings models.AppSettings,
 	onlyDomain string,
-) ([]models.Profile, RefreshSummary, error) {
+) ([]Replacement, RefreshSummary, error) {
 	summary := RefreshSummary{}
-	sources := collectSubscriptionSources(profiles)
-	strict := strings.TrimSpace(onlyDomain) != ""
+	domain := strings.TrimSpace(onlyDomain)
+	var replacements []Replacement
+	found := false
 
-	if strict {
-		domain := strings.TrimSpace(onlyDomain)
-		if domain == "local" {
-			return profiles, summary, fmt.Errorf("invalid subscription domain")
-		}
-		subURL, ok := sources[domain]
-		if !ok {
-			return profiles, summary, fmt.Errorf(
-				"subscription URL not found for domain %q; re-import this subscription once, then refresh will work",
-				domain)
-		}
-		sources = map[string]string{domain: subURL}
-	}
-	if len(sources) == 0 {
-		return profiles, summary, nil
-	}
-
-	result := profiles
-	for sourceDomain, subURL := range sources {
-		parsed, err := url.Parse(subURL)
-		if err != nil || parsed.Hostname() == "" {
-			if strict {
-				return profiles, summary, fmt.Errorf(
-					"saved subscription URL is invalid for %q", sourceDomain)
-			}
-			summary.Skipped++
+	for _, source := range collectSubscriptionSources(profiles) {
+		if domain != "" && domain != source.domain {
 			continue
 		}
-		if parsed.Hostname() != sourceDomain {
-			if strict {
-				return profiles, summary, fmt.Errorf(
-					"saved subscription URL host %q does not match source %q",
-					parsed.Hostname(), sourceDomain)
+		found = true
+		parsed, err := url.Parse(source.url)
+		if err != nil || parsed.Hostname() != source.domain || parsed.Scheme != "http" && parsed.Scheme != "https" {
+			if domain != "" {
+				return nil, summary, fmt.Errorf("saved subscription URL is invalid for %q", domain)
 			}
 			summary.Skipped++
 			continue
 		}
 
-		body, status, headers, err := c.getWithHeaders(ctx, subURL, settings)
+		replacement, err := c.fetchSubscription(ctx, settings, source)
 		if err != nil {
-			if strict {
-				return profiles, summary, fmt.Errorf(
-					"failed to request subscription %q: %w", sourceDomain, err)
+			if domain != "" {
+				return nil, summary, err
 			}
 			summary.Failed++
 			continue
 		}
-		if status < 200 || status >= 300 {
-			if strict {
-				return profiles, summary, fmt.Errorf(
-					"subscription server %q returned %d: %s",
-					sourceDomain, status, explainStatus(status, settings, preview(body, 180)))
-			}
-			summary.Failed++
-			continue
-		}
-
-		fresh := buildProfiles(subscriptionEntries(body), sourceDomain, subURL)
-		if len(fresh) == 0 {
-			if strict {
-				return profiles, summary, emptySubscription(sourceDomain, body, headers, time.Now())
-			}
-			summary.Failed++
-			continue
-		}
-
-		filtered := make([]models.Profile, 0, len(result)+len(fresh))
-		var previous []models.Profile
-		for _, profile := range result {
-			if strings.TrimSpace(profile.SourceDomain) != sourceDomain {
-				filtered = append(filtered, profile)
-			} else {
-				previous = append(previous, profile)
-			}
-		}
-		attachInfo(fresh, ParseSubscriptionInfoWithBody(headers, body, time.Now()))
-		result = append(filtered, KeepIdentities(previous, fresh)...)
+		replacement.refresh = true
+		replacements = append(replacements, replacement)
 		summary.Refreshed++
 	}
 
-	if strict && summary.Refreshed == 0 {
-		return profiles, summary, fmt.Errorf("subscription refresh finished, but no profiles were updated")
+	if domain != "" && !found {
+		return nil, summary, fmt.Errorf(
+			"subscription URL not found for domain %q; re-import this subscription once, then refresh will work", domain)
 	}
-	return result, summary, nil
+	return replacements, summary, nil
+}
+
+// Apply merges fetched servers into the latest profiles, preserving changes
+// made while the request ran, such as adding a profile or starring a server.
+func Apply(current []models.Profile, replacements []Replacement) []models.Profile {
+	for _, replacement := range replacements {
+		updated := make([]models.Profile, 0, len(current)+len(replacement.fresh))
+		var previous []models.Profile
+		insertAt := -1
+		for _, profile := range current {
+			if !replacement.source.matches(profile) {
+				updated = append(updated, profile)
+				continue
+			}
+			if insertAt < 0 {
+				insertAt = len(updated)
+			}
+			previous = append(previous, profile)
+		}
+		if insertAt < 0 {
+			if replacement.refresh {
+				// The subscription was removed or its URL changed during the fetch.
+				continue
+			}
+			insertAt = len(updated)
+		}
+		current = slices.Insert(updated, insertAt, KeepIdentities(previous, replacement.fresh)...)
+	}
+	return current
 }
 
 // SubscriptionLinks decodes a subscription body and returns the usable links.
@@ -230,6 +220,8 @@ func subscriptionEntries(raw string) []subscriptionEntry {
 	decoded := decodeSubscriptionBody(raw)
 	// Whole Xray configs, as panels send Happ 4: read as their links.
 	if links, ok := link.XrayConfigsAsLinks(decoded); ok {
+		decoded = links
+	} else if links, ok := link.ClashProxiesAsLinks(decoded); ok {
 		decoded = links
 	}
 
@@ -320,7 +312,7 @@ func buildProfiles(entries []subscriptionEntry, sourceDomain, subURL string) []m
 	for _, entry := range entries {
 		rawLink := entry.link
 		protocol := link.DetectProtocol(rawLink)
-		if protocol == "unknown" {
+		if protocol == "unknown" || protocol == "sing-box" || protocol == "clash-yaml" {
 			continue
 		}
 		zero := uint64(0)
@@ -341,40 +333,55 @@ func buildProfiles(entries []subscriptionEntry, sourceDomain, subURL string) []m
 	return profiles
 }
 
-// collectSubscriptionSources maps each source domain to the URL it came from,
-// falling back to profiles that stored the subscription URL as their link.
-func collectSubscriptionSources(profiles []models.Profile) map[string]string {
-	sources := map[string]string{}
-	legacy := map[string]string{}
-
+// collectSubscriptionSources keeps all URLs on a host. Older profiles can
+// store the subscription URL in ConfigLink instead of SubscriptionURL.
+func collectSubscriptionSources(profiles []models.Profile) []subscriptionSource {
+	var sources, legacy []subscriptionSource
+	hasExplicitURL := map[string]bool{}
+	seen := map[subscriptionSource]bool{}
 	for _, profile := range profiles {
-		source := strings.TrimSpace(profile.SourceDomain)
-		if source == "" || source == "local" {
+		domain := strings.TrimSpace(profile.SourceDomain)
+		if domain == "" || domain == "local" {
 			continue
 		}
-
-		subURL := strings.TrimSpace(profile.SubscriptionURL)
-		if subURL == "" {
-			if parsed, err := url.Parse(strings.TrimSpace(profile.ConfigLink)); err == nil {
-				if parsed.Scheme == "http" || parsed.Scheme == "https" {
-					if _, exists := legacy[source]; !exists {
-						legacy[source] = strings.TrimSpace(profile.ConfigLink)
-					}
-				}
+		if rawURL := strings.TrimSpace(profile.SubscriptionURL); rawURL != "" {
+			hasExplicitURL[domain] = true
+			source := subscriptionSource{domain: domain, url: rawURL}
+			if !seen[source] {
+				sources = append(sources, source)
+				seen[source] = true
 			}
-			continue
-		}
-		if _, exists := sources[source]; !exists {
-			sources[source] = subURL
+		} else if rawURL := legacySubscriptionURL(profile); rawURL != "" {
+			legacy = append(legacy, subscriptionSource{domain: domain, url: rawURL})
 		}
 	}
-
-	for source, subURL := range legacy {
-		if _, exists := sources[source]; !exists {
-			sources[source] = subURL
+	for _, source := range legacy {
+		if !hasExplicitURL[source.domain] && !seen[source] {
+			sources = append(sources, source)
+			seen[source] = true
 		}
 	}
 	return sources
+}
+
+func (source subscriptionSource) matches(profile models.Profile) bool {
+	if strings.TrimSpace(profile.SourceDomain) != source.domain {
+		return false
+	}
+	if rawURL := strings.TrimSpace(profile.SubscriptionURL); rawURL != "" {
+		return rawURL == source.url
+	}
+	return legacySubscriptionURL(profile) == source.url
+}
+
+func legacySubscriptionURL(profile models.Profile) string {
+	rawURL := strings.TrimSpace(profile.ConfigLink)
+	parsed, err := url.Parse(rawURL)
+	if err == nil && parsed.Hostname() == strings.TrimSpace(profile.SourceDomain) &&
+		(parsed.Scheme == "http" || parsed.Scheme == "https") {
+		return rawURL
+	}
+	return ""
 }
 
 func preview(body string, limit int) string {

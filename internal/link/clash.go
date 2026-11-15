@@ -33,7 +33,37 @@ func outboundFromClashYAML(raw string) (Outbound, error) {
 	if err != nil {
 		return nil, err
 	}
+	return outboundFromClashProxy(proxy)
+}
 
+// ClashProxiesAsLinks imports the proxy entries of a Clash subscription as
+// server links. It ignores provider routing, listeners, and proxy groups.
+func ClashProxiesAsLinks(body string) (string, bool) {
+	var config struct {
+		Proxies []any `yaml:"proxies"`
+	}
+	if !strings.Contains(body, "proxies:") || yaml.Unmarshal([]byte(body), &config) != nil || config.Proxies == nil {
+		return "", false
+	}
+	var lines []string
+	for _, entry := range config.Proxies {
+		proxy, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		outbound, err := outboundFromClashProxy(proxy)
+		if err != nil {
+			continue
+		}
+		encoded, err := EncodeShareLink(outbound, stringValue(proxy["name"]))
+		if err == nil {
+			lines = append(lines, encoded)
+		}
+	}
+	return strings.Join(lines, "\n"), true
+}
+
+func outboundFromClashProxy(proxy map[string]any) (Outbound, error) {
 	server := stringValue(proxy["server"])
 	port := intValue(proxy["port"])
 	if server == "" || port == 0 {

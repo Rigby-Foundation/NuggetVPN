@@ -841,11 +841,16 @@ func buildTransport(transportType string, params url.Values, host string) map[st
 	return nil
 }
 
-// normalizeXHTTPMode keeps only the modes the core accepts, so a typo in a
-// share link fails the config with a clear message instead of being sent to
-// the server as a mode it does not implement.
+// normalizeXHTTPMode keeps only the modes Xray accepts. Unknown modes fall
+// back to the core's automatic mode.
 func normalizeXHTTPMode(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
+	mode := strings.ToLower(strings.TrimSpace(value))
+	switch mode {
+	case "auto", "packet-up", "stream-up", "stream-one":
+		return mode
+	default:
+		return ""
+	}
 }
 
 // applySNISpoof lets the user override the TLS server name globally.

@@ -22,6 +22,8 @@ vars:
   ADB:
     sh: 'command -v adb || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}/platform-tools/adb"'
   TAGS: 'android'
+  # Xray's Android interface discovery uses anet, which links to net.zoneCache.
+  GO_LINK_FLAGS: '-checklinkname=0'
 
 tasks:
   build:
@@ -69,10 +71,10 @@ tasks:
         export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
         mkdir -p build/android/app/src/main/jniLibs/$ABI
         if [ "{{.PRODUCTION}}" = "true" ]; then
-          go build -buildmode=c-shared -tags "production,{{.TAGS}}" -trimpath -buildvcs=false -ldflags="-w -s" \
+          go build -buildmode=c-shared -tags "production,{{.TAGS}}" -trimpath -buildvcs=false -ldflags="{{.GO_LINK_FLAGS}} -w -s" \
             -o build/android/app/src/main/jniLibs/$ABI/libwails.so .
         else
-          go build -buildmode=c-shared -tags "debug,{{.TAGS}}" -buildvcs=false -gcflags=all="-l" \
+          go build -buildmode=c-shared -tags "debug,{{.TAGS}}" -buildvcs=false -gcflags=all="-l" -ldflags="{{.GO_LINK_FLAGS}}" \
             -o build/android/app/src/main/jniLibs/$ABI/libwails.so .
         fi
         rm -f build/android/app/src/main/jniLibs/$ABI/libwails.h

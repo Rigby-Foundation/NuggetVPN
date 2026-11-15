@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
 // ---------------------------------------------------------------------------
@@ -13,38 +14,44 @@ import (
 func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
 	// A subscription body is read whole; see releaseMemory.
 	defer releaseMemory()
-	profiles, settings := a.snapshot()
-	updated, err := a.remote.ImportSubscription(a.context(), profiles, settings, url)
+	settings := a.GetSettings()
+	replacement, err := a.remote.FetchSubscription(a.context(), settings, url)
 	if err != nil {
 		return nil, err
 	}
-	return a.replaceProfiles(updated), nil
+	return a.applySubscriptions([]remote.Replacement{replacement}), nil
 }
 
 // RefreshSubscriptionsOnStartup re-fetches every saved subscription.
 func (a *App) RefreshSubscriptionsOnStartup() (remote.RefreshSummary, error) {
+	return a.refreshSubscriptions("")
+}
+
+// RefreshSubscriptionByDomain re-fetches each subscription on the given host.
+func (a *App) RefreshSubscriptionByDomain(sourceDomain string) (remote.RefreshSummary, error) {
+	return a.refreshSubscriptions(sourceDomain)
+}
+
+func (a *App) refreshSubscriptions(sourceDomain string) (remote.RefreshSummary, error) {
 	// A subscription body is read whole; see releaseMemory.
 	defer releaseMemory()
 	profiles, settings := a.snapshot()
-	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, "")
+	replacements, summary, err := a.remote.FetchSubscriptions(a.context(), profiles, settings, sourceDomain)
 	if err != nil {
 		return summary, err
 	}
-	a.replaceProfiles(updated)
+	if len(replacements) != 0 {
+		a.applySubscriptions(replacements)
+	}
 	return summary, nil
 }
 
-// RefreshSubscriptionByDomain re-fetches a single subscription.
-func (a *App) RefreshSubscriptionByDomain(sourceDomain string) (remote.RefreshSummary, error) {
-	// A subscription body is read whole; see releaseMemory.
-	defer releaseMemory()
-	profiles, settings := a.snapshot()
-	updated, summary, err := a.remote.RefreshSubscriptions(a.context(), profiles, settings, sourceDomain)
-	if err != nil {
-		return summary, err
-	}
-	a.replaceProfiles(updated)
-	return summary, nil
+func (a *App) applySubscriptions(replacements []remote.Replacement) []models.Profile {
+	a.mu.Lock()
+	profiles := a.replaceProfilesLocked(remote.Apply(a.profiles, replacements))
+	a.mu.Unlock()
+	_ = storage.SaveProfiles(profiles)
+	return profiles
 }
 
 // LoginUser authenticates against the profile sync server.
