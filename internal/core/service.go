@@ -37,13 +37,13 @@ type ServiceOptions struct {
 	// ParentPID is the GUI process. When it disappears the service tears the
 	// tunnel down instead of leaving a root process owning the route table.
 	ParentPID int
-	// WorkingDir is where sing-box resolves relative paths (its cache file).
+	// WorkingDir is where Xray resolves relative paths (its cache file).
 	WorkingDir string
 	// Version is reported back on ping so a stale service can be detected.
 	Version string
 }
 
-// Service hosts the embedded sing-box instance behind a unix socket.
+// Service hosts the embedded Xray instance behind a unix socket.
 type Service struct {
 	options  ServiceOptions
 	instance Instance
@@ -305,23 +305,19 @@ func (s *Service) handle(request Request) Response {
 
 	case CmdStart:
 		config := []byte(request.Config)
-		if request.Text != "" {
-			config = []byte(request.Text)
-		}
 		if len(config) == 0 {
 			response.OK, response.Error = false, "start requires a config"
 			break
 		}
-		start := StartRequest{Core: request.Core, Config: config, Aux: request.Aux}
 		logf := func(message string) { s.broadcastLog("", message) }
 		if !s.instance.Running() {
 			removeStaleAdapter(logf)
 		}
-		err := s.instance.StartCore(start, s.broadcastLog)
+		err := s.instance.StartConfigured(config, request.Script, request.RuleCount, s.broadcastLog)
 		// A leftover adapter appeared, or was missed: clear it and try once more.
 		if adapterNameTaken(err) && !s.instance.Running() {
 			removeStaleAdapter(logf)
-			err = s.instance.StartCore(start, s.broadcastLog)
+			err = s.instance.StartConfigured(config, request.Script, request.RuleCount, s.broadcastLog)
 		}
 		if err != nil {
 			response.OK, response.Error = false, err.Error()

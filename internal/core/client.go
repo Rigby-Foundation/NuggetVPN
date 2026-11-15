@@ -62,7 +62,7 @@ func NewClient(socketPath, tokenPath, version string) *Client {
 	return c
 }
 
-// OnLog registers the sink for sing-box log lines.
+// OnLog registers the sink for Xray log lines.
 func (c *Client) OnLog(handler func(level, message string)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -183,7 +183,7 @@ func (c *Client) handshake() (Response, error) {
 //
 // It goes through a file rather than argv because argv is world-readable on
 // Linux and inspectable by other processes on Windows, and the credential opens
-// a root-owned control socket that accepts arbitrary sing-box configs.
+// a root-owned control socket that accepts native Xray configs.
 func (c *Client) newToken() (string, error) {
 	buffer := make([]byte, 32)
 	if _, err := rand.Read(buffer); err != nil {
@@ -440,10 +440,18 @@ func (c *Client) request(request Request) (Response, error) {
 	}
 }
 
-// Start hands a generated config to the core service.
-func (c *Client) Start(configJSON []byte) error {
+// Start runs a native Xray config without generated routing (e.g. integration tests).
+func (c *Client) Start(configJSON []byte) error { return c.StartConfigured(configJSON, "", 0) }
+
+// StartConfigured starts Xray and the app's generated routing graph.
+func (c *Client) StartConfigured(configJSON []byte, script string, ruleCount int) error {
+	message := Request{Cmd: CmdStart, Config: json.RawMessage(configJSON), Script: script, RuleCount: ruleCount}
 	if runtime.GOOS == "ios" {
-		if err := StartTunnelIOS(configJSON); err != nil {
+		data, err := json.Marshal(message)
+		if err != nil {
+			return err
+		}
+		if err := StartTunnelIOS(data); err != nil {
 			return err
 		}
 		c.dispatchEvent(EventState, "", "", true, 0, 0)
@@ -452,7 +460,7 @@ func (c *Client) Start(configJSON []byte) error {
 	if err := c.Ensure(); err != nil {
 		return err
 	}
-	_, err := c.request(Request{Cmd: CmdStart, Config: json.RawMessage(configJSON)})
+	_, err := c.request(message)
 	return err
 }
 
@@ -537,31 +545,6 @@ func (c *Client) CloseConnection(id string) error {
 		return nil
 	}
 	_, err := c.request(Request{Cmd: CmdCloseConnection, ConnectionID: id})
-	return err
-}
-
-// StartCore hands a config for any core to the service; see StartRequest.
-func (c *Client) StartCore(request StartRequest) error {
-	if runtime.GOOS == "ios" {
-		if err := StartTunnelIOS(request.Config); err != nil {
-			return err
-		}
-		c.dispatchEvent(EventState, "", "", true, 0, 0)
-		return nil
-	}
-	if err := c.Ensure(); err != nil {
-		return err
-	}
-	message := Request{Cmd: CmdStart, Core: request.Core}
-	if request.Core == CoreMihomo {
-		message.Text = string(request.Config)
-	} else {
-		message.Config = json.RawMessage(request.Config)
-	}
-	if len(request.Aux) > 0 {
-		message.Aux = json.RawMessage(request.Aux)
-	}
-	_, err := c.request(message)
 	return err
 }
 

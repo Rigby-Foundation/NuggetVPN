@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -64,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -117,7 +117,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -177,7 +177,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -238,7 +238,7 @@ jobs:
         shell: bash
         run: |
           cd bin
-          7z a "Kage-${{ github.ref_name }}-windows-amd64.zip" Kage.exe
+          7z a "Kage-${{ github.ref_name }}-windows-amd64.zip" Kage.exe wintun.dll Wintun-LICENSE.txt
           for installer in *-installer.exe; do
             [ -e "$installer" ] || continue
             # The silent one keeps "silent" in its name: both match the glob.
@@ -265,7 +265,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2

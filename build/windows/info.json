@@ -6,7 +6,7 @@
 		"0000": {
 			"ProductVersion": "2.4.0",
 			"CompanyName": "Rigby Foundation",
-			"FileDescription": "Modern, lightweight VPN client with an embedded sing-box core",
+			"FileDescription": "Modern, lightweight VPN client with an embedded Xray core",
 			"LegalCopyright": "(c) 2026, Rigby Foundation",
 			"ProductName": "Kage",
 			"Comments": "GPL-3.0-only"

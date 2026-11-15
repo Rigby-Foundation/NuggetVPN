@@ -3,104 +3,47 @@
 package ios
 
 import (
-	"context"
-	"fmt"
+	"encoding/json"
+	"os"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
-	box "github.com/sagernet/sing-box"
-	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/trafficcontrol"
-	"github.com/sagernet/sing-box/include"
-	"github.com/sagernet/sing-box/option"
-	sbjson "github.com/sagernet/sing/common/json"
-	"github.com/sagernet/sing/service"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayruntime"
 )
 
-var (
-	tunnelRunMu sync.Mutex
-	instance    *box.Box
-	cancelFn    context.CancelFunc
-	traffic     *trafficcontrol.Manager
-)
+var tunnelRunMu sync.Mutex
+var instance xrayruntime.Instance
 
-// extensionMemoryLimit keeps the Go heap well under what iOS allows a packet
-// tunnel extension (about 50 MB in all, code and Go's own overhead included).
-// Going over gets the extension killed without a word: the tunnel just
-// stops. A soft limit makes the collector work harder as it nears it instead.
 const extensionMemoryLimit = 32 << 20
 
-func StartTunnel(configJSON []byte, fd int) error {
+// StartTunnel passes NetworkExtension's descriptor straight to native Xray.
+func StartTunnel(data []byte, fd int) error {
 	tunnelRunMu.Lock()
 	defer tunnelRunMu.Unlock()
-
+	_ = instance.Stop()
 	debug.SetMemoryLimit(extensionMemoryLimit)
-
-	if instance != nil {
-		_ = stopTunnelLocked()
+	var request struct {
+		Config    json.RawMessage `json:"config"`
+		Script    string          `json:"script"`
+		RuleCount int             `json:"rule_count"`
 	}
-
-	SetTunnelFD(fd)
-
-	platform := NewPlatform()
-	ctx := service.ContextWith[adapter.PlatformInterface](include.Context(context.Background()), platform)
-	options, err := sbjson.UnmarshalExtendedContext[option.Options](ctx, configJSON)
-	if err != nil {
-		return fmt.Errorf("invalid sing-box config: %w", err)
+	if err := json.Unmarshal(data, &request); err != nil {
+		return err
 	}
-
-	runCtx, cancel := context.WithCancel(ctx)
-	boxInstance, err := box.New(box.Options{
-		Context: runCtx,
-		Options: options,
-	})
-	if err != nil {
-		cancel()
-		return fmt.Errorf("create sing-box: %w", err)
+	if err := os.Setenv("XRAY_TUN_FD", strconv.Itoa(fd)); err != nil {
+		return err
 	}
-
-	if err := boxInstance.Start(); err != nil {
-		_ = boxInstance.Close()
-		cancel()
-		return fmt.Errorf("start sing-box: %w", err)
+	if err := instance.StartConfig(request.Config, request.Script, request.RuleCount, nil); err != nil {
+		_ = os.Unsetenv("XRAY_TUN_FD")
+		return err
 	}
-
-	instance = boxInstance
-	cancelFn = cancel
-	traffic = service.PtrFromContext[trafficcontrol.Manager](runCtx)
 	return nil
 }
-
 func StopTunnel() {
 	tunnelRunMu.Lock()
 	defer tunnelRunMu.Unlock()
-	_ = stopTunnelLocked()
+	_ = instance.Stop()
+	_ = os.Unsetenv("XRAY_TUN_FD")
 }
-
-func stopTunnelLocked() error {
-	if instance == nil {
-		return nil
-	}
-	inst := instance
-	cancel := cancelFn
-	instance = nil
-	cancelFn = nil
-	traffic = nil
-
-	if cancel != nil {
-		cancel()
-	}
-	err := inst.Close()
-	SetTunnelFD(-1)
-	return err
-}
-
-func TunnelStats() (up, down int64) {
-	tunnelRunMu.Lock()
-	defer tunnelRunMu.Unlock()
-	if traffic == nil {
-		return 0, 0
-	}
-	u, d := traffic.Total()
-	return u, d
-}
+func TunnelStats() (int64, int64) { up, down, _ := instance.Stats(); return up, down }

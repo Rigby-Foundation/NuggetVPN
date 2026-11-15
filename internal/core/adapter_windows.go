@@ -11,7 +11,7 @@ import (
 )
 
 // tunAdapterName is what every core names the tunnel's adapter (see
-// sbconfig.tunInterfaceNameFor and the mihomo config's device).
+// xrayconfig.buildInbounds).
 const tunAdapterName = "NuggetVPN"
 
 // removeStaleAdapter deletes a "NuggetVPN" adapter left behind while no

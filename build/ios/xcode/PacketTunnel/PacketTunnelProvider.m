@@ -4,7 +4,7 @@
 #import "NuggetVPN.h"
 
 // The utun control socket iOS made for this tunnel. Found the way WireGuard
-// and sing-box's own iOS app find it: the open descriptor whose
+// and Xray's own iOS app find it: the open descriptor whose
 // UTUN_OPT_IFNAME answers with a utun name. Reading it through the packet
 // flow's private keys breaks between iOS releases.
 #define NUGGET_SYSPROTO_CONTROL 2
@@ -27,7 +27,7 @@ static NSString *NuggetMask(int prefix) {
 }
 
 // The interface settings, from the config's tun inbound: the same address
-// and MTU sing-box is told, so iOS does not drop the packets sing-box sizes
+// and MTU Xray is told, so iOS does not drop the packets Xray sizes
 // for its own MTU, and the local networks the config keeps off the tunnel.
 static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configString) {
     NSArray *v4Addresses = @[@"172.19.0.1"], *v4Masks = @[@"255.255.255.252"];
@@ -39,21 +39,22 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
 
     NSData *data = [configString dataUsingEncoding:NSUTF8StringEncoding];
     NSDictionary *config = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    if ([config[@"config"] isKindOfClass:[NSDictionary class]]) config = config[@"config"];
     NSDictionary *tunInbound = nil;
     if ([config isKindOfClass:[NSDictionary class]]) {
         for (NSDictionary *inbound in config[@"inbounds"]) {
-            if ([inbound isKindOfClass:[NSDictionary class]] && [inbound[@"type"] isEqual:@"tun"]) {
-                tunInbound = inbound;
+            if ([inbound isKindOfClass:[NSDictionary class]] && [inbound[@"protocol"] isEqual:@"tun"]) {
+                tunInbound = inbound[@"settings"];
                 break;
             }
         }
     }
     if (tunInbound) {
-        if ([tunInbound[@"mtu"] isKindOfClass:[NSNumber class]] && [tunInbound[@"mtu"] intValue] > 0) {
-            mtu = tunInbound[@"mtu"];
+        if ([tunInbound[@"MTU"] isKindOfClass:[NSNumber class]] && [tunInbound[@"MTU"] intValue] > 0) {
+            mtu = tunInbound[@"MTU"];
         }
         NSMutableArray *addresses4 = [NSMutableArray array], *masks4 = [NSMutableArray array];
-        for (NSString *cidr in tunInbound[@"address"]) {
+        for (NSString *cidr in tunInbound[@"gateway"]) {
             NSArray *parts = [cidr componentsSeparatedByString:@"/"];
             if (parts.count != 2) continue;
             if ([parts[0] containsString:@":"]) {
@@ -147,7 +148,7 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
             return;
         }
 
-        NSLog(@"[PacketTunnel] Got valid tunFd=%d, starting sing-box tunnel...", tunFd);
+        NSLog(@"[PacketTunnel] Got valid tunFd=%d, starting Xray tunnel...", tunFd);
         char *startErr = StartPacketTunnel((char *)[configString UTF8String], tunFd);
         if (startErr != NULL) {
             NSString *errMsg = [NSString stringWithUTF8String:startErr];

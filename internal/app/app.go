@@ -103,21 +103,18 @@ type App struct {
 	loggingOn atomic.Bool
 
 	// ruleOwners maps the running config's route rules, by index, to the
-	// routing rule each came from; see sbconfig.Result.RuleOwners.
+	// routing rule each came from; see xrayconfig.Result.RuleOwners.
 	ruleOwners []string
 	// serverFor maps the running config's outbound tags to server profile
-	// ids; see sbconfig.Result.ServerFor.
+	// ids; see xrayconfig.Result.ServerFor.
 	serverFor map[string]string
-	// ruleTexts, set while mihomo runs, traces the rules it reports back to
-	// routing rules; see ruleForText.
-	ruleTexts map[string]string
 
 	// connectGen counts connects and disconnects, so a reconnect in progress
 	// can tell it has been superseded. lastConnect is what to reconnect to.
 	connectGen  atomic.Uint64
 	lastConnect connectRequest
 	// alternatives are the servers the exit may switch between, from the
-	// last connect; see sbconfig.Request.Alternatives.
+	// last connect; see xrayconfig.Request.Alternatives.
 	alternatives []models.Profile
 	// lockedDown is set while the kill switch's lockdown config runs.
 	lockedDown atomic.Bool

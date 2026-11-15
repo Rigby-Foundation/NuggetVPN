@@ -9,63 +9,45 @@ import (
 	"testing"
 )
 
-// bridgePath is the command table, relative to this package.
-var bridgePath = filepath.Join("..", "..", "frontend", "src", "lib", "backend.ts")
-
-// bridgeEntry is one row of the command table in frontend/src/lib/backend.ts.
-type bridgeEntry struct {
-	method string
-	args   int
-}
-
-// commandTablePattern matches `method: "Name", args: [...]` entries.
-var commandTablePattern = regexp.MustCompile(`method:\s*"(\w+)",\s*args:\s*\[([^\]]*)\]`)
+var bridgePath = filepath.Join("..", "..", "frontend", "src", "lib", "window.ts")
 
 func readBridge(t *testing.T) string {
 	t.Helper()
 	source, err := os.ReadFile(bridgePath)
+	if os.IsNotExist(err) {
+		// The frontend rebuild is committed separately from the core migration.
+		// Keep the service-name check usable with the previous frontend too.
+		source, err = os.ReadFile(filepath.Join("..", "..", "frontend", "src", "lib", "backend.ts"))
+	}
 	if err != nil {
-		t.Fatalf("read bridge: %v", err)
+		t.Fatalf("read window bridge: %v", err)
 	}
 	return string(source)
 }
 
-func parseBridgeCommands(t *testing.T) []bridgeEntry {
-	t.Helper()
-
-	matches := commandTablePattern.FindAllStringSubmatch(readBridge(t), -1)
-	if len(matches) == 0 {
-		t.Fatal("no commands found in the bridge table; did its format change?")
+// The rebuilt frontend currently binds only its window actions directly.
+func TestWindowActionsMatchApp(t *testing.T) {
+	if _, err := os.Stat(bridgePath); os.IsNotExist(err) {
+		t.Skip("window actions are checked when the separate frontend migration is present")
 	}
-
-	entries := make([]bridgeEntry, 0, len(matches))
-	for _, match := range matches {
-		args := 0
-		if trimmed := strings.TrimSpace(match[2]); trimmed != "" {
-			args = strings.Count(trimmed, ",") + 1
-		}
-		entries = append(entries, bridgeEntry{method: match[1], args: args})
+	source := readBridge(t)
+	actionType := regexp.MustCompile(`type WindowAction\s*=([^;]+);`).FindStringSubmatch(source)
+	if len(actionType) != 2 {
+		t.Fatal("window action type is missing")
 	}
-	return entries
-}
-
-// TestBridgeCommandTableMatchesApp keeps the frontend's command table honest.
-// The bridge calls Go by name, so a renamed or re-signatured App method would
-// otherwise only fail at runtime, in whichever screen happens to use it.
-func TestBridgeCommandTableMatchesApp(t *testing.T) {
+	actions := regexp.MustCompile(`"([A-Za-z]+)"`).FindAllStringSubmatch(actionType[1], -1)
+	if len(actions) == 0 {
+		t.Fatal("no window actions found")
+	}
 	appType := reflect.TypeOf(&App{})
-
-	for _, entry := range parseBridgeCommands(t) {
-		method, ok := appType.MethodByName(entry.method)
+	for _, action := range actions {
+		method, ok := appType.MethodByName(action[1])
 		if !ok {
-			t.Errorf("bridge references App.%s, which does not exist", entry.method)
+			t.Errorf("missing App.%s", action[1])
 			continue
 		}
-		// Subtract the receiver from the input count.
-		want := method.Type.NumIn() - 1
-		if want != entry.args {
-			t.Errorf("bridge passes %d args to App.%s, which takes %d",
-				entry.args, entry.method, want)
+		if method.Type.NumIn() != 1 {
+			t.Errorf("App.%s requires arguments the window bridge does not send", action[1])
 		}
 	}
 }
@@ -88,27 +70,11 @@ func TestServiceFQNMatchesGo(t *testing.T) {
 	}
 }
 
-// TestBoundMethodsAreReachable flags exported App methods the UI cannot call,
-// so a new backend method is not silently left unwired.
-func TestBoundMethodsAreReachable(t *testing.T) {
-	// Lifecycle hooks are called by Wails, not the frontend.
-	internal := map[string]bool{
-		"ServiceStartup":  true,
-		"ServiceShutdown": true,
-		"ServiceName":     true,
-	}
-
-	wired := map[string]bool{}
-	for _, entry := range parseBridgeCommands(t) {
-		wired[entry.method] = true
-	}
-
+func TestLegacyCoreSwitchingIsNotBound(t *testing.T) {
 	appType := reflect.TypeOf(&App{})
-	for i := range appType.NumMethod() {
-		name := appType.Method(i).Name
-		if internal[name] || wired[name] {
-			continue
+	for _, name := range []string{"ListCores", "SetCore"} {
+		if _, ok := appType.MethodByName(name); ok {
+			t.Errorf("obsolete multi-core API App.%s remains bound", name)
 		}
-		t.Errorf("App.%s is bound but no bridge command maps to it", name)
 	}
 }

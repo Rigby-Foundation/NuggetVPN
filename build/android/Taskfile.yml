@@ -1,7 +1,7 @@
 version: '3'
 
 # NuggetVPN's Android build, adapted from the Wails template: our own
-# main_android.go registers main (no generated overlay), the sing-box feature
+# main_android.go registers main (no generated overlay), the native Xray
 # tags are added, and the NDK toolchain is found on Windows hosts as well.
 #
 #   wails3 task android:build           debug library for one ABI (arm64)
@@ -21,7 +21,7 @@ vars:
     sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"'
   ADB:
     sh: 'command -v adb || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}/platform-tools/adb"'
-  TAGS: 'android,{{.SING_BOX_TAGS}}'
+  TAGS: 'android'
 
 tasks:
   build:
@@ -126,7 +126,7 @@ tasks:
   logs:
     summary: Streams the app's log from a connected phone
     cmds:
-      - '"{{.ADB}}" logcat -v time | grep -E "(Wails|NuggetBridge|NuggetVpnService|GoLog|sing-box)"'
+      - '"{{.ADB}}" logcat -v time | grep -E "(Wails|NuggetBridge|NuggetVpnService|GoLog|Xray)"'
 
   clean:
     summary: Removes Android build outputs

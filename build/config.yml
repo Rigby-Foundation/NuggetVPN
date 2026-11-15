@@ -8,7 +8,7 @@ info:
   companyName: "Rigby Foundation" # The name of the company
   productName: "Kage" # The name of the application
   productIdentifier: "org.rigbyfoundation.nuggetvpn" # The unique product identifier
-  description: "Modern, lightweight VPN client with an embedded sing-box core" # The application description
+  description: "Modern, lightweight VPN client with an embedded Xray core" # The application description
   copyright: "(c) 2026, Rigby Foundation" # Copyright text
   comments: "GPL-3.0-only" # Comments
   version: "2.4.0" # The application version

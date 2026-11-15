@@ -6,14 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/stats"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 	"os"
-	"path/filepath"
 )
 
 type ConnectionState struct {
@@ -222,13 +220,13 @@ func (a *App) reconnect(generation uint64, last connectRequest, killSwitch bool)
 func (a *App) engageLockdown() {
 	_, settings := a.snapshot()
 	self, _ := os.Executable()
-	config, err := sbconfig.Lockdown(settings, self)
+	config, err := xrayconfig.Lockdown(settings, self)
 	if err != nil {
 		a.appendLog("WARN kill switch: " + err.Error())
 		return
 	}
 	a.lockedDown.Store(true)
-	if err := a.core.Start(config); err != nil {
+	if err := a.core.StartConfigured(config.JSON, config.Script, len(config.RuleOwners)); err != nil {
 		a.lockedDown.Store(false)
 		a.appendLog("WARN kill switch could not block traffic: " + err.Error())
 		return
@@ -609,28 +607,11 @@ func (a *App) startProfile(
 		a.appendLog("WARN " + warning)
 	}
 
-	request := sbconfig.Request{
-		Profile:       profile,
-		Profiles:      profiles,
-		Settings:      settings,
-		MixedPort:     MixedPort,
-		CacheFilePath: filepath.Join(storage.RuntimeDir(), "cache.db"),
-		LocalRuleSets: localSets,
-		CustomGeo:     customGeo,
-		RuleLists:     lists,
-		Alternatives:  alternatives,
-		Resolve:       a.resolveServers,
-	}
-
-	// Another core than the built-in one: see cores.go.
-	switch settings.Core {
-	case models.CoreMihomo:
-		return a.startMihomo(profile, profiles, settings, alternatives, lists)
-	case models.CoreXray:
-		return a.startXray(profile, profiles, settings, request)
-	}
-
-	result, err := sbconfig.Build(request)
+	result, err := xrayconfig.Build(xrayconfig.Request{
+		Profile: profile, Profiles: profiles, Settings: settings, MixedPort: MixedPort,
+		LocalRuleSets: localSets, CustomGeo: customGeo, RuleLists: lists,
+		Alternatives: alternatives, Resolve: a.resolveServers,
+	})
 	if err != nil {
 		return err
 	}
@@ -638,35 +619,11 @@ func (a *App) startProfile(
 		a.appendLog("WARN " + warning)
 	}
 	a.mu.Lock()
-	a.ruleOwners = result.RuleOwners
-	a.serverFor = result.ServerFor
-	a.ruleTexts = nil
+	a.ruleOwners, a.serverFor = result.RuleOwners, result.ServerFor
 	a.mu.Unlock()
-
-	// Mirror the config to disk purely so users can inspect what ran.
 	_ = os.WriteFile(storage.CoreConfigPath(), result.JSON, 0o600)
-
-	a.appendLog(fmt.Sprintf("Starting %s (%s)", profile.Name, profile.Protocol))
-	if result.Verbatim {
-		a.appendLog("Using the profile's own sing-box config verbatim")
-	} else {
-		mode := "full tunnel"
-		if settings.SplitTunnelling() {
-			mode = fmt.Sprintf("split tunnel (default: %s, %d rule entries)",
-				settings.DefaultAction, result.SplitRules)
-		}
-		a.appendLog("Routing mode: " + mode)
-		if result.ChainHops > 0 {
-			a.appendLog(fmt.Sprintf("Proxy chain: %d hop(s) before the exit", result.ChainHops))
-		}
-	}
-
-	if settings.Core == models.CoreSingBox {
-		// The same config, on official sing-box instead of the fork.
-		a.appendLog("Running on official sing-box")
-		return a.core.StartCore(core.StartRequest{Core: core.CoreSingBox, Config: result.JSON})
-	}
-	return a.core.Start(result.JSON)
+	a.appendLog(fmt.Sprintf("Starting %s with Xray", profile.Name))
+	return a.core.StartConfigured(result.JSON, result.Script, len(result.RuleOwners))
 }
 
 // fastestCandidates bounds the servers the core keeps measuring. Each is

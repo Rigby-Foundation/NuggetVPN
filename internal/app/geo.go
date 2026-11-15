@@ -16,8 +16,8 @@ import (
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/geodat"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ func geoRuleSets(settings models.AppSettings) (local map[string]string, custom m
 				warnings = append(warnings, fmt.Sprintf("Could not write the rule-set for %s:%s: %v", kind, value, err))
 				return
 			}
-			local[sbconfig.RuleSetTag(kind, value)] = target
+			local[xrayconfig.RuleSetTag(kind, value)] = target
 		}
 		missing := func(value string) {
 			warnings = append(warnings, fmt.Sprintf("%s:%s is not in your %s.dat; that entry is skipped.", kind, value, kind))

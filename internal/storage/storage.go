@@ -147,7 +147,7 @@ func CLITokenPath() string {
 	return filepath.Join(RuntimeDir(), "cli.token")
 }
 
-// CoreConfigPath is where the generated sing-box config is mirrored for
+// CoreConfigPath is where the generated Xray config is mirrored for
 // debugging. The core service receives its config over the socket, so this file
 // is informational only.
 func CoreConfigPath() string { return filepath.Join(RuntimeDir(), "config.json") }

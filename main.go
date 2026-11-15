@@ -1,4 +1,4 @@
-// Kage is a Wails desktop client with sing-box linked in as a library.
+// Kage is a Wails desktop client with Xray linked in as a library.
 //
 // The binary has two modes:
 //
@@ -6,7 +6,7 @@
 //	Kage --core-service   the privileged core, started by the GUI
 //
 // Both modes are the same executable, so the UI and the tunnel can never drift
-// to different sing-box versions.
+// to different Xray versions.
 package main
 
 import (
@@ -67,7 +67,7 @@ func main() {
 	runGUI()
 }
 
-// runCoreService hosts the embedded sing-box behind a unix socket. It is
+// runCoreService hosts the embedded Xray behind a unix socket. It is
 // started by the GUI under an elevation prompt.
 func runCoreService() error {
 	flags := flag.NewFlagSet("core-service", flag.ContinueOnError)
@@ -136,7 +136,7 @@ func runGUI() {
 
 	wailsApp := application.New(application.Options{
 		Name:        "Kage",
-		Description: "Modern, lightweight VPN client with an embedded sing-box core",
+		Description: "Modern, lightweight VPN client with an embedded Xray core",
 		Icon:        appIcon,
 		Services:    services,
 		Windows: application.WindowsOptions{

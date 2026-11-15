@@ -149,7 +149,7 @@ func TestDisconnectedRulePreserved(t *testing.T) {
 }
 
 // TestCleanValuesRejectsBadAddresses stops a typo in an IP rule from reaching
-// sing-box, where it would fail the whole config rather than that one row.
+// Xray, where it would fail the whole config rather than that one row.
 func TestCleanValuesRejectsBadAddresses(t *testing.T) {
 	rule := RoutingRule{
 		Kind: SourceIP,

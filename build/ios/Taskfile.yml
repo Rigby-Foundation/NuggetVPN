@@ -22,7 +22,7 @@ tasks:
         GOOS=ios GOARCH=arm64 CGO_ENABLED=1 \
         CGO_CFLAGS="-isysroot ${SDK_PATH} -target arm64-apple-ios15.0-simulator -mios-simulator-version-min=15.0 -Wno-deprecated-declarations" \
         CGO_LDFLAGS="-isysroot ${SDK_PATH} -target arm64-apple-ios15.0-simulator" \
-        go build -tags "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme" -buildmode=c-archive -overlay build/ios/xcode/overlay.json -o bin/NuggetVPN.a .
+        go build -buildmode=c-archive -overlay build/ios/xcode/overlay.json -o bin/NuggetVPN.a .
 
   build:
     summary: Builds Kage for the iOS Simulator using xcodebuild
@@ -51,7 +51,7 @@ tasks:
         GOOS=ios GOARCH=arm64 CGO_ENABLED=1 \
         CGO_CFLAGS="-isysroot ${SDK_PATH} -target arm64-apple-ios15.0 -miphoneos-version-min=15.0 -Wno-deprecated-declarations" \
         CGO_LDFLAGS="-isysroot ${SDK_PATH} -target arm64-apple-ios15.0" \
-        go build -tags "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme" -buildmode=c-archive -overlay build/ios/xcode/overlay.json -o bin/NuggetVPN.a .
+        go build -buildmode=c-archive -overlay build/ios/xcode/overlay.json -o bin/NuggetVPN.a .
       - |
         xcodebuild -project {{.XCODE_PROJ}} -scheme {{.SCHEME}} -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - |

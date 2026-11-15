@@ -16,8 +16,8 @@ import (
 	"golang.org/x/net/idna"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------
@@ -25,11 +25,9 @@ import (
 // ---------------------------------------------------------------------------
 //
 // A rule list is a maintained list of sites or addresses — blocked in some
-// country, ad servers, a game's servers — published at a URL. Lists in the
-// core's own formats (.srs, .json) are handed to it to download and refresh.
-// Everything else is the plain formats these lists are usually published in,
-// which the core cannot read, so the app downloads them, converts them, and
-// refreshes them once they are a day old.
+// country, ad servers, or game servers. The app downloads plain and JSON
+// lists and compiles their entries into native Xray matchers. Binary .srs
+// lists are not supported; an unavailable list makes its rule fail explicitly.
 
 const (
 	// maxRuleListSize bounds a list download. The largest common lists are a
@@ -44,7 +42,6 @@ type RuleListStatus struct {
 	URL string `json:"url"`
 	// Native lists are downloaded by the core, which reports nothing back;
 	// their entries are unknown here.
-	Native    bool   `json:"native"`
 	Entries   int    `json:"entries"`
 	UpdatedAt int64  `json:"updated_at"`
 	Error     string `json:"error,omitempty"`
@@ -54,7 +51,7 @@ type RuleListStatus struct {
 func ruleListDir() string { return filepath.Join(storage.DataDir(), "lists") }
 
 func ruleListCache(address string) string {
-	return filepath.Join(ruleListDir(), sbconfig.ListTag(address)+".txt")
+	return filepath.Join(ruleListDir(), xrayconfig.ListTag(address)+".txt")
 }
 
 // ruleListURLs returns every list URL the routing uses, in order.
@@ -103,10 +100,6 @@ func (a *App) UpdateRuleLists() ([]RuleListStatus, error) {
 
 func readRuleListStatus(address string) RuleListStatus {
 	status := RuleListStatus{URL: address}
-	if _, native := sbconfig.NativeListFormat(address); native {
-		status.Native = true
-		return status
-	}
 	cache := ruleListCache(address)
 	stat, err := os.Stat(cache)
 	if err != nil {
@@ -124,14 +117,11 @@ func readRuleListStatus(address string) RuleListStatus {
 // them, with force). A list that cannot be downloaded falls back to the copy
 // already on disk; one that was never downloaded is left out, with a
 // warning, and the rest of the routing still works.
-func (a *App) prepareRuleLists(settings models.AppSettings, force bool) (map[string]sbconfig.RuleList, []string) {
-	lists := map[string]sbconfig.RuleList{}
+func (a *App) prepareRuleLists(settings models.AppSettings, force bool) (map[string]xrayconfig.RuleList, []string) {
+	lists := map[string]xrayconfig.RuleList{}
 	var warnings []string
 
 	for _, address := range ruleListURLs(settings) {
-		if _, native := sbconfig.NativeListFormat(address); native {
-			continue
-		}
 		cache := ruleListCache(address)
 		stat, statErr := os.Stat(cache)
 		if force || statErr != nil || time.Since(stat.ModTime()) > ruleListMaxAge {
@@ -206,12 +196,12 @@ func (a *App) downloadRuleList(address, target string) error {
 
 // writeRuleList writes a list as the core's source rule-sets: one with
 // everything, and one with only the domains, for DNS rules.
-func writeRuleList(address string, entries ruleListEntries) (sbconfig.RuleList, error) {
+func writeRuleList(address string, entries ruleListEntries) (xrayconfig.RuleList, error) {
 	dir := storage.RuleSetDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return sbconfig.RuleList{}, err
+		return xrayconfig.RuleList{}, err
 	}
-	tag := sbconfig.ListTag(address)
+	tag := xrayconfig.ListTag(address)
 	write := func(name string, rules []map[string]any) (string, error) {
 		target := filepath.Join(dir, name+".json")
 		body, err := json.Marshal(map[string]any{"version": 3, "rules": rules})
@@ -232,7 +222,7 @@ func writeRuleList(address string, entries ruleListEntries) (sbconfig.RuleList, 
 		all = append(all, map[string]any{"ip_cidr": entries.cidr})
 	}
 
-	list := sbconfig.RuleList{}
+	list := xrayconfig.RuleList{}
 	var err error
 	if list.Path, err = write(tag, all); err != nil {
 		return list, err
@@ -286,6 +276,23 @@ func (e ruleListEntries) domainRule() map[string]any {
 //
 // Comments (#, //, !, ;) and anything unrecognised are skipped.
 func parseRuleList(data []byte) ruleListEntries {
+	// Also accept source JSON lists from older installations, converting their
+	// entries to native Xray matchers rather than handing the file to a core.
+	var source struct {
+		Rules []map[string]json.RawMessage `json:"rules"`
+	}
+	if json.Unmarshal(data, &source) == nil && len(source.Rules) > 0 {
+		var result ruleListEntries
+		for _, rule := range source.Rules {
+			for key, target := range map[string]*[]string{"domain": &result.domain, "domain_suffix": &result.suffix, "domain_keyword": &result.keyword, "domain_regex": &result.regex, "ip_cidr": &result.cidr} {
+				var entries []string
+				if json.Unmarshal(rule[key], &entries) == nil {
+					*target = append(*target, entries...)
+				}
+			}
+		}
+		return result
+	}
 	var entries ruleListEntries
 	seen := map[string]bool{}
 	add := func(list *[]string, kind, value string) {

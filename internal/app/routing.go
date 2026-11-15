@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/sbconfig"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,7 +12,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // DefaultRuleHits is the key GetRuleHits counts unmatched traffic under.
-const DefaultRuleHits = sbconfig.DefaultOwner
+const DefaultRuleHits = xrayconfig.DefaultOwner
 
 // SwitchRoutingSetup makes another saved routing setup the active one. The
 // graph being edited is kept in the setup it belonged to.
@@ -87,18 +87,8 @@ func (a *App) GetRuleHits() map[string]int {
 	a.mu.Lock()
 	connected := a.state.Status == StatusConnected
 	owners := a.ruleOwners
-	external := a.ruleTexts != nil
 	a.mu.Unlock()
 	if !connected {
-		return result
-	}
-	// mihomo has no per-rule counters; count its connections.
-	if external {
-		for _, connection := range a.GetConnections() {
-			if connection.Rule != "" {
-				result[connection.Rule]++
-			}
-		}
 		return result
 	}
 	if len(owners) == 0 {

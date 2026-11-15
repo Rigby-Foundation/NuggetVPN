@@ -1,5 +1,5 @@
 // Package link turns share links, sing-box JSON and legacy Clash YAML into
-// sing-box outbound objects.
+// normalized outbound descriptions.
 package link
 
 import (
@@ -12,8 +12,8 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 )
 
-// Outbound is a sing-box outbound (or endpoint) object. It stays a generic map
-// because the field set differs per protocol and sing-box validates it during
+// Outbound is a normalized server description. It stays a generic map
+// because the field set differs per protocol and Xray validates its converted form during
 // option unmarshalling anyway.
 type Outbound map[string]any
 
@@ -38,9 +38,9 @@ type ErrUnsupportedProtocol struct {
 
 func (e *ErrUnsupportedProtocol) Error() string {
 	if e.Reason != "" {
-		return fmt.Sprintf("%s:// is not supported by the sing-box core: %s", e.Scheme, e.Reason)
+		return fmt.Sprintf("%s:// is not supported by Xray: %s", e.Scheme, e.Reason)
 	}
-	return fmt.Sprintf("%s:// is not supported by the sing-box core", e.Scheme)
+	return fmt.Sprintf("%s:// is not supported by Xray", e.Scheme)
 }
 
 // ParseOutbound converts one stored profile link into a sing-box outbound.
@@ -103,7 +103,7 @@ func ParseOutbound(rawLink string, settings models.AppSettings) (Outbound, error
 	case "rigby":
 		return nil, &ErrUnsupportedProtocol{
 			Scheme: "rigby",
-			Reason: "it is a clash-rs fork protocol with no sing-box implementation",
+			Reason: "it is a clash-rs fork protocol with no Xray implementation",
 		}
 	default:
 		return nil, &ErrUnsupportedProtocol{Scheme: parsed.Scheme}

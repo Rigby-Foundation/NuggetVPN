@@ -19,7 +19,7 @@ var lastResolved sync.Map // domain -> []string
 // resolveServers looks the servers' hostnames up with the system's resolver,
 // before the tunnel exists, so the core does not have to: its own lookup goes
 // to the configured DNS server directly over UDP, which ISPs that block or
-// intercept public resolvers never answer. See sbconfig.Request.Resolve.
+// intercept public resolvers never answer. See xrayconfig.Request.Resolve.
 func (a *App) resolveServers(domains []string) map[string][]string {
 	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()

@@ -8,12 +8,12 @@ Thank you for your interest in contributing to Kage! We welcome contributions fr
 
 Ensure you have the development environment set up as described in the [README.md](README.md). You will need:
 
-- Go 1.26+
+- Go 1.27+
 - Bun (or Node.js)
 - The Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
 - A working C toolchain for your OS
 
-There is no sidecar to download. sing-box is a Go module dependency and is compiled into the binary.
+There is no sidecar to download. Xray is a Go module dependency and is compiled into the binary.
 
 ### Setting Up the Environment
 
@@ -34,7 +34,7 @@ There is no sidecar to download. sing-box is a Go module dependency and is compi
      command table in that file.
 3. **Test**:
    ```bash
-   make test     # Go test suite, including the sing-box config tests
+   make test     # Go test suite, including the native Xray config tests
    make vet
    ```
    Then run `make dev` and confirm the VPN connects and disconnects cleanly.
@@ -44,38 +44,30 @@ There is no sidecar to download. sing-box is a Go module dependency and is compi
 
 ### Build tags
 
-sing-box gates features behind build tags, and a missing tag fails silently at
-runtime rather than loudly at build time. `buildtags.go` converts that into a
-compile error and `Taskfile.yml` holds the canonical list in `SING_BOX_TAGS`,
-so prefer `make` / `wails3 task` over bare `go build`. If you add a sing-box
-feature that needs a new tag, add it to `SING_BOX_TAGS` in `Taskfile.yml`, to
-`buildtags.go` if it is load-bearing, and to both workflow files under
-`.github/workflows/`.
+The native Xray runtime needs no feature tags. Use `make` / `wails3 task`, or
+normal Go build and test commands. The pinned upstream revision needs Go 1.27.
 
 ### Adding a backend call
 
-The frontend reaches Go through `frontend/src/lib/backend.ts`, which calls
-methods by name rather than through the generated bindings, so the frontend
-stays buildable on its own. Add the exported method on `App`, then add one row
-to the command table in that file. `bridge_test.go` fails if the two drift:
-unknown method, wrong argument count, or an exported `App` method with no
-command mapped to it.
+Export the method on `internal/app.App` and call it through Wails generated
+bindings, or `Call.ByName` with the service name in `frontend/src/lib/window.ts`.
+The service-name and window-action tests check the currently rebuilt frontend's
+bridge. The old all-method command table was removed with the old UI.
 
 ### Touching config generation
 
-`internal/sbconfig` is the highest-risk area: a wrong field name produces a
-config that sing-box rejects, or worse, silently accepts with the security
-property removed. Tests in `internal/sbconfig/build_test.go` feed generated
-configs through sing-box's real option parser and, for Reality, actually
-construct the outbound. Add a case there for any protocol or option you touch.
+`internal/xrayconfig` builds native Xray JSON and routing code. Its tests load
+and start Xray's real router to verify matching, including logical and inverted
+rules. Keep these tests and the service's local traffic tests passing when
+changing protocols or routing behavior. Do not silently skip unsupported rules.
 
 ## Project Structure
 
 - **`main.go`** — entry point; dispatches between the GUI and `--core-service`, and builds the window and system tray.
 - **`app.go`** — the type bound to the frontend.
 - **`Taskfile.yml`, `build/`** — the Wails v3 build and packaging pipeline.
-- **`internal/core/`** — embedded sing-box lifecycle, privileged service, IPC client, elevation.
-- **`internal/sbconfig/`** — profile + settings → sing-box config.
+- **`internal/core/`** — native Xray lifecycle, privileged service, IPC client, elevation.
+- **`internal/xrayconfig/`** — profile + settings → native Xray config.
 - **`internal/link/`** — share links, sing-box JSON and legacy Clash YAML → outbounds.
 - **`internal/remote/`** — subscriptions and profile sync.
 - **`internal/probe/`** — latency and connectivity probes.

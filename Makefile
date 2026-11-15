@@ -1,8 +1,5 @@
-# Kage — Wails v3 + embedded sing-box
-#
-# The real build logic lives in Taskfile.yml (Wails v3 is Task-driven); these
-# targets are thin wrappers so `make` keeps working and the sing-box build tags
-# are never forgotten. buildtags.go fails the build if they are missing.
+# Kage — Wails v3 + native Xray
+# Build logic lives in Taskfile.yml; these targets are convenience wrappers.
 
 .DEFAULT_GOAL := build
 
@@ -56,7 +53,7 @@ test:
 vet:
 	wails3 task vet
 
-## tags: print the sing-box build tags
+## tags: print optional Go build tags
 .PHONY: tags
 tags:
 	@wails3 task tags

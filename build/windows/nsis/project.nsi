@@ -142,6 +142,8 @@ Section
     update_ready:
     
     !insertmacro wails.files
+    File "..\..\..\bin\wintun.dll"
+    File "..\..\..\bin\Wintun-LICENSE.txt"
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -153,6 +155,8 @@ Section
 SectionEnd
 
 Section "uninstall" 
+    Delete "$INSTDIR\wintun.dll"
+    Delete "$INSTDIR\Wintun-LICENSE.txt"
     !insertmacro wails.setShellContext
 
     RMDir /r "$AppData\NuggetVPN.exe" # Remove the WebView2 DataPath

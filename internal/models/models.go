@@ -1,5 +1,5 @@
 // Package models holds the data types shared between the UI, storage and the
-// sing-box config generator. The JSON tags are deliberately identical to the
+// Xray config generator. The JSON tags are deliberately identical to the
 // ones the previous Rust build wrote, so existing profiles.json / settings.json
 // files keep working after the migration.
 package models
@@ -188,10 +188,6 @@ type AppSettings struct {
 	// UpdateCheck looks for a new release at start and once a day. A
 	// pointer so older settings default to on.
 	UpdateCheck *bool `json:"update_check"`
-	// Core is which program runs the tunnel: CoreBuiltin (the sing-box
-	// fork built into the app), CoreSingBox (official sing-box), CoreMihomo
-	// or CoreXray.
-	Core string `json:"core"`
 	// GlobalShortcut connects and disconnects from anywhere, written as
 	// "Ctrl+Alt+V". Empty means none.
 	GlobalShortcut string `json:"global_shortcut"`
@@ -248,14 +244,6 @@ type GeoFile struct {
 	Codes     int    `json:"codes"`
 	UpdatedAt int64  `json:"updated_at"`
 }
-
-// Cores the tunnel can run on.
-const (
-	CoreBuiltin = "builtin"
-	CoreSingBox = "sing-box"
-	CoreMihomo  = "mihomo"
-	CoreXray    = "xray"
-)
 
 // What closing the window does.
 const (
@@ -329,11 +317,6 @@ func (s *AppSettings) Normalize() {
 	}
 	if s.GeoFiles == nil {
 		s.GeoFiles = map[string]GeoFile{}
-	}
-	switch s.Core {
-	case CoreBuiltin, CoreSingBox, CoreMihomo, CoreXray:
-	default:
-		s.Core = CoreBuiltin
 	}
 	if s.UpdateCheck == nil {
 		enabled := true

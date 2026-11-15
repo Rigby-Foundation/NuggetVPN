@@ -11,7 +11,7 @@ import (
 )
 
 // freePort reserves a localhost port so the test config cannot collide with a
-// real sing-box instance on the developer's machine.
+// real Xray instance on the developer's machine.
 func freePort(t *testing.T) int {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -22,33 +22,14 @@ func freePort(t *testing.T) int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-// testConfig is a minimal sing-box config that needs no elevated privileges:
+// testConfig is a minimal Xray config that needs no elevated privileges:
 // a local mixed inbound and a direct outbound, no TUN.
 func testConfig(t *testing.T) []byte {
 	t.Helper()
 	config := map[string]any{
-		// Supplying a PlatformLogWriter makes sing-box enable its cache file,
-		// which otherwise lands in the package directory as ./cache.db. Pin it
-		// to the test's temp dir so the source tree stays clean.
-		"experimental": map[string]any{
-			"cache_file": map[string]any{
-				"enabled": true,
-				"path":    filepath.Join(t.TempDir(), "cache.db"),
-			},
-		},
-		"log": map[string]any{"level": "warn"},
-		"dns": map[string]any{
-			"servers": []any{map[string]any{"type": "udp", "tag": "d", "server": "1.1.1.1"}},
-			"final":   "d",
-		},
-		"inbounds": []any{map[string]any{
-			"type": "mixed", "tag": "in", "listen": "127.0.0.1", "listen_port": freePort(t),
-		}},
-		"outbounds": []any{map[string]any{"type": "direct", "tag": "direct"}},
-		"route": map[string]any{
-			"final":                   "direct",
-			"default_domain_resolver": map[string]any{"server": "d"},
-		},
+		"log":       map[string]any{"loglevel": "warning"},
+		"inbounds":  []any{map[string]any{"protocol": "socks", "tag": "mixed-in", "listen": "127.0.0.1", "port": freePort(t), "settings": map[string]any{"auth": "noauth", "udp": true}}},
+		"outbounds": []any{map[string]any{"protocol": "freedom", "tag": "direct"}},
 	}
 	encoded, err := json.Marshal(config)
 	if err != nil {
@@ -181,7 +162,7 @@ func TestServiceStartStopRoundTrip(t *testing.T) {
 func TestServiceRejectsBadConfig(t *testing.T) {
 	client := startTestService(t)
 
-	err := client.Start([]byte(`{"outbounds":[{"type":"not-a-real-protocol","tag":"proxy"}]}`))
+	err := client.Start([]byte(`{"outbounds":[{"protocol":"not-a-real-protocol","tag":"proxy"}]}`))
 	if err == nil {
 		t.Fatal("expected an error for an unknown outbound type")
 	}
@@ -238,7 +219,7 @@ func TestRestartReplacesInstance(t *testing.T) {
 }
 
 // TestServiceRejectsUnauthenticatedClients is the regression test for the
-// privilege boundary: the socket hands arbitrary sing-box configs to a root
+// privilege boundary: the socket hands arbitrary Xray configs to a root
 // process, so a peer that cannot produce the session token must get nothing.
 func TestServiceRejectsUnauthenticatedClients(t *testing.T) {
 	_, socket := startTestServiceOnSocket(t)
@@ -392,4 +373,3 @@ func TestIsTCP(t *testing.T) {
 		}
 	}
 }
-

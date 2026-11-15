@@ -12,7 +12,7 @@ import (
 //
 // A rule says "traffic matching this source goes to this destination". Rules
 // are evaluated in order, and whatever matches nothing takes DefaultAction.
-// That is the whole model: it maps directly onto sing-box route rules, and
+// That is the whole model: it maps directly onto Xray route rules, and
 // directly onto the node graph the UI draws.
 //
 // It replaces a three-way RoutingMode enum that could only express "send these
@@ -319,7 +319,7 @@ func (c RoutingCondition) validValue(value string) bool {
 	}
 }
 
-// Usable reports whether the rule would produce a sing-box rule.
+// Usable reports whether the rule would produce a Xray rule.
 func (r RoutingRule) Usable() bool {
 	if !ValidSourceKind(r.Kind) || !ValidAction(r.Action) {
 		return false

@@ -15,7 +15,7 @@ import (
 //
 // The built-in core reads these settings under Xray's names, so they are kept
 // as they come. Only the names it knows are kept, since it refuses a config
-// with a field it does not; Xray and mihomo convert from the same set.
+// with a field it does not; native Xray converts from the same set.
 
 // XHTTPFields are the XHTTP settings the built-in core reads besides host,
 // path and mode, under Xray's names (option/v2ray_xhttp.go in the core).

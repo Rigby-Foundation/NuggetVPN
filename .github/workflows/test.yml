@@ -7,16 +7,13 @@ on:
       - "v*"
   pull_request:
 
-# Superseded runs are pointless here: a CGO build of sing-box plus Wails is the
+# Superseded runs are pointless here: a CGO build of Xray plus Wails is the
 # expensive part, so cancel the previous one on a new push.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# The build tags live in Taskfile.yml and are applied automatically by
-# `wails3 task build`; buildtags.go fails the build if any are missing.
 env:
-  SING_BOX_TAGS: with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme
   WAILS_VERSION: v3.0.0
 
 # Runners are GitHub-hosted.
@@ -39,7 +36,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - name: Install Linux dependencies
@@ -58,11 +55,11 @@ jobs:
           echo '<!doctype html><title>Kage</title>' > frontend/dist/index.html
 
       - name: Vet
-        run: go vet -tags "$SING_BOX_TAGS" ./...
+        run: go vet ./...
         shell: bash
 
       - name: Test
-        run: go test -tags "$SING_BOX_TAGS" -count=1 ./...
+        run: go test -count=1 ./...
         shell: bash
 
   android:
@@ -73,7 +70,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2
@@ -158,7 +155,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
           cache: true
 
       - uses: oven-sh/setup-bun@v2

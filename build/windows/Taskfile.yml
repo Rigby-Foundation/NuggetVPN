@@ -26,9 +26,20 @@ tasks:
           EXTRA_TAGS: '{{.EXTRA_TAGS}}'
           OBFUSCATED: '{{.OBFUSCATED}}'
           GARBLE_ARGS: '{{.GARBLE_ARGS}}'
+      - task: fetch:wintun
+        vars:
+          ARCH: '{{.ARCH | default ARCH}}'
     vars:
       # Default to CGO_ENABLED=0 if not explicitly set
       CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+
+  fetch:wintun:
+    summary: Packages the checksum-verified signed driver for native Xray TUN
+    cmds:
+      - go run ./cmd/fetchwintun -arch '{{.ARCH | default ARCH}}' -out '{{.BIN_DIR}}'
+    env:
+      GOOS: '{{OS}}'
+      GOARCH: '{{ARCH}}'
 
   build:native:
     summary: Builds the application using native Go cross-compilation

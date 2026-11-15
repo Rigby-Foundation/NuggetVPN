@@ -60,7 +60,7 @@ func (a *App) discardLogs() {
 	}
 }
 
-// ansiSequence matches the colour codes sing-box writes (SGR: ESC [ ... m).
+// ansiSequence matches the colour codes Xray writes (SGR: ESC [ ... m).
 var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 // StripANSI removes terminal colour codes.

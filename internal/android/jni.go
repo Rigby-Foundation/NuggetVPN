@@ -1,7 +1,7 @@
 //go:build android
 
 // Package android is the app's side of its Android host: the JNI bridge to
-// the Java code in build/android, and the sing-box platform interface that
+// the Java code in build/android, and the Xray platform interface that
 // gets the tunnel from Android's VpnService.
 //
 // Java starts it: NuggetBridge.attach() hands Go the bridge object, and from

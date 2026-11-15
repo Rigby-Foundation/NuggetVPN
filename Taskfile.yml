@@ -11,12 +11,8 @@ vars:
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
 
-  # sing-box gates features behind build tags, and a missing one fails *silently
-  # at runtime*: no Reality (with_utls), no Hysteria2/TUIC (with_quic), no TUN
-  # (with_gvisor). buildtags.go turns that into a compile error, and the default
-  # below means a plain `wails3 build` still picks them up.
-  SING_BOX_TAGS: "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"
-  EXTRA_TAGS: '{{.EXTRA_TAGS | default "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme"}}'
+  # Optional extra Go build tags; native Xray needs no feature tags.
+  EXTRA_TAGS: '{{.EXTRA_TAGS | default ""}}'
 
 includes:
   common: ./build/Taskfile.yml
@@ -52,18 +48,18 @@ tasks:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
   test:
-    summary: Runs the Go test suite with the production build tags
+    summary: Runs the Go test suite
     deps:
       - task: ensure:frontend:dist
     cmds:
-      - go test -tags "{{.SING_BOX_TAGS}}" -count=1 ./...
+      - go test -count=1 ./...
 
   vet:
-    summary: Static analysis with the production build tags
+    summary: Static analysis
     deps:
       - task: ensure:frontend:dist
     cmds:
-      - go vet -tags "{{.SING_BOX_TAGS}}" ./...
+      - go vet ./...
 
   ensure:frontend:dist:
     # main.go embeds frontend/dist, which is a build artifact and therefore not
@@ -78,7 +74,7 @@ tasks:
       - echo '<!doctype html><title>Kage</title>' > frontend/dist/index.html
 
   tags:
-    summary: Prints the sing-box build tags
+    summary: Prints optional extra Go build tags
     silent: true
     cmds:
-      - echo "{{.SING_BOX_TAGS}}"
+      - echo "{{.EXTRA_TAGS}}"

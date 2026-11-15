@@ -10,7 +10,7 @@ section: "net"
 priority: "optional"
 maintainer: "Rigby Foundation <noreply@rigbyfoundation.org>"
 description: |
-  Modern, lightweight VPN client with an embedded sing-box core.
+  Modern, lightweight VPN client with an embedded Xray core.
   Supports VLESS (including Reality), VMess, Trojan, Shadowsocks,
   Hysteria, Hysteria2, TUIC and WireGuard.
 vendor: "Rigby Foundation"

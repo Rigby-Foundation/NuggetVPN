@@ -1,15 +1,15 @@
-// Package core owns the embedded sing-box instance and the small privileged
+// Package core owns the embedded Xray instance and the small privileged
 // service that hosts it.
 //
-// sing-box is linked into this binary as a library. Creating a TUN interface
+// Xray is linked into this binary as a library. Creating a TUN interface
 // still needs root, so the GUI re-executes *itself* with --core-service under an
 // elevation prompt and then drives that process over a unix socket. There is no
-// second program and no `sing-box run -c file.json`: the same code, the same
+// second program and no external core executable: the same code, the same
 // version, one privilege boundary.
 //
 // # Authentication
 //
-// The socket hands an arbitrary sing-box config to a root process, so being
+// The socket hands a native Xray config to a root process, so being
 // able to connect to it is equivalent to root. File permissions alone are not
 // enough: chmod/chown are no-ops on AF_UNIX on Windows. Every connection must
 // therefore open with a CmdHello carrying a per-session token that the GUI
@@ -19,6 +19,7 @@ package core
 
 import (
 	"encoding/json"
+	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayruntime"
 	"net"
 	"strconv"
 	"strings"
@@ -61,11 +62,9 @@ type Request struct {
 	Token string `json:"token,omitempty"`
 	// ConnectionID names the connection CmdCloseConnection closes.
 	ConnectionID string `json:"connection_id,omitempty"`
-	// Core and Aux extend CmdStart to other cores; see StartRequest.
-	Core string `json:"core,omitempty"`
-	// Text is a start's config when it is not JSON (mihomo's YAML).
-	Text string          `json:"text,omitempty"`
-	Aux  json.RawMessage `json:"aux,omitempty"`
+	// Script is generated routing code, stored privately for this run.
+	Script    string `json:"script,omitempty"`
+	RuleCount int    `json:"rule_count,omitempty"`
 }
 
 // Response answers exactly one Request.
@@ -83,28 +82,8 @@ type Response struct {
 	Connections []ConnectionInfo `json:"connections,omitempty"`
 }
 
-// ConnectionInfo is one open connection, as the core tracks it.
-type ConnectionInfo struct {
-	ID string `json:"id"`
-	// Network is "tcp" or "udp"; Protocol is what sniffing found ("tls", "quic").
-	Network  string `json:"network"`
-	Protocol string `json:"protocol,omitempty"`
-	// Host is the domain when one is known; Destination is the address dialed.
-	Host        string `json:"host,omitempty"`
-	Destination string `json:"destination"`
-	// Process is the path of the program that opened it, when known.
-	Process string `json:"process,omitempty"`
-	// Rule is the index of the route rule that matched, or -1 for none.
-	Rule int `json:"rule"`
-	// RuleText is mihomo's own description of the rule that matched
-	// ("DomainSuffix,example.com"), where there is no index.
-	RuleText string `json:"rule_text,omitempty"`
-	Outbound string `json:"outbound"`
-	Upload   int64  `json:"upload"`
-	Download int64  `json:"download"`
-	// Started is when it opened, in unix milliseconds.
-	Started int64 `json:"started"`
-}
+// ConnectionInfo is an in-process Xray connection snapshot.
+type ConnectionInfo = xrayruntime.ConnectionInfo
 
 // Event is an unsolicited message from the core service.
 type Event struct {
@@ -131,4 +110,3 @@ func isTCP(addr string) bool {
 	p, err := strconv.Atoi(port)
 	return err == nil && p >= 0 && p <= 65535
 }
-

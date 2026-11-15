@@ -46,13 +46,12 @@ regular installer takes `/S` for the same.
 
 ### Connecting
 
-- **Every common protocol**: VLESS (including **Reality** with XTLS Vision),
-  VMess, Trojan, Shadowsocks, Hysteria, Hysteria2, TUIC, WireGuard, SOCKS,
-  HTTP and SSH, over TCP, WebSocket, gRPC, HTTP/2, HTTPUpgrade and **XHTTP**.
-- **Four cores to choose from** (see [Cores](#cores)).
+- **Native Xray**: VLESS (including **Reality** and XTLS Vision), VMess,
+  Trojan, Shadowsocks, WireGuard, SOCKS and HTTP, with supported TCP,
+  WebSocket, gRPC, HTTPUpgrade and **XHTTP** transports. See [Core](#core).
 - **Subscriptions**, with data usage and expiry shown when the provider
   reports them. Share links (`vless://`, `vmess://`, `ss://` and others),
-  full sing-box configs, and Clash configs are all accepted.
+  legacy JSON and Clash subscriptions can supply server descriptions.
 - **Proxy chains**, where each hop dials through the one before it.
 - **Fastest server**: the tunnel keeps measuring the best few servers and
   moves to whichever is fastest.
@@ -119,28 +118,24 @@ See [docs/plugins](docs/plugins/README.md), the
 - **Backups**: settings, profiles, routing and theme files can be exported
   and imported as one file.
 
-## Cores
+## Core
 
-The core is the engine that carries the traffic. You choose it under
-**Settings → Core**.
+Xray is the only proxy and VPN engine. Its native TUN inbound handles packets,
+its DNS and router handle lookups and the routing graph, and its outbounds reach
+servers directly. No sing-box, mihomo, secondary proxy engine or loopback bridge
+is built or launched. There is no core selector.
 
-| Core | What it is | Differences |
-| --- | --- | --- |
-| **Built-in** (default) | [TodayCore](https://github.com/TumGovic/TodayCore): sing-box 1.15 with Xray's XHTTP transport, REALITY with the `X25519MLKEM768` key share, and VLESS post-quantum encryption | None. Everything in the app is built for it. |
-| **Official sing-box** | SagerNet's sing-box 1.15.0-alpha.9, unmodified apart from its module path | No XHTTP servers. |
-| **mihomo** | Clash Meta 1.19. It runs complete Clash configs as they are. | Rules on a detected protocol and sing-box-format rule lists are skipped. It uses its own geo data. TLS fragmentation doesn't apply. |
-| **Xray** | Xray-core 26.3. It handles the servers, while the built-in core keeps the tunnel, DNS and routing. | No Hysteria, TUIC or SSH servers. No Shadowsocks plugins. |
+The app pins upstream Xray revision `5d17b872edde` for automatic desktop TUN
+routes, interface binding, process matching and the native Lua router. It needs
+Go 1.27. Android and iOS pass their OS-provided tunnel descriptor directly to
+Xray. Windows packages must provide the architecture's `wintun.dll` beside Kage.
+Linux VPN mode currently requires systemd-resolved and `resolvectl` so Xray can
+configure DNS without falling back to a leaking system resolver.
 
-All four are linked into the same binary and run in the same privileged
-process, so switching between them is instant.
-
-- The fork keeps sing-box's module path through a `replace` directive.
-- Official sing-box is vendored in `third_party/` under a module path of its
-  own, so both can coexist. [`third_party/README.md`](third_party/README.md)
-  explains what that took.
-- Xray reaches the servers through a password-protected loopback entry point
-  on the built-in core, which sends that traffic straight out. That keeps it
-  from routing its own connections back into itself.
+Share links and legacy subscription formats are imported as server descriptions;
+only native Xray configuration is executed. Protocols or transport options Xray
+cannot implement are rejected. Old `core` settings are ignored when loading and
+are removed the next time settings are saved.
 
 ## Architecture
 
@@ -160,7 +155,7 @@ the UI and the tunnel can never drift apart in version.
 ```
 ┌────────────────┐     socket       ┌──────────────────────────┐
 │  GUI (user)    │ ───────────────► │  --core-service (root)   │
-│  React + Wails │   JSON lines     │  the cores, as libraries │
+│  React + Wails │   JSON lines     │  native Xray engine       │
 │                │ ◄─────────────── │  TUN + routing + DNS     │
 └────────────────┘ logs/state/stats └──────────────────────────┘
 ```
@@ -188,11 +183,9 @@ argv is world-readable on Linux.
 
 ### No core exposes an API
 
-Every counter and connection list is read in-process. None of the cores gets
-an HTTP controller. Opening one would give every local program, and through
-permissive CORS every web page you visit, a view of your live connections and
-a way to drive a root process. For the same reason, any API a Clash config
-asks for is dropped before mihomo sees it.
+Counters and live connections are tracked around Xray's in-process dispatch.
+No HTTP controller is exposed. API listeners and log-file paths in incoming
+configs are removed at the service boundary.
 
 ## Building
 
@@ -252,10 +245,10 @@ wails3 task android:run:device   # debug build on a connected phone
 How it differs from the desktop:
 
 - **The tunnel:** Android's VpnService provides it. The core service runs
-  inside the app, and `internal/android` gives sing-box the tunnel, keeps the
+  inside the app, and `internal/android` gives Xray the tunnel, keeps the
   core's own sockets out of it, and reports the network in use.
-- **Cores:** the built-in core, and Xray behind it. Official sing-box and
-  mihomo aren't available there yet.
+- **Core:** the same native Xray engine as desktop. VpnService sockets are
+  protected directly, and connection owners come from Android's bridge.
 - **The "System" theme:** Android 12 and later use the wallpaper's Material
   You colours. Desktop builds also follow wallpaper colours, as described below.
 - **Plugins:** they bring themes, fonts and routing setups, but their pages
@@ -276,26 +269,11 @@ and light/dark mode follows the OS. GNOME timed XML wallpapers use the
 first still image. If a wallpaper cannot be read, System uses the default
 light/dark colours. A manually chosen accent still takes priority.
 
-### Build tags are required
+### Build tags
 
-sing-box gates features behind build tags, and a missing tag makes the
-feature disappear **silently at runtime**:
-
-| Tag | Without it |
-| --- | --- |
-| `with_utls` | Reality does not work |
-| `with_quic` | no Hysteria, Hysteria2 or TUIC |
-| `with_wireguard` | no WireGuard |
-| `with_clash_api` | no traffic counters. The accounting is built with this tag and read in-process; no listener is opened. |
-| `with_gvisor` | no legacy gVisor stack. The generated config doesn't use it; only a hand-written config that names it needs it. |
-
-`buildtags.go` turns a missing tag into a compile error. The list lives in
-`Taskfile.yml` as `SING_BOX_TAGS`, and every build task applies it, including
-a bare `wails3 build`. To pass the tags by hand:
-
-```bash
-go build -tags "$(make -s tags)" .
-```
+Native Xray requires no sing-box feature tags. `make build`, `make test` and
+`wails3 task build` use the normal Go build. `EXTRA_TAGS` remains available for
+optional application-specific tags.
 
 ## Where things live
 
@@ -304,7 +282,6 @@ go build -tags "$(make -s tags)" .
 | Profiles and settings | `~/Library/Application Support/org.rigbyfoundation.nuggetvpn` | `$XDG_DATA_HOME/org.rigbyfoundation.nuggetvpn` | `%APPDATA%\org.rigbyfoundation.nuggetvpn` |
 | Logs | `~/Library/Logs/org.rigbyfoundation.nuggetvpn` | `$XDG_DATA_HOME/.../logs` | `%LOCALAPPDATA%\...\logs` |
 | Generated core config | `~/Library/Caches/org.rigbyfoundation.nuggetvpn/` | `$XDG_CACHE_HOME/...` | `%LOCALAPPDATA%\...\runtime` |
-| Core data (admin-only) | `/Library/Application Support/NuggetVPN/cores` | `/var/lib/nuggetvpn/cores` | `%ProgramData%\NuggetVPN\cores` |
 
 ## Project structure
 
@@ -315,11 +292,10 @@ go build -tags "$(make -s tags)" .
   package path, and `package main` reports that path differently in a binary
   than in a test.
 - **`internal/core/`**: the privileged service, its client, and the
-  in-process runtimes for each core.
-- **`internal/sbconfig/`**: turns a profile plus settings into a sing-box
-  config. `route.go` compiles the routing graph.
-- **`internal/cores/`**: translation for the other cores. `mihomo/` builds a
-  Clash config, and `xray/` builds Xray's server config.
+  native Xray lifecycle.
+- **`internal/xrayconfig/`**: profiles and settings to native Xray JSON and
+  routing code, including logical/inverted graph rules and proxy chains.
+- **`internal/xrayruntime/`**: the engine, counters and live connection tracking.
 - **`internal/link/`**: parses share links, sing-box JSON and Clash YAML.
 - **`internal/remote/`**: subscriptions and the optional profile sync server.
 - **`internal/probe/`**: latency and connectivity checks.
@@ -338,8 +314,6 @@ go build -tags "$(make -s tags)" .
 - **`cmd/nuggetplugin/`**: builds a `.nuggetplugin` from a folder.
 - **`internal/storage/`**, **`internal/models/`**: persistence and shared
   types.
-- **`third_party/`**: official sing-box and its sing-tun, vendored under
-  their own module paths.
 - **`frontend/`**: the React app. `src/lib/backend.ts` bridges it to Go, and
   `src/locales/` holds the translations.
 - **`Taskfile.yml`**, **`build/`**: the Wails build and packaging pipeline.

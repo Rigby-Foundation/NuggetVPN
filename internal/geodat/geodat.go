@@ -1,11 +1,5 @@
-// Package geodat reads V2Ray/Xray geoip.dat and geosite.dat files — the
-// format Happ and most Xray clients ship — and turns entries from them into
-// sing-box rule-sets.
-//
-// The core cannot read these files: its own geoip/geosite databases were
-// removed in sing-box 1.12 in favour of rule-sets (see the TodayCore docs,
-// configuration/route/geoip.md). So a code a rule asks for is looked up here
-// and written out as a local source rule-set.
+// Package geodat reads V2Ray/Xray geoip.dat and geosite.dat files, including
+// attribute-filtered entries, for the app's routing graph and code picker.
 //
 // The files are protobuf. The schema is small and stable, so it is decoded by
 // hand with protowire rather than by generating code for it:
@@ -49,7 +43,7 @@ const (
 // ErrNotDat means the bytes did not decode as the expected list.
 var ErrNotDat = errors.New("not a geoip.dat or geosite.dat file")
 
-// Sites is one geosite code, split the way a sing-box rule wants it.
+// Sites is one geosite code, split into native domain matcher categories.
 type Sites struct {
 	Domain  []string
 	Suffix  []string
