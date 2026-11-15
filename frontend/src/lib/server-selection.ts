@@ -1,5 +1,18 @@
 import type { ConnectionState, Profile, ProxyMode } from "@/types";
 
+export function groupProfiles(profiles: Profile[], originalOrder = profiles) {
+    const byGroup = new Map<string, Profile[]>();
+    for (const profile of originalOrder) {
+        const group = profile.group ?? "";
+        if (!byGroup.has(group)) byGroup.set(group, []);
+    }
+    for (const profile of profiles) byGroup.get(profile.group ?? "")?.push(profile);
+    return [...byGroup].filter(([, members]) => members.length).map(([group, members]) => ({
+        name: group || null,
+        profiles: members,
+    }));
+}
+
 /** A measured candidate is a recommendation, never evidence of a live tunnel. */
 export function serverSelection({ profiles, pings, domain, mode, profileId, state, unsupported = {} }: {
     profiles: Profile[];
@@ -11,7 +24,7 @@ export function serverSelection({ profiles, pings, domain, mode, profileId, stat
     unsupported?: Record<string, string>;
 }) {
     const available = profiles.filter((profile) => (profile.source_domain?.trim() || "local") === (domain.trim() || "local"));
-    const best = available.filter((profile) => !unsupported[profile.id] && pings[profile.id] != null && Number.isFinite(pings[profile.id]) && pings[profile.id] >= 0)
+    const best = available.filter((profile) => !unsupported[profile.id] && pings[profile.id] != null && Number.isFinite(pings[profile.id]) && pings[profile.id]! >= 0)
         .reduce<Profile | undefined>((winner, profile) => !winner || pings[profile.id]! < pings[winner.id]! ? profile : winner, undefined);
     const actual = state?.status === "connected" ? profiles.find((profile) => profile.id === state.profile_id) : undefined;
     const selected = available.find((profile) => profile.id === profileId);

@@ -20,10 +20,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // Events for the window.
-const (
-	speedProgressEventName = "speed-progress"
-	wifiEventName          = "wifi-changed"
-)
+const speedProgressEventName = "speed-progress"
 
 // insights holds what the background work keeps between rounds.
 type insights struct {
@@ -46,15 +43,13 @@ func (a *App) statsStore() *stats.Store {
 }
 
 // runBackground is the app's clock: counting traffic by program, checking
-// servers, following the routing schedule and the Wi-Fi rules, and saving
-// statistics. It runs until the app stops.
+// servers, following the routing schedule, and saving statistics.
+// It runs until the app stops.
 func (a *App) runBackground(ctx context.Context) {
 	usage := time.NewTicker(2 * time.Second)
 	defer usage.Stop()
 	schedule := time.NewTicker(20 * time.Second)
 	defer schedule.Stop()
-	network := time.NewTicker(10 * time.Second)
-	defer network.Stop()
 	save := time.NewTicker(time.Minute)
 	defer save.Stop()
 	// The first health round a little after start, then every quarter hour.
@@ -62,7 +57,6 @@ func (a *App) runBackground(ctx context.Context) {
 	defer health.Stop()
 
 	a.followSchedule()
-	a.checkWifi()
 	for {
 		select {
 		case <-ctx.Done():
@@ -72,8 +66,6 @@ func (a *App) runBackground(ctx context.Context) {
 			a.countUsage()
 		case <-schedule.C:
 			a.followSchedule()
-		case <-network.C:
-			a.checkWifi()
 		case <-save.C:
 			_ = a.statsStore().Save()
 		case <-health.C:

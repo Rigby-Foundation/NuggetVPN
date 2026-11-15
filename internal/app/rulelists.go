@@ -84,17 +84,14 @@ func (a *App) GetRuleLists() []RuleListStatus {
 	return statuses
 }
 
-// UpdateRuleLists downloads every list the routing uses now, and restarts a
-// running tunnel so they take effect.
+// UpdateRuleLists downloads every list and offers to apply them to a running tunnel.
 func (a *App) UpdateRuleLists() ([]RuleListStatus, error) {
 	_, settings := a.snapshot()
 	_, warnings := a.prepareRuleLists(settings, true)
 	for _, warning := range warnings {
 		a.appendLog("WARN " + warning)
 	}
-	if err := a.reapplyRouting(); err != nil {
-		return a.GetRuleLists(), err
-	}
+	a.requestCoreReload()
 	return a.GetRuleLists(), nil
 }
 

@@ -1,106 +1,27 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-
-import { useAppearance } from "@/components/appearance-provider";
-import { CustomTheme, PLUGIN_THEME_PREFIX, sanitizeTheme, UserFont } from "@/lib/appearance";
-import { eventPayload, invoke, listen } from "@/lib/backend";
-import { HostActions, registerFrame, setHostActions, setHostPlugins, startPluginHost } from "@/lib/plugin-host";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useVpn } from "@/app/VpnProvider";
+import { invoke } from "@/lib/backend";
+import { currentLanguage } from "@/lib/i18n";
+import { getPlatform, hasNativeRuntime } from "@/lib/platform";
+import { registerFrame, setHostActions, setHostPlugins, startPluginHost } from "@/lib/plugin-host";
 import { cn } from "@/lib/utils";
-import { PluginInfo } from "@/types";
-
-interface PluginsContext {
-    plugins: PluginInfo[];
-    /** Replaces the list, after an install, removal or toggle. */
-    setPlugins: (plugins: PluginInfo[]) => void;
-    refresh: () => Promise<void>;
+import type { PluginInfo } from "@/types";
+export function usePlugins() {
+  const { plugins, setPlugins } = useVpn();
+  const refresh = useCallback(async () => { setPlugins(await invoke<PluginInfo[]>("list_plugins")); }, [setPlugins]);
+  return { plugins, setPlugins, refresh };
 }
-
-const Context = createContext<PluginsContext | null>(null);
-
-export function usePlugins(): PluginsContext {
-    const value = useContext(Context);
-    if (!value) throw new Error("usePlugins must be used inside PluginsProvider");
-    return value;
+export function PluginRuntime({ children }: { children: ReactNode }) {
+  const { plugins, connection } = useVpn();
+  const state = useRef(connection); state.current = connection;
+  useEffect(() => {
+    if (!hasNativeRuntime()) return;
+    setHostActions({ state: () => state.current, language: currentLanguage, platform: getPlatform });
+    return startPluginHost();
+  }, []);
+  useEffect(() => setHostPlugins(plugins), [plugins]);
+  return <>{children}<div aria-hidden="true" className="pointer-events-none fixed -left-[9999px] size-px overflow-hidden">{plugins.filter((plugin) => plugin.enabled && plugin.background).map((plugin) => <PluginFrame key={plugin.id + plugin.checksum} plugin={plugin} url={plugin.background!} title={plugin.name} hidden />)}</div></>;
 }
-
-/** A plugin's themes in the theme editor's shape, checked like the user's own. */
-function themesOf(plugins: PluginInfo[]): CustomTheme[] {
-    return plugins
-        .filter((plugin) => plugin.enabled)
-        .flatMap((plugin) =>
-            plugin.themes.map((theme) =>
-                sanitizeTheme(
-                    {
-                        ...theme,
-                        name: theme.name,
-                        image: theme.image ? { ...theme.image } : undefined,
-                    },
-                    PLUGIN_THEME_PREFIX
-                )
-            )
-        )
-        .filter((theme): theme is CustomTheme => !!theme);
-}
-
-function fontsOf(plugins: PluginInfo[]): UserFont[] {
-    return plugins.filter((plugin) => plugin.enabled).flatMap((plugin) => plugin.fonts);
-}
-
-/**
- * Loads the plugins, hands their content to the rest of the app, and runs
- * their background pages. `actions` is how the host reaches the app.
- */
-export function PluginsProvider({ actions, children }: { actions: HostActions; children: ReactNode }) {
-    const [plugins, setPluginsState] = useState<PluginInfo[]>([]);
-    const { setPluginContent } = useAppearance();
-    const contentRef = useRef(setPluginContent);
-    contentRef.current = setPluginContent;
-
-    setHostActions(actions);
-
-    const setPlugins = useCallback((list: PluginInfo[]) => {
-        setHostPlugins(list);
-        setPluginsState(list);
-        contentRef.current(themesOf(list), fontsOf(list));
-    }, []);
-
-    const refresh = useCallback(async () => {
-        const list = await invoke<PluginInfo[]>("list_plugins").catch(() => null);
-        if (Array.isArray(list)) setPlugins(list);
-    }, [setPlugins]);
-
-    useEffect(() => {
-        const stop = startPluginHost();
-        const changed = listen("plugins-changed", (data) => {
-            const list = eventPayload<PluginInfo[]>(data);
-            if (Array.isArray(list)) setPlugins(list);
-        });
-        void refresh();
-        return () => {
-            changed();
-            stop();
-        };
-    }, [refresh, setPlugins]);
-
-    const value = useMemo(() => ({ plugins, setPlugins, refresh }), [plugins, setPlugins, refresh]);
-    const background = plugins.filter((plugin) => plugin.enabled && plugin.background);
-
-    return (
-        <Context.Provider value={value}>
-            {children}
-            {/* Out of sight and out of the tab order; still running. */}
-            <div aria-hidden="true" className="pointer-events-none fixed -start-[9999px] top-0 h-px w-px overflow-hidden">
-                {background.map((plugin) => (
-                    <PluginFrame key={plugin.id + plugin.checksum} plugin={plugin} url={plugin.background!} title={plugin.name} hidden />
-                ))}
-            </div>
-        </Context.Provider>
-    );
-}
-
-/**
- * One plugin page. The sandbox allows scripts and nothing else: no
- * same-origin, forms, popups, top navigation, downloads or modals.
- */
 export function PluginFrame({
     plugin,
     url,

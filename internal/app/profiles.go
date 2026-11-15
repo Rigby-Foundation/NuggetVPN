@@ -24,6 +24,9 @@ func (a *App) snapshot() ([]models.Profile, models.AppSettings) {
 }
 
 func (a *App) replaceProfiles(profiles []models.Profile) []models.Profile {
+	for i := range profiles {
+		link.NormalizeProfileMetadata(&profiles[i])
+	}
 	a.mu.Lock()
 	a.profiles = profiles
 	snapshot := make([]models.Profile, len(profiles))
@@ -57,6 +60,7 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 	profiles = append(profiles, models.Profile{
 		ID:           uuid.NewString(),
 		Name:         resolved,
+		Description:  link.ExtractDescription(trimmed),
 		Server:       "Auto",
 		Protocol:     link.DetectProtocol(trimmed),
 		ConfigLink:   trimmed,
@@ -195,6 +199,7 @@ func (a *App) UpdateProfile(id, name, configLink string) ([]models.Profile, erro
 	}
 
 	profiles[index].Name = resolvedName
+	profiles[index].Description = link.ExtractDescription(trimmedLink)
 	profiles[index].ConfigLink = trimmedLink
 	profiles[index].Server = server
 	profiles[index].Protocol = link.DetectProtocol(trimmedLink)

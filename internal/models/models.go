@@ -10,6 +10,7 @@ import "strings"
 type Profile struct {
 	ID              string  `json:"id"`
 	Name            string  `json:"name"`
+	Description     string  `json:"description,omitempty"`
 	Server          string  `json:"server"`
 	Protocol        string  `json:"protocol"`
 	ConfigLink      string  `json:"config_link"`
@@ -215,13 +216,6 @@ type AppSettings struct {
 	RoutingSchedule  []ScheduleEntry `json:"routing_schedule"`
 	ScheduleFallback string          `json:"schedule_fallback"`
 
-	// WifiAutoConnect connects on joining a Wi-Fi network that is not in
-	// TrustedNetworks. WifiTrustedDisconnect disconnects on joining one that
-	// is.
-	WifiAutoConnect       bool     `json:"wifi_auto_connect"`
-	WifiTrustedDisconnect bool     `json:"wifi_trusted_disconnect"`
-	TrustedNetworks       []string `json:"trusted_networks"`
-
 	// ServerHealth checks the servers now and then, keeps their history, and
 	// tries the ones that keep failing last. A pointer so older settings
 	// default to on.
@@ -352,7 +346,6 @@ func (s *AppSettings) Normalize() {
 	s.normalizeSetups()
 	s.normalizeIdentity()
 	s.normalizeSchedule()
-	s.normalizeNetworks()
 	if s.RoutingSchedule == nil {
 		s.RoutingSchedule = []ScheduleEntry{}
 	}

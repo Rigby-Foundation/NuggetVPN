@@ -19,7 +19,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/routing/controls";
 import { Input } from "@/components/ui/input";
 import { errorMessage, invoke } from "@/lib/backend";
 import { useT } from "@/lib/i18n";

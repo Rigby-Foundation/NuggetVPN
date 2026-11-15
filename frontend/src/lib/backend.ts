@@ -8,6 +8,8 @@
  * `TestBoundMethodsAreReachable` fails if a Go method is left unwired.
  */
 import { Call, Events } from "@wailsio/runtime";
+import { hasNativeRuntime } from "@/lib/platform";
+import { currentLanguage, translate } from "@/lib/i18n";
 
 /**
  * Fully qualified name of the bound service: `<package path>.<type>`.
@@ -54,6 +56,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     import_routing: { method: "ImportRouting", args: [] },
     switch_routing_setup: { method: "SwitchRoutingSetup", args: ["id"] },
     get_rule_hits: { method: "GetRuleHits", args: [] },
+    preview_domain_match: { method: "PreviewDomainMatch", args: ["kind", "values", "hostname"] },
+    validate_routing_rule: { method: "ValidateRoutingRule", args: ["rule"] },
     get_rule_lists: { method: "GetRuleLists", args: [] },
     update_rule_lists: { method: "UpdateRuleLists", args: [] },
     get_connections: { method: "GetConnections", args: [] },
@@ -63,13 +67,11 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     set_ui_language: { method: "SetUILanguage", args: ["language"] },
     take_pending_link: { method: "TakePendingLink", args: [] },
     get_version: { method: "GetVersion", args: [] },
-    list_cores: { method: "ListCores", args: [] },
-    set_core: { method: "SetCore", args: ["name"] },
-    unsupported_profiles: { method: "UnsupportedProfiles", args: [] },
     open_url: { method: "OpenURL", args: ["url"] },
     export_backup: { method: "ExportBackup", args: ["ui"] },
     import_backup: { method: "ImportBackup", args: [] },
     list_user_files: { method: "ListUserFiles", args: ["kind"] },
+    list_system_fonts: { method: "ListSystemFonts", args: [] },
     import_user_file: { method: "ImportUserFile", args: ["kind"] },
     remove_user_file: { method: "RemoveUserFile", args: ["kind", "id"] },
     get_app_usage: { method: "GetAppUsage", args: ["days"] },
@@ -78,7 +80,6 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     run_speed_test: { method: "RunSpeedTest", args: [] },
     stop_speed_test: { method: "StopSpeedTest", args: [] },
     get_speed_tests: { method: "GetSpeedTests", args: [] },
-    get_wifi_state: { method: "GetWifiState", args: [] },
     get_system_palette: { method: "GetSystemPalette", args: [] },
     set_system_bars: { method: "SetSystemBars", args: ["color", "light"] },
     list_installed_apps: { method: "ListInstalledApps", args: [] },
@@ -104,6 +105,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_branding_images: { method: "GetBrandingImages", args: ["urls"] },
 
     connect: { method: "Connect", args: ["sourceDomain", "mode", "profileId"] },
+    switch_connection: { method: "SwitchConnection", args: ["sourceDomain", "mode", "profileId"] },
+    reload_core: { method: "ReloadCore", args: [] },
     disconnect: { method: "Disconnect", args: [] },
     get_connection_state: { method: "GetConnectionState", args: [] },
     get_traffic: { method: "GetTraffic", args: [] },
@@ -142,6 +145,7 @@ export async function invoke<T = unknown>(
     command: string,
     args: Record<string, unknown> = {}
 ): Promise<T> {
+    if (!hasNativeRuntime()) throw new Error(translate(currentLanguage(), "ui.nativeAction"));
     const entry = COMMANDS[command];
     if (!entry) {
         throw new Error(`Unknown backend command: ${command}`);
@@ -157,6 +161,7 @@ export function listen<T = unknown>(
     event: string,
     handler: (payload: T) => void
 ): UnlistenFn {
+    if (!hasNativeRuntime()) return () => {};
     return Events.On(event, (wailsEvent: { data: unknown }) => {
         handler(wailsEvent.data as T);
     });
@@ -185,7 +190,6 @@ export const EVENTS = {
     importLink: "import-link",
     updateProgress: "update-progress",
     speedProgress: "speed-progress",
-    wifi: "wifi-changed",
 } as const;
 
 /** Window chrome controls used by the custom title bar. */

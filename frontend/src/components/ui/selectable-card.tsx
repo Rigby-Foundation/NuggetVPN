@@ -47,7 +47,7 @@ function SelectableCard({
             onClick={onSelect}
             onKeyDown={handleKeyDown}
             className={cn(
-                "cursor-pointer transition-colors py-0",
+                "cursor-pointer rounded-xl border border-border/60 bg-card/70 py-0 gap-0 ring-0 transition-colors",
                 "hover:border-primary/40",
                 selected && "border-primary/70 bg-primary/5",
                 className

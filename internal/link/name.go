@@ -120,7 +120,8 @@ func protocolDisplayName(scheme string) string {
 }
 
 // ExtractName derives a human label for a link, preferring the fragment.
-func ExtractName(rawLink string) string {
+func ExtractName(rawLink string) (result string) {
+	defer func() { result, _ = ProfileLabel(result) }()
 	trimmed := strings.TrimSpace(strings.ReplaceAll(rawLink, "&amp;", "&"))
 
 	if name, ok := nameFromSingBoxJSON(trimmed); ok {

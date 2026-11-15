@@ -100,23 +100,23 @@ export function EditConfigDialog({
             if (isSubscription) {
                 const trimmedUrl = url.trim();
                 if (!trimmedUrl) {
-                    setError("Subscription URL cannot be empty");
+                    setError(t("ui.subAddressRequired"));
                     setSaving(false);
                     return;
                 }
                 if (onUpdateSubscriptionUrl) {
                     await onUpdateSubscriptionUrl(activeSource.domain, trimmedUrl);
-                    toast.success("Subscription URL updated", { id: "sub-url-updated" });
+                    toast.success(t("ui.subAddressSaved"), { id: "sub-url-updated" });
                 }
             } else if (localProfile && onUpdateProfile) {
                 const trimmedLink = link.trim();
                 if (!trimmedLink) {
-                    setError("Config link cannot be empty");
+                    setError(t("ui.configRequired"));
                     setSaving(false);
                     return;
                 }
                 await onUpdateProfile(localProfile.id, name.trim() || localProfile.name, trimmedLink);
-                toast.success("Configuration updated", { id: "profile-updated" });
+                toast.success(t("ui.configSaved"), { id: "profile-updated" });
             }
             handleClose();
         } catch (err) {
@@ -132,12 +132,12 @@ export function EditConfigDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {isSubscription ? <Globe size={18} className="text-primary" /> : <Server size={18} className="text-primary" />}
-                        <span>{isSubscription ? "Edit Subscription" : "Edit Configuration"}</span>
+                        <span>{isSubscription ? t("ui.editSubUrl") : t("ui.editConfig")}</span>
                     </DialogTitle>
                     <DialogDescription>
                         {isSubscription
-                            ? "Update the subscription address or export all included servers."
-                            : "Edit configuration parameters and credentials."}
+                            ? t("ui.subEditHint")
+                            : t("ui.configEditHint")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -145,7 +145,7 @@ export function EditConfigDialog({
                     {/* Name / Label */}
                     <div className="space-y-1.5">
                         <Label htmlFor="config-edit-name" className="text-xs font-medium">
-                            Configuration Name
+                            {t("ui.configName")}
                         </Label>
                         <Input
                             id="config-edit-name"
@@ -156,7 +156,7 @@ export function EditConfigDialog({
                         />
                         {isSubscription && (
                             <span className="text-[11px] text-muted-foreground">
-                                Subscription provider domain: {source.domain}
+                                {t("ui.providerDomain", { name: activeSource.domain })}
                             </span>
                         )}
                     </div>
@@ -165,7 +165,7 @@ export function EditConfigDialog({
                     {isSubscription ? (
                         <div className="space-y-1.5">
                             <Label htmlFor="config-edit-url" className="text-xs font-medium">
-                                Subscription URL
+                                {t("ui.subAddress")}
                             </Label>
                             <Input
                                 id="config-edit-url"
@@ -179,7 +179,7 @@ export function EditConfigDialog({
                     ) : (
                         <div className="space-y-1.5">
                             <Label htmlFor="config-edit-link" className="text-xs font-medium">
-                                Configuration Link / Raw Outbound
+                                {t("ui.rawConfig")}
                             </Label>
                             <Textarea
                                 id="config-edit-link"
@@ -208,13 +208,13 @@ export function EditConfigDialog({
                                 size="sm"
                                 onClick={() => {
                                     handleClose();
-                                    onExport(sourceProfiles, `Export ${activeSource.label}`);
+                                    onExport(sourceProfiles, activeSource.label);
                                 }}
                                 className="gap-1.5 text-xs"
                                 disabled={saving}
                             >
                                 <Download size={14} />
-                                <span>Export ({sourceProfiles.length})…</span>
+                                <span>{t("logs.export")} ({sourceProfiles.length})</span>
                             </Button>
                         ) : null}
                     </div>
@@ -237,7 +237,7 @@ export function EditConfigDialog({
                             className="gap-1.5"
                         >
                             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                            <span>Save Changes</span>
+                            <span>{t("common.save")}</span>
                         </Button>
                     </div>
                 </DialogFooter>

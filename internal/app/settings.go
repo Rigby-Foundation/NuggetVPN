@@ -25,6 +25,10 @@ func (a *App) GetSettings() models.AppSettings {
 // SaveSettings persists settings coming from the UI. Normalisation happens
 // here, once, rather than being duplicated in the renderer.
 func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, error) {
+	return a.saveSettings(settings, true)
+}
+
+func (a *App) saveSettings(settings models.AppSettings, promptReload bool) (models.AppSettings, error) {
 	settings.Normalize()
 
 	// Only a change is applied, compared with the last state read from the
@@ -43,6 +47,7 @@ func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, err
 	}
 
 	a.mu.Lock()
+	coreChanged := coreSettingsSignature(a.settings) != coreSettingsSignature(settings)
 	setupsChanged := setupsSignature(a.settings) != setupsSignature(settings)
 	loggingStopped := a.settings.LoggingOn() && !settings.LoggingOn()
 	a.settings = settings
@@ -58,7 +63,13 @@ func (a *App) SaveSettings(settings models.AppSettings) (models.AppSettings, err
 	if setupsChanged {
 		a.refreshTrayMenu()
 	}
-	return settings, storage.SaveSettings(settings)
+	if err := storage.SaveSettings(settings); err != nil {
+		return settings, err
+	}
+	if promptReload && coreChanged {
+		a.requestCoreReload()
+	}
+	return settings, nil
 }
 
 // setupsSignature is what the tray shows of the routing setups.

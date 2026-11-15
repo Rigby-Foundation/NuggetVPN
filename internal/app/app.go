@@ -113,9 +113,6 @@ type App struct {
 	// can tell it has been superseded. lastConnect is what to reconnect to.
 	connectGen  atomic.Uint64
 	lastConnect connectRequest
-	// alternatives are the servers the exit may switch between, from the
-	// last connect; see xrayconfig.Request.Alternatives.
-	alternatives []models.Profile
 	// lockedDown is set while the kill switch's lockdown config runs.
 	lockedDown atomic.Bool
 
@@ -155,6 +152,15 @@ func New(version string, icon []byte, notifier *notifications.NotificationServic
 
 		notifier: notifier,
 		version:  version,
+	}
+	metadataChanged := false
+	for i := range service.profiles {
+		if link.NormalizeProfileMetadata(&service.profiles[i]) {
+			metadataChanged = true
+		}
+	}
+	if metadataChanged {
+		_ = storage.SaveProfiles(service.profiles)
 	}
 	service.initPluginHost()
 	service.settings.Normalize()

@@ -14,8 +14,9 @@
  * The choice lives in this renderer's storage, like the theme, so the first
  * frame is already in the right language.
  */
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DirectionProvider } from "@radix-ui/react-direction";
+import { I18nContext } from "@/lib/i18n-context";
 
 import en from "@/locales/en";
 import fa from "@/locales/fa";
@@ -125,19 +126,8 @@ export function translate(language: Language, key: MessageKey, params?: Params):
 
 export type Translate = (key: MessageKey, params?: Params) => string;
 
-interface I18nContext {
-    language: Language;
-    /** Text direction: "rtl" for Persian. Logical CSS (ms-, pe-, start-) follows it. */
-    dir: "ltr" | "rtl";
-    choice: LanguageChoice;
-    setChoice: (choice: LanguageChoice) => void;
-    t: Translate;
-}
-
-const Context = createContext<I18nContext | null>(null);
-
-export function useI18n(): I18nContext {
-    const value = useContext(Context);
+export function useI18n() {
+    const value = useContext(I18nContext);
     if (!value) {
         throw new Error("useI18n must be used inside I18nProvider");
     }
@@ -183,8 +173,8 @@ export function I18nProvider({
     // <html dir>: without it a ScrollArea stamps dir="ltr" on itself and
     // everything inside it — most of every page — stays left to right.
     return (
-        <Context.Provider value={value}>
+        <I18nContext.Provider value={value}>
             <DirectionProvider dir={dir}>{children}</DirectionProvider>
-        </Context.Provider>
+        </I18nContext.Provider>
     );
 }

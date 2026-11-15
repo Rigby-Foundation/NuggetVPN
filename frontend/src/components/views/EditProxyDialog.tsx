@@ -130,7 +130,7 @@ export function EditProxyDialog({
     const handleTabChange = (tab: string) => {
         if (tab === "form" && activeTab === "raw") {
             try {
-                const parsed = parseProxyLink(rawInput, form.name || profile.name);
+                const parsed = parseProxyLink(rawInput, form.name || activeProfile.name);
                 setForm(parsed);
             } catch {
                 // Keep existing form state if parse fails
@@ -153,13 +153,13 @@ export function EditProxyDialog({
                 finalLink = rawInput.trim();
                 finalName = form.name.trim() || activeProfile.name;
                 if (!finalLink) {
-                    setError("Configuration cannot be empty");
+                    setError(t("ui.configRequired"));
                     setSaving(false);
                     return;
                 }
             } else {
                 if (!form.server.trim()) {
-                    setError("Server address is required");
+                    setError(t("ui.serverAddressRequired"));
                     setSaving(false);
                     return;
                 }
@@ -168,7 +168,7 @@ export function EditProxyDialog({
             }
 
             await onSave(activeProfile.id, finalName, finalLink);
-            toast.success("Proxy configuration saved", { id: "proxy-saved" });
+            toast.success(t("ui.configSaved"), { id: "proxy-saved" });
             handleClose();
         } catch (err) {
             setError(errorMessage(err));
@@ -201,8 +201,8 @@ export function EditProxyDialog({
                             </DialogTitle>
                             <DialogDescription className="text-xs text-muted-foreground truncate">
                                 {activeProfile.source_domain && activeProfile.source_domain !== "local"
-                                    ? `Subscription: ${activeProfile.source_domain}`
-                                    : "Custom Proxy Profile"}
+                                    ? t("ui.providerDomain", { name: activeProfile.source_domain })
+                                    : t("ui.individualProfiles")}
                             </DialogDescription>
                         </div>
                     </div>
@@ -216,11 +216,11 @@ export function EditProxyDialog({
                         <TabsList className="grid grid-cols-2 h-9 w-full">
                             <TabsTrigger value="form" className="text-xs gap-1.5 py-1.5">
                                 <Sliders size={13} />
-                                <span>Settings</span>
+                                <span>{t("nav.settings")}</span>
                             </TabsTrigger>
                             <TabsTrigger value="raw" className="text-xs gap-1.5 py-1.5">
                                 <Code2 size={13} />
-                                <span>Raw Link / Code</span>
+                                <span>{t("ui.rawConfig")}</span>
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
@@ -242,25 +242,25 @@ export function EditProxyDialog({
                                 <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Globe size={14} className="text-primary" />
-                                        <span>Server & Connection</span>
+                                        <span>{t("ui.connectionPage")}</span>
                                     </div>
                                     <div className="space-y-2.5">
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-name" className="text-[11px] text-muted-foreground">
-                                                Display Name
+                                                {t("ui.configName")}
                                             </Label>
                                             <Input
                                                 id="edit-name"
                                                 value={form.name}
                                                 onChange={(e) => updateField("name", e.target.value)}
-                                                placeholder="e.g. 🇳🇱 Netherlands 01"
+                                                placeholder={t("add.namePlaceholder")}
                                                 className="h-8.5 text-xs"
                                             />
                                         </div>
                                         <div className="grid grid-cols-3 gap-2.5">
                                             <div className="col-span-2 space-y-1">
                                                 <Label htmlFor="edit-server" className="text-[11px] text-muted-foreground">
-                                                    Server Address / Host
+                                                    {t("ui.serverAddress")}
                                                 </Label>
                                                 <Input
                                                     id="edit-server"
@@ -272,7 +272,7 @@ export function EditProxyDialog({
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-port" className="text-[11px] text-muted-foreground">
-                                                    Port
+                                                    {t("ui.port")}
                                                 </Label>
                                                 <Input
                                                     id="edit-port"
@@ -293,13 +293,13 @@ export function EditProxyDialog({
                                 <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Key size={14} className="text-primary" />
-                                        <span>Credentials & Auth</span>
+                                        <span>{t("ui.credentials")}</span>
                                     </div>
 
                                     {(isVless || isVmess || isTuic) && (
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-uuid" className="text-[11px] text-muted-foreground">
-                                                User ID (UUID)
+                                                {t("ui.userId")}
                                             </Label>
                                             <Input
                                                 id="edit-uuid"
@@ -313,16 +313,16 @@ export function EditProxyDialog({
 
                                     {isVless && (
                                         <div className="space-y-1">
-                                            <Label htmlFor="edit-flow" className="text-[11px] text-muted-foreground">Flow</Label>
+                                            <Label htmlFor="edit-flow" className="text-[11px] text-muted-foreground">{t("ui.flow")}</Label>
                                             <Select
                                                 value={form.flow || "none"}
-                                                onValueChange={(val) => updateField("flow", val === "none" ? "" : val)}
+                                                onValueChange={(val) => updateField("flow", val === "none" ? "" : val ?? "")}
                                             >
                                                 <SelectTrigger id="edit-flow" className="h-8.5 text-xs font-mono w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="none">None</SelectItem>
+                                                    <SelectItem value="none">{t("configuration.bulk.none")}</SelectItem>
                                                     <SelectItem value="xtls-rprx-vision">xtls-rprx-vision</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -346,19 +346,19 @@ export function EditProxyDialog({
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label htmlFor="edit-vmess-security" className="text-[11px] text-muted-foreground">Security / Cipher</Label>
+                                                <Label htmlFor="edit-vmess-security" className="text-[11px] text-muted-foreground">{t("ui.encryption")}</Label>
                                                 <Select
                                                     value={form.cipher || "auto"}
-                                                    onValueChange={(val) => updateField("cipher", val)}
+                                                    onValueChange={(val) => updateField("cipher", val ?? "auto")}
                                                 >
                                                     <SelectTrigger id="edit-vmess-security" className="h-8.5 text-xs font-mono w-full">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="auto">auto</SelectItem>
+                                                        <SelectItem value="auto">{t("appearance.units.auto")}</SelectItem>
                                                         <SelectItem value="aes-128-gcm">aes-128-gcm</SelectItem>
                                                         <SelectItem value="chacha20-poly1305">chacha20-poly1305</SelectItem>
-                                                        <SelectItem value="none">none</SelectItem>
+                                                        <SelectItem value="none">{t("configuration.bulk.none")}</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -368,13 +368,13 @@ export function EditProxyDialog({
                                     {(isTrojan || isHy2 || isSS) && (
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-password" className="text-[11px] text-muted-foreground">
-                                                Password / Key
+                                                {t("ui.passwordOrKey")}
                                             </Label>
                                             <Input
                                                 id="edit-password"
                                                 value={form.password}
                                                 onChange={(e) => updateField("password", e.target.value)}
-                                                placeholder="Authentication password"
+                                                placeholder={t("ui.password")}
                                                 className="h-8.5 font-mono text-xs"
                                             />
                                         </div>
@@ -382,10 +382,10 @@ export function EditProxyDialog({
 
                                     {isSS && (
                                         <div className="space-y-1">
-                                            <Label htmlFor="edit-cipher" className="text-[11px] text-muted-foreground">Encryption Method</Label>
+                                            <Label htmlFor="edit-cipher" className="text-[11px] text-muted-foreground">{t("ui.encryption")}</Label>
                                             <Select
                                                 value={form.cipher || "aes-256-gcm"}
-                                                onValueChange={(val) => updateField("cipher", val)}
+                                                onValueChange={(val) => updateField("cipher", val ?? "auto")}
                                             >
                                                 <SelectTrigger id="edit-cipher" className="h-8.5 text-xs font-mono w-full">
                                                     <SelectValue />
@@ -405,25 +405,25 @@ export function EditProxyDialog({
                                         <div className="grid grid-cols-2 gap-2.5">
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-username" className="text-[11px] text-muted-foreground">
-                                                    Username
+                                                    {t("ui.username")}
                                                 </Label>
                                                 <Input
                                                     id="edit-username"
                                                     value={form.username}
                                                     onChange={(e) => updateField("username", e.target.value)}
-                                                    placeholder="Optional"
+                                                    placeholder={t("ui.optional")}
                                                     className="h-8.5 text-xs"
                                                 />
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-socks-pass" className="text-[11px] text-muted-foreground">
-                                                    Password
+                                                    {t("ui.password")}
                                                 </Label>
                                                 <Input
                                                     id="edit-socks-pass"
                                                     value={form.password}
                                                     onChange={(e) => updateField("password", e.target.value)}
-                                                    placeholder="Optional"
+                                                    placeholder={t("ui.optional")}
                                                     className="h-8.5 text-xs"
                                                 />
                                             </div>
@@ -435,16 +435,16 @@ export function EditProxyDialog({
                                 <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Network size={14} className="text-primary" />
-                                        <span>Transport & Network</span>
+                                        <span>{t("routing.source.network")}</span>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                         <div className="space-y-1">
-                                            <Label htmlFor="edit-network" className="text-[11px] text-muted-foreground">Network Type</Label>
+                                            <Label htmlFor="edit-network" className="text-[11px] text-muted-foreground">{t("ui.transportType")}</Label>
                                             <Select
                                                 value={form.network}
-                                                onValueChange={(val: "tcp" | "ws" | "grpc" | "http" | "httpupgrade") =>
-                                                    updateField("network", val)
+                                                onValueChange={(val: "tcp" | "ws" | "grpc" | "http" | "httpupgrade" | null) =>
+                                                    updateField("network", val ?? "tcp")
                                                 }
                                             >
                                                 <SelectTrigger id="edit-network" className="h-8.5 text-xs w-full">
@@ -463,7 +463,7 @@ export function EditProxyDialog({
                                         {form.network === "grpc" ? (
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-service" className="text-[11px] text-muted-foreground">
-                                                    gRPC Service Name
+                                                    {t("ui.grpcService")}
                                                 </Label>
                                                 <Input
                                                     id="edit-service"
@@ -476,13 +476,13 @@ export function EditProxyDialog({
                                         ) : (
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-path" className="text-[11px] text-muted-foreground">
-                                                    Path
+                                                    {t("ui.path")}
                                                 </Label>
                                                 <Input
                                                     id="edit-path"
                                                     value={form.path}
                                                     onChange={(e) => updateField("path", e.target.value)}
-                                                    placeholder="/ or /ws"
+                                                    placeholder="/ws"
                                                     className="h-8.5 font-mono text-xs"
                                                 />
                                             </div>
@@ -492,7 +492,7 @@ export function EditProxyDialog({
                                     {(form.network === "ws" || form.network === "httpupgrade" || form.network === "http") && (
                                         <div className="space-y-1">
                                             <Label htmlFor="edit-host" className="text-[11px] text-muted-foreground">
-                                                Host Header (Optional)
+                                                {t("ui.hostHeader")}
                                             </Label>
                                             <Input
                                                 id="edit-host"
@@ -511,23 +511,23 @@ export function EditProxyDialog({
                                 <div className="rounded-xl border bg-card/60 p-4 space-y-3.5 shadow-xs">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                         <Shield size={14} className="text-primary" />
-                                        <span>Security & TLS</span>
+                                        <span>{t("ui.tlsSecurity")}</span>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                         <div className="space-y-1">
-                                            <Label htmlFor="edit-tls" className="text-[11px] text-muted-foreground">Security Mode</Label>
+                                            <Label htmlFor="edit-tls" className="text-[11px] text-muted-foreground">{t("ui.securityMode")}</Label>
                                             <Select
                                                 value={form.security}
-                                                onValueChange={(val: "none" | "tls" | "reality") =>
-                                                    updateField("security", val)
+                                                onValueChange={(val: "none" | "tls" | "reality" | null) =>
+                                                    updateField("security", val ?? "tls")
                                                 }
                                             >
                                                 <SelectTrigger id="edit-tls" className="h-8.5 text-xs w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="none">None (Plain)</SelectItem>
+                                                    <SelectItem value="none">{t("ui.noSecurity")}</SelectItem>
                                                     <SelectItem value="tls">TLS</SelectItem>
                                                     <SelectItem value="reality">Reality</SelectItem>
                                                 </SelectContent>
@@ -537,7 +537,7 @@ export function EditProxyDialog({
                                         {form.security !== "none" ? (
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-sni" className="text-[11px] text-muted-foreground">
-                                                    SNI / Server Name
+                                                    {t("ui.serverNameSni")}
                                                 </Label>
                                                 <Input
                                                     id="edit-sni"
@@ -553,10 +553,10 @@ export function EditProxyDialog({
                                     {form.security !== "none" && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                             <div className="space-y-1">
-                                                <Label htmlFor="edit-fingerprint" className="text-[11px] text-muted-foreground">uTLS Fingerprint</Label>
+                                                <Label htmlFor="edit-fingerprint" className="text-[11px] text-muted-foreground">{t("ui.fingerprint")}</Label>
                                                 <Select
                                                     value={form.fingerprint || "chrome"}
-                                                    onValueChange={(val) => updateField("fingerprint", val)}
+                                                    onValueChange={(val) => updateField("fingerprint", val ?? "chrome")}
                                                 >
                                                     <SelectTrigger id="edit-fingerprint" className="h-8.5 text-xs w-full">
                                                         <SelectValue />
@@ -574,14 +574,14 @@ export function EditProxyDialog({
                                             <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-1.5">
                                                 <div className="space-y-0.5">
                                                     <Label className="text-[11px] font-medium cursor-pointer">
-                                                        Skip Cert Verify
+                                                        {t("ui.skipCertCheck")}
                                                     </Label>
                                                     <p className="text-[9px] text-muted-foreground">
-                                                        Allow self-signed certs
+                                                        {t("ui.selfSigned")}
                                                     </p>
                                                 </div>
                                                 <Switch
-                                                    aria-label="Skip certificate verification"
+                                                    aria-label={t("ui.skipCertCheck")}
                                                     checked={form.insecure}
                                                     onCheckedChange={(checked) => updateField("insecure", checked)}
                                                 />
@@ -594,30 +594,30 @@ export function EditProxyDialog({
                                         <div className="rounded-lg border bg-muted/15 p-3 space-y-2.5">
                                             <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                                                 <Lock size={13} className="text-primary" />
-                                                <span>Reality Parameters</span>
+                                                <span>{t("ui.realitySettings")}</span>
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-pbk" className="text-[11px] text-muted-foreground">
-                                                    Public Key (pbk)
+                                                    {t("ui.publicKey")}
                                                 </Label>
                                                 <Input
                                                     id="edit-pbk"
                                                     value={form.publicKey}
                                                     onChange={(e) => updateField("publicKey", e.target.value)}
-                                                    placeholder="Reality public key"
+                                                    placeholder={t("ui.publicKey")}
                                                     className="h-8 font-mono text-xs"
                                                 />
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div className="space-y-1">
                                                     <Label htmlFor="edit-sid" className="text-[11px] text-muted-foreground">
-                                                        Short ID (sid)
+                                                        {t("ui.shortId")}
                                                     </Label>
                                                     <Input
                                                         id="edit-sid"
                                                         value={form.shortId}
                                                         onChange={(e) => updateField("shortId", e.target.value)}
-                                                        placeholder="e.g. 81ded0d6"
+                                                        placeholder="81ded0d6"
                                                         className="h-8 font-mono text-xs"
                                                     />
                                                 </div>
@@ -629,7 +629,7 @@ export function EditProxyDialog({
                                                         id="edit-spx"
                                                         value={form.spiderX}
                                                         onChange={(e) => updateField("spiderX", e.target.value)}
-                                                        placeholder="Optional"
+                                                        placeholder={t("ui.optional")}
                                                         className="h-8 font-mono text-xs"
                                                     />
                                                 </div>
@@ -642,12 +642,12 @@ export function EditProxyDialog({
                                     <div className="rounded-xl border bg-card/60 p-4 space-y-3 shadow-xs">
                                         <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                                             <Zap size={14} className="text-primary" />
-                                            <span>Hysteria 2 Protocol Options</span>
+                                            <span>{t("ui.hysteriaOptions")}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2.5">
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-obfs" className="text-[11px] text-muted-foreground">
-                                                    Obfuscation Type
+                                                    {t("ui.obfsType")}
                                                 </Label>
                                                 <Input
                                                     id="edit-obfs"
@@ -659,25 +659,25 @@ export function EditProxyDialog({
                                             </div>
                                             <div className="space-y-1">
                                                 <Label htmlFor="edit-obfs-pass" className="text-[11px] text-muted-foreground">
-                                                    Obfs Password
+                                                    {t("ui.obfsPassword")}
                                                 </Label>
                                                 <Input
                                                     id="edit-obfs-pass"
                                                     value={form.obfsPassword}
                                                     onChange={(e) => updateField("obfsPassword", e.target.value)}
-                                                    placeholder="Password"
+                                                    placeholder={t("ui.password")}
                                                     className="h-8.5 font-mono text-xs"
                                                 />
                                             </div>
                                             <div className="col-span-2 space-y-1">
                                                 <Label htmlFor="edit-ports" className="text-[11px] text-muted-foreground">
-                                                    Port Hopping Range
+                                                    {t("ui.portHopping")}
                                                 </Label>
                                                 <Input
                                                     id="edit-ports"
                                                     value={form.ports}
                                                     onChange={(e) => updateField("ports", e.target.value)}
-                                                    placeholder="e.g. 20000-40000"
+                                                    placeholder="20000-40000"
                                                     className="h-8.5 font-mono text-xs"
                                                 />
                                             </div>
@@ -690,10 +690,10 @@ export function EditProxyDialog({
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="raw-config-textarea" className="text-xs font-medium">
-                                    Raw Configuration URI / JSON
+                                    {t("ui.rawConfig")}
                                 </Label>
                                 <span className="text-[10px] text-muted-foreground font-mono">
-                                    vless://, vmess://, trojan://, ss://, hy2:// or JSON
+                                    vless://, vmess://, trojan://, ss://, hy2://, JSON
                                 </span>
                             </div>
                             <Textarea
@@ -701,12 +701,12 @@ export function EditProxyDialog({
                                 value={rawInput}
                                 onChange={(e) => setRawInput(e.target.value)}
                                 rows={14}
-                                placeholder="Paste or edit raw URI/outbound configuration"
+                                placeholder={t("ui.rawConfigHint")}
                                 className="font-mono text-xs resize-y"
                                 disabled={saving}
                             />
                             <p className="text-[11px] text-muted-foreground">
-                                You can paste any standard proxy share link or sing-box outbound JSON object here.
+                                {t("ui.rawConfigHint")}
                             </p>
                         </div>
                     )}
@@ -728,7 +728,7 @@ export function EditProxyDialog({
                                 disabled={saving}
                             >
                                 <Download size={13} />
-                                <span>Export…</span>
+                                <span>{t("logs.export")}</span>
                             </Button>
                         ) : null}
                     </div>
@@ -752,7 +752,7 @@ export function EditProxyDialog({
                             className="gap-1.5 h-8 text-xs"
                         >
                             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                            <span>Save Changes</span>
+                            <span>{t("common.save")}</span>
                         </Button>
                     </div>
                 </DialogFooter>

@@ -301,7 +301,6 @@ optional application-specific tags.
 - **`internal/probe/`**: latency and connectivity checks.
 - **`internal/stats/`**, **`internal/speedtest/`**: statistics kept over
   time, and the speed test.
-- **`internal/wifi/`**: reads the Wi-Fi network's name on each system.
 - **`internal/cli/`**: the command line, and the socket the app answers it
   on.
 - **`internal/geodat/`**, **`internal/vflow/`**: geo files and the `.vflow`

@@ -1,4 +1,3 @@
-import { Segmented } from "@/components/ui/segmented";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Download, FileUp, Globe2, Info, Landmark, Link2, Loader2, Redo2, RefreshCw, Server, StickyNote, Trash2, Puzzle, Undo2, Upload, Plus } from "lucide-react";
@@ -27,13 +26,15 @@ import {
     kindMeta,
     NODE_TYPES,
     RuleListsContext,
-    RulePatch,
 } from "@/components/routing/nodes";
+import { RoutingToolbox } from "@/components/routing/Toolbox";
+import { InlineRuleFields } from "@/components/routing/RuleFields";
+import { DESTINATIONS } from "@/components/routing/guide";
 import { RuleOrder } from "@/components/routing/order";
-import { usePlugins } from "@/components/plugins/plugins-provider";
+import { usePlugins } from "@/hooks/use-plugins";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { PresetList, PresetPlacement, PresetRule } from "@/components/routing/presets";
+import { PresetPlacement, PresetRule } from "@/components/routing/presets";
 import { SetupSwitcher } from "@/components/routing/setups";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,9 +42,9 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/routing/controls";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/routing/controls";
 import { errorMessage, invoke } from "@/lib/backend";
 import { MessageKey, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -60,19 +61,6 @@ import {
 } from "@/types";
 import { usePageVisible } from "@/hooks/use-page-visible";
 
-// Domain patterns are added as a domains card, switched to patterns there.
-const SOURCE_KINDS: RoutingKind[] = [
-    "apps",
-    "domains",
-    "ip",
-    "port",
-    "protocol",
-    "network",
-    "geosite",
-    "geoip",
-    "ruleset",
-    "logical",
-];
 const ACTIONS: RoutingAction[] = ["proxy", "direct", "block", "drop"];
 
 /**
@@ -157,7 +145,7 @@ const COLUMN_GAP = 520;
 // "Show all", and the input. Nodes used to grow with every entry, so no gap
 // could fit them and a long list spilled over the node below it; now that a
 // long list collapses, one fixed gap does.
-const SOURCE_GAP = 380;
+const SOURCE_GAP = 340;
 const ACTION_GAP = 200;
 
 function fallbackPosition(id: string, index: number): CanvasPoint {
@@ -194,13 +182,19 @@ function nextNotePosition(
 /** Position for a newly added source: below whatever is lowest already. */
 function nextSourcePosition(
     rules: RoutingRule[],
-    layout: Record<string, CanvasPoint>
+    layout: Record<string, CanvasPoint>,
+    nodes: Node[] = [],
 ): CanvasPoint {
+    const measured = new Map(nodes.map((node) => [node.id, node]));
+    const defaultPoint = layout[DEFAULT_NODE] ?? fallbackPosition(DEFAULT_NODE, 0);
+    const defaultBottom = defaultPoint.y + (measured.get(DEFAULT_NODE)?.measured?.height ?? defaultPoint.height ?? 180);
     const lowest = rules.reduce((bottom, rule, index) => {
         const point = layout[rule.id] ?? fallbackPosition(rule.id, index);
-        return Math.max(bottom, point.y);
-    }, fallbackPosition(DEFAULT_NODE, 0).y);
-    return { x: 0, y: lowest + SOURCE_GAP };
+        const node = measured.get(rule.id);
+        const height = node?.measured?.height ?? point.height ?? SOURCE_GAP - 40;
+        return Math.max(bottom, point.y + height);
+    }, defaultBottom);
+    return { x: 0, y: lowest + 40 };
 }
 
 interface RoutingViewProps {
@@ -223,6 +217,7 @@ interface CanvasProps {
     hits: Record<string, number> | null;
     /** Set by the canvas so the palette outside it can move the viewport. */
     onReady: (focus: (point: CanvasPoint) => void) => void;
+    onFitReady: (fit: () => void, measure: () => Node[]) => void;
 }
 
 /** The server destinations on the canvas: those placed, plus any a rule uses. */
@@ -238,11 +233,12 @@ function serverIds(settings: AppSettings): string[] {
     return ids;
 }
 
-function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profiles, hits, onReady }: CanvasProps) {
+function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profiles, hits, onReady, onFitReady }: CanvasProps) {
     const t = useT();
     const rules = useMemo(() => settings.routing_rules ?? [], [settings.routing_rules]);
     const layout = useMemo(() => settings.routing_layout ?? {}, [settings.routing_layout]);
     const { setCenter, getZoom, fitView, getNodes, getEdges } = useReactFlow();
+    useEffect(() => onFitReady(() => { void fitView({ padding: 0.18, duration: 250 }); }, getNodes), [onFitReady, fitView, getNodes]);
     // The zoom, for CSS: a connector's catch area stays the same size on
     // screen however far the canvas is zoomed out. See App.css.
     const zoom = useStore((state) => state.transform[2]);
@@ -297,15 +293,6 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 routing_rules: rulesRef.current.map((rule) =>
                     rule.id === id ? { ...rule, ...patch } : rule
                 ),
-            });
-        },
-        [onChange]
-    );
-
-    const removeRule = useCallback(
-        (id: string) => {
-            onChange({
-                routing_rules: rulesRef.current.filter((rule) => rule.id !== id),
             });
         },
         [onChange]
@@ -425,17 +412,16 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 type: rule.kind === "logical" ? "logical" : "source",
                 position: positioned(rule.id, index),
                 data: {
+                    content: <InlineRuleFields rule={rule} onChange={(patch) => updateRule(rule.id, patch)} />,
+                    onDelete: () => onChange({ routing_rules: rulesRef.current.filter((item) => item.id !== rule.id) }),
+                    destination: rule.action === "proxy" && rule.server ? profiles.find((profile) => profile.id === rule.server)?.name ?? t("routing.server.gone") : rule.action ? t(DESTINATIONS[rule.action].title) : undefined,
                     kind: rule.kind,
                     values: rule.values ?? [],
                     mode: rule.mode ?? "and",
                     conditions: rule.conditions ?? [],
-                    action: rule.action,
                     invert: !!rule.invert,
-                    dns: rule.dns ?? "",
                     hits: hitsFor(rule.id),
                     order: index + 1,
-                    onChange: (patch: RulePatch) => updateRule(rule.id, patch),
-                    onDelete: () => removeRule(rule.id),
                 },
             })),
             ...ACTIONS.flatMap((action) => {
@@ -489,7 +475,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 },
             };
         });
-    }, [settings.default_action, settings.default_server, rules, layout, inboundCounts, hiddenActions, onHideAction, updateRule, removeRule, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize]);
+    }, [settings.default_action, settings.default_server, rules, layout, inboundCounts, hiddenActions, onHideAction, comments, updateComment, removeComment, servers, profiles, removeServer, hits, resizeNode, resetNodeSize, updateRule, onChange, t]);
 
     const derivedEdges = useMemo<Edge[]>(() => {
         // An edge carrying connections right now is drawn heavier and moves;
@@ -498,7 +484,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
         const dashed = (stroke: string, active: boolean) => ({
             stroke,
             strokeWidth: active ? 2.5 : 1.5,
-            strokeDasharray: "5 5",
+            strokeDasharray: active ? "6 5" : undefined,
             opacity: active ? 1 : 0.5,
         });
         const active = (id: string) => (hits?.[id] ?? 0) > 0;
@@ -556,7 +542,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                         ...(resizing ? { width: before.width, height: before.height } : {}),
                         dragging: before.dragging,
                         resizing: before.resizing,
-                        selected: before.selected,
+                        selected: node.selectable === false ? false : before.selected,
                         measured: before.measured,
                     };
                 });
@@ -658,34 +644,13 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
         return () => window.removeEventListener("keydown", onKey);
     }, [removeSelected]);
 
-    /** Clicking an edge with scissors cuts that connection. */
-    const onEdgeClick = useCallback(
-        (event: React.MouseEvent, edge: Edge) => {
-            event.stopPropagation();
-            const undeletable =
-                edge.id === "edge:default" ||
-                edge.source === DEFAULT_NODE ||
-                edge.deletable === false ||
-                (edge.data as Record<string, unknown> | undefined)?.deletable === false;
-
-            if (undeletable) {
-                const message =
-                    edge.id === "edge:default" || edge.source === DEFAULT_NODE
-                        ? t("routing.cannotDeleteDefault")
-                        : t("routing.cannotDeleteConnection");
-                toast(message, { icon: "⚠️", id: "cannot-delete-connection" });
-                return;
-            }
-
-            const ruleId = edge.id.startsWith("edge:") ? edge.id.slice("edge:".length) : edge.source;
-            updateRule(ruleId, { action: "" as RoutingAction, server: "" });
-        },
-        [updateRule, t]
-    );
-
+    /** Select a wire before offering to disconnect it. */
+    const [selectedWire, setSelectedWire] = useState<Edge | null>(null);
+    useEffect(() => { if (selectedWire && !edges.some((edge) => edge.id === selectedWire.id)) setSelectedWire(null); }, [edges, selectedWire]);
     return (
-        <div ref={wrapperRef} className="h-full w-full" style={{ ["--flow-zoom" as string]: zoom }}>
+        <div ref={wrapperRef} className="relative h-full w-full" style={{ ["--flow-zoom" as string]: zoom }}>
         <ReactFlow
+            proOptions={{ hideAttribution: true }}
             nodes={nodes}
             edges={edges}
             nodeTypes={NODE_TYPES}
@@ -699,7 +664,9 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
-            onEdgeClick={onEdgeClick}
+            onNodeClick={() => setSelectedWire(null)}
+            onPaneClick={() => setSelectedWire(null)}
+            onEdgeClick={(_, edge) => setSelectedWire(edge)}
             // A dragged wire snaps to a connector this far away.
             connectionRadius={40}
             fitView={savedViewport === null}
@@ -710,186 +677,12 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
             deleteKeyCode={null}
             className="bg-transparent"
         >
-            <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
+            <Background variant={BackgroundVariant.Dots} gap={18} size={0.8}
+                color="color-mix(in srgb, var(--foreground) 10%, transparent)" />
             <Controls showInteractive={false} />
         </ReactFlow>
+        {selectedWire && <div className="nodrag absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 shadow-sm"><span className="text-xs text-muted-foreground">{selectedWire.id === "edge:default" ? t("routing.ui.default") : t("routing.ui.wire")}</span>{selectedWire.id !== "edge:default" && <Button size="sm" variant="secondary" onClick={() => { updateRule(selectedWire.source, { action: "" as RoutingAction, server: "" }); setSelectedWire(null); }}>{t("routing.ui.disconnect")}</Button>}<Button size="sm" variant="ghost" onClick={() => setSelectedWire(null)}>{t("connection.dismiss")}</Button></div>}
         </div>
-    );
-}
-
-/**
- * The palette.
- *
- * It sits beside the canvas rather than floating over it: as a floating panel
- * it covered the destination nodes, which are exactly what you are aiming at
- * while wiring a rule up.
- */
-function Palette({
-    core,
-    defaultAction,
-    onAddSource,
-    onAddNote,
-    onSetDefault,
-    onAddServer,
-    onAddPreset,
-    hiddenActions,
-    onShowAction,
-    profiles,
-    placedServers,
-    geoPanel,
-    orderPanel,
-    className,
-}: {
-    /** The chosen core; mihomo skips protocol rules, so they are not offered. */
-    core: string;
-    defaultAction: RoutingAction;
-    onAddSource: (kind: RoutingKind) => void;
-    onAddNote: () => void;
-    onSetDefault: (action: RoutingAction) => void;
-    onAddServer: (profileId: string) => void;
-    onAddPreset: (rules: PresetRule[], placement: PresetPlacement) => void;
-    /** Hidden destinations nothing uses, offered here to put back. */
-    hiddenActions: RoutingAction[];
-    onShowAction: (action: RoutingAction) => void;
-    profiles: Profile[];
-    placedServers: string[];
-    geoPanel: React.ReactNode;
-    orderPanel: React.ReactNode;
-    className?: string;
-}) {
-    const t = useT();
-    const [tab, setTab] = useRemembered<"add" | "order">("routing.panel", "add");
-    const available = profiles.filter((profile) => !placedServers.includes(profile.id));
-    return (
-        <aside className={cn("w-60 shrink-0 rounded-xl border bg-card/60 p-2 overflow-y-auto", className)}>
-            <div className="mb-2 grid grid-cols-2 gap-0.5 rounded-lg bg-muted/60 p-0.5" role="tablist">
-                {(["add", "order"] as const).map((option) => (
-                    <button
-                        key={option}
-                        type="button"
-                        role="tab"
-                        aria-selected={tab === option}
-                        onClick={() => setTab(option)}
-                        className={cn(
-                            "rounded-md py-1 text-xs transition-colors",
-                            tab === option ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        {t(option === "add" ? "routing.tab.add" : "routing.tab.order")}
-                    </button>
-                ))}
-            </div>
-            {tab === "order" ? orderPanel : (
-            <>
-            <p className="flex items-center gap-1 px-2 pt-1 pb-2 text-xs font-medium text-muted-foreground">
-                <span className="flex-1">{t("routing.sources")}</span>
-                <InfoTip text={t("routing.dragHint")} />
-            </p>
-            {SOURCE_KINDS.map((kind) => {
-                const meta = kindMeta(kind);
-                const skipped = kind === "protocol" && core === "mihomo";
-                return (
-                    <button
-                        key={kind}
-                        type="button"
-                        onClick={() => onAddSource(kind)}
-                        disabled={skipped}
-                        title={skipped ? t("core.mihomo.limit.protocol") : undefined}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start disabled:opacity-45 disabled:hover:bg-transparent"
-                    >
-                        <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
-                        <span className="truncate">{t(meta.label)}</span>
-                    </button>
-                );
-            })}
-
-            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                {t("routing.catchAll")}
-            </p>
-            {ACTIONS.map((action) => {
-                const meta = ACTION_META[action];
-                const isDefault = defaultAction === action;
-                return (
-                    <button
-                        key={action}
-                        type="button"
-                        onClick={() => onSetDefault(action)}
-                        aria-pressed={isDefault}
-                        title={t("routing.sendUnmatched", { action: t(meta.label) })}
-                        className={cn(
-                            "w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-start",
-                            isDefault ? "bg-accent" : "hover:bg-accent"
-                        )}
-                    >
-                        <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
-                        <span className="truncate flex-1">{t(meta.label)}</span>
-                        {isDefault ? (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                                {t("routing.default")}
-                            </span>
-                        ) : null}
-                    </button>
-                );
-            })}
-
-            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                {t("routing.destinations")}
-            </p>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <button
-                        type="button"
-                        disabled={available.length === 0}
-                        title={available.length === 0 ? t("routing.server.none") : t("routing.server.addHint")}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start disabled:opacity-50 disabled:hover:bg-transparent"
-                    >
-                        <Server size={15} style={{ color: "var(--status-connected)" }} aria-hidden="true" />
-                        <span className="truncate">{t("routing.server.add")}</span>
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="left" className="w-64 max-h-80 overflow-y-auto">
-                    {available.map((profile) => (
-                        <DropdownMenuItem key={profile.id} className="text-xs gap-2" onClick={() => onAddServer(profile.id)}>
-                            <span className="truncate">{profile.name}</span>
-                            <span className="ms-auto shrink-0 text-muted-foreground">{profile.protocol}</span>
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
-            {hiddenActions.map((action) => {
-                const meta = ACTION_META[action];
-                return (
-                    <button
-                        key={action}
-                        type="button"
-                        onClick={() => onShowAction(action)}
-                        title={t("routing.action.show")}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
-                    >
-                        <meta.icon size={15} style={{ color: meta.accent }} aria-hidden="true" />
-                        <span className="truncate">{t(meta.label)}</span>
-                    </button>
-                );
-            })}
-
-            <PresetList onAdd={onAddPreset} />
-
-            <p className="px-2 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                {t("routing.canvas")}
-            </p>
-            <button
-                type="button"
-                onClick={onAddNote}
-                className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-accent text-start"
-            >
-                <StickyNote size={15} className="text-muted-foreground" aria-hidden="true" />
-                <span className="truncate">{t("routing.note")}</span>
-            </button>
-
-            {geoPanel}
-            </>
-            )}
-        </aside>
     );
 }
 
@@ -1118,7 +911,12 @@ const HISTORY_LIMIT = 100;
 
 function RoutingView({ settings, onChange: save, onReplace, profiles, connected }: RoutingViewProps) {
     const t = useT();
-    const [view, setView] = useRemembered<"graph" | "rules">("routing.view", "graph");
+    const fitCanvas = useRef<(() => void) | null>(null);
+    const measureCanvas = useRef<() => Node[]>(() => []);
+    const onFitReady = useCallback((fit: () => void, measure: () => Node[]) => {
+        fitCanvas.current = fit;
+        measureCanvas.current = measure;
+    }, []);
 
     // Undo and redo. Every change to the graph passes through onChange below,
     // which records the graph as it was; undo puts it back. Changes to
@@ -1285,6 +1083,12 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
     const { plugins } = usePlugins();
     const isMobile = useIsMobile();
     const [paletteOpen, setPaletteOpen] = useState(false);
+    const inspect = (id: string) => {
+        const index = rules.findIndex((rule) => rule.id === id);
+        const position = settings.routing_layout?.[id] ?? fallbackPosition(id, Math.max(0, index));
+        focusRef.current?.(position);
+        setPaletteOpen(false);
+    };
     const hiddenActions = useHiddenActions();
     // A hidden destination something goes to is on the canvas regardless.
     const offeredActions = hiddenActions.hidden.filter(
@@ -1362,35 +1166,14 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
         setTimeout(() => focusRef.current?.(position), 60);
     }, [onChange, settings.routing_comments, settings.routing_layout]);
 
-    const addSource = useCallback(
-        (kind: RoutingKind) => {
-            const id = `${kind}-${Date.now().toString(36)}`;
-            const layout = settings.routing_layout ?? {};
-            const position = nextSourcePosition(rules, layout);
-            const rule: RoutingRule =
-                kind === "logical"
-                    ? {
-                          id,
-                          kind,
-                          values: [],
-                          mode: "and",
-                          conditions: [
-                              { kind: "apps", values: [] },
-                              { kind: "network", values: [] },
-                          ],
-                          action: "proxy",
-                      }
-                    : { id, kind, values: [], action: "proxy" };
-
-            onChange({
-                routing_rules: [...rules, rule],
-                routing_layout: { ...layout, [id]: position },
-            });
-            // Once the node exists, not during this render.
-            setTimeout(() => focusRef.current?.(position), 60);
-        },
-        [onChange, rules, settings.routing_layout]
-    );
+    const addSource = useCallback((kind: RoutingKind) => {
+        const rule: RoutingRule = { id: `${kind}-${crypto.randomUUID()}`, kind, values: [], action: "" as RoutingAction, ...(kind === "logical" ? { mode: "and", conditions: [{ kind: "domains", values: [] }] } : {}) };
+        const layout = settings.routing_layout ?? {};
+        const position = nextSourcePosition(rules, layout, measureCanvas.current());
+        onChange({ routing_rules: [...rules, rule], routing_layout: { ...layout, [rule.id]: position } });
+        setPaletteOpen(false);
+        setTimeout(() => focusRef.current?.(position), 60);
+    }, [onChange, rules, settings.routing_layout]);
 
     const placedServers = useMemo(() => serverIds(settings), [settings]);
 
@@ -1429,15 +1212,35 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
         [onChange, rules, settings.routing_layout, t]
     );
 
+    const tidyLayout = () => {
+        const layout = { ...(settings.routing_layout ?? {}) };
+        const measured = new Map(measureCanvas.current().map((node) => [node.id, node.measured]));
+        const sourceIds = [...rules.map((rule) => rule.id), DEFAULT_NODE];
+        const widestSource = Math.max(320, ...sourceIds.map((id) => measured.get(id)?.width ?? layout[id]?.width ?? 0));
+        const layOutColumn = (ids: string[], x: number, rowHeight: number) => {
+            let y = 0;
+            for (const id of ids) {
+                const point = layout[id];
+                layout[id] = { ...point, x, y };
+                y += Math.max(rowHeight, (measured.get(id)?.height ?? point?.height ?? 0) + 32);
+            }
+        };
+        layOutColumn(sourceIds, 0, 240);
+        layOutColumn([
+            ...ACTIONS.filter((action) => !offeredActions.includes(action)).map(actionNodeId),
+            ...placedServers.map(serverNodeId),
+        ], widestSource + 96, 164);
+        onChange({ routing_layout: layout });
+        setTimeout(() => fitCanvas.current?.(), 60);
+    };
+
     return (
-        <div className="enter-stagger absolute inset-0 flex flex-col">
-            <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-6 pt-3 sm:pt-5 pb-3 shrink-0">
+        <div className="absolute inset-0 flex flex-col">
+            <header data-page-part="0" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-10 pt-7 sm:pt-9 pb-4 shrink-0">
                 <div className="min-w-0">
                     <h1 className="sr-only">{t("nav.routing")}</h1>
                     <div className="flex flex-wrap items-center gap-3">
                         <SetupSwitcher settings={settings} onReplace={onReplace} />
-                        <Segmented<"graph" | "rules"> label={t("routing.view")} value={view} onChange={setView}
-                            options={[{ value: "graph", label: t("routing.view.graph") }, { value: "rules", label: t("routing.view.rules") }]} />
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                         {rules.length === 0
@@ -1468,6 +1271,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                     >
                         <Redo2 size={15} aria-hidden="true" />
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={tidyLayout} title={t("routing.ui.tidy")}>{t("routing.ui.tidy")}</Button>
                     <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => void importRouting()} aria-label={t("routing.import")} title={t("routing.import")}>
                         <Upload size={14} aria-hidden="true" /> <span className="hidden sm:inline">{t("routing.import")}</span>
                     </Button>
@@ -1523,25 +1327,10 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
             ) : null}
 
             <div className="flex-1 min-h-0 mx-2 sm:mx-4 mb-2 sm:mb-4 flex gap-3">
-                {view === "rules" ? (
-                    <div className="mx-auto w-full max-w-5xl overflow-y-auto rounded-xl border bg-card/40 p-3 sm:p-5">
-                        <RuleOrder expanded rules={rules} profiles={profiles} onReorder={(next) => onChange({ routing_rules: next })}
-                            onFocus={(id) => {
-                                const index = rules.findIndex((rule) => rule.id === id);
-                                pendingFocus.current = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
-                                setView("graph");
-                            }} />
-                        <div className="mt-4 space-y-3 border-t pt-4">
-                            <h2 className="text-sm font-medium">{t("routing.catchAll")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("routing.catchAll.destination", { destination: settings.default_server ? profiles.find((p) => p.id === settings.default_server)?.name ?? defaultLabel : defaultLabel })}</p>
-                            <Button variant="outline" size="sm" onClick={() => setView("graph")}>{t("routing.view.graph")}</Button>
-                        </div>
-                    </div>
-                ) : <>
                 {/* The graph reads left to right in every language: sources
                     on the left, destinations on the right, the way the edges
                     are drawn. It is not mirrored in right-to-left layouts. */}
-                <div className="relative flex-1 min-w-0 rounded-xl border overflow-hidden" dir="ltr">
+                <div data-page-part="1" className="relative flex-1 min-w-0 rounded-xl border border-border/60 bg-card/20 overflow-hidden" dir="ltr">
                     <GeoCodesContext.Provider value={geoCodes}>
                         <RuleListsContext.Provider value={listsContext}>
                             <ReactFlowProvider>
@@ -1553,6 +1342,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                                     profiles={profiles}
                                     hits={hits}
                                     onReady={handleReady}
+                                    onFitReady={onFitReady}
                                 />
                             </ReactFlowProvider>
                         </RuleListsContext.Provider>
@@ -1570,22 +1360,19 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                 </div>
                 {isMobile ? (
                     <Sheet open={paletteOpen} onOpenChange={setPaletteOpen}>
-                        <SheetContent side="bottom" className="h-[75vh] rounded-t-2xl px-3 pb-4">
+                        <SheetContent side="bottom" className="h-[75dvh] rounded-t-2xl px-3 pb-4">
                             <SheetHeader className="px-1 pb-0">
                                 <SheetTitle>{t("nav.routing")}</SheetTitle>
                             </SheetHeader>
-                            <Palette
-                                core={settings.core}                                className="w-full border-0 bg-transparent p-0"
-                                defaultAction={settings.default_action}
+                            <RoutingToolbox
+                                className="w-full flex-1 border-0 bg-transparent p-0"
                                 onAddSource={(...args: Parameters<typeof addSource>) => {
                                     addSource(...args);
-                                    setPaletteOpen(false);
                                 }}
                                 onAddNote={() => {
                                     addNote();
                                     setPaletteOpen(false);
                                 }}
-                                onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
                                 onAddServer={(id) => {
                                     addServer(id);
                                     setPaletteOpen(false);
@@ -1604,23 +1391,16 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                                         rules={rules}
                                         profiles={profiles}
                                         onReorder={(next) => onChange({ routing_rules: next })}
-                                        onFocus={(id) => {
-                                            const index = rules.findIndex((rule) => rule.id === id);
-                                            const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
-                                            focusRef.current?.(point);
-                                            setPaletteOpen(false);
-                                        }}
+                                        onFocus={inspect}
                                     />
                                 }
                             />
                         </SheetContent>
                     </Sheet>
                 ) : (
-                    <Palette
-                        core={settings.core}                        defaultAction={settings.default_action}
+                    <RoutingToolbox
                         onAddSource={addSource}
                         onAddNote={addNote}
-                        onSetDefault={(action) => onChange({ default_action: action, default_server: "" })}
                         onAddServer={addServer}
                         onAddPreset={addPreset}
                         hiddenActions={offeredActions}
@@ -1633,16 +1413,11 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                                 rules={rules}
                                 profiles={profiles}
                                 onReorder={(next) => onChange({ routing_rules: next })}
-                                onFocus={(id) => {
-                                    const index = rules.findIndex((rule) => rule.id === id);
-                                    const point = (settings.routing_layout ?? {})[id] ?? fallbackPosition(id, Math.max(index, 0));
-                                    focusRef.current?.(point);
-                                }}
+                                onFocus={inspect}
                             />
                         }
                     />
                 )}
-                </>}
             </div>
         </div>
     );

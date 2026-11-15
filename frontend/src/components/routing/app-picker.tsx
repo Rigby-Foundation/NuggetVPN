@@ -223,7 +223,7 @@ export function AppPicker({
         <Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
             {/* No focus on the search box at first: on a phone that raises
                 the keyboard over half the list. */}
-            <DialogContent className="flex h-[85vh] flex-col gap-3 p-4 sm:max-w-md" onOpenAutoFocus={(event) => event.preventDefault()}>
+            <DialogContent className="flex h-[85vh] flex-col gap-3 p-4 sm:max-w-md" initialFocus={false}>
                 <DialogHeader>
                     <DialogTitle>{t("apps.title")}</DialogTitle>
                     <DialogDescription>{t("apps.description")}</DialogDescription>

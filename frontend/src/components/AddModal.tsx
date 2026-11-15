@@ -106,10 +106,10 @@ function AddModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
-        className="sm:max-w-md"
+        className="max-h-[calc(100svh-2rem)] overflow-y-auto p-5 sm:max-w-md"
         onPaste={onPaste}
         // On a phone, focusing the field raised the keyboard over the dialog.
-        onOpenAutoFocus={isAndroid ? (event) => event.preventDefault() : undefined}
+        initialFocus={isAndroid ? false : undefined}
       >
         <DialogHeader>
           <DialogTitle>{t("add.title")}</DialogTitle>

@@ -91,6 +91,7 @@ function SubscriptionIdentity({
                                     : appSettings.subscription_user_agent
                             }
                             onValueChange={(value) => {
+                                if (value == null) return;
                                 if (value === CUSTOM) {
                                     setCustom(true);
                                     return;

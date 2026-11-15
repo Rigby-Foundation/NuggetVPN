@@ -45,7 +45,7 @@ var trayIcon []byte
 
 // version is stamped into the core service handshake so the GUI can detect a
 // service left behind by an older build.
-var version = "2.4.0"
+var version = "3.0.0"
 
 func main() {
 	// Kage status, connect, ...: control the running app and exit.
@@ -173,14 +173,15 @@ func runGUI() {
 	})
 
 	window = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:      app.WindowName,
-		Title:     "Kage",
-		Width:     1100,
-		Height:    750,
-		MinWidth:  400,
-		MinHeight: 500,
-		URL:       "/",
-		Hidden:    startHidden,
+		Name:            app.WindowName,
+		Title:           "Kage",
+		Width:           1100,
+		Height:          750,
+		MinWidth:        400,
+		MinHeight:       500,
+		URL:             "/",
+		Hidden:          startHidden,
+		DevToolsEnabled: models.DevBuild,
 		// The UI draws its own title bar and rounded corners.
 		Frameless:        true,
 		BackgroundType:   application.BackgroundTypeTransparent,
@@ -190,6 +191,17 @@ func runGUI() {
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
 	})
+
+	if models.DevBuild {
+		configureWebViewDevtools(window)
+		openInspector := func(application.Window) { window.OpenDevTools() }
+		window.RegisterKeyBinding("F12", openInspector)
+		if runtime.GOOS == "darwin" {
+			window.RegisterKeyBinding("Alt+Command+I", openInspector)
+		} else {
+			window.RegisterKeyBinding("Ctrl+Shift+I", openInspector)
+		}
+	}
 
 	// The service looks the window up during startup and builds the tray and
 	// the close behaviour around it.

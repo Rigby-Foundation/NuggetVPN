@@ -1,7 +1,18 @@
 import { Globe, Zap } from "lucide-react";
 
-import { countryOf, flagUrl } from "@/lib/flags";
+import { countryOf, flagUrl, withoutFlagEmoji } from "@/lib/flags";
 import { cn } from "@/lib/utils";
+
+/** The same country flag and readable server name in menus and fields. */
+export function ServerLabel({ name }: { name: string }) {
+    const label = withoutFlagEmoji(name);
+    return (
+        <span className="flex min-w-0 items-center gap-2">
+            <Flag name={name} size={20} />
+            <span className="min-w-0 truncate" title={label}>{label}</span>
+        </span>
+    );
+}
 
 /**
  * A server's country as a round flag, read from its name; a neutral globe

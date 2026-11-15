@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { eventPayload, invoke, listen } from "@/lib/backend";
+import { withProfileMetadata } from "@/lib/profile-metadata";
 import { ConfigSource, Profile, ProxyMode, RefreshSummary, SubscriptionInfo } from "@/types";
 
 /** Profiles added by hand are grouped under this pseudo-domain. */
@@ -121,6 +122,7 @@ export function useProfiles() {
 
     /** Applies a new profile list and repairs the selection in one step. */
     const apply = useCallback((next: Profile[]) => {
+        next = next.map(withProfileMetadata);
         setProfiles(next);
         setSelection((current) => reconcileSelection(next, current));
         return next;

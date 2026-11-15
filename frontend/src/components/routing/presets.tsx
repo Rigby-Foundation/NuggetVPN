@@ -6,7 +6,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/routing/controls";
 import { Input } from "@/components/ui/input";
 import { MessageKey, useI18n, useT } from "@/lib/i18n";
 import { RoutingRule } from "@/types";

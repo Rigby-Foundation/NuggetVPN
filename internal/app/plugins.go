@@ -443,7 +443,7 @@ func (a *App) AddPluginRule(id string, rule PluginRule) (models.AppSettings, err
 	}
 	a.emit(settingsEventName, saved)
 	a.appendLog(fmt.Sprintf("Plugin %s added a %s rule", plugin.Manifest.Name, rule.Kind))
-	return saved, a.reapplyRouting()
+	return saved, nil
 }
 
 // PluginNotify shows a system notification for a plugin allowed to.

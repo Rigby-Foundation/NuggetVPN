@@ -1,6 +1,7 @@
 export interface Profile {
     id: string;
     name: string;
+    description?: string;
     server: string;
     protocol: string;
     config_link: string;
@@ -119,16 +120,10 @@ export interface AppSettings {
     /** "Ctrl+Alt+V"-style; "" for none. */
     global_shortcut: string;
     /** Which program runs the tunnel. */
-    core: CoreName;
     /** Switches routing setups by the time of the week. */
     routing_schedule: ScheduleEntry[];
     /** The setup outside every schedule entry; "" leaves whichever is on. */
     schedule_fallback: string;
-    /** Connect on joining a Wi-Fi network that is not trusted. */
-    wifi_auto_connect: boolean;
-    /** Disconnect on joining a trusted Wi-Fi network. */
-    wifi_trusted_disconnect: boolean;
-    trusted_networks: string[];
     /** Check servers in the background and try failing ones last. */
     server_health: boolean | null;
     /** Count traffic by program. */
@@ -268,7 +263,7 @@ export interface RoutingSetup {
 }
 
 /** The cores the tunnel can run on. */
-export type CoreName = "builtin" | "sing-box" | "mihomo" | "xray";
+export type CoreName = "xray";
 
 /** A core built into the app; see core.CoreInfo. */
 export interface CoreInfo {
@@ -479,14 +474,6 @@ export interface SpeedProgress {
     fraction: number;
     mbps: number;
     latency_ms: number;
-}
-
-/** The Wi-Fi network; see app.WifiState. */
-export interface WifiState {
-    on_wifi: boolean;
-    ssid: string;
-    hidden: boolean;
-    unsupported: boolean;
 }
 
 /** See models.SubscriptionChoice. */

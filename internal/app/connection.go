@@ -251,6 +251,56 @@ func (a *App) Connect(sourceDomain, mode, profileID string) (ConnectionState, er
 	return a.connect(sourceDomain, mode, profileID, a.connectGen.Add(1))
 }
 
+// SwitchConnection applies a server chosen while connected. A deliberate
+// selection on the connection page replaces a pinned chain exit.
+func (a *App) SwitchConnection(sourceDomain, mode, profileID string) (ConnectionState, error) {
+	generation := a.connectGen.Load()
+	a.mu.Lock()
+	state := a.state
+	a.mu.Unlock()
+	if state.Status != StatusConnected {
+		return state, nil
+	}
+	_, settings := a.snapshot()
+	if settings.ProxyChainEnabled && settings.ProxyChainExit != "" {
+		settings.ProxyChainExit = ""
+		saved, err := a.saveSettings(settings, false)
+		if err != nil {
+			return state, err
+		}
+		a.emit(settingsEventName, saved)
+	}
+	if !a.connectGen.CompareAndSwap(generation, generation+1) {
+		return state, nil
+	}
+	return a.connect(sourceDomain, mode, profileID, generation+1)
+}
+
+// ReloadCore reapplies saved settings using the user's latest connection choice.
+// A disconnected tunnel stays disconnected, including when a reload prompt was
+// left open while the user disconnected elsewhere.
+func (a *App) ReloadCore() (ConnectionState, error) {
+	generation := a.connectGen.Load()
+	a.mu.Lock()
+	state, request := a.state, a.lastConnect
+	a.mu.Unlock()
+	if state.Status != StatusConnected {
+		return state, nil
+	}
+	if !request.valid {
+		profiles, _ := a.snapshot()
+		profile, found := profileByID(profiles, state.ProfileID)
+		if !found {
+			return state, fmt.Errorf("the connected server is no longer available")
+		}
+		request = connectRequest{valid: true, source: profile.NormalizedSourceDomain(), mode: ModeManual, profile: profile.ID}
+	}
+	if !a.connectGen.CompareAndSwap(generation, generation+1) {
+		return state, nil
+	}
+	return a.connect(request.source, request.mode, request.profile, generation+1)
+}
+
 // connect is Connect, for a given generation: a reconnect passes the one it
 // started in, and gives up if the user has since connected or disconnected.
 func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (ConnectionState, error) {
@@ -261,18 +311,32 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 	}
 
 	profiles, settings := a.snapshot()
+	a.mu.Lock()
+	previous := a.state
+	a.mu.Unlock()
 	if len(profiles) == 0 {
 		return a.fail("No profiles found. Add a profile or import a subscription.")
 	}
 
 	plan, err := a.planConnection(profiles, settings, sourceDomain, mode, profileID)
 	if err != nil {
+		if previous.Status == StatusConnected {
+			return previous, err
+		}
 		return a.fail(err.Error())
 	}
 
+	a.flushUsage()
 	a.setState(ConnectionState{Status: StatusConnecting})
 	a.resetTraffic()
 
+	failStart := func(err error, reason string) (ConnectionState, error) {
+		if previous.Status == StatusConnected && a.core.Running() {
+			a.beginSession(previous.ProfileID)
+			return a.setState(previous), err
+		}
+		return a.failFor(err.Error(), reason)
+	}
 	var lastErr error
 	for index, candidate := range plan.order {
 		profile, ok := profileByID(profiles, candidate)
@@ -296,11 +360,11 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 			a.appendLog(fmt.Sprintf("%s failed: %v", profile.Name, err))
 			if reason, local := localFailure(err); local {
 				// Not the server's fault, so not counted against it either.
-				return a.failFor(err.Error(), reason)
+				return failStart(err, reason)
 			}
 			a.recordEvent(profile.ID, stats.KindConnect, false)
 			if !plan.resilient {
-				return a.fail(err.Error())
+				return failStart(err, "")
 			}
 			continue
 		}
@@ -310,7 +374,6 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 		a.lockedDown.Store(false)
 		a.mu.Lock()
 		a.lastConnect = connectRequest{valid: true, source: sourceDomain, mode: mode, profile: profileID}
-		a.alternatives = alternatives
 		a.mu.Unlock()
 		return a.setState(ConnectionState{
 			Status:    StatusConnected,
@@ -321,7 +384,7 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 	}
 
 	if lastErr != nil {
-		return a.fail(fmt.Sprintf("No working server found (last error: %v).", lastErr))
+		return failStart(fmt.Errorf("No working server found (last error: %v).", lastErr), "")
 	}
 	return a.fail("No proxy available for this configuration.")
 }
@@ -425,6 +488,20 @@ func (a *App) planConnection(
 		for _, id := range settings.ProxyChain {
 			inChain[id] = true
 		}
+	}
+
+	if exitID := strings.TrimSpace(settings.ProxyChainExit); settings.ProxyChainEnabled && exitID != "" {
+		if inChain[exitID] {
+			return connectionPlan{}, fmt.Errorf("the exit server cannot also be an intermediate hop")
+		}
+		exit, found := profileByID(profiles, exitID)
+		if !found {
+			return connectionPlan{}, fmt.Errorf("the selected exit server is no longer available")
+		}
+		if err := checkProfile(settings, exit); err != nil {
+			return connectionPlan{}, err
+		}
+		return connectionPlan{order: []string{exit.ID}}, nil
 	}
 
 	var domainProfiles, eligible []models.Profile

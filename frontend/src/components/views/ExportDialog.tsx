@@ -28,24 +28,21 @@ interface ExportDialogProps {
     title?: string;
 }
 
-const FORMAT_CONFIG: Record<ExportFormat, { label: string; ext: string; mime: string; desc: string }> = {
+const FORMAT_CONFIG: Record<ExportFormat, { label: string; ext: string; desc: string }> = {
     singbox: {
         label: "sing-box",
         ext: "json",
-        mime: "application/json",
-        desc: "Modern sing-box 1.11+ format (JSON)",
+        desc: "sing-box (JSON)",
     },
     clash: {
         label: "Clash / Mihomo",
         ext: "yaml",
-        mime: "text/yaml",
-        desc: "Clash Meta / Mihomo compatible format (YAML)",
+        desc: "Clash / Mihomo (YAML)",
     },
     xray: {
         label: "Xray / V2Ray",
         ext: "json",
-        mime: "application/json",
-        desc: "Xray-core / V2Ray outbound & client format (JSON)",
+        desc: "Xray / V2Ray (JSON)",
     },
 };
 
@@ -53,7 +50,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
     const t = useT();
     const [open, setOpen] = useState(isOpen);
     const closingRef = useRef(false);
-    const [format, setFormat] = useState<ExportFormat>("singbox");
+    const [format, setFormat] = useState<ExportFormat>("xray");
     const [fullConfig, setFullConfig] = useState(true);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
@@ -114,10 +111,10 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
         try {
             await navigator.clipboard.writeText(content);
             setCopied(true);
-            toast.success("Configuration copied to clipboard", { id: "export-copy" });
+            toast.success(t("export.copied"), { id: "export-copy" });
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            toast.error("Failed to copy configuration", { id: "export-copy-err" });
+            toast.error(t("ui.configCopyFailed"), { id: "export-copy-err" });
         }
     };
 
@@ -131,7 +128,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
             const path = await save({ defaultPath: defaultFilename });
             if (path) {
                 await writeTextFile(path, content);
-                toast.success(`Saved to ${path.split(/[\\/]/).pop()}`, { id: "export-save" });
+                toast.success(t("ui.fileSaved", { file: path.split(/[\\/]/).pop() ?? path }), { id: "export-save" });
                 handleClose();
             }
         } catch (err) {
@@ -185,7 +182,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
                             {FORMAT_CONFIG[format].desc}
                         </span>
                         <span className="text-[10px]">
-                            {content ? `${content.split("\n").length} lines` : ""}
+                            {content ? t("ui.lineCount", { count: content.split("\n").length }) : ""}
                         </span>
                     </div>
 

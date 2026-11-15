@@ -95,8 +95,7 @@ func (a *App) refreshTrayMenu() {
 				name = labels.mainSetup
 			}
 			routing.AddRadio(name, id == settings.ActiveRoutingSetup).OnClick(func(*application.Context) {
-				// Switching reconnects, which takes a moment; not on the
-				// menu's thread.
+				// Save the selected routing setup off the menu's thread.
 				go func() {
 					if _, err := a.SwitchRoutingSetup(id); err != nil {
 						a.appendLog("Could not switch routing: " + err.Error())

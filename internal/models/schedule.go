@@ -105,18 +105,3 @@ func (s *AppSettings) normalizeSchedule() {
 		s.ScheduleFallback = ""
 	}
 }
-
-// normalizeNetworks tidies the trusted Wi-Fi networks.
-func (s *AppSettings) normalizeNetworks() {
-	seen := map[string]bool{}
-	kept := []string{}
-	for _, name := range s.TrustedNetworks {
-		name = strings.TrimSpace(name)
-		if name == "" || len(name) > 64 || seen[name] || len(kept) == 100 {
-			continue
-		}
-		seen[name] = true
-		kept = append(kept, name)
-	}
-	s.TrustedNetworks = kept
-}

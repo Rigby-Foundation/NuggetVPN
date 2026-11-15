@@ -1,123 +1,82 @@
-import { ReactNode } from "react";
-import { ChevronRight, type LucideIcon } from "lucide-react";
-
-import { cn } from "@/lib/utils";
-
-/**
- * The settings shell.
- *
- * Settings used to be four tabs with every control stacked underneath, which
- * meant the tab strip had to grow with each new group and a setting was found
- * by reading the whole page. A list of named groups says what is inside each
- * one before you open it, and leaves room to add groups without redesigning
- * anything.
- */
-
-interface RowProps {
-    icon: LucideIcon;
-    title: string;
-    subtitle: string;
-    badge?: string;
-    onClick: () => void;
-}
-
-export function SettingsRow({ icon: Icon, title, subtitle, badge, onClick }: RowProps) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                "w-full flex items-center gap-3 rounded-xl border bg-card/60 px-3 py-2.5 text-start",
-                "transition-colors hover:bg-accent/60"
-            )}
-        >
-            <span
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted/60 text-muted-foreground"
-                aria-hidden="true"
-            >
-                <Icon size={16} />
-            </span>
-
-            <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{title}</span>
-                    {badge ? (
-                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            {badge}
-                        </span>
-                    ) : null}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                    {subtitle}
-                </span>
-            </span>
-
-            <ChevronRight size={16} className="shrink-0 text-muted-foreground rtl:-scale-x-100" aria-hidden="true" />
-        </button>
-    );
-}
+import type { ReactNode } from "react";
 
 /** A titled block of controls inside a section. */
 export function SettingsGroup({
-    title,
-    description,
-    children,
+  title,
+  description,
+  children,
 }: {
-    title?: string;
-    description?: string;
-    children: ReactNode;
+  title?: string;
+  description?: string;
+  children: ReactNode;
 }) {
-    return (
-        <section className="rounded-xl border bg-card/60 p-4 space-y-4">
-            {title ? (
-                <header>
-                    <h3 className="text-sm font-medium">{title}</h3>
-                    {description ? (
-                        <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</p>
-                    ) : null}
-                </header>
-            ) : null}
-            {children}
-        </section>
-    );
+  return (
+    <section className="settings-group space-y-3.5 rounded-2xl border border-border/60 bg-card/40 p-4 sm:p-5">
+      {title || description ? (
+        <header>
+          {title && <h3 className="text-sm font-semibold">{title}</h3>}
+          {description ? (
+            <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </header>
+      ) : null}
+      {children}
+    </section>
+  );
 }
 
 /** One labelled control with an explanation, laid out consistently. */
 export function SettingsField({
-    label,
-    description,
-    control,
-    stacked = false,
+  label,
+  description,
+  control,
+  stacked = false,
 }: {
-    label: string;
-    description?: string;
-    control: ReactNode;
-    /** Put the control under the label, for anything wider than a switch. */
-    stacked?: boolean;
+  label: string;
+  description?: string;
+  control: ReactNode;
+  /** Put the control under the label, for anything wider than a switch. */
+  stacked?: boolean;
 }) {
-    if (stacked) {
-        return (
-            <div className="space-y-2" role="group" aria-label={label}>
-                <div>
-                    <div className="text-sm font-medium">{label}</div>
-                    {description ? (
-                        <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</div>
-                    ) : null}
-                </div>
-                <div className="max-w-xl">{control}</div>
-            </div>
-        );
-    }
-
+  if (stacked) {
     return (
-        <div className="flex items-start justify-between gap-4" role="group" aria-label={label}>
-            <div className="min-w-0">
-                <div className="text-sm font-medium">{label}</div>
-                {description ? (
-                    <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">{description}</div>
-                ) : null}
+      <div
+        className="space-y-2"
+        data-slot="settings-field"
+        role="group"
+        aria-label={label}
+      >
+        <div>
+          <div className="text-[13px] font-medium">{label}</div>
+          {description ? (
+            <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+              {description}
             </div>
-            <div className="shrink-0">{control}</div>
+          ) : null}
         </div>
+        <div className="max-w-xl">{control}</div>
+      </div>
     );
+  }
+
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      data-slot="settings-field"
+      role="group"
+      aria-label={label}
+    >
+      <div className="min-w-0 flex-1 basis-36">
+        <div className="text-[13px] font-medium">{label}</div>
+        {description ? (
+          <div className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+            {description}
+          </div>
+        ) : null}
+      </div>
+      <div className="max-w-full shrink-0">{control}</div>
+    </div>
+  );
 }

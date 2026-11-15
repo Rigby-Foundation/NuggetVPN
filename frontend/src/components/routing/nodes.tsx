@@ -34,7 +34,8 @@ import { AppPicker, useAppLabels } from "@/components/routing/app-picker";
 import { isAndroid, isIOS } from "@/lib/platform";
 import { MessageKey, useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { RoutingAction, RoutingCondition, RoutingKind, RoutingSource, RuleListStatus } from "@/types";
+import { RULE_GUIDE, DESTINATIONS } from "@/components/routing/guide";
+import { RoutingAction, RoutingKind, RoutingSource, RuleListStatus } from "@/types";
 
 /**
  * Presentation for each source kind. Colour carries meaning here — an edge is
@@ -151,7 +152,7 @@ export const ACTION_META: Record<
         hint: "routing.action.proxy.hint",
         status: "routing.action.proxy.status",
         icon: Shield,
-        accent: "var(--status-connected)",
+        accent: "var(--foreground)",
     },
     direct: {
         label: "routing.action.direct",
@@ -264,114 +265,31 @@ function Resizer({
     );
 }
 
-function NodeShell({
-    accent,
-    icon: Icon,
-    title,
-    subtitle,
-    selected,
-    onDelete,
-    hits,
-    order,
-    wide,
-    box,
-    children,
-}: {
-    accent: string;
-    icon: typeof Globe;
-    title: string;
-    subtitle: string;
-    selected?: boolean;
-    onDelete?: () => void;
-    /** Connections the rule is carrying now; undefined while disconnected. */
-    hits?: number;
-    /** The rule's place in the order the core checks them. */
-    order?: number;
-    wide?: boolean;
-    box?: BoxData;
-    children?: React.ReactNode;
+function NodeShell({ accent, icon: Icon, title, subtitle, selected, onDelete, hits, order, wide, box, children }: {
+    accent: string; icon: typeof Globe; title: string; subtitle: string; selected?: boolean;
+    onDelete?: () => void; hits?: number; order?: number; wide?: boolean; box?: BoxData; children?: React.ReactNode;
 }) {
     const t = useT();
-    // Connectors are drawn beside the card, not in it. The card clips its
-    // content to round its corners, and its backdrop blur makes it the box
-    // they are placed in, so inside it half of each dot was cut off, along
-    // with the area around it that catches the pointer.
     const parts = Children.toArray(children);
     const isHandle = (part: React.ReactNode) => isValidElement(part) && part.type === Handle;
     const handles = parts.filter(isHandle);
     const content = parts.filter((part) => !isHandle(part));
     const { fill, onResizeStart, onResetSize } = useFill(box);
-    return (
-        <>
-        <Resizer box={box} selected={selected} accent={accent} minWidth={wide ? 260 : 200} onResizeStart={onResizeStart} />
-        <div
-            className={cn(
-                // A resized node fills the box React Flow gives it, and its
-                // body scrolls when the box is shorter than the content.
-                fill ? "flex h-full w-full flex-col" : wide ? "w-80" : "w-64",
-                "rounded-xl border bg-card/95 backdrop-blur-sm shadow-lg overflow-hidden",
-                "transition-shadow",
-                selected ? "ring-2 ring-offset-2 ring-offset-background" : ""
-            )}
-            style={{
-                borderColor: accent,
-                ...(selected ? ({ ["--tw-ring-color" as string]: accent } as object) : {}),
-            }}
-        >
-            <div className="h-0.5 w-full shrink-0" style={{ background: accent }} />
-
-            <div className="flex shrink-0 items-start gap-2.5 px-3.5 pt-3 pb-2.5">
-                <span
-                    className="mt-0.5 shrink-0"
-                    style={{ color: accent }}
-                    aria-hidden="true"
-                >
-                    <Icon size={16} />
-                </span>
-                <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium leading-tight truncate">
-                        {order !== undefined ? (
-                            <span className="me-1.5 text-muted-foreground tabular-nums">{order}.</span>
-                        ) : null}
-                        {title}
-                    </span>
-                    <span className="block text-[11px] text-muted-foreground truncate">
-                        {subtitle}
-                    </span>
-                </span>
-                {hits !== undefined ? <HitsBadge count={hits} accent={accent} /> : null}
-                {box?.sized && onResetSize ? (
-                    <button
-                        type="button"
-                        onClick={onResetSize}
-                        aria-label={t("routing.resetSize")}
-                        title={t("routing.resetSize")}
-                        className="nodrag shrink-0 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    >
-                        <Shrink size={13} aria-hidden="true" />
-                    </button>
-                ) : null}
-                {onDelete ? (
-                    <button
-                        type="button"
-                        onClick={onDelete}
-                        aria-label={t("routing.remove", { name: title })}
-                        className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                        <Trash2 size={13} aria-hidden="true" />
-                    </button>
-                ) : null}
-            </div>
-
-            {fill ? (
-                <div className="nowheel min-h-0 flex-1 overflow-y-auto">{content}</div>
-            ) : (
-                content
-            )}
-        </div>
-        {handles}
-        </>
-    );
+    return <>
+      <Resizer box={box} selected={selected} accent={accent} minWidth={260} onResizeStart={onResizeStart} />
+      <div className={cn(fill ? "flex h-full w-full flex-col" : wide ? "w-88" : "w-80", "routing-node relative min-w-64 overflow-hidden rounded-2xl border bg-card shadow-sm transition-[border-color,box-shadow]", selected ? "border-primary/70 ring-2 ring-primary/15" : "border-border")}>
+        <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
+        <header className="flex shrink-0 items-center gap-2.5 px-4 pt-4 pb-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl" style={{ color: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}><Icon size={16} /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold">{title}</span><span title={subtitle} className="mt-0.5 block truncate text-[11px] text-muted-foreground">{subtitle}</span></span>
+          {order !== undefined && <span title={t("routing.ui.priority")} className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">#{order}</span>}
+          {hits !== undefined && <HitsBadge count={hits} accent={accent} />}
+          {box?.sized && onResetSize && <button type="button" onClick={onResetSize} aria-label={t("routing.resetSize")} className="nodrag rounded-lg p-1 text-muted-foreground hover:bg-muted"><Shrink size={12} /></button>}
+          {onDelete && <button type="button" onClick={onDelete} aria-label={t("routing.remove", { name: title })} className="nodrag rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 size={13} /></button>}
+        </header>
+        {fill ? <div className="nowheel min-h-0 flex-1 overflow-y-auto">{content}</div> : content}
+      </div>{handles}
+    </>;
 }
 
 /** How many connections a rule is carrying right now. */
@@ -442,48 +360,44 @@ const COLLAPSED_ROWS = 6;
 /** The most rows an expanded list draws at once; the filter narrows the rest. */
 const EXPANDED_ROWS = 100;
 
-function ValueRow({ value, detail, named, onRemove }: { value: string; detail?: string; named?: boolean; onRemove: () => void }) {
+function ValueRow({ value, detail, named, onChange, onRemove }: {
+    value: string; detail?: string; named?: boolean;
+    onChange: (value: string) => void; onRemove: () => void;
+}) {
     const t = useT();
+    const [draft, setDraft] = useState(value);
+    const [focused, setFocused] = useState(false);
+    useEffect(() => setDraft(value), [value]);
+    const commit = () => {
+        const next = draft.trim();
+        if (!next) onRemove();
+        else if (next !== value) onChange(next);
+    };
     return (
-        <div className="group flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
-            {named && detail ? (
-                // An app picked from the list: its name, and under it the path.
-                <span className="flex-1 min-w-0">
-                    <span className="block truncate text-[11px] font-medium">{detail}</span>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground" dir="ltr" title={value}>
-                        {value}
-                    </span>
-                </span>
-            ) : (
-                <span className="flex-1 min-w-0">
-                    <span className="block truncate font-mono text-[11px]" title={value}>
-                        {value}
-                    </span>
-                    {detail ? <span className="block truncate text-[10px] text-muted-foreground">{detail}</span> : null}
-                </span>
-            )}
-            <button
-                type="button"
-                onClick={onRemove}
+        <div className="group flex min-w-0 items-center gap-1 rounded-xl border border-border/70 bg-muted/35 px-2 py-1">
+            <div className="min-w-0 flex-1">
+                <Input value={!focused && named && detail ? detail : draft}
+                    onFocus={() => setFocused(true)} onChange={(event) => setDraft(event.target.value)}
+                    onBlur={() => { commit(); setFocused(false); }}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                        if (event.key === "Escape") setDraft(value);
+                    }}
+                    aria-label={t("routing.ui.edit", { name: value })} title={value}
+                    spellCheck={false} dir="ltr"
+                    className="nodrag h-8 min-w-0 border-0 bg-transparent! px-1 font-mono text-xs! shadow-none focus-visible:ring-0" />
+                {!named && detail && <p className="truncate px-1 text-[10px] text-muted-foreground">{detail}</p>}
+            </div>
+            <button type="button" onClick={onRemove}
                 aria-label={t("routing.remove", { name: value })}
-                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive"
-            >
+                className="nodrag shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive">
                 <Trash2 size={12} aria-hidden="true" />
             </button>
         </div>
     );
 }
 
-/**
- * A rule's entries, drawn in bounded size.
- *
- * Every entry used to be its own row, so a rule holding a few thousand
- * addresses put tens of thousands of elements into the canvas, and opening
- * Routing took seconds while they were built and measured. A node is a
- * summary on a map, not the place to read a thousand addresses one by one:
- * a long list collapses to its first few, and expanding it gives a scrolling
- * list with a filter, which is how you would look for one of them anyway.
- */
+/** Keep large lists bounded while preserving inline editing and filtering. */
 function ValueList({
     values,
     onChange,
@@ -502,7 +416,9 @@ function ValueList({
 
     const remove = (value: string) => onChange(values.filter((item) => item !== value));
     const row = (value: string) => (
-        <ValueRow key={value} value={value} detail={detail?.(value)} named={named} onRemove={() => remove(value)} />
+        <ValueRow key={value} value={value} detail={detail?.(value)} named={named}
+            onChange={(next) => onChange([...new Set(values.map((item) => item === value ? next : item))])}
+            onRemove={() => remove(value)} />
     );
     const needle = filter.trim().toLowerCase();
     const matches = useMemo(
@@ -671,7 +587,7 @@ function useListDetail() {
  * The entries of one matcher and the ways to add to them: a text field, chips
  * for a closed set, suggestions from the user's geo files.
  */
-function EntryEditor({
+export function EntryEditor({
     kind,
     values,
     onChange,
@@ -683,6 +599,7 @@ function EntryEditor({
     const meta = SOURCE_META[kind];
     const t = useT();
     const [draft, setDraft] = useState("");
+    const [adding, setAdding] = useState(false);
     const listDetail = useListDetail();
     const lists = useContext(RuleListsContext);
     // Apps are picked from the installed ones: by package on Android, by
@@ -694,9 +611,8 @@ function EntryEditor({
 
     const commit = () => {
         const value = draft.trim();
-        if (!value) {
-            return;
-        }
+        setAdding(false);
+        if (!value) return;
         if (!values.includes(value)) {
             onChange([...values, value]);
         }
@@ -715,6 +631,7 @@ function EntryEditor({
     const textField = (
         <div className="flex items-center gap-1.5 pt-1">
             <Input
+                autoFocus
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={onKeyDown}
@@ -738,9 +655,7 @@ function EntryEditor({
 
     return (
         <div className="space-y-1">
-            {values.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground py-1.5">{t("routing.emptyRule")}</p>
-            ) : (
+            {values.length > 0 && (
                 <ValueList
                     values={values}
                     onChange={onChange}
@@ -751,22 +666,31 @@ function EntryEditor({
 
             {pickApps ? (
                 <>
-                    {isAndroid ? null : textField}
+                    {adding && !isAndroid ? textField : null}
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => setPicking(true)}
-                        className="nodrag mt-1 h-7 w-full gap-1.5 text-[11px]"
+                        className="nodrag mt-2 h-9 w-full gap-1.5 rounded-xl border-dashed bg-transparent text-[11px] text-muted-foreground"
                     >
                         <Plus size={12} aria-hidden="true" /> {t("apps.choose")}
                     </Button>
+                    {!isAndroid && !adding && <button type="button" onClick={() => setAdding(true)}
+                        className="nodrag w-full py-1 text-[10px] text-muted-foreground hover:text-foreground">
+                        {t("routing.ui.manualEntry")}
+                    </button>}
                     <AppPicker open={picking} values={values} onClose={() => setPicking(false)} onChange={onChange} />
                 </>
             ) : choices ? (
                 <ChoiceChips options={choices} values={values} onChange={onChange} />
-            ) : (
+            ) : adding ? (
                 textField
+            ) : (
+                <button type="button" onClick={() => setAdding(true)}
+                    className="nodrag mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-[11px] text-muted-foreground hover:bg-muted/40">
+                    <Plus size={13} aria-hidden="true" />{t("common.add")}
+                </button>
             )}
             {kind === "geosite" || kind === "geoip" ? (
                 <GeoSuggestions
@@ -793,111 +717,6 @@ function EntryEditor({
                     )}
                     {t("routing.list.update")}
                 </button>
-            ) : null}
-        </div>
-    );
-}
-
-/**
- * The options every rule has below its entries: match everything except
- * them, and, for rules about domains, which DNS server resolves them.
- */
-function RuleOptions({
-    kind,
-    action,
-    invert,
-    dns,
-    onChange,
-}: {
-    kind: RoutingKind;
-    action: RoutingAction;
-    invert: boolean;
-    dns: string;
-    onChange: (patch: { invert?: boolean; dns?: string }) => void;
-}) {
-    const t = useT();
-    const [dnsOpen, setDnsOpen] = useState(dns !== "");
-    const [draft, setDraft] = useState(dns);
-    useEffect(() => setDraft(dns), [dns]);
-    useEffect(() => {
-        if (dns) setDnsOpen(true);
-    }, [dns]);
-
-    // A blocked rule's names are never looked up, and "everything except
-    // these domains" is not a list of names to send to a resolver.
-    const canDns = DOMAIN_KINDS.includes(kind) && action !== "block" && action !== "drop" && !invert;
-    const invalid = draft.trim() !== "" && !validDnsAddress(draft);
-    const save = () => {
-        const next = draft.trim();
-        if (next !== dns && (next === "" || validDnsAddress(next))) onChange({ dns: next });
-    };
-
-    return (
-        <div className="border-t px-3.5 py-2 space-y-1.5">
-            <div className="flex items-center gap-1.5">
-                <button
-                    type="button"
-                    onClick={() => onChange({ invert: !invert })}
-                    aria-pressed={invert}
-                    title={t("routing.invert.hint")}
-                    className={cn(
-                        "nodrag rounded-md border px-1.5 py-0.5 text-[11px] transition-colors",
-                        invert
-                            ? "border-foreground/30 bg-foreground text-background"
-                            : "border-dashed text-muted-foreground hover:border-solid hover:text-foreground"
-                    )}
-                >
-                    {t("routing.invert")}
-                </button>
-                {canDns && !dnsOpen ? (
-                    <button
-                        type="button"
-                        onClick={() => setDnsOpen(true)}
-                        title={t("routing.dns.hint")}
-                        className="nodrag rounded-md border border-dashed px-1.5 py-0.5 text-[11px] text-muted-foreground hover:border-solid hover:text-foreground"
-                    >
-                        {t("routing.dns")}
-                    </button>
-                ) : null}
-            </div>
-            {canDns && dnsOpen ? (
-                <div>
-                    <label className="block text-[10px] text-muted-foreground pb-0.5" htmlFor={undefined}>
-                        {t("routing.dns.label")}
-                    </label>
-                    <div className="flex items-center gap-1">
-                        <Input
-                            value={draft}
-                            onChange={(event) => setDraft(event.target.value)}
-                            onBlur={save}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    save();
-                                }
-                            }}
-                            placeholder="https://dns.google/dns-query"
-                            aria-label={t("routing.dns.label")}
-                            aria-invalid={invalid}
-                            className={cn("nodrag h-7 text-[11px] font-mono", invalid ? "border-destructive" : "")}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setDraft("");
-                                setDnsOpen(false);
-                                if (dns) onChange({ dns: "" });
-                            }}
-                            aria-label={t("routing.dns.remove")}
-                            className="nodrag shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
-                        >
-                            <Trash2 size={12} aria-hidden="true" />
-                        </button>
-                    </div>
-                    <p className={cn("pt-0.5 text-[10px]", invalid ? "text-destructive" : "text-muted-foreground")}>
-                        {invalid ? t("routing.dns.invalid") : t("routing.dns.hint")}
-                    </p>
-                </div>
             ) : null}
         </div>
     );
@@ -930,7 +749,7 @@ export function CommentNode({ data, selected }: NodeProps) {
             className={cn(
                 // Resized, the text area takes whatever height the box has.
                 fill ? "flex h-full w-full flex-col" : "w-60",
-                "rounded-xl border border-dashed bg-card/85 shadow-sm backdrop-blur-sm",
+                "rounded-2xl border border-dashed border-border bg-card/80 shadow-none",
                 selected ? "ring-2 ring-ring/50" : ""
             )}
         >
@@ -977,273 +796,41 @@ export function CommentNode({ data, selected }: NodeProps) {
     );
 }
 
-/** What changes a rule node can make to its rule. */
-export interface RulePatch {
-    kind?: RoutingSource;
-    values?: string[];
-    invert?: boolean;
-    dns?: string;
-    mode?: "and" | "or";
-    conditions?: RoutingCondition[];
-}
-
-export interface SourceNodeData {
+interface SourceNodeData {
     kind: RoutingSource;
     values: string[];
-    action: RoutingAction;
     invert: boolean;
-    dns: string;
     hits?: number;
     order?: number;
-    onChange: (patch: RulePatch) => void;
-    onDelete: () => void;
     [key: string]: unknown;
 }
 
-/** A traffic source: a list of entries plus an output port. */
+/** Rules are edited directly in their cards while the handles stay connectable. */
 export function SourceNode({ data, selected }: NodeProps) {
-    const { kind, values, action, invert, dns, hits, order, onChange, onDelete } = data as SourceNodeData;
-    const meta = SOURCE_META[kind];
     const t = useT();
-
+    const rule = data as SourceNodeData;
+    const meta = SOURCE_META[rule.kind];
     return (
-        <NodeShell
-            accent={meta.accent}
-            icon={meta.icon}
-            title={t(meta.label)}
-            subtitle={invert ? t("routing.invert.hint") : t(meta.hint)}
-            selected={selected}
-            box={data as BoxData}
-            onDelete={onDelete}
-            hits={hits}
-            order={order}
-        >
-            {kind === "domains" || kind === "domain_regex" ? (
-                <DomainModeSwitch kind={kind} values={values} onChange={onChange} />
-            ) : null}
-            <div className="px-3.5 pb-3">
-                <EntryEditor kind={kind} values={values} onChange={(next) => onChange({ values: next })} />
-            </div>
-            <RuleOptions kind={kind} action={action} invert={invert} dns={dns} onChange={onChange} />
-
-            <Handle
-                type="source"
-                position={Position.Right}
-                style={{ background: meta.accent, color: meta.accent }}
-            />
+        <NodeShell accent={meta.accent} icon={meta.icon} title={t(RULE_GUIDE[rule.kind].title)}
+            subtitle={t(RULE_GUIDE[rule.kind].short)} selected={selected} box={data as BoxData}
+            onDelete={data.onDelete as () => void} hits={rule.hits} order={rule.order}>
+            {data.content as React.ReactNode}
+            <Handle type="source" position={Position.Right} title={t("routing.dragHint")}
+                style={{ background: meta.accent, color: meta.accent }} />
         </NodeShell>
     );
 }
 
-/** A domain as a pattern matching it and its subdomains, as "domains" does. */
-function domainAsPattern(domain: string): string {
-    return `(^|\\.)${domain.replace(/^\.+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
-}
-
-/**
- * Domains and domain patterns are one card: this switches between listing
- * names and writing regular expressions. Names carry over as the patterns
- * that match them; a pattern has no name to go back to, so switching back
- * waits until the list is empty.
- */
-function DomainModeSwitch({
-    kind,
-    values,
-    onChange,
-}: {
-    kind: "domains" | "domain_regex";
-    values: string[];
-    onChange: (patch: RulePatch) => void;
-}) {
-    const t = useT();
-    const locked = kind === "domain_regex" && values.length > 0;
-    const options = [
-        { kind: "domains" as const, label: t("routing.domains.names") },
-        { kind: "domain_regex" as const, label: t("routing.domains.pattern") },
-    ];
-    return (
-        <div className="px-3.5 pb-2">
-            <div className="nodrag inline-flex rounded-md bg-muted/60 p-0.5" role="radiogroup" aria-label={t("routing.source.domains")}>
-                {options.map((option) => {
-                    const active = option.kind === kind;
-                    const disabled = !active && option.kind === "domains" && locked;
-                    return (
-                        <button
-                            key={option.kind}
-                            type="button"
-                            role="radio"
-                            aria-checked={active}
-                            disabled={disabled}
-                            title={disabled ? t("routing.domains.patternLocked") : undefined}
-                            onClick={() => {
-                                if (active) return;
-                                onChange(
-                                    option.kind === "domain_regex"
-                                        ? { kind: option.kind, values: values.map(domainAsPattern) }
-                                        : { kind: option.kind }
-                                );
-                            }}
-                            className={cn(
-                                "rounded px-2 py-0.5 text-[11px] transition-colors disabled:opacity-50",
-                                active ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground"
-                            )}
-                        >
-                            {option.label}
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-/** Kinds a combined rule's condition can be. */
-const CONDITION_KINDS: RoutingSource[] = [
-    "apps", "domains", "domain_regex", "ip", "port", "protocol", "network", "geosite", "geoip", "ruleset",
-];
-
-export interface LogicalNodeData {
-    mode: "and" | "or";
-    conditions: RoutingCondition[];
-    action: RoutingAction;
-    invert: boolean;
-    dns: string;
-    hits?: number;
-    order?: number;
-    onChange: (patch: RulePatch) => void;
-    onDelete: () => void;
-    [key: string]: unknown;
-}
-
-/**
- * A combined rule: conditions that must all match, or any one of them. Each
- * condition can be negated on its own — "Telegram, and not TCP" — and the
- * whole rule too.
- */
 export function LogicalNode({ data, selected }: NodeProps) {
-    const { mode, conditions, action, invert, dns, hits, order, onChange, onDelete } = data as LogicalNodeData;
     const t = useT();
-
-    const setCondition = (index: number, patch: Partial<RoutingCondition>) =>
-        onChange({
-            conditions: conditions.map((condition, position) =>
-                position === index ? { ...condition, ...patch } : condition
-            ),
-        });
-
     return (
-        <NodeShell
-            accent={LOGICAL_META.accent}
-            icon={LOGICAL_META.icon}
-            title={t(LOGICAL_META.label)}
-            subtitle={invert ? t("routing.invert.hint") : t(LOGICAL_META.hint)}
-            selected={selected}
-            box={data as BoxData}
-            onDelete={onDelete}
-            hits={hits}
-            order={order}
-            wide
-        >
-            <div className="px-3.5 pb-3 space-y-2">
-                <div className="grid grid-cols-2 gap-0.5 rounded-lg bg-muted/60 p-0.5" role="radiogroup" aria-label={t("routing.logical.mode")}>
-                    {(["and", "or"] as const).map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            role="radio"
-                            aria-checked={mode === option}
-                            onClick={() => onChange({ mode: option })}
-                            className={cn(
-                                "nodrag rounded-md py-1 text-[11px] transition-colors",
-                                mode === option ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {t(option === "and" ? "routing.logical.all" : "routing.logical.any")}
-                        </button>
-                    ))}
-                </div>
-
-                {conditions.length === 0 ? (
-                    <p className="text-[11px] text-muted-foreground">{t("routing.logical.empty")}</p>
-                ) : null}
-
-                {conditions.map((condition, index) => {
-                    const meta = SOURCE_META[condition.kind];
-                    return (
-                        <div key={index} className="rounded-lg border p-2 space-y-1.5" style={{ borderColor: `color-mix(in oklab, ${meta.accent} 45%, var(--border))` }}>
-                            {index > 0 ? (
-                                <span className="-mt-4 mb-0.5 block w-fit rounded bg-card px-1 text-[10px] text-muted-foreground">
-                                    {t(mode === "and" ? "routing.logical.and" : "routing.logical.or")}
-                                </span>
-                            ) : null}
-                            <div className="flex items-center gap-1.5">
-                                <meta.icon size={13} style={{ color: meta.accent }} className="shrink-0" aria-hidden="true" />
-                                <Select
-                                    value={condition.kind}
-                                    onValueChange={(kind) =>
-                                        // A new kind starts empty: an app name is not a port.
-                                        setCondition(index, { kind: kind as RoutingSource, values: [] })
-                                    }
-                                >
-                                    <SelectTrigger size="sm" className="nodrag data-[size=sm]:h-7 flex-1 min-w-0 px-2 text-[11px]" aria-label={t("routing.logical.kind")}>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {CONDITION_KINDS.map((kind) => (
-                                            <SelectItem key={kind} value={kind} className="text-xs">
-                                                {t(SOURCE_META[kind].label)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <button
-                                    type="button"
-                                    onClick={() => setCondition(index, { invert: !condition.invert })}
-                                    aria-pressed={!!condition.invert}
-                                    title={t("routing.invert.hint")}
-                                    className={cn(
-                                        "nodrag shrink-0 rounded-md border px-1.5 py-0.5 text-[11px]",
-                                        condition.invert
-                                            ? "border-foreground/30 bg-foreground text-background"
-                                            : "border-dashed text-muted-foreground hover:border-solid hover:text-foreground"
-                                    )}
-                                >
-                                    {t("routing.condition.not")}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => onChange({ conditions: conditions.filter((_, position) => position !== index) })}
-                                    aria-label={t("routing.remove", { name: t(meta.label) })}
-                                    className="nodrag shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                >
-                                    <Trash2 size={12} aria-hidden="true" />
-                                </button>
-                            </div>
-                            <EntryEditor
-                                kind={condition.kind}
-                                values={condition.values ?? []}
-                                onChange={(values) => setCondition(index, { values })}
-                            />
-                        </div>
-                    );
-                })}
-
-                <button
-                    type="button"
-                    onClick={() => onChange({ conditions: [...conditions, { kind: "domains", values: [] }] })}
-                    className="nodrag flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[11px] text-muted-foreground hover:border-solid hover:bg-muted/50 hover:text-foreground"
-                >
-                    <Plus size={11} aria-hidden="true" />
-                    {t("routing.logical.addCondition")}
-                </button>
-            </div>
-            <RuleOptions kind="logical" action={action} invert={invert} dns={dns} onChange={onChange} />
-
-            <Handle
-                type="source"
-                position={Position.Right}
-                style={{ background: LOGICAL_META.accent, color: LOGICAL_META.accent }}
-            />
+        <NodeShell accent={LOGICAL_META.accent} icon={Combine} title={t("routing.source.logical")}
+            subtitle={t(data.mode === "or" ? "routing.logical.any" : "routing.logical.all")}
+            selected={selected} box={data as BoxData} onDelete={data.onDelete as () => void}
+            hits={data.hits as number | undefined} order={data.order as number | undefined} wide>
+            {data.content as React.ReactNode}
+            <Handle type="source" position={Position.Right} title={t("routing.dragHint")}
+                style={{ background: LOGICAL_META.accent, color: LOGICAL_META.accent }} />
         </NodeShell>
     );
 }
@@ -1256,23 +843,19 @@ export function LogicalNode({ data, selected }: NodeProps) {
  * border, and a custom type reusing the name inherits all of it.
  */
 export function CatchAllNode({ data, selected }: NodeProps) {
-    const { hits, action, destination } = (data ?? {}) as { hits?: number; action?: RoutingAction; destination?: string };
     const t = useT();
+    const { hits } = data as { hits?: number };
     return (
         <NodeShell
             accent="var(--routing-default)"
             icon={MoreHorizontal}
-            title={t("routing.catchAll")}
+            title={t("routing.ui.default")}
             subtitle={t("routing.catchAll.hint")}
             selected={selected}
             box={data as BoxData}
             hits={hits}
         >
-            <div className="px-3.5 pb-3">
-                <p className="text-[11px] text-muted-foreground">
-                    {action && ACTION_META[action] ? t("routing.catchAll.destination", { destination: destination || t(ACTION_META[action].label) }) : t("routing.catchAll.connect")}
-                </p>
-            </div>
+            <p className="px-4 pb-4 text-xs leading-relaxed text-muted-foreground">{t("routing.ui.defaultHint")}</p>
             <Handle
                 type="source"
                 position={Position.Right}
@@ -1316,8 +899,8 @@ export function ActionNode({ data, selected }: NodeProps) {
         <NodeShell
             accent={meta.accent}
             icon={meta.icon}
-            title={t(meta.label)}
-            subtitle={t(meta.hint)}
+            title={t(DESTINATIONS[action].title)}
+            subtitle={t(DESTINATIONS[action].description)}
             selected={selected}
             box={data as BoxData}
             onDelete={onHide}

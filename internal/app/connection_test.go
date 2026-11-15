@@ -54,3 +54,52 @@ func TestServerFallbackOff(t *testing.T) {
 		t.Fatalf("manual with fallback on: got %+v, want b then a", plan)
 	}
 }
+
+func TestProxyChainExitSelection(t *testing.T) {
+	profiles := []models.Profile{
+		{ID: "main", SourceDomain: "main.example", ConfigLink: "vless://00000000-0000-0000-0000-000000000000@main.example:443"},
+		{ID: "hop", SourceDomain: "other.example", ConfigLink: "vless://00000000-0000-0000-0000-000000000000@hop.example:443"},
+		{ID: "exit", SourceDomain: "other.example", ConfigLink: "vless://00000000-0000-0000-0000-000000000000@exit.example:443"},
+	}
+	cases := []struct {
+		name    string
+		enabled bool
+		hops    []string
+		exit    string
+		mode    string
+		want    string
+		wantErr bool
+	}{
+		{name: "explicit exit in another subscription", enabled: true, hops: []string{"hop"}, exit: "exit", mode: ModeAuto, want: "exit"},
+		{name: "explicit exit without intermediate hops", enabled: true, exit: "exit", mode: ModeAuto, want: "exit"},
+		{name: "disabled chain uses connection page", exit: "exit", mode: ModeManual, want: "main"},
+		{name: "default exit uses connection page", enabled: true, hops: []string{"hop"}, mode: ModeManual, want: "main"},
+		{name: "missing exit", enabled: true, hops: []string{"hop"}, exit: "removed", mode: ModeAuto, wantErr: true},
+		{name: "exit already in chain", enabled: true, hops: []string{"hop"}, exit: "hop", mode: ModeAuto, wantErr: true},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			off := false
+			settings := models.AppSettings{
+				ProxyChainEnabled: test.enabled,
+				ProxyChain:        test.hops,
+				ProxyChainExit:    test.exit,
+				ServerFallback:    &off,
+			}
+			app := &App{}
+			plan, err := app.planConnection(profiles, settings, "main.example", test.mode, "main")
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("expected invalid chain exit to be rejected")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.order) != 1 || plan.order[0] != test.want || plan.resilient {
+				t.Fatalf("got plan %+v, want only %s", plan, test.want)
+			}
+		})
+	}
+}

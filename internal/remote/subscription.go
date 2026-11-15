@@ -327,6 +327,7 @@ func buildProfiles(entries []subscriptionEntry, sourceDomain, subURL string) []m
 		profiles = append(profiles, models.Profile{
 			ID:              uuid.NewString(),
 			Name:            link.ExtractName(rawLink),
+			Description:     link.ExtractDescription(rawLink),
 			Server:          "Auto",
 			Protocol:        protocol,
 			ConfigLink:      rawLink,

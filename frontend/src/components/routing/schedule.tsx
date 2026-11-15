@@ -10,6 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { AppSettings, RoutingSetup, ScheduleEntry } from "@/types";
@@ -40,6 +41,7 @@ export function ScheduleDialog({
 }) {
     const { t, language } = useI18n();
     const setups = settings.routing_setups ?? [];
+    const setupOptions = setups.map((setup) => ({ value: setup.id, label: nameOf(setup) }));
     const [entries, setEntries] = useState<ScheduleEntry[]>(() => structuredClone(settings.routing_schedule ?? []));
     const [fallback, setFallback] = useState(settings.schedule_fallback ?? "");
 
@@ -80,18 +82,20 @@ export function ScheduleDialog({
                     {entries.map((entry, index) => (
                         <div key={entry.id} className="space-y-2 rounded-lg border p-2.5">
                             <div className="flex flex-wrap items-center gap-2">
-                                <select
-                                    className={cn(field, "min-w-0 flex-1")}
-                                    value={entry.setup}
-                                    onChange={(event) => update(index, { setup: event.target.value })}
-                                    aria-label={t("schedule.setup")}
+                                <Select<string>
+                                    items={setupOptions}
+                                    value={entry.setup || null}
+                                    onValueChange={(setup) => { if (setup !== null) update(index, { setup }); }}
                                 >
-                                    {setups.map((setup) => (
-                                        <option key={setup.id} value={setup.id}>
-                                            {nameOf(setup)}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <SelectTrigger className="min-w-28 flex-1 text-xs" aria-label={t("schedule.setup")}>
+                                        <SelectValue placeholder={t("schedule.setup")} />
+                                    </SelectTrigger>
+                                    <SelectContent alignItemWithTrigger={false}>
+                                        {setupOptions.map(({ value, label }) => (
+                                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <input
                                     type="time"
                                     className={field}
@@ -149,17 +153,24 @@ export function ScheduleDialog({
                     </Button>
                 </div>
 
-                <label className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-3 text-xs">
                     <span className="min-w-0 flex-1 text-muted-foreground">{t("schedule.otherwise")}</span>
-                    <select className={field} value={fallback} onChange={(event) => setFallback(event.target.value)}>
-                        <option value="">{t("schedule.leave")}</option>
-                        {setups.map((setup) => (
-                            <option key={setup.id} value={setup.id}>
-                                {nameOf(setup)}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                    <Select<string>
+                        items={[{ value: "", label: t("schedule.leave") }, ...setupOptions]}
+                        value={fallback}
+                        onValueChange={(value) => setFallback(value ?? "")}
+                    >
+                        <SelectTrigger aria-label={t("schedule.otherwise")} className="max-w-[60%] text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                            <SelectItem value="">{t("schedule.leave")}</SelectItem>
+                            {setupOptions.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
 
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose}>
