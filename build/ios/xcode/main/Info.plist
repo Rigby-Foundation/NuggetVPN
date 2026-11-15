@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Kage</string>
 	<key>CFBundleGetInfoString</key>
-	<string>GPL-3.0-only</string>
+	<string>MPL-2.0</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.rigbyfoundation.nuggetvpn</string>
 	<key>CFBundleName</key>

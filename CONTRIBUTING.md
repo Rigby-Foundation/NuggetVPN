@@ -83,4 +83,4 @@ changing protocols or routing behavior. Do not silently skip unsupported rules.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's [GPL-3.0 License](LICENSE).
+By contributing, you agree that your contributions will be licensed under the project's [MPL-2.0 License](LICENSE).

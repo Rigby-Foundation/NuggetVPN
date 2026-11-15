@@ -5,7 +5,7 @@
 		<key>CFBundleExecutable</key>
 		<string>Kage</string>
 		<key>CFBundleGetInfoString</key>
-		<string>GPL-3.0-only</string>
+		<string>MPL-2.0</string>
 		<key>CFBundleIconFile</key>
 		<string>icons</string>
 		<key>CFBundleIconName</key>

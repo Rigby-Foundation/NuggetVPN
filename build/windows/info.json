@@ -9,7 +9,7 @@
 			"FileDescription": "Modern, lightweight VPN client with an embedded Xray core",
 			"LegalCopyright": "(c) 2026, Rigby Foundation",
 			"ProductName": "Kage",
-			"Comments": "GPL-3.0-only"
+			"Comments": "MPL-2.0"
 		}
 	}
 }

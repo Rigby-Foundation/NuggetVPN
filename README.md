@@ -345,4 +345,4 @@ xattr -cr /Applications/Kage.app
 
 ## License
 
-[GPL-3.0](LICENSE).
+[MPL-2.0](LICENSE).

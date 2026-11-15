@@ -10,7 +10,7 @@ info:
   productIdentifier: "org.rigbyfoundation.nuggetvpn" # The unique product identifier
   description: "Modern, lightweight VPN client with an embedded Xray core" # The application description
   copyright: "(c) 2026, Rigby Foundation" # Copyright text
-  comments: "GPL-3.0-only" # Comments
+  comments: "MPL-2.0" # Comments
   version: "2.4.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
@@ -22,7 +22,7 @@ ios:
   displayName: "Kage"
   version: "2.4.0"
   company: "Rigby Foundation"
-  comments: "GPL-3.0-only"
+  comments: "MPL-2.0"
   minIOSVersion: "15.0"
 
 # Dev mode configuration
