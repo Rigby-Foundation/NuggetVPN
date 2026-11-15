@@ -4,7 +4,7 @@ vars:
   SIM_ID: '{{.SIM_ID | default "FA0D23C3-B010-4DC7-898F-74EFB10175B2"}}'
   XCODE_PROJ: "build/ios/xcode/main.xcodeproj"
   SCHEME: "NuggetVPN"
-  APP_OUTPUT: "/Users/turborigby/Library/Developer/Xcode/DerivedData/main-hkjfsjagolbwlbdcgmmzbxkzlnws/Build/Products/Debug-iphonesimulator/NuggetVPN.app"
+  APP_OUTPUT: "/Users/turborigby/Library/Developer/Xcode/DerivedData/main-hkjfsjagolbwlbdcgmmzbxkzlnws/Build/Products/Debug-iphonesimulator/Kage.app"
 
 tasks:
   gen:
@@ -25,14 +25,14 @@ tasks:
         go build -tags "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_dhcp,with_acme" -buildmode=c-archive -overlay build/ios/xcode/overlay.json -o bin/NuggetVPN.a .
 
   build:
-    summary: Builds NuggetVPN for the iOS Simulator using xcodebuild
+    summary: Builds Kage for the iOS Simulator using xcodebuild
     deps:
       - archive
     cmds:
       - xcodebuild -project {{.XCODE_PROJ}} -scheme {{.SCHEME}} -destination 'generic/platform=iOS Simulator' -configuration Debug build
 
   install:
-    summary: Installs the built NuggetVPN app into the iOS simulator
+    summary: Installs the built Kage app into the iOS simulator
     cmds:
       - xcrun simctl install {{.SIM_ID}} {{.APP_OUTPUT}}
 
@@ -42,7 +42,7 @@ tasks:
       - open {{.XCODE_PROJ}}
 
   ipa:
-    summary: Builds and packages NuggetVPN.ipa for physical iOS devices
+    summary: Builds and packages Kage.ipa for physical iOS devices
     cmds:
       - npm --prefix frontend run build
       - |
@@ -58,11 +58,11 @@ tasks:
         IPA_DIR="build/ios/ipa"
         rm -rf "${IPA_DIR}"
         mkdir -p "${IPA_DIR}/Payload"
-        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "NuggetVPN.app" -path "*/Release-iphoneos/*" -type d | head -n 1)
+        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "Kage.app" -path "*/Release-iphoneos/*" -type d | head -n 1)
         cp -R "${APP_PATH}" "${IPA_DIR}/Payload/"
-        rm -f bin/NuggetVPN.ipa
-        cd "${IPA_DIR}" && zip -qr "../../../bin/NuggetVPN.ipa" Payload
-        echo "Created bin/NuggetVPN.ipa successfully"
+        rm -f bin/Kage.ipa
+        cd "${IPA_DIR}" && zip -qr "../../../bin/Kage.ipa" Payload
+        echo "Created bin/Kage.ipa successfully"
 
   package:
     summary: Packages a production IPA

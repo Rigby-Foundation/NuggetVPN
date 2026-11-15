@@ -216,7 +216,7 @@ func (a *App) PickPlugin() (PluginPreview, error) {
 	dialog := a.app.Dialog.OpenFile().
 		SetTitle("Install a plugin").
 		CanChooseFiles(true).
-		AddFilter("NuggetVPN plugin", "*"+plugins.Extension)
+		AddFilter("Kage plugin", "*"+plugins.Extension)
 	if a.window != nil {
 		dialog = dialog.AttachToWindow(a.window)
 	}

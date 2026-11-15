@@ -40,7 +40,7 @@ func (a *App) ExportRouting() (string, error) {
 		SetMessage("Save routing").
 		SetFilename("routing"+vflow.Extension).
 		CanCreateDirectories(true).
-		AddFilter("NuggetVPN routing", "*"+vflow.Extension)
+		AddFilter("Kage routing", "*"+vflow.Extension)
 	if a.window != nil {
 		dialog = dialog.AttachToWindow(a.window)
 	}
@@ -68,7 +68,7 @@ func (a *App) ImportRouting() (FlowImport, error) {
 	dialog := a.app.Dialog.OpenFile().
 		SetTitle("Open routing").
 		CanChooseFiles(true).
-		AddFilter("NuggetVPN routing", "*"+vflow.Extension)
+		AddFilter("Kage routing", "*"+vflow.Extension)
 	if a.window != nil {
 		dialog = dialog.AttachToWindow(a.window)
 	}
@@ -97,7 +97,7 @@ func (a *App) applyFlow(data []byte) (FlowImport, error) {
 	flow, err := vflow.Decode(data)
 	if err != nil {
 		if errors.Is(err, vflow.ErrNotFlow) {
-			return FlowImport{}, fmt.Errorf("that is not a NuggetVPN routing file")
+			return FlowImport{}, fmt.Errorf("that is not a Kage routing file")
 		}
 		return FlowImport{}, err
 	}

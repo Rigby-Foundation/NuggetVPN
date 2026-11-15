@@ -383,7 +383,7 @@ function App() {
         startedRef.current = true;
 
         const start = async () => {
-            appendLog(["NuggetVPN started."]);
+            appendLog(["Kage started."]);
             let saved: AppSettings["last_selection"] = null;
             let autoConnect = false;
             let autoUpdate = true;
@@ -890,7 +890,7 @@ function App() {
 
     const handleDumpLogs = useCallback(async () => {
         try {
-            const path = await save({ defaultPath: "nuggetvpn-logs.txt" });
+            const path = await save({ defaultPath: "kage-logs.txt" });
             if (!path) {
                 return;
             }

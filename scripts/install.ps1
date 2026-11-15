@@ -1,4 +1,4 @@
-# NuggetVPN installer for Windows.
+# Kage installer for Windows.
 #
 #   irm https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.ps1 | iex
 #
@@ -15,7 +15,7 @@ $Repo = 'Rigby-Foundation/NuggetVPN'
 function Say($text) { Write-Host "  $text" }
 
 if (-not [Environment]::Is64BitOperatingSystem) {
-    throw 'NuggetVPN needs 64-bit Windows.'
+    throw 'Kage needs 64-bit Windows.'
 }
 if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
     Say 'ARM64 Windows: installing the x64 build, which runs under emulation.'
@@ -23,7 +23,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
 
 Say 'Looking up the latest release...'
 $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" `
-    -Headers @{ 'User-Agent' = 'NuggetVPN-install'; 'Accept' = 'application/vnd.github+json' }
+    -Headers @{ 'User-Agent' = 'Kage-install'; 'Accept' = 'application/vnd.github+json' }
 $asset = $release.assets | Where-Object { $_.name -like '*-windows-amd64-installer.exe' } | Select-Object -First 1
 if (-not $asset) {
     throw "Release $($release.tag_name) has no Windows installer."
@@ -32,7 +32,7 @@ if (-not $asset) {
 $target = Join-Path $env:TEMP $asset.name
 Say "Downloading $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB)..."
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $target -UseBasicParsing `
-    -Headers @{ 'User-Agent' = 'NuggetVPN-install' }
+    -Headers @{ 'User-Agent' = 'Kage-install' }
 
 # GitHub records each asset's SHA-256 as "sha256:<hex>". Older releases may
 # predate that; then there is nothing to compare against.
@@ -54,7 +54,7 @@ if ($process.ExitCode -ne 0) {
 }
 
 # Where it went: the installer records the program in the uninstall list.
-$keyName = 'Rigby FoundationNuggetVPN'
+$keyName = 'Rigby FoundationKage'
 $executable = $null
 foreach ($root in 'HKLM:', 'HKCU:') {
     $key = "$root\Software\Microsoft\Windows\CurrentVersion\Uninstall\$keyName"
@@ -64,10 +64,10 @@ foreach ($root in 'HKLM:', 'HKCU:') {
     }
 }
 if (-not $executable) {
-    $executable = Join-Path $env:ProgramFiles 'Rigby Foundation\NuggetVPN\NuggetVPN.exe'
+    $executable = Join-Path $env:ProgramFiles 'Rigby Foundation\Kage\Kage.exe'
 }
 
-Say "NuggetVPN $($release.tag_name) is installed."
+Say "Kage $($release.tag_name) is installed."
 if (Test-Path $executable) {
     # Started from this (non-elevated) shell, so it runs as the user.
     Start-Process -FilePath $executable

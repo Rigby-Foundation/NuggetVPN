@@ -13,7 +13,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// The command line: NuggetVPN status, connect, ...
+// The command line: Kage status, connect, ...
 // ---------------------------------------------------------------------------
 
 func (a *App) startCommandLine() {
@@ -144,7 +144,7 @@ func (a *App) handleCommand(command string, args []string) (string, any, error) 
 		return fmt.Sprintf("Through %s\nDownload  %.1f Mbps\nUpload    %.1f Mbps\nPing      %.0f ms (jitter %.1f ms)",
 			result.Server, result.Download, result.Upload, result.Latency, result.Jitter), result, nil
 	}
-	return "", nil, fmt.Errorf("unknown command %q; try: NuggetVPN help", command)
+	return "", nil, fmt.Errorf("unknown command %q; try: Kage help", command)
 }
 
 // findServer picks a server by id, exact name, or a unique part of a name.
@@ -163,7 +163,7 @@ func findServer(profiles []models.Profile, query string) (models.Profile, error)
 	case 1:
 		return partial[0], nil
 	case 0:
-		return models.Profile{}, fmt.Errorf("no server matches %q; see: NuggetVPN servers", query)
+		return models.Profile{}, fmt.Errorf("no server matches %q; see: Kage servers", query)
 	}
 	var names []string
 	for _, profile := range partial[:min(len(partial), 8)] {

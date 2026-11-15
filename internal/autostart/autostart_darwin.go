@@ -27,7 +27,7 @@ func enable(executable string) error {
 	// copy (App Translocation) that is gone after the next restart; a login
 	// item pointing there would silently do nothing.
 	if strings.Contains(executable, "/AppTranslocation/") {
-		return errors.New("move NuggetVPN to the Applications folder first: macOS is running it from a temporary copy, which will not exist at the next login")
+		return errors.New("move Kage to the Applications folder first: macOS is running it from a temporary copy, which will not exist at the next login")
 	}
 	path, err := agentPath()
 	if err != nil {

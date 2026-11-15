@@ -35,7 +35,7 @@ func enable(executable string) error {
 	quoted := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", `$`, `\$`).Replace(executable)
 	entry := "[Desktop Entry]\n" +
 		"Type=Application\n" +
-		"Name=NuggetVPN\n" +
+		"Name=Kage\n" +
 		"Exec=\"" + quoted + "\" " + Flag + "\n" +
 		"X-GNOME-Autostart-enabled=true\n"
 	return os.WriteFile(path, []byte(entry), 0o644)

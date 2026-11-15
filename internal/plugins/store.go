@@ -44,7 +44,7 @@ func Read(data []byte) (*Package, error) {
 	}
 	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return nil, errors.New("that is not a NuggetVPN plugin")
+		return nil, errors.New("that is not a Kage plugin")
 	}
 	if len(archive.File) > maxFiles {
 		return nil, fmt.Errorf("the plugin has more than %d files", maxFiles)
@@ -86,7 +86,7 @@ func Read(data []byte) (*Package, error) {
 	}
 	manifestData, ok := files[ManifestName]
 	if !ok {
-		return nil, errors.New("that is not a NuggetVPN plugin: there is no plugin.json")
+		return nil, errors.New("that is not a Kage plugin: there is no plugin.json")
 	}
 	present := make(map[string]bool, len(files))
 	for name := range files {

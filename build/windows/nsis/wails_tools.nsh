@@ -5,13 +5,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "NuggetVPN"
+    !define INFO_PROJECTNAME "Kage"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "Rigby Foundation"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "NuggetVPN"
+    !define INFO_PRODUCTNAME "Kage"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "2.4.0"

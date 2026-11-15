@@ -4,9 +4,9 @@ The app's own program also works as a command: it controls the copy that is
 running, from a terminal, a script or a keyboard shortcut.
 
 ```
-NuggetVPN status
-NuggetVPN connect Tokyo
-NuggetVPN disconnect
+Kage status
+Kage connect Tokyo
+Kage disconnect
 ```
 
 The app has to be running (it can be minimised to the tray). With no app
@@ -27,7 +27,7 @@ running, commands say so and exit with code 2.
 Add `--json` to any command to get JSON instead of text, for scripts:
 
 ```
-$ NuggetVPN status --json
+$ Kage status --json
 {"status":"connected","profile_id":"p-de","profile":"Frankfurt 1","since":1790000000000}
 ```
 
@@ -43,24 +43,24 @@ $ NuggetVPN status --json
 
 | System | |
 | --- | --- |
-| Windows | `C:\Program Files\Rigby Foundation\NuggetVPN\NuggetVPN.exe`, or where you installed it |
-| macOS | `/Applications/NuggetVPN.app/Contents/MacOS/NuggetVPN` |
-| Linux | `/usr/bin/NuggetVPN` from the .deb or .rpm, or the AppImage itself |
+| Windows | `C:\Program Files\Rigby Foundation\Kage\Kage.exe`, or where you installed it |
+| macOS | `/Applications/Kage.app/Contents/MacOS/Kage` |
+| Linux | `/usr/bin/Kage` from the .deb or .rpm, or the AppImage itself |
 
 On macOS, an alias makes it easier:
 
 ```bash
-alias nuggetvpn=/Applications/NuggetVPN.app/Contents/MacOS/NuggetVPN
+alias kage=/Applications/Kage.app/Contents/MacOS/Kage
 ```
 
 ### Windows
 
-NuggetVPN is a window program, and Windows doesn't wait for those to finish.
+Kage is a window program, and Windows doesn't wait for those to finish.
 In `cmd`, the prompt comes back before the output appears. In PowerShell,
 piping the output makes it wait:
 
 ```powershell
-& "C:\Program Files\Rigby Foundation\NuggetVPN\NuggetVPN.exe" status | Write-Output
+& "C:\Program Files\Rigby Foundation\Kage\Kage.exe" status | Write-Output
 ```
 
 Scripts that read the output or the exit code, or that redirect it, work as

@@ -44,7 +44,7 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
       - name: Build universal .dmg
-        run: wails3 task darwin:package:universal:dmg DMG_NAME="NuggetVPN-${{ github.ref_name }}-macos-universal.dmg"
+        run: wails3 task darwin:package:universal:dmg DMG_NAME="Kage-${{ github.ref_name }}-macos-universal.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           wails3 task ios:ipa
-          mv bin/NuggetVPN.ipa "bin/NuggetVPN-${{ github.ref_name }}-ios-unsigned.ipa"
+          mv bin/Kage.ipa "bin/Kage-${{ github.ref_name }}-ios-unsigned.ipa"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -156,7 +156,7 @@ jobs:
           for file in *.deb *.rpm *.AppImage; do
             [ -e "$file" ] || continue
             extension="${file##*.}"
-            mv "$file" "NuggetVPN-${{ github.ref_name }}-linux-amd64.${extension}"
+            mv "$file" "Kage-${{ github.ref_name }}-linux-amd64.${extension}"
           done
           ls -la
 
@@ -227,24 +227,24 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
 
       - name: Package
-        # Produces bin/NuggetVPN.exe plus bin/NuggetVPN-amd64-installer.exe.
+        # Produces bin/Kage.exe plus bin/Kage-amd64-installer.exe.
         run: wails3 task windows:package
 
       - name: Package the silent installer
-        # bin/NuggetVPN-amd64-silent-installer.exe: no pages, starts the app.
+        # bin/Kage-amd64-silent-installer.exe: no pages, starts the app.
         run: wails3 task windows:create:nsis:silent
 
       - name: Archive
         shell: bash
         run: |
           cd bin
-          7z a "NuggetVPN-${{ github.ref_name }}-windows-amd64.zip" NuggetVPN.exe
+          7z a "Kage-${{ github.ref_name }}-windows-amd64.zip" Kage.exe
           for installer in *-installer.exe; do
             [ -e "$installer" ] || continue
             # The silent one keeps "silent" in its name: both match the glob.
             case "$installer" in
-              *-silent-installer.exe) mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-silent-installer.exe" ;;
-              *) mv "$installer" "NuggetVPN-${{ github.ref_name }}-windows-amd64-installer.exe" ;;
+              *-silent-installer.exe) mv "$installer" "Kage-${{ github.ref_name }}-windows-amd64-silent-installer.exe" ;;
+              *) mv "$installer" "Kage-${{ github.ref_name }}-windows-amd64-installer.exe" ;;
             esac
           done
           ls -la
@@ -332,7 +332,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           wails3 task android:package
-          mv bin/NuggetVPN.apk "bin/NuggetVPN-${{ github.ref_name }}-android.apk"
+          mv bin/Kage.apk "bin/Kage-${{ github.ref_name }}-android.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -355,7 +355,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "NuggetVPN ${{ github.ref_name }}"
+          name: "Kage ${{ github.ref_name }}"
           body: "See the assets to download this version and install."
           draft: true
           prerelease: false

@@ -276,7 +276,7 @@ func ParseManifest(data []byte, files map[string]bool) (Manifest, error) {
 			known = known || candidate == permission
 		}
 		if !known {
-			return manifest, fmt.Errorf("unknown permission %q; the plugin may need a newer NuggetVPN", permission)
+			return manifest, fmt.Errorf("unknown permission %q; the plugin may need a newer Kage", permission)
 		}
 		seen[permission] = true
 	}

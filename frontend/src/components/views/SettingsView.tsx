@@ -463,7 +463,9 @@ function SettingsView({
           : t("chain.summary", { count });
       }
       case "subscriptions":
-        return appSettings.subscription_user_agent || t("identity.defaultIdentity");
+        return appSettings.subscription_user_agent === "NuggetVPN/1.0"
+            ? t("identity.defaultAgent", { name: "Kage" })
+            : appSettings.subscription_user_agent || t("identity.defaultIdentity");
       case "privacy":
         return [
           appSettings.ip_check_enabled === false ? t("privacy.summaryOff") : t("privacy.summaryOn"),

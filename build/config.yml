@@ -6,7 +6,7 @@ version: '3'
 # This information is used to generate the build assets.
 info:
   companyName: "Rigby Foundation" # The name of the company
-  productName: "NuggetVPN" # The name of the application
+  productName: "Kage" # The name of the application
   productIdentifier: "org.rigbyfoundation.nuggetvpn" # The unique product identifier
   description: "Modern, lightweight VPN client with an embedded sing-box core" # The application description
   copyright: "(c) 2026, Rigby Foundation" # Copyright text
@@ -19,7 +19,7 @@ info:
 # iOS build configuration
 ios:
   bundleID: "org.rigbyfoundation.nuggetvpn"
-  displayName: "NuggetVPN"
+  displayName: "Kage"
   version: "2.4.0"
   company: "Rigby Foundation"
   comments: "GPL-3.0-only"

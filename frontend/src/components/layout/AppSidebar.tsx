@@ -1,4 +1,5 @@
 import { NAV_TABS } from "@/lib/tabs";
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { Activity, BarChart3, FileText, Power, Server, Settings, Signal, Waypoints } from "lucide-react";
 
 import {
@@ -56,7 +57,7 @@ function AppSidebar({
                         onMaximize={onMaximize}
                     />
                 ) : (
-                    <span className="text-xl unbounded tracking-tight">Nugget</span>
+                    <BrandWordmark />
                 )}
             </SidebarHeader>
 

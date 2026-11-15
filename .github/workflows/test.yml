@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p frontend/dist
-          echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
+          echo '<!doctype html><title>Kage</title>' > frontend/dist/index.html
 
       - name: Vet
         run: go vet -tags "$SING_BOX_TAGS" ./...
@@ -133,8 +133,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NuggetVPN-android-debug
-          path: bin/NuggetVPN.apk
+          name: Kage-android-debug
+          path: bin/Kage.apk
           if-no-files-found: error
 
   build:
@@ -208,15 +208,15 @@ jobs:
       # macOS refuses to launch. ditto is the one that keeps a bundle intact.
       - name: Archive .app
         if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent bin/NuggetVPN.app bin/NuggetVPN-macos.zip
+        run: ditto -c -k --keepParent bin/Kage.app bin/Kage-macos.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuggetvpn-${{ matrix.name }}
+          name: kage-${{ matrix.name }}
           # The zip carries the bundle; uploading the directory as well would
           # ship the broken copy next to the good one.
           path: |
             bin/*
-            !bin/NuggetVPN.app
+            !bin/Kage.app
           if-no-files-found: error

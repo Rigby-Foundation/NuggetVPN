@@ -1,4 +1,4 @@
-# NuggetVPN documentation
+# Kage documentation
 
 ## Plugins
 

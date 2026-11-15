@@ -55,8 +55,8 @@
             matched.protocolConfiguration = protocol;
         }
         protocol.providerBundleIdentifier = @"org.rigbyfoundation.nuggetvpn.PacketTunnel";
-        protocol.serverAddress = @"NuggetVPN";
-        matched.localizedDescription = @"NuggetVPN";
+        protocol.serverAddress = @"Kage";
+        matched.localizedDescription = @"Kage";
         matched.enabled = YES;
 
         self.vpnManager = matched;
@@ -78,7 +78,7 @@
         }
         protocol.providerBundleIdentifier = @"org.rigbyfoundation.nuggetvpn.PacketTunnel";
         protocol.serverAddress = @"127.0.0.1";
-        manager.localizedDescription = @"NuggetVPN";
+        manager.localizedDescription = @"Kage";
         manager.enabled = YES;
 
         // Share config file via App Group container

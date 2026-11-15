@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  APP_NAME: "NuggetVPN"
+  APP_NAME: "Kage"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "bun"}}'
   # Matches the strictPort setting in frontend/vite.config.ts.
@@ -75,7 +75,7 @@ tasks:
       - test -d frontend/dist
     cmds:
       - mkdir -p frontend/dist
-      - echo '<!doctype html><title>NuggetVPN</title>' > frontend/dist/index.html
+      - echo '<!doctype html><title>Kage</title>' > frontend/dist/index.html
 
   tags:
     summary: Prints the sing-box build tags

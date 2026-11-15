@@ -105,7 +105,7 @@ const en = {
     "connection.hint.idle": "Connect",
     "connection.hint.connecting": "Finding the fastest server…",
     "connection.hint.error": "The last attempt failed",
-    "connection.error.adapter": "Windows couldn't set up Nugget's network adapter. Another VPN app's adapter is usually in the way: close other VPN apps, or turn their adapters off in Network Connections (ncpa.cpl), then connect again.",
+    "connection.error.adapter": "Windows couldn't set up Kage's network adapter. Another VPN app's adapter is usually in the way: close other VPN apps, or turn their adapters off in Network Connections (ncpa.cpl), then connect again.",
     "connection.error.local": "Something on this computer stopped the connection, not the server, so other servers weren't tried. The details are below.",
     "connection.connect": "Connect",
     "connection.disconnect": "Disconnect",
@@ -247,7 +247,7 @@ const en = {
     "add.addProfile": "Add profile",
 
     // Onboarding
-    "onboarding.title": "Welcome to NuggetVPN",
+    "onboarding.title": "Welcome to Kage",
     "onboarding.subtitle": "Connect to your sync server to get started",
     "onboarding.createAccountTitle": "Create your account",
     "onboarding.signInTitle": "Sign in to your account",
@@ -285,7 +285,7 @@ const en = {
     "welcome.addStep.done": { one: "Added — {count} server ready", other: "Added — {count} servers ready" },
     "welcome.prefs.title": "A few preferences",
     "welcome.prefs.body": "All of these can be changed later in Settings.",
-    "welcome.finish": "Start using NuggetVPN",
+    "welcome.finish": "Start using Kage",
 
     // Toasts
     "toast.saveFailed": "Could not save settings: {error}",
@@ -509,9 +509,9 @@ const en = {
     "updates.install": "Download and install · {size}",
     "updates.downloading": "Downloading…",
     "updates.page": "Release page",
-    "updates.installHint": "On Windows the installer opens and NuggetVPN closes so it can be replaced. On macOS the disk image opens; drag the app over the old one.",
+    "updates.installHint": "On Windows the installer opens and Kage closes so it can be replaced. On macOS the disk image opens; drag the app over the old one.",
     "updates.manualHint": "Download the package for your system from the release page.",
-    "updates.toast": "NuggetVPN {version} is available.",
+    "updates.toast": "Kage {version} is available.",
     "updates.view": "View",
 
     // Appearance
@@ -710,7 +710,7 @@ const en = {
     // Behaviour
     "behaviour.startup": "Startup",
     "behaviour.launch": "Launch at system startup",
-    "behaviour.launch.description": "Starts NuggetVPN when you log in, without opening its window.",
+    "behaviour.launch.description": "Starts Kage when you log in, without opening its window.",
     "behaviour.autoConnect": "Connect automatically",
     "behaviour.autoConnect.description": "Connects to the server you used last as soon as the app starts.",
     "shortcut.title": "Shortcut",
@@ -728,7 +728,7 @@ const en = {
     "behaviour.fastest": "Switch to the fastest server",
     "behaviour.fastest.description": "In automatic mode, keep measuring the best few servers and move to whichever is fastest. Uses a little data every few minutes.",
     "behaviour.fallback": "Try other servers if one fails",
-    "behaviour.fallback.description": "When the server you picked can't start, connect through the next one in the subscription. Off, Nugget stops and tells you why.",
+    "behaviour.fallback.description": "When the server you picked can't start, connect through the next one in the subscription. Off, Kage stops and tells you why.",
     "behaviour.notifications": "Notifications",
     "behaviour.notifications.description": "A system notification when the connection drops and when it comes back.",
     "connection.reconnecting": "Connection lost — reconnecting (attempt {attempt})…",
@@ -760,7 +760,7 @@ const en = {
     "close.hide": "Hide completely",
     "close.hide.summary": "hides completely",
     "close.hide.description":
-        "No window, no taskbar entry and no tray icon. To bring it back, launch NuggetVPN again — it opens the copy that is already running.",
+        "No window, no taskbar entry and no tray icon. To bring it back, launch Kage again — it opens the copy that is already running.",
     "close.quit": "Quit",
     "close.quit.summary": "quits on close",
     "close.quit.description": "Closes the app and disconnects.",

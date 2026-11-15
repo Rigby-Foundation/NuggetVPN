@@ -23,12 +23,12 @@ type notifyText struct{ dropped, droppedBody, reconnected string }
 // notifyTexts are the notifications in each language the UI offers. Like the
 // tray menu, they are shown by Go, outside the webview's translations.
 var notifyTexts = map[string]notifyText{
-	"en": {"Connection lost", "NuggetVPN is reconnecting.", "Reconnected"},
-	"ru": {"Соединение потеряно", "NuggetVPN переподключается.", "Подключение восстановлено"},
-	"uk": {"З'єднання втрачено", "NuggetVPN перепідключається.", "Підключення відновлено"},
-	"zh": {"连接已断开", "NuggetVPN 正在重新连接。", "已重新连接"},
-	"ja": {"接続が切れました", "NuggetVPN が再接続しています。", "再接続しました"},
-	"fa": {"اتصال قطع شد", "NuggetVPN در حال اتصال دوباره است.", "دوباره متصل شد"},
+	"en": {"Connection lost", "Kage is reconnecting.", "Reconnected"},
+	"ru": {"Соединение потеряно", "Kage переподключается.", "Подключение восстановлено"},
+	"uk": {"З'єднання втрачено", "Kage перепідключається.", "Підключення відновлено"},
+	"zh": {"连接已断开", "Kage 正在重新连接。", "已重新连接"},
+	"ja": {"接続が切れました", "Kage が再接続しています。", "再接続しました"},
+	"fa": {"اتصال قطع شد", "Kage در حال اتصال دوباره است.", "دوباره متصل شد"},
 }
 
 // notify shows a system notification, when the user has them on. A

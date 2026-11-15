@@ -129,7 +129,7 @@ func Decode(data []byte) (Flow, error) {
 		return Flow{}, fmt.Errorf("%w: missing version", ErrNotFlow)
 	}
 	if flow.Version > Version {
-		return Flow{}, fmt.Errorf("this .vflow is version %d, made by a newer NuggetVPN; this one reads up to version %d", flow.Version, Version)
+		return Flow{}, fmt.Errorf("this .vflow is version %d, made by a newer Kage; this one reads up to version %d", flow.Version, Version)
 	}
 	return flow, nil
 }

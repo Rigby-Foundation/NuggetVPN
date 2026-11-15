@@ -1,5 +1,5 @@
 #!/bin/sh
-# NuggetVPN installer for macOS and Linux.
+# Kage installer for macOS and Linux.
 #
 #   curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.sh | sh
 #
@@ -29,7 +29,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 say "Looking up the latest release..."
-curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: NuggetVPN-install" "$API" -o "$WORK/release.json" \
+curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: Kage-install" "$API" -o "$WORK/release.json" \
     || fail "could not reach GitHub"
 TAG=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$WORK/release.json" | head -n 1)
 
@@ -57,7 +57,7 @@ download() {
     [ "$digest" = "$url" ] && digest=""
     file="$WORK/${url##*/}"
     say "Downloading ${url##*/}..." >&2
-    curl -fL --progress-bar -H "User-Agent: NuggetVPN-install" "$url" -o "$file" || fail "download failed"
+    curl -fL --progress-bar -H "User-Agent: Kage-install" "$url" -o "$file" || fail "download failed"
     if [ -n "$digest" ]; then
         if have sha256sum; then actual=$(sha256sum "$file" | cut -d' ' -f1)
         else actual=$(shasum -a 256 "$file" | cut -d' ' -f1); fi
@@ -98,7 +98,7 @@ install_macos() {
         as_root rm -rf "$destination/$name"
         as_root ditto "$app" "$destination/$name"
     fi
-    say "NuggetVPN $TAG is installed."
+    say "Kage $TAG is installed."
     open "$destination/$name"
 }
 
@@ -124,19 +124,19 @@ install_linux() {
         image=$(download "-linux-amd64.AppImage")
         bin="$HOME/.local/bin"
         mkdir -p "$bin" "$HOME/.local/share/applications"
-        install -m 755 "$image" "$bin/NuggetVPN.AppImage"
+        install -m 755 "$image" "$bin/Kage.AppImage"
         cat > "$HOME/.local/share/applications/nuggetvpn.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=NuggetVPN
-Exec=$bin/NuggetVPN.AppImage
+Name=Kage
+Exec=$bin/Kage.AppImage
 Terminal=false
 Categories=Network;
 EOF
-        say "Installed to $bin/NuggetVPN.AppImage (needs libfuse2 to run)."
+        say "Installed to $bin/Kage.AppImage (needs libfuse2 to run)."
         case ":$PATH:" in *":$bin:"*) ;; *) say "Add $bin to your PATH to run it from a terminal." ;; esac
     fi
-    say "NuggetVPN $TAG is installed."
+    say "Kage $TAG is installed."
 }
 
 case "$(uname -s)" in

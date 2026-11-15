@@ -1,9 +1,9 @@
-// NuggetVPN is a Wails desktop client with sing-box linked in as a library.
+// Kage is a Wails desktop client with sing-box linked in as a library.
 //
 // The binary has two modes:
 //
-//	nuggetvpn                  the GUI
-//	nuggetvpn --core-service   the privileged core, started by the GUI
+//	Kage                  the GUI
+//	Kage --core-service   the privileged core, started by the GUI
 //
 // Both modes are the same executable, so the UI and the tunnel can never drift
 // to different sing-box versions.
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 
@@ -47,7 +48,7 @@ var trayIcon []byte
 var version = "2.4.0"
 
 func main() {
-	// NuggetVPN status, connect, ...: control the running app and exit.
+	// Kage status, connect, ...: control the running app and exit.
 	if cli.IsCommand(os.Args[1:]) {
 		os.Exit(cli.Run(os.Args[1:], storage.CLISocketPath(), storage.CLITokenPath(), version))
 	}
@@ -59,7 +60,7 @@ func main() {
 			return
 		}
 		if arg == "--version" {
-			fmt.Println("NuggetVPN", version)
+			fmt.Println("Kage", version)
 			return
 		}
 	}
@@ -124,11 +125,23 @@ func runGUI() {
 	// Set once the window exists; the second-instance callback needs it.
 	var window *application.WebviewWindow
 
+	// WebView2 otherwise derives this from the executable's name. Keep the
+	// existing profile so the Kage rename retains appearance and language.
+	webviewDataPath := ""
+	if runtime.GOOS == "windows" {
+		if configDir, err := os.UserConfigDir(); err == nil {
+			webviewDataPath = filepath.Join(configDir, "NuggetVPN.exe")
+		}
+	}
+
 	wailsApp := application.New(application.Options{
-		Name:        "NuggetVPN",
+		Name:        "Kage",
 		Description: "Modern, lightweight VPN client with an embedded sing-box core",
 		Icon:        appIcon,
 		Services:    services,
+		Windows: application.WindowsOptions{
+			WebviewUserDataPath: webviewDataPath,
+		},
 		Assets: application.AssetOptions{
 			Handler: app.PluginFiles(app.UserFilesHandler(application.AssetFileServerFS(assets))),
 			// Before the runtime endpoint: see plugins.GuardRuntime.
@@ -161,7 +174,7 @@ func runGUI() {
 
 	window = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      app.WindowName,
-		Title:     "NuggetVPN",
+		Title:     "Kage",
 		Width:     1100,
 		Height:    750,
 		MinWidth:  400,
@@ -182,6 +195,6 @@ func runGUI() {
 	// the close behaviour around it.
 
 	if err := wailsApp.Run(); err != nil {
-		log.Fatalf("failed to start NuggetVPN: %v", err)
+		log.Fatalf("failed to start Kage: %v", err)
 	}
 }

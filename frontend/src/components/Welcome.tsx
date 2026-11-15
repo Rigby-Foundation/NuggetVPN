@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useAppearance } from "@/components/appearance-provider";
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -236,11 +237,7 @@ function Welcome({
           {step === 0 ? (
             <>
               {/* The wordmark reads left to right in every language. */}
-              <div className="unbounded text-4xl sm:text-5xl font-semibold tracking-tight">
-                <span dir="ltr" className="inline-block">
-                  Nugget<span className="text-primary">.</span>
-                </span>
-              </div>
+              <BrandWordmark className="block h-9 sm:h-11" />
               <h1 className="mt-5 text-2xl sm:text-3xl font-semibold tracking-tight">{t("onboarding.title")}</h1>
               <p className="mt-2 text-base text-muted-foreground">{t("welcome.tagline")}</p>
 

@@ -2,7 +2,7 @@
 # Built by `wails3 tool package`, which embeds nfpm — nothing extra to install.
 # Docs: https://nfpm.goreleaser.com
 
-name: "nuggetvpn"
+name: "kage"
 arch: ${GOARCH}
 platform: "linux"
 version: "2.4.0"
@@ -19,14 +19,14 @@ license: "GPL-3.0-only"
 release: "1"
 
 contents:
-  - src: "./bin/NuggetVPN"
-    dst: "/usr/bin/NuggetVPN"
+  - src: "./bin/Kage"
+    dst: "/usr/bin/Kage"
     file_info:
       mode: 0755
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/512x512/apps/NuggetVPN.png"
-  - src: "./build/linux/NuggetVPN.desktop"
-    dst: "/usr/share/applications/NuggetVPN.desktop"
+    dst: "/usr/share/icons/hicolor/512x512/apps/Kage.png"
+  - src: "./build/linux/Kage.desktop"
+    dst: "/usr/share/applications/Kage.desktop"
 
 # GTK4 + WebKitGTK 6.0 is the Wails v3 default stack (Ubuntu 24.04+ / Debian 13+).
 # polkit is not optional here: the GUI elevates the core service with pkexec to

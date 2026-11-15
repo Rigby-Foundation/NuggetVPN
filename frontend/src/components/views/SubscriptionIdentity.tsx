@@ -24,7 +24,8 @@ import { AppSettings } from "@/types";
  * `Happ/<version>` is the format Happ itself sends.
  */
 const USER_AGENTS = [
-    { value: "NuggetVPN/1.0", label: "NuggetVPN" },
+    // Keep the established wire identity for subscription provider compatibility.
+    { value: "NuggetVPN/1.0", label: "Kage" },
     { value: "Happ/4.9.0", label: "Happ" },
     { value: "Beam/2.0", label: "BEAM" },
     { value: "v2rayNG/1.9.16", label: "v2rayNG" },

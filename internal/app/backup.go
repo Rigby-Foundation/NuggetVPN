@@ -70,9 +70,9 @@ func (a *App) ExportBackup(ui string) (string, error) {
 	}
 	dialog := a.app.Dialog.SaveFile().
 		SetMessage("Save a backup").
-		SetFilename("NuggetVPN "+time.Now().Format("2006-01-02")+backupExtension).
+		SetFilename("Kage "+time.Now().Format("2006-01-02")+backupExtension).
 		CanCreateDirectories(true).
-		AddFilter("NuggetVPN backup", "*"+backupExtension)
+		AddFilter("Kage backup", "*"+backupExtension)
 	if a.window != nil {
 		dialog = dialog.AttachToWindow(a.window)
 	}
@@ -133,7 +133,7 @@ func (a *App) ImportBackup() (BackupImport, error) {
 	dialog := a.app.Dialog.OpenFile().
 		SetTitle("Open a backup").
 		CanChooseFiles(true).
-		AddFilter("NuggetVPN backup", "*"+backupExtension)
+		AddFilter("Kage backup", "*"+backupExtension)
 	if a.window != nil {
 		dialog = dialog.AttachToWindow(a.window)
 	}
@@ -159,10 +159,10 @@ func (a *App) ImportBackup() (BackupImport, error) {
 func (a *App) restoreBackup(data []byte) (BackupImport, error) {
 	var backup Backup
 	if err := json.Unmarshal(data, &backup); err != nil || backup.Format != backupFormat {
-		return BackupImport{}, errors.New("that is not a NuggetVPN backup")
+		return BackupImport{}, errors.New("that is not a Kage backup")
 	}
 	if backup.Version > backupVersion {
-		return BackupImport{}, fmt.Errorf("this backup is version %d, made by a newer NuggetVPN; update the app first", backup.Version)
+		return BackupImport{}, fmt.Errorf("this backup is version %d, made by a newer Kage; update the app first", backup.Version)
 	}
 
 	// Files first: settings may refer to them.

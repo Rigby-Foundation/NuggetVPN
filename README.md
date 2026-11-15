@@ -1,7 +1,12 @@
-# NuggetVPN
+# Kage
 
 A fast, good-looking VPN client for Windows, macOS, Linux, Android and iOS, built with
 [Wails v3](https://v3.wails.io/) and [React 19](https://react.dev/).
+
+Previously named NuggetVPN. Existing profiles, preferences, backups, plugins,
+and `nuggetvpn://` import links remain compatible. The repository, bundle
+identifier, data directories, and subscription User-Agent retain their existing
+names for compatibility.
 
 Every proxy core it can run is compiled **into** the app as a Go library.
 There is no bundled executable, nothing is downloaded at runtime, and
@@ -30,7 +35,7 @@ Windows, `…-silent-installer.exe` installs with no questions asked, and the
 regular installer takes `/S` for the same.
 
 > [!WARNING]
-> **iOS: you sign it yourself.** NuggetVPN is not on the App Store. Each
+> **iOS: you sign it yourself.** Kage is not on the App Store. Each
 > release has an unsigned `…-ios-unsigned.ipa` (iOS 15 and newer) for you to
 > sign with your own certificate, in a signing app or with TrollStore. The
 > certificate must allow VPN apps (Network Extensions, packet tunnel): one
@@ -83,7 +88,7 @@ regular installer takes `/S` for the same.
 - **Speed test** through the current server, from the Connection screen.
 - **Logs** streamed from the core. They are off by default in release
   builds.
-- **A command line**: `NuggetVPN status`, `connect Tokyo`, `disconnect` and
+- **A command line**: `Kage status`, `connect Tokyo`, `disconnect` and
   more control the running app from a terminal or a script. See
   [docs/cli.md](docs/cli.md).
 
@@ -142,8 +147,8 @@ process, so switching between them is instant.
 The app is a single binary with two modes:
 
 ```
-NuggetVPN                  the GUI (runs as your user)
-NuggetVPN --core-service   the privileged core (started by the GUI)
+Kage                  the GUI (runs as your user)
+Kage --core-service   the privileged core (started by the GUI)
 ```
 
 Creating a TUN interface requires root, but a browser engine should never
@@ -222,10 +227,10 @@ the TUN interface. It asks once per app session, not once per connection.
 
 | Command | Produces |
 | --- | --- |
-| `make dmg` | `bin/NuggetVPN.dmg` |
+| `make dmg` | `bin/Kage.dmg` |
 | `make dmg-universal` | a universal (arm64 + amd64) `.dmg` |
 | `make linux-packages` | `.deb`, `.rpm` and `.AppImage` in `bin/` |
-| `make package` (Windows) | `NuggetVPN.exe` and an NSIS installer |
+| `make package` (Windows) | `Kage.exe` and an NSIS installer |
 
 Wails ships the `.app`, `.deb`, `.rpm` and AppImage packagers. The DMG
 script is ours, in `build/darwin/make-dmg.sh`, and it only uses `hdiutil` and
@@ -352,7 +357,7 @@ The app is not signed with an Apple Developer certificate, so Gatekeeper may
 block it:
 
 ```bash
-xattr -cr /Applications/NuggetVPN.app
+xattr -cr /Applications/Kage.app
 ```
 
 ## Known limitations

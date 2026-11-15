@@ -1,6 +1,6 @@
-# Contributing to NuggetVPN
+# Contributing to Kage
 
-Thank you for your interest in contributing to NuggetVPN! We welcome contributions from the community to help make this the best VPN client for privacy enthusiasts.
+Thank you for your interest in contributing to Kage! We welcome contributions from the community to help make this the best VPN client for privacy enthusiasts.
 
 ## Getting Started
 

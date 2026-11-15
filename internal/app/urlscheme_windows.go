@@ -28,7 +28,7 @@ func registerURLScheme() {
 		return
 	}
 	defer root.Close()
-	_ = root.SetStringValue("", "URL:NuggetVPN")
+	_ = root.SetStringValue("", "URL:Kage")
 	_ = root.SetStringValue("URL Protocol", "")
 
 	if icon, _, err := registry.CreateKey(root, "DefaultIcon", registry.SET_VALUE); err == nil {

@@ -16,6 +16,7 @@ build/darwin/Assets.car
 build/linux/*.desktop
 build/linux/appimage/build
 build/linux/appimage/*.png
+build/linux/appimage/Kage
 build/linux/appimage/NuggetVPN
 # Windows resource objects. Wails v3 writes the one it links into the binary at
 # the repository root, not under build/windows/, so both are covered.
@@ -24,6 +25,7 @@ build/linux/appimage/NuggetVPN
 .env
 .env.*
 !.env.example
+kage-logs.txt
 nuggetvpn-logs.txt
 
 # Task runner and TypeScript incremental caches

@@ -1,7 +1,7 @@
 // Package cli lets scripts and terminals drive the running app:
 //
-//	NuggetVPN status
-//	NuggetVPN connect Tokyo
+//	Kage status
+//	Kage connect Tokyo
 //
 // The app listens on a socket in the user's own runtime folder, and every
 // request carries a token from a file beside it that only the user can read,
@@ -159,7 +159,7 @@ func (s *Server) serve(conn net.Conn, handler Handler) {
 }
 
 // ErrNotRunning means the app is not running, or is too old to answer.
-var ErrNotRunning = errors.New("NuggetVPN is not running; start it first")
+var ErrNotRunning = errors.New("Kage is not running; start it first")
 
 // Call sends one command to the running app.
 func Call(socketPath, tokenPath, command string, args []string) (Response, error) {
@@ -206,7 +206,7 @@ func Run(args []string, socketPath, tokenPath, version string) int {
 		rest = append(rest, arg)
 	}
 	if len(rest) == 0 || rest[0] == "help" || rest[0] == "--help" || rest[0] == "-h" {
-		fmt.Printf("NuggetVPN %s\n\nUsage: NuggetVPN <command> [--json]\n\n", version)
+		fmt.Printf("Kage %s\n\nUsage: Kage <command> [--json]\n\n", version)
 		for _, command := range Commands {
 			fmt.Printf("  %-20s %s\n", command.Usage, command.Help)
 		}

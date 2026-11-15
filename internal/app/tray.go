@@ -20,7 +20,7 @@ import (
 // the window back has to restore it.
 func (a *App) buildTray() {
 	tray := a.app.SystemTray.New()
-	tray.SetTooltip("NuggetVPN")
+	tray.SetTooltip("Kage")
 	tray.SetIcon(a.icon)
 
 	// A left click should reveal the window rather than only open the menu.
@@ -36,12 +36,12 @@ type trayText struct{ open, disconnect, quit, routing, mainSetup string }
 // built here, not in the webview, so it cannot use the UI's translations;
 // five strings are not worth sharing a catalogue over.
 var trayLabels = map[string]trayText{
-	"en": {"Open NuggetVPN", "Disconnect", "Quit NuggetVPN", "Routing", "Main"},
-	"ru": {"Открыть NuggetVPN", "Отключиться", "Выйти из NuggetVPN", "Маршрутизация", "Основная"},
-	"uk": {"Відкрити NuggetVPN", "Відключитися", "Вийти з NuggetVPN", "Маршрутизація", "Основна"},
-	"zh": {"打开 NuggetVPN", "断开连接", "退出 NuggetVPN", "路由", "主要"},
-	"ja": {"NuggetVPN を開く", "切断", "NuggetVPN を終了", "ルーティング", "メイン"},
-	"fa": {"باز کردن NuggetVPN", "قطع اتصال", "خروج از NuggetVPN", "مسیریابی", "اصلی"},
+	"en": {"Open Kage", "Disconnect", "Quit Kage", "Routing", "Main"},
+	"ru": {"Открыть Kage", "Отключиться", "Выйти из Kage", "Маршрутизация", "Основная"},
+	"uk": {"Відкрити Kage", "Відключитися", "Вийти з Kage", "Маршрутизація", "Основна"},
+	"zh": {"打开 Kage", "断开连接", "退出 Kage", "路由", "主要"},
+	"ja": {"Kage を開く", "切断", "Kage を終了", "ルーティング", "メイン"},
+	"fa": {"باز کردن Kage", "قطع اتصال", "خروج از Kage", "مسیریابی", "اصلی"},
 }
 
 // SetUILanguage relabels the tray menu in the language the UI is showing.

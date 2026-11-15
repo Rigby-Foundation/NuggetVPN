@@ -3,7 +3,7 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleExecutable</key>
-		<string>NuggetVPN</string>
+		<string>Kage</string>
 		<key>CFBundleGetInfoString</key>
 		<string>GPL-3.0-only</string>
 		<key>CFBundleIconFile</key>
@@ -13,7 +13,7 @@
 		<key>CFBundleIdentifier</key>
 		<string>org.rigbyfoundation.nuggetvpn</string>
 		<key>CFBundleName</key>
-		<string>NuggetVPN</string>
+		<string>Kage</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

@@ -18,7 +18,7 @@ func elevateAndRun(executable string, args []string) error {
 	pkexec, err := exec.LookPath("pkexec")
 	if err != nil {
 		return fmt.Errorf(
-			"pkexec was not found; install polkit or start NuggetVPN from a session that can create TUN interfaces")
+			"pkexec was not found; install polkit or start Kage from a session that can create TUN interfaces")
 	}
 	return startDetached(pkexec, append([]string{executable}, args...))
 }

@@ -124,7 +124,7 @@ export function ExportDialog({ isOpen, onClose, profiles, title }: ExportDialogP
     const handleSaveFile = async () => {
         if (!content) return;
         const cfg = FORMAT_CONFIG[format];
-        const defaultFilename = `nuggetvpn-${format}-${profiles.length}servers.${cfg.ext}`;
+        const defaultFilename = `kage-${format}-${profiles.length}servers.${cfg.ext}`;
 
         setSaving(true);
         try {

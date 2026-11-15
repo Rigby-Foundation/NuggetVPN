@@ -1,4 +1,4 @@
-# NuggetVPN — Wails v3 + embedded sing-box
+# Kage — Wails v3 + embedded sing-box
 #
 # The real build logic lives in Taskfile.yml (Wails v3 is Task-driven); these
 # targets are thin wrappers so `make` keeps working and the sing-box build tags

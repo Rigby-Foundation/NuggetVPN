@@ -1,6 +1,7 @@
 import { ServerPicker } from "./ServerPicker";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { Plus } from "lucide-react";
+import { BrandWordmark } from "@/components/brand-wordmark";
 
 import { MacWindowControls } from "@/components/layout/MacWindowControls";
 import { WindowControls } from "@/components/layout/WindowControls";
@@ -100,9 +101,9 @@ export function UnifiedHeader({
                 <button
                     type="button"
                     onClick={() => onTabChange("connection")}
-                    className="text-sm font-semibold tracking-tight unbounded hover:opacity-85 transition-opacity"
+                    className="flex shrink-0 items-center hover:opacity-85 transition-opacity"
                 >
-                    Nugget
+                    <BrandWordmark className="h-4" />
                 </button>
             </div>
 

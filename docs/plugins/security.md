@@ -3,7 +3,7 @@
 Plugins without a native backend run their pages in a browser sandbox.
 Native and hybrid desktop plugins also run an executable with the user’s OS
 access and require explicit approval. App permissions restrict calls through
-NuggetVPN; they do not sandbox native filesystem or network access.
+Kage; they do not sandbox native filesystem or network access.
 See [native backends and checksum approval](native.md).
 
 ## Permissions

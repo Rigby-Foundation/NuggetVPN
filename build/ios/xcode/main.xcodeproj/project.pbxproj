@@ -56,7 +56,7 @@
 /* Begin PBXFileReference section */
 		C0DEBEEF0000000000000002 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		C0DEBEEF0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C0DEBEEF0000000000000004 /* NuggetVPN.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NuggetVPN.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DEBEEF0000000000000004 /* Kage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DEBEEF0000000000000006 /* NuggetVPNManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NuggetVPNManager.m; sourceTree = "<group>"; };
 		C0DEBEEF0000000000000007 /* NuggetVPNManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NuggetVPNManager.h; sourceTree = "<group>"; };
 		C0DEBEEF0000000000000008 /* NuggetVPN.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NuggetVPN.entitlements; sourceTree = "<group>"; };
@@ -121,7 +121,7 @@
 		C0DEBEEF0000000000000020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C0DEBEEF0000000000000004 /* NuggetVPN.app */,
+				C0DEBEEF0000000000000004 /* Kage.app */,
 				C0DEBEEF0000000000000208 /* PacketTunnel.appex */,
 			);
 			name = Products;
@@ -183,7 +183,7 @@
 			);
 			name = NuggetVPN;
 			productName = NuggetVPN;
-			productReference = C0DEBEEF0000000000000004 /* NuggetVPN.app */;
+			productReference = C0DEBEEF0000000000000004 /* Kage.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C0DEBEEF0000000000000200 /* PacketTunnel */ = {
@@ -305,7 +305,7 @@
 					"$(inherited)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn;
-				PRODUCT_NAME = NuggetVPN;
+				PRODUCT_NAME = Kage;
 				SDKROOT = iphoneos;
 			};
 			name = Debug;
@@ -328,7 +328,7 @@
 					"$(inherited)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn;
-				PRODUCT_NAME = NuggetVPN;
+				PRODUCT_NAME = Kage;
 				SDKROOT = iphoneos;
 			};
 			name = Release;
