@@ -17,6 +17,35 @@ body,
   overscroll-behavior: none;
 }
 
+html {
+  color-scheme: light;
+  scrollbar-color: var(--muted-foreground) var(--background);
+  scrollbar-width: thin;
+}
+
+body.dark {
+  color-scheme: dark;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid var(--background);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
 .window-drag {
   --wails-draggable: drag;
   user-select: none;

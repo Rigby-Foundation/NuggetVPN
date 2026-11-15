@@ -6,6 +6,7 @@ import {
   CircleArrowUp,
   Eye,
   Fingerprint,
+  Info,
   Languages,
   Network,
   Palette,
@@ -18,7 +19,9 @@ import {
   Trash2,
   Waypoints,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import toast from "react-hot-toast";
+import { aboutPage } from "@/app/pages";
 import { useVpn } from "@/app/vpn-context";
 import { Page } from "@/components/Page";
 import { cn } from "@/lib/utils";
@@ -89,6 +92,7 @@ const sections = [
     key: "settings.updates",
     group: "general",
   },
+  { id: "about", icon: Info, key: "settings.about", group: "general" },
   {
     id: "connection",
     icon: Network,
@@ -135,6 +139,7 @@ const searchTerms: Partial<Record<SectionId, MessageKey[]>> = {
 };
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const vpn = useVpn();
   const { settings, patchSettings } = vpn;
   const { t, choice, setChoice } = useI18n();
@@ -154,6 +159,10 @@ export default function SettingsPage() {
     ].some((value) => value.toLocaleLowerCase().includes(needle)),
   );
   const selectSection = (id: SectionId) => {
+    if (id === "about") {
+      void navigate(aboutPage);
+      return;
+    }
     setSection(id);
     setQuery("");
   };

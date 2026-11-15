@@ -21,6 +21,8 @@ export interface AppPage {
 }
 
 export const defaultPage = "/connection";
+export const settingsPage = "/settings";
+export const aboutPage = `${settingsPage}/about`;
 
 // Add pages here. Routes and sidebar links are generated from this list.
 export const pages: readonly AppPage[] = [
@@ -53,10 +55,15 @@ export const pages: readonly AppPage[] = [
     sidebar: {},
   },
   {
-    path: "/settings",
+    path: settingsPage,
     title: "nav.settings",
     icon: Settings,
     load: () => import("@/pages/SettingsPage"),
-    sidebar: {},
+    sidebar: { end: false },
+  },
+  {
+    path: aboutPage,
+    title: "settings.about",
+    load: () => import("@/pages/AboutPage"),
   },
 ];
