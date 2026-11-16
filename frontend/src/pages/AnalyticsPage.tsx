@@ -105,12 +105,15 @@ function TrafficTimeline({ days, statistics }: { days: Day[]; statistics: Return
   const [focused, setFocused] = useState<string | null>(null);
   const chosen = days.find((day) => day.day === selected) ?? days.at(-1);
   const active = days.find((day) => day.day === focused) ?? chosen;
-  const maxBytes = Math.max(1, ...days.map((day) => Math.max(day.up, day.down)));
+  const peak = Math.max(1000, ...days.map((day) => Math.max(day.up, day.down)));
+  const magnitude = 10 ** Math.floor(Math.log10(peak));
+  const maxBytes = (peak <= 2 * magnitude ? 2 : peak <= 5 * magnitude ? 5 : 10) * magnitude;
   const date = (value: string, long = false) => new Intl.DateTimeFormat(language, {
     month: "short", day: "numeric", ...(long ? { weekday: "long" } : {}), timeZone: "UTC",
   }).format(new Date(value));
-  const marks = new Set(Array.from({ length: Math.min(days.length, 5) }, (_, index) =>
-    Math.round(index * (days.length - 1) / Math.max(1, Math.min(days.length, 5) - 1))));
+  const markCount = days.length <= 7 ? days.length : 5;
+  const marks = new Set(Array.from({ length: markCount }, (_, index) =>
+    Math.round(index * (days.length - 1) / Math.max(1, markCount - 1))));
 
   return (
     <section data-page-part="1" className="min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-card/45" aria-labelledby="timeline-heading">
@@ -132,57 +135,76 @@ function TrafficTimeline({ days, statistics }: { days: Day[]; statistics: Return
           </dl>
         </div>
         {active && (
-          <div className="space-y-2" dir="ltr">
-            <div className="relative">
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-dashed border-border/70" />
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-border" />
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-3/4 border-t border-dashed border-border/70" />
-              <div
-                role="radiogroup"
-                aria-labelledby="timeline-heading"
-                className="grid h-35 sm:h-44"
-                style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
-                onPointerLeave={() => setFocused(null)}
-                onKeyDown={(event) => {
-                  const index = days.findIndex((day) => day.day === chosen?.day);
-                  const next = event.key === "Home" ? 0 : event.key === "End" ? days.length - 1
-                    : event.key === "ArrowLeft" ? Math.max(0, index - 1)
-                    : event.key === "ArrowRight" ? Math.min(days.length - 1, index + 1) : -1;
-                  if (next < 0) return;
-                  event.preventDefault();
-                  setFocused(null);
-                  setSelected(days[next].day);
-                  event.currentTarget.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
-                }}
-              >
-                {days.map((day) => (
-                  <button
-                    key={day.day}
-                    type="button"
-                    role="radio"
-                    aria-checked={day.day === chosen?.day}
-                    aria-label={t("stats.dayLabel", { day: date(day.day, true), down: formatBytes(day.down), up: formatBytes(day.up) })}
-                    tabIndex={day.day === chosen?.day ? 0 : -1}
-                    onPointerEnter={(event) => { if (event.pointerType === "mouse") setFocused(day.day); }}
-                    onClick={() => setSelected(day.day)}
-                    className={cn("relative grid min-w-0 grid-rows-2 justify-items-center rounded-sm px-px outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", day.day === active.day && "bg-muted/70")}
+          <div className="space-y-3" dir="ltr">
+            <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2 gap-y-2 text-[10px] tabular-nums sm:text-[11px]">
+              <div aria-hidden="true" className="relative text-right text-muted-foreground">
+                <span className="absolute right-0 top-0 -translate-y-1/2">{formatBytes(maxBytes)}</span>
+                <span className="absolute right-0 top-1/2 -translate-y-1/2">{formatBytes(maxBytes / 2)}</span>
+                <span className="absolute right-0 bottom-0 translate-y-1/2">0</span>
+              </div>
+              <div className="relative">
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-border/55" />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-border/55" />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-border" />
+                <div
+                  role="radiogroup"
+                  aria-labelledby="timeline-heading"
+                  className="grid h-35 sm:h-44"
+                  style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
+                  onPointerLeave={() => setFocused(null)}
+                  onKeyDown={(event) => {
+                    const index = days.findIndex((day) => day.day === chosen?.day);
+                    const next = event.key === "Home" ? 0 : event.key === "End" ? days.length - 1
+                      : event.key === "ArrowLeft" ? Math.max(0, index - 1)
+                      : event.key === "ArrowRight" ? Math.min(days.length - 1, index + 1) : -1;
+                    if (next < 0) return;
+                    event.preventDefault();
+                    setFocused(null);
+                    setSelected(days[next].day);
+                    event.currentTarget.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+                  }}
+                >
+                  {days.map((day) => (
+                    <button
+                      key={day.day}
+                      type="button"
+                      role="radio"
+                      aria-checked={day.day === chosen?.day}
+                      aria-label={t("stats.dayLabel", { day: date(day.day, true), down: formatBytes(day.down), up: formatBytes(day.up) })}
+                      tabIndex={day.day === chosen?.day ? 0 : -1}
+                      onPointerEnter={(event) => { if (event.pointerType === "mouse") setFocused(day.day); }}
+                      onClick={() => setSelected(day.day)}
+                      className="relative flex min-w-0 justify-center rounded-sm px-px outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <span aria-hidden="true" className={cn("pointer-events-none absolute inset-y-0 w-10 max-w-full rounded-sm transition-colors motion-reduce:transition-none sm:w-12", day.day === active.day && "bg-muted/35")} />
+                      <span aria-hidden="true" className="relative flex h-full w-full max-w-8 items-end justify-center gap-px sm:max-w-10 sm:gap-1">
+                        {total(day) === 0 ? (
+                          <span className="h-px w-3 -translate-y-px bg-muted-foreground/45" />
+                        ) : (
+                          <>
+                            <span className="w-1/2 rounded-t-xs bg-chart-2" style={{ height: day.down > 0 ? `max(2px, ${day.down / maxBytes * 100}%)` : 0 }} />
+                            <span className="w-1/2 rounded-t-xs bg-teal-700 dark:bg-teal-400" style={{ height: day.up > 0 ? `max(2px, ${day.up / maxBytes * 100}%)` : 0 }} />
+                          </>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div aria-hidden="true" className="relative col-start-2 h-4 whitespace-nowrap text-center text-muted-foreground">
+                {[...marks].map((index) => (
+                  <span
+                    key={days[index].day}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${(index + 0.5) / days.length * 100}%` }}
                   >
-                    <span aria-hidden="true" className="w-full max-w-6 self-end rounded-t-xs bg-chart-2" style={{ height: `${day.down / maxBytes * 95}%` }} />
-                    <span aria-hidden="true" className="w-full max-w-6 self-start rounded-b-xs bg-teal-700 dark:bg-teal-400" style={{ height: `${day.up / maxBytes * 95}%` }} />
-                  </button>
+                    <span className={cn(days.length > 1 && days.length <= 7 && "hidden sm:inline")}>{date(days[index].day)}</span>
+                    {days.length > 1 && days.length <= 7 && (
+                      <span className="sm:hidden">{new Intl.DateTimeFormat(language, { day: "numeric", timeZone: "UTC" }).format(new Date(days[index].day))}</span>
+                    )}
+                  </span>
                 ))}
               </div>
-            </div>
-            <div aria-hidden="true" className="relative h-4 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
-              {[...marks].map((index, tick) => (
-                <span
-                  key={days[index].day}
-                  className={cn("absolute", index === 0 ? "left-0" : index === days.length - 1 ? "right-0" : "-translate-x-1/2", marks.size === 5 && tick % 2 !== 0 && "hidden sm:inline")}
-                  style={index > 0 && index < days.length - 1 ? { left: `${(index + 0.5) / days.length * 100}%` } : undefined}
-                >
-                  {date(days[index].day)}
-                </span>
-              ))}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg bg-muted/35 px-3 py-2 text-xs" dir="auto">
               <span className="font-medium">{date(active.day, true)}</span>
