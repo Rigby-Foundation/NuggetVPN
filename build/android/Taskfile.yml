@@ -15,7 +15,7 @@ includes:
   common: ../Taskfile.yml
 
 vars:
-  APP_ID: org.rigbyfoundation.nuggetvpn
+  APP_ID: org.rigbyfoundation.kage
   MIN_SDK: '24'
   SDK_ROOT:
     sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"'

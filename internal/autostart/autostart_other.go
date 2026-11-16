@@ -10,7 +10,7 @@ import (
 )
 
 // An XDG autostart entry, which GNOME, KDE and most other desktops honour.
-func entryPath() (string, error) {
+func desktopFile(name string) (string, error) {
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
 		home, err := os.UserHomeDir()
@@ -19,7 +19,27 @@ func entryPath() (string, error) {
 		}
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "autostart", "nuggetvpn.desktop"), nil
+	return filepath.Join(base, "autostart", name), nil
+}
+
+func entryPath() (string, error) { return desktopFile("kage.desktop") }
+
+func MigrateLegacy() error {
+	path, err := desktopFile("nuggetvpn.desktop")
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if !enabled() {
+		if err := Set(true); err != nil {
+			return err
+		}
+	}
+	return os.Remove(path)
 }
 
 func enable(executable string) error {

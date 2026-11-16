@@ -8,7 +8,7 @@ Kage is a VPN and proxy client for **macOS, Windows, Linux, Android, and iOS**. 
 
 [Download Kage](https://github.com/Rigby-Foundation/NuggetVPN/releases) · [CLI guide](docs/cli.md) · [Plugin documentation](docs/plugins/README.md)
 
-Kage was previously called NuggetVPN. The repository and app IDs still use the old name so existing profiles, settings, backups, and plugins carry forward.
+Kage was previously called NuggetVPN. Its app ID is now `org.rigbyfoundation.kage`. On desktop, Kage moves the previous app data folder on first launch. On Android and iOS, export a backup from the old app and import it into the new installation to transfer your profiles and settings.
 
 ## Install
 

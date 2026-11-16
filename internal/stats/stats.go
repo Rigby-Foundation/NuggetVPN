@@ -63,9 +63,10 @@ type SpeedResult struct {
 
 type file struct {
 	// Usage is day ("2006-01-02") → program → bytes.
-	Usage  map[string]map[string]*Bytes `json:"usage"`
-	Health map[string][]Sample          `json:"health"`
-	Speed  []SpeedResult                `json:"speed"`
+	Usage   map[string]map[string]*Bytes `json:"usage"`
+	Traffic map[string]*trafficDay       `json:"traffic,omitempty"`
+	Health  map[string][]Sample          `json:"health"`
+	Speed   []SpeedResult                `json:"speed"`
 }
 
 // Store is the app's statistics.
@@ -88,38 +89,52 @@ func Open(path string) *Store {
 	if store.data.Health == nil {
 		store.data.Health = map[string][]Sample{}
 	}
+	if store.data.Traffic == nil {
+		store.data.Traffic = map[string]*trafficDay{}
+	}
 	return store
 }
 
 // Save writes the statistics if anything changed.
 func (s *Store) Save() error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.dirty {
-		s.mu.Unlock()
 		return nil
 	}
 	s.prune(time.Now())
 	data, err := json.Marshal(s.data)
-	s.dirty = false
-	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
-	temporary := s.path + ".tmp"
-	if err := os.WriteFile(temporary, data, 0o644); err != nil {
+	temp, err := os.CreateTemp(filepath.Dir(s.path), ".stats-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(temporary, s.path)
+	defer os.Remove(temp.Name())
+	_, err = temp.Write(data)
+	closeErr := temp.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := os.Rename(temp.Name(), s.path); err != nil {
+		return err
+	}
+	s.dirty = false
+	return nil
 }
 
 // Clear forgets everything.
 func (s *Store) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.data = file{Usage: map[string]map[string]*Bytes{}, Health: map[string][]Sample{}}
+	s.data = file{Usage: map[string]map[string]*Bytes{}, Traffic: map[string]*trafficDay{}, Health: map[string][]Sample{}}
 	s.dirty = true
 }
 
@@ -128,6 +143,11 @@ func (s *Store) prune(now time.Time) {
 	for day := range s.data.Usage {
 		if day < oldest {
 			delete(s.data.Usage, day)
+		}
+	}
+	for day := range s.data.Traffic {
+		if day < oldest {
+			delete(s.data.Traffic, day)
 		}
 	}
 	cutoff := now.Add(-healthWindow).Unix()
@@ -157,9 +177,12 @@ func (s *Store) AddUsage(day time.Time, program string, up, down uint64) {
 	if up == 0 && down == 0 {
 		return
 	}
-	key := day.Format(time.DateOnly)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.addUsage(day.Format(time.DateOnly), program, Bytes{Up: up, Down: down})
+}
+
+func (s *Store) addUsage(key, program string, bytes Bytes) {
 	programs := s.data.Usage[key]
 	if programs == nil {
 		programs = map[string]*Bytes{}
@@ -170,8 +193,8 @@ func (s *Store) AddUsage(day time.Time, program string, up, down uint64) {
 		counter = &Bytes{}
 		programs[program] = counter
 	}
-	counter.Up += up
-	counter.Down += down
+	counter.Up += bytes.Up
+	counter.Down += bytes.Down
 	s.dirty = true
 }
 
@@ -197,6 +220,10 @@ func (s *Store) Usage(days int, now time.Time) ([]ProgramUsage, []DayUsage) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.usageLocked(days, now)
+}
+
+func (s *Store) usageLocked(days int, now time.Time) ([]ProgramUsage, []DayUsage) {
 	totals := map[string]*ProgramUsage{}
 	daily := make([]DayUsage, 0, days)
 	for offset := days - 1; offset >= 0; offset-- {

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { EthernetPort, Info, Route, Server, Settings, UserGroup } from "lucide-react";
+import { ChartNoAxesColumn, EthernetPort, Info, Route, Server, Settings, UserGroup } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -14,6 +14,8 @@ export interface AppPage {
     group?: string;
     label?: MessageKey;
     mobileLabel?: MessageKey;
+    /** Set false for pages reached through another screen on phones. */
+    mobile?: boolean;
     /** Use a concrete URL for routes with parameters or wildcards. */
     to?: string;
     /** Set false to keep this item active on child pages. */
@@ -24,6 +26,7 @@ export interface AppPage {
 export const defaultPage = "/connection";
 export const settingsPage = "/settings";
 export const aboutPage = `${settingsPage}/about`;
+export const analyticsPage = "/analytics";
 
 // Add pages here. Routes and sidebar links are generated from this list.
 export const pages: readonly AppPage[] = [
@@ -54,6 +57,13 @@ export const pages: readonly AppPage[] = [
     icon: Route,
     load: () => import("@/pages/RoutingPage"),
     sidebar: { mobileLabel: "nav.mobileRouting" },
+  },
+  {
+    path: analyticsPage,
+    title: "stats.analytics",
+    icon: ChartNoAxesColumn,
+    load: () => import("@/pages/AnalyticsPage"),
+    sidebar: { mobile: false },
   },
   {
     path: settingsPage,

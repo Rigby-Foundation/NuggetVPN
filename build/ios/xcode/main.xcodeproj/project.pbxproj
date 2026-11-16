@@ -304,7 +304,7 @@
 					"$(SRCROOT)/../../../bin",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.kage;
 				PRODUCT_NAME = Kage;
 				SDKROOT = iphoneos;
 			};
@@ -327,7 +327,7 @@
 					"$(SRCROOT)/../../../bin",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.kage;
 				PRODUCT_NAME = Kage;
 				SDKROOT = iphoneos;
 			};
@@ -351,7 +351,7 @@
 					"$(SRCROOT)/../../../bin",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn.PacketTunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.kage.PacketTunnel;
 				PRODUCT_NAME = PacketTunnel;
 				SDKROOT = iphoneos;
 			};
@@ -375,7 +375,7 @@
 					"$(SRCROOT)/../../../bin",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.nuggetvpn.PacketTunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rigbyfoundation.kage.PacketTunnel;
 				PRODUCT_NAME = PacketTunnel;
 				SDKROOT = iphoneos;
 			};

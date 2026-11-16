@@ -65,6 +65,7 @@ const (
 // through here so the event and the state can never disagree.
 func (a *App) setState(state ConnectionState) ConnectionState {
 	a.mu.Lock()
+	a.recordAnalyticsStateLocked(state)
 	a.state = state
 	a.mu.Unlock()
 
@@ -329,6 +330,7 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 		return a.fail(err.Error())
 	}
 
+	a.countUsage()
 	a.flushUsage()
 	a.setState(ConnectionState{Status: StatusConnecting})
 	a.resetTraffic()
@@ -405,6 +407,7 @@ func (a *App) Disconnect() (ConnectionState, error) {
 	a.lastConnect = connectRequest{}
 	a.mu.Unlock()
 
+	a.countUsage()
 	a.flushUsage()
 
 	// Go idle *before* asking the core to stop. Stopping makes the core

@@ -11,10 +11,10 @@ import (
 )
 
 // serviceLogDir is where the service's output and its launchd job are kept.
-const serviceLogDir = "/Library/Application Support/NuggetVPN"
+const serviceLogDir = "/Library/Application Support/Kage"
 
 // serviceLabel names the service's launchd job.
-const serviceLabel = "org.rigbyfoundation.nuggetvpn.core"
+const serviceLabel = "org.rigbyfoundation.kage.core"
 
 // elevateAndRun launches the core service as root via the standard macOS
 // authorization prompt.

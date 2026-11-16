@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
@@ -51,9 +53,18 @@ func (a *App) saveSettings(settings models.AppSettings, promptReload bool) (mode
 	}
 
 	a.mu.Lock()
+	if err := storage.SaveSettings(settings); err != nil {
+		previous := a.settings
+		a.mu.Unlock()
+		return previous, err
+	}
 	coreChanged := coreSettingsSignature(a.settings) != coreSettingsSignature(settings)
 	setupsChanged := setupsSignature(a.settings) != setupsSignature(settings)
 	loggingStopped := a.settings.LoggingOn() && !settings.LoggingOn()
+	if models.On(a.settings.AppStats) != models.On(settings.AppStats) {
+		a.advanceAnalyticsClockLocked(time.Now())
+		a.resetAnalyticsSampleLocked()
+	}
 	a.settings = settings
 	a.loggingOn.Store(settings.LoggingOn())
 	a.mu.Unlock()
@@ -66,9 +77,6 @@ func (a *App) saveSettings(settings models.AppSettings, promptReload bool) (mode
 	// on every node dragged across the canvas.
 	if setupsChanged {
 		a.refreshTrayMenu()
-	}
-	if err := storage.SaveSettings(settings); err != nil {
-		return settings, err
 	}
 	if promptReload && coreChanged {
 		a.requestCoreReload()

@@ -42,6 +42,16 @@ interface BackupResult {
     ui?: Record<string, string> | null;
 }
 
+export function restoreWindowState(ui: BackupResult["ui"]) {
+    try {
+        Object.entries(ui ?? {}).forEach(([key, value]) => {
+            if (key === "theme" || key.startsWith("nugget.")) localStorage.setItem(key, String(value));
+        });
+    } catch {
+        // The backend's restored data is still usable without web storage.
+    }
+}
+
 /**
  * Everything in one file — settings, servers and subscriptions, themes and
  * fonts, added pictures — to move to another computer or keep aside. This
@@ -72,13 +82,7 @@ export function BackupPanel() {
             if (!result.imported) return;
             // The window's own part goes back into storage, and a reload
             // brings everything up from the restored state at once.
-            try {
-                Object.entries(result.ui ?? {}).forEach(([key, value]) => {
-                    if (key === "theme" || key.startsWith("nugget.")) localStorage.setItem(key, String(value));
-                });
-            } catch {
-                // Storage unavailable: the backend's part is restored anyway.
-            }
+            restoreWindowState(result.ui);
             window.location.reload();
         } catch (error) {
             toast.error(errorMessage(error), { id: "backup" });

@@ -8,7 +8,7 @@ import (
 
 func TestUsageByProgramAndDay(t *testing.T) {
 	store := Open(filepath.Join(t.TempDir(), "stats.json"))
-	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.Local)
+	now := time.Now()
 	store.AddUsage(now, "chrome.exe", 100, 1000)
 	store.AddUsage(now, "chrome.exe", 50, 500)
 	store.AddUsage(now.AddDate(0, 0, -1), "Telegram.exe", 10, 20)
@@ -30,6 +30,40 @@ func TestUsageByProgramAndDay(t *testing.T) {
 	again := Open(store.path)
 	if programs, _ := again.Usage(30, now); len(programs) != 3 {
 		t.Errorf("reloaded: %+v", programs)
+	}
+}
+
+func TestAnalyticsPersistsDailyCountersAndSplitsTimeAtMidnight(t *testing.T) {
+	store := Open(filepath.Join(t.TempDir(), "stats.json"))
+	year, month, day := time.Now().Date()
+	midnight := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	yesterday, now := midnight.Add(-time.Minute), midnight.Add(2*time.Minute)
+	store.AddSession(yesterday)
+	store.AddConnected(yesterday, now)
+	store.AddTraffic(yesterday, Traffic{Bytes: Bytes{Up: 15, Down: 144}, Proxied: Bytes{Up: 15, Down: 144}}, map[string]Bytes{"server-id": {Up: 15, Down: 144}}, map[string]Bytes{"Browser": {Up: 15, Down: 144}})
+	store.AddTraffic(now, Traffic{Bytes: Bytes{Up: 30, Down: 100}, Direct: Bytes{Up: 30, Down: 100}}, nil, map[string]Bytes{"Browser": {Up: 30, Down: 100}})
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reopened := Open(store.path)
+	week := reopened.Analytics(7, now)
+	before, after := week.Days[5], week.Days[6]
+	if before.ConnectedMS != 60_000 || after.ConnectedMS != 120_000 || before.Sessions != 1 || after.Sessions != 0 {
+		t.Fatalf("time or sessions assigned to the wrong day: %+v / %+v", before, after)
+	}
+	if before.Proxied.Down != 144 || after.Direct.Down != 100 || week.Servers["server-id"].Down != 144 {
+		t.Fatalf("lost route or server usage: %+v", week)
+	}
+	if len(week.Programs) != 1 || week.Programs[0].Down != 244 || reopened.Analytics(1, now).Programs[0].Down != 100 {
+		t.Fatalf("wrong program totals for range: %+v", week.Programs)
+	}
+	reopened.Clear()
+	if err := reopened.Save(); err != nil {
+		t.Fatal(err)
+	}
+	cleared := Open(store.path).Analytics(7, now)
+	if len(cleared.Programs) != 0 || len(cleared.Servers) != 0 || cleared.Days[5].Sessions != 0 {
+		t.Fatalf("cleared history survived restart: %+v", cleared)
 	}
 }
 

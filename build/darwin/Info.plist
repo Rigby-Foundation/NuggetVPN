@@ -11,7 +11,7 @@
 		<key>CFBundleIconName</key>
 		<string>appicon</string>
 		<key>CFBundleIdentifier</key>
-		<string>org.rigbyfoundation.nuggetvpn</string>
+		<string>org.rigbyfoundation.kage</string>
 		<key>CFBundleName</key>
 		<string>Kage</string>
 		<key>CFBundlePackageType</key>
@@ -30,7 +30,7 @@
 		<array>
 			<dict>
 				<key>CFBundleURLName</key>
-				<string>org.rigbyfoundation.nuggetvpn</string>
+				<string>org.rigbyfoundation.kage</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
 					<string>kage</string>

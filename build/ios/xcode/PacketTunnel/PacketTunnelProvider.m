@@ -106,7 +106,7 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
 
     NSString *configString = options[@"config"];
     if (!configString || configString.length == 0) {
-        NSURL *groupURL = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.org.rigbyfoundation.nuggetvpn"];
+        NSURL *groupURL = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.org.rigbyfoundation.kage"];
         if (groupURL) {
             NSURL *configFileURL = [groupURL URLByAppendingPathComponent:@"tunnel_config.json"];
             configString = [NSString stringWithContentsOfURL:configFileURL encoding:NSUTF8StringEncoding error:nil];
@@ -115,7 +115,7 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
 
     if (!configString || configString.length == 0) {
         NSLog(@"[PacketTunnel] Error: empty configuration");
-        completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn"
+        completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.kage"
                                               code:101
                                           userInfo:@{NSLocalizedDescriptionKey: @"Missing or empty tunnel configuration"}]);
         return;
@@ -142,7 +142,7 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
 
         if (tunFd <= 0) {
             NSLog(@"[PacketTunnel] Failed to get valid file descriptor from packetFlow");
-            completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn"
+            completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.kage"
                                                   code:102
                                               userInfo:@{NSLocalizedDescriptionKey: @"Could not get virtual tun file descriptor"}]);
             return;
@@ -153,7 +153,7 @@ static NEPacketTunnelNetworkSettings *NuggetSettingsFromConfig(NSString *configS
         if (startErr != NULL) {
             NSString *errMsg = [NSString stringWithUTF8String:startErr];
             NSLog(@"[PacketTunnel] StartPacketTunnel failed: %@", errMsg);
-            completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn"
+            completionHandler([NSError errorWithDomain:@"org.rigbyfoundation.kage"
                                                   code:103
                                               userInfo:@{NSLocalizedDescriptionKey: errMsg}]);
             return;

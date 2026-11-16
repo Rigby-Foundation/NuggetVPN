@@ -125,7 +125,7 @@ install_linux() {
         bin="$HOME/.local/bin"
         mkdir -p "$bin" "$HOME/.local/share/applications"
         install -m 755 "$image" "$bin/Kage.AppImage"
-        cat > "$HOME/.local/share/applications/nuggetvpn.desktop" <<EOF
+        cat > "$HOME/.local/share/applications/kage.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Kage

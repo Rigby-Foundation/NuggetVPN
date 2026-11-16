@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NuggetVPN"
+rootProject.name = "Kage"
 include ':app'

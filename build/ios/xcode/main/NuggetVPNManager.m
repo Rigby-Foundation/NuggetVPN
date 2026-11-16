@@ -36,7 +36,7 @@
         for (NETunnelProviderManager *m in managers) {
             if ([m.protocolConfiguration isKindOfClass:[NETunnelProviderProtocol class]]) {
                 NETunnelProviderProtocol *p = (NETunnelProviderProtocol *)m.protocolConfiguration;
-                if ([p.providerBundleIdentifier isEqualToString:@"org.rigbyfoundation.nuggetvpn.PacketTunnel"]) {
+                if ([p.providerBundleIdentifier isEqualToString:@"org.rigbyfoundation.kage.PacketTunnel"]) {
                     matched = m;
                     break;
                 }
@@ -54,7 +54,7 @@
             protocol = [[NETunnelProviderProtocol alloc] init];
             matched.protocolConfiguration = protocol;
         }
-        protocol.providerBundleIdentifier = @"org.rigbyfoundation.nuggetvpn.PacketTunnel";
+        protocol.providerBundleIdentifier = @"org.rigbyfoundation.kage.PacketTunnel";
         protocol.serverAddress = @"Kage";
         matched.localizedDescription = @"Kage";
         matched.enabled = YES;
@@ -67,7 +67,7 @@
 - (void)startWithConfig:(NSString *)configJSON completion:(void (^)(NSError * _Nullable error))completion {
     [self loadManagerWithCompletion:^(NETunnelProviderManager * _Nullable manager) {
         if (!manager) {
-            if (completion) completion([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"Could not initialize NETunnelProviderManager"}]);
+            if (completion) completion([NSError errorWithDomain:@"org.rigbyfoundation.kage" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"Could not initialize NETunnelProviderManager"}]);
             return;
         }
 
@@ -76,13 +76,13 @@
             protocol = [[NETunnelProviderProtocol alloc] init];
             manager.protocolConfiguration = protocol;
         }
-        protocol.providerBundleIdentifier = @"org.rigbyfoundation.nuggetvpn.PacketTunnel";
+        protocol.providerBundleIdentifier = @"org.rigbyfoundation.kage.PacketTunnel";
         protocol.serverAddress = @"127.0.0.1";
         manager.localizedDescription = @"Kage";
         manager.enabled = YES;
 
         // Share config file via App Group container
-        NSURL *groupURL = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.org.rigbyfoundation.nuggetvpn"];
+        NSURL *groupURL = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:@"group.org.rigbyfoundation.kage"];
         if (groupURL) {
             NSURL *configFileURL = [groupURL URLByAppendingPathComponent:@"tunnel_config.json"];
             [configJSON writeToURL:configFileURL atomically:YES encoding:NSUTF8StringEncoding error:nil];
@@ -107,7 +107,7 @@
                 BOOL started = [manager.connection startVPNTunnelWithOptions:options andReturnError:&startError];
                 if (!started) {
                     NSLog(@"[NuggetVPNManager] startVPNTunnel error: %@", startError);
-                    if (completion) completion(startError ?: [NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-2 userInfo:@{NSLocalizedDescriptionKey: @"iOS refused to start the VPN"}]);
+                    if (completion) completion(startError ?: [NSError errorWithDomain:@"org.rigbyfoundation.kage" code:-2 userInfo:@{NSLocalizedDescriptionKey: @"iOS refused to start the VPN"}]);
                     return;
                 }
                 // Accepting the request is not connecting: the extension may
@@ -140,7 +140,7 @@
     };
 
     void (^failed)(void) = ^{
-        NSError *fallback = [NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-3 userInfo:@{NSLocalizedDescriptionKey: @"The VPN extension stopped before connecting. Its log lines start with [PacketTunnel] in Console."}];
+        NSError *fallback = [NSError errorWithDomain:@"org.rigbyfoundation.kage" code:-3 userInfo:@{NSLocalizedDescriptionKey: @"The VPN extension stopped before connecting. Its log lines start with [PacketTunnel] in Console."}];
         if (@available(iOS 16.0, *)) {
             [connection fetchLastDisconnectErrorWithCompletionHandler:^(NSError * _Nullable error) {
                 finish(error ?: fallback);
@@ -181,7 +181,7 @@
         @synchronized (lock) { pending = !finished; }
         if (!pending) return;
         [connection stopVPNTunnel];
-        finish([NSError errorWithDomain:@"org.rigbyfoundation.nuggetvpn" code:-4 userInfo:@{NSLocalizedDescriptionKey: @"The VPN did not connect within 30 seconds"}]);
+        finish([NSError errorWithDomain:@"org.rigbyfoundation.kage" code:-4 userInfo:@{NSLocalizedDescriptionKey: @"The VPN did not connect within 30 seconds"}]);
     });
 }
 

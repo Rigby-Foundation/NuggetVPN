@@ -54,6 +54,9 @@ type tracker struct {
 	up, down atomic.Int64
 	rules    int
 	router   routing.Router
+	usageID  string
+	byRoute  map[string]*trafficCounter
+	byApp    map[string]*trafficCounter
 }
 
 type Instance struct {
@@ -108,7 +111,10 @@ func (i *Instance) StartConfig(config []byte, script string, ruleCount int, sink
 		i.clearScript()
 		return err
 	}
-	t := &tracker{open: map[string]*connection{}, rules: ruleCount}
+	t := &tracker{
+		open: map[string]*connection{}, rules: ruleCount, usageID: uuid.NewString(),
+		byRoute: map[string]*trafficCounter{}, byApp: map[string]*trafficCounter{},
+	}
 	if r := instance.GetFeature(routing.RouterType()); r != nil {
 		t.router = r.(routing.Router)
 	}
@@ -290,38 +296,44 @@ func (h *trackedHandler) Dispatch(ctx context.Context, link *transport.Link) {
 	c.close = func() { once.Do(func() { cancel(); common.Interrupt(link.Reader); common.Interrupt(link.Writer) }) }
 	h.tracker.mu.Lock()
 	h.tracker.open[info.ID] = c
+	route, app := h.tracker.usageCounters(info.Outbound, info.Process)
 	h.tracker.mu.Unlock()
 	defer func() { c.close(); h.tracker.mu.Lock(); delete(h.tracker.open, info.ID); h.tracker.mu.Unlock() }()
-	counted := &transport.Link{Reader: &countedReader{Reader: link.Reader, local: &c.up, total: &h.tracker.up}, Writer: &countedWriter{Writer: link.Writer, local: &c.down, total: &h.tracker.down}}
+	counted := &transport.Link{
+		Reader: &countedReader{Reader: link.Reader, counters: [4]*atomic.Int64{&c.up, &h.tracker.up, &route.up, &app.up}},
+		Writer: &countedWriter{Writer: link.Writer, counters: [4]*atomic.Int64{&c.down, &h.tracker.down, &route.down, &app.down}},
+	}
 	h.Handler.Dispatch(ctx, counted)
 }
 
 type trackingKey struct{}
 type countedReader struct {
 	buf.Reader
-	local, total *atomic.Int64
+	counters [4]*atomic.Int64
 }
 
 func (r *countedReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	data, err := r.Reader.ReadMultiBuffer()
 	size := int64(data.Len())
-	r.local.Add(size)
-	r.total.Add(size)
+	for _, counter := range r.counters {
+		counter.Add(size)
+	}
 	return data, err
 }
 func (r *countedReader) Interrupt() { common.Interrupt(r.Reader) }
 
 type countedWriter struct {
 	buf.Writer
-	local, total *atomic.Int64
+	counters [4]*atomic.Int64
 }
 
 func (w *countedWriter) WriteMultiBuffer(data buf.MultiBuffer) error {
 	size := int64(data.Len())
 	err := w.Writer.WriteMultiBuffer(data)
 	if err == nil {
-		w.local.Add(size)
-		w.total.Add(size)
+		for _, counter := range w.counters {
+			counter.Add(size)
+		}
 	}
 	return err
 }

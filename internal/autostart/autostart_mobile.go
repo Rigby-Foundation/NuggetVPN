@@ -12,3 +12,5 @@ func enable(string) error { return errMobile }
 func disable() error { return nil }
 
 func enabled() bool { return false }
+
+func MigrateLegacy() error { return nil }

@@ -4,6 +4,7 @@ import { useVpn } from "@/app/vpn-context";
 import { AppHeader } from "@/components/Header";
 import { MobileNavigation } from "@/components/MobileNavigation";
 import { LockedProfiles } from "@/components/settings/profile-encryption";
+import { FirstRunSetup } from "@/components/FirstRunSetup";
 import { AppSidebar } from "@/components/Sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -13,7 +14,7 @@ import { useApplyFont } from "@/lib/fonts";
 import { useT, type MessageKey } from "@/lib/i18n";
 
 export function AppLayout() {
-  const { plugins, profileEncryption } = useVpn();
+  const { plugins, profileEncryption, settings, loaded } = useVpn();
   useApplyTheme(plugins);
   useApplyFont();
   const compact = useIsMobile();
@@ -27,11 +28,12 @@ export function AppLayout() {
   const handle = matches.at(-1)?.handle as { title?: MessageKey } | undefined;
   const title = handle?.title && t(handle.title);
   const locked = profileEncryption?.locked;
+  const setup = loaded && settings.setup_completed === false && !locked;
 
   useEffect(() => {
-    const pageTitle = locked ? t("profileEncryption.locked") : title;
+    const pageTitle = locked ? t("profileEncryption.locked") : setup ? t("setup.title") : title;
     document.title = pageTitle ? `${pageTitle} — Kage` : "Kage";
-  }, [locked, t, title]);
+  }, [locked, setup, t, title]);
 
   useEffect(() => {
     main.current?.scrollTo(0, 0);
@@ -52,7 +54,7 @@ export function AppLayout() {
       </a>
       <AppHeader />
       <div className="flex min-h-0 flex-1 bg-sidebar">
-        {!compact && !locked && <AppSidebar />}
+        {!compact && !locked && !setup && <AppSidebar />}
         <main
           id="page-content"
           ref={main}
@@ -65,11 +67,11 @@ export function AppLayout() {
             data-page-motion={pageMotion}
             className="h-full"
           >
-            {locked ? <LockedProfiles unavailable={profileEncryption.unavailable} /> : <Outlet />}
+            {locked ? <LockedProfiles unavailable={profileEncryption.unavailable} /> : setup ? <FirstRunSetup /> : <Outlet />}
           </div>
         </main>
       </div>
-      {compact && !locked && <MobileNavigation />}
+      {compact && !locked && !setup && <MobileNavigation />}
     </SidebarProvider>
   );
 }

@@ -29,13 +29,14 @@ import (
 const (
 	// CmdHello authenticates a connection. It must be the first command sent;
 	// anything else on an unauthenticated connection closes it.
-	CmdHello    = "hello"
-	CmdPing     = "ping"
-	CmdStart    = "start"
-	CmdStop     = "stop"
-	CmdStatus   = "status"
-	CmdStats    = "stats"
-	CmdShutdown = "shutdown"
+	CmdHello         = "hello"
+	CmdPing          = "ping"
+	CmdStart         = "start"
+	CmdStop          = "stop"
+	CmdStatus        = "status"
+	CmdStats         = "stats"
+	CmdTrafficReport = "traffic_report"
+	CmdShutdown      = "shutdown"
 	// CmdRuleHits asks how many open connections each route rule matched.
 	CmdRuleHits = "rule_hits"
 	// CmdConnections lists the open connections.
@@ -80,10 +81,13 @@ type Response struct {
 	Hits []int `json:"hits,omitempty"`
 	// Connections answers CmdConnections.
 	Connections []ConnectionInfo `json:"connections,omitempty"`
+	Traffic     *TrafficReport   `json:"traffic,omitempty"`
 }
 
 // ConnectionInfo is an in-process Xray connection snapshot.
 type ConnectionInfo = xrayruntime.ConnectionInfo
+type TrafficReport = xrayruntime.TrafficReport
+type TrafficBytes = xrayruntime.TrafficBytes
 
 // Event is an unsolicited message from the core service.
 type Event struct {

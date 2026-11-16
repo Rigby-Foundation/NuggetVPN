@@ -12,8 +12,30 @@ import (
 // Manager's Startup tab lists and toggles.
 const (
 	runKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
-	valueName = "NuggetVPN"
+	valueName = "Kage"
 )
+
+func MigrateLegacy() error {
+	key, err := registry.OpenKey(registry.CURRENT_USER, runKey, registry.QUERY_VALUE|registry.SET_VALUE)
+	if errors.Is(err, registry.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	if _, _, err := key.GetStringValue("NuggetVPN"); errors.Is(err, registry.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if !enabled() {
+		if err := Set(true); err != nil {
+			return err
+		}
+	}
+	return key.DeleteValue("NuggetVPN")
+}
 
 func enable(executable string) error {
 	key, _, err := registry.CreateKey(registry.CURRENT_USER, runKey, registry.SET_VALUE)

@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "org.rigbyfoundation.nuggetvpn"
+        applicationId "org.rigbyfoundation.kage"
         minSdk 24
         targetSdk 35
         versionCode 30000

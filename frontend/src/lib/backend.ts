@@ -80,6 +80,7 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
     import_user_file: { method: "ImportUserFile", args: ["kind"] },
     remove_user_file: { method: "RemoveUserFile", args: ["kind", "id"] },
     get_app_usage: { method: "GetAppUsage", args: ["days"] },
+    get_traffic_analytics: { method: "GetTrafficAnalytics", args: ["days"] },
     clear_statistics: { method: "ClearStatistics", args: [] },
     get_server_health: { method: "GetServerHealth", args: [] },
     run_speed_test: { method: "RunSpeedTest", args: [] },

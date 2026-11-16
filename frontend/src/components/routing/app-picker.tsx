@@ -85,7 +85,7 @@ export function AppIcon({ packageName, size = 28 }: { packageName: string; size?
     );
 }
 
-const SELF_PACKAGE = "org.rigbyfoundation.nuggetvpn";
+const SELF_PACKAGES = ["org.rigbyfoundation.kage", "org.rigbyfoundation.nuggetvpn"];
 const SELF_LABELS = new Set(["Kage", "NuggetVPN", "Nugget"]);
 
 /** The names of the apps a rule lists, for showing packages as apps. */
@@ -97,7 +97,7 @@ export function useAppLabels(): Map<string, string> {
                 new Map([
                     // This app is left out of the picker (routing itself makes
                     // no sense) but its own requests still show up by package.
-                    [SELF_PACKAGE, "Kage"],
+                    ...SELF_PACKAGES.map((id): [string, string] => [id, "Kage"]),
                     ...apps.map((app): [string, string] => [app.package, app.label]),
                 ])
             )

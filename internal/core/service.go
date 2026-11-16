@@ -345,6 +345,9 @@ func (s *Service) handle(request Request) Response {
 		response.Running = ok
 		response.Up, response.Down = up, down
 
+	case CmdTrafficReport:
+		response.Traffic, response.Running = s.instance.runtime.TrafficReport()
+
 	case CmdRuleHits:
 		hits, ok := s.instance.RuleHits()
 		response.Running = ok

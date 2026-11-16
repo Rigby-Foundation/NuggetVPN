@@ -1,8 +1,4 @@
 // Package storage owns the on-disk locations for profiles, settings and logs.
-//
-// The directories intentionally match the ones the Tauri build used
-// (bundle identifier org.rigbyfoundation.nuggetvpn) so an upgrade keeps the
-// user's existing profiles and settings.
 package storage
 
 import (
@@ -17,51 +13,67 @@ import (
 )
 
 // Identifier is the bundle identifier used for per-user directories.
-const Identifier = "org.rigbyfoundation.nuggetvpn"
+const Identifier = "org.rigbyfoundation.kage"
+
+const legacyIdentifier = "org.rigbyfoundation.nuggetvpn"
+
+// SingleInstanceID lets both desktop builds use the same lock during upgrades.
+const SingleInstanceID = legacyIdentifier
 
 var writeMu sync.Mutex
 
 // DataDir returns the directory holding profiles.json and settings.json.
 func DataDir() string {
+	if migration.data != "" {
+		return migration.data
+	}
+	return dataDir(Identifier)
+}
+
+func dataDir(identifier string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
 	switch runtime.GOOS {
 	case "darwin", "ios":
-		return filepath.Join(home, "Library", "Application Support", Identifier)
+		return filepath.Join(home, "Library", "Application Support", identifier)
 	case "windows":
 		if appData := os.Getenv("APPDATA"); appData != "" {
-			return filepath.Join(appData, Identifier)
+			return filepath.Join(appData, identifier)
 		}
-		return filepath.Join(home, "AppData", "Roaming", Identifier)
+		return filepath.Join(home, "AppData", "Roaming", identifier)
 	default:
 		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, Identifier)
+			return filepath.Join(xdg, identifier)
 		}
-		return filepath.Join(home, ".local", "share", Identifier)
+		return filepath.Join(home, ".local", "share", identifier)
 	}
 }
 
 // LogDir returns the directory session.log is written to.
 func LogDir() string {
+	if migration.logs != "" {
+		return migration.logs
+	}
+	return logDir(Identifier)
+}
+
+func logDir(identifier string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
 	switch runtime.GOOS {
 	case "darwin", "ios":
-		return filepath.Join(home, "Library", "Logs", Identifier)
+		return filepath.Join(home, "Library", "Logs", identifier)
 	case "windows":
 		if local := os.Getenv("LOCALAPPDATA"); local != "" {
-			return filepath.Join(local, Identifier, "logs")
+			return filepath.Join(local, identifier, "logs")
 		}
-		return filepath.Join(home, "AppData", "Local", Identifier, "logs")
+		return filepath.Join(home, "AppData", "Local", identifier, "logs")
 	default:
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, Identifier, "logs")
-		}
-		return filepath.Join(home, ".local", "share", Identifier, "logs")
+		return filepath.Join(DataDir(), "logs")
 	}
 }
 
@@ -122,7 +134,7 @@ func ControlSocketPath() string {
 	if len(path) <= maxUnixSocketPath {
 		return path
 	}
-	return filepath.Join(os.TempDir(), fmt.Sprintf("nuggetvpn-%d.sock", os.Getuid()))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("kage-%d.sock", os.Getuid()))
 }
 
 // CLISocketPath is where the running app answers the command line; see
@@ -135,14 +147,14 @@ func CLISocketPath() string {
 	if len(path) <= maxUnixSocketPath {
 		return path
 	}
-	return filepath.Join(os.TempDir(), fmt.Sprintf("nuggetvpn-cli-%d.sock", os.Getuid()))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("kage-cli-%d.sock", os.Getuid()))
 }
 
 // CLITokenPath holds the token the command line must present. It is in the
 // user's own runtime folder, readable by them alone.
 func CLITokenPath() string {
 	if runtime.GOOS == "ios" || runtime.GOOS == "android" {
-		return filepath.Join(os.TempDir(), "nuggetvpn_cli.token")
+		return filepath.Join(os.TempDir(), "kage_cli.token")
 	}
 	return filepath.Join(RuntimeDir(), "cli.token")
 }
@@ -176,13 +188,26 @@ func LoadSettings() models.AppSettings {
 	settings := models.DefaultSettings()
 	data, err := os.ReadFile(SettingsPath())
 	if err != nil {
+		// Existing profiles or an unreadable settings file indicate an
+		// established installation, whose recovery flow should stay available.
+		completed := pathExists(SettingsPath()) || pathExists(ProfilesPath())
+		settings.SetupCompleted = &completed
 		return settings
 	}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return models.DefaultSettings()
+		settings = models.DefaultSettings()
+	}
+	if settings.SetupCompleted == nil {
+		completed := true
+		settings.SetupCompleted = &completed
 	}
 	settings.Normalize()
 	return settings
+}
+
+func pathExists(path string) bool {
+	_, err := os.Lstat(path)
+	return !os.IsNotExist(err)
 }
 
 // SaveSettings writes settings.json atomically.

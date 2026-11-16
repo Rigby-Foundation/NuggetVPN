@@ -299,6 +299,7 @@ func (c *Client) readLoop(conn net.Conn) {
 			Hits    []int  `json:"hits"`
 
 			Connections []ConnectionInfo `json:"connections"`
+			Traffic     *TrafficReport   `json:"traffic"`
 		}
 		if err := decoder.Decode(&envelope); err != nil {
 			readErr = err
@@ -327,6 +328,7 @@ func (c *Client) readLoop(conn net.Conn) {
 				Hits:    envelope.Hits,
 
 				Connections: envelope.Connections,
+				Traffic:     envelope.Traffic,
 			}
 			close(waiter)
 		}
@@ -404,6 +406,10 @@ func (c *Client) dispatchEvent(name, level, message string, running bool, up, do
 }
 
 func (c *Client) request(request Request) (Response, error) {
+	return c.requestWithin(request, 90*time.Second)
+}
+
+func (c *Client) requestWithin(request Request, timeout time.Duration) (Response, error) {
 	c.mu.Lock()
 	if c.encoder == nil {
 		c.mu.Unlock()
@@ -432,7 +438,7 @@ func (c *Client) request(request Request) (Response, error) {
 			return response, errors.New(response.Error)
 		}
 		return response, nil
-	case <-time.After(90 * time.Second):
+	case <-time.After(timeout):
 		c.mu.Lock()
 		delete(c.pending, request.ID)
 		c.mu.Unlock()
@@ -513,6 +519,32 @@ func (c *Client) Stats() (up, down int64, ok bool) {
 		return 0, 0, false
 	}
 	return response.Up, response.Down, response.Running
+}
+
+// TrafficReport returns the cumulative counters for analytics. iOS currently
+// exposes only the tunnel's aggregate counters across its extension bridge.
+func (c *Client) TrafficReport() (*TrafficReport, bool) {
+	if runtime.GOOS == "ios" {
+		up, down, ok := c.Stats()
+		return totalTrafficReport(up, down, ok)
+	}
+	const timeout = time.Second
+	reply, err := c.requestWithin(Request{Cmd: CmdTrafficReport}, timeout)
+	if err == nil {
+		return reply.Traffic, reply.Running
+	}
+	if reply.Error == "unknown command: "+CmdTrafficReport {
+		reply, err = c.requestWithin(Request{Cmd: CmdStats}, timeout)
+		return totalTrafficReport(reply.Up, reply.Down, err == nil && reply.Running)
+	}
+	return nil, false
+}
+
+func totalTrafficReport(up, down int64, ok bool) (*TrafficReport, bool) {
+	if !ok || up < 0 || down < 0 {
+		return nil, false
+	}
+	return &TrafficReport{Total: TrafficBytes{Up: uint64(up), Down: uint64(down)}}, true
 }
 
 // RuleHits reads the open connections per route rule; see Instance.RuleHits.

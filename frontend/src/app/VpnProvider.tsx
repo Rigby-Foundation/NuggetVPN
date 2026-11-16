@@ -153,13 +153,13 @@ function useVpnData() {
     return () => stops.forEach((stop) => stop());
   }, [reload, replaceSettings, applyConnection]);
   const saveSettings = useCallback(
-    (next: AppSettings) => {
+    (next: AppSettings, optimistic = true) => {
       if (!loaded)
         return Promise.reject(
           new Error(translate(currentLanguage(), "ui.settingsLoading")),
         );
       const version = ++revision.current;
-      replaceSettings(next);
+      if (optimistic) replaceSettings(next);
       if (!hasNativeRuntime()) return Promise.resolve();
       saving.current += 1;
       const request = queue.current

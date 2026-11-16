@@ -219,6 +219,7 @@ func (a *App) ServiceShutdown() error {
 	if a.pluginHost != nil {
 		a.pluginHost.Close()
 	}
+	a.countUsage()
 	a.flushUsage()
 	_ = a.statsStore().Save()
 	a.stopCommandLine()

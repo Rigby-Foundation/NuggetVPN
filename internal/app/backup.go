@@ -208,6 +208,7 @@ func (a *App) restoreBackup(data []byte) (BackupImport, error) {
 	settings := backup.Settings
 	settings.HWID = current.HWID
 	settings.AuthToken = current.AuthToken
+	settings.SetupCompleted = current.SetupCompleted
 	settings.LaunchAtStartup = current.LaunchAtStartup
 	settings.Normalize()
 

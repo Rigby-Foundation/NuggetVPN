@@ -79,12 +79,33 @@ func TestNativeXrayCarriesTrafficAndTracksConnections(t *testing.T) {
 	if !ok || up == 0 || down == 0 {
 		t.Fatalf("traffic %d/%d, ok=%v", up, down, ok)
 	}
+	transport.CloseIdleConnections()
+	deadline := time.Now().Add(time.Second)
+	for {
+		connections, ok := client.Connections()
+		if ok && len(connections) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the completed connection remained open")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	report, ok := client.TrafficReport()
+	if !ok || report == nil || report.ID == "" || report.ByRoute["direct"] != report.Total ||
+		report.Total.Up == 0 || report.Total.Down == 0 || len(report.ByApp) == 0 {
+		t.Fatalf("completed flow disappeared from the traffic report: %+v", report)
+	}
 	if err := client.Stop(); err != nil {
 		t.Fatal(err)
 	}
 	// The native listener must have been released, ready for the next start.
 	if err := client.StartConfigured(config, "", 1); err != nil {
 		t.Fatal(err)
+	}
+	next, ok := client.TrafficReport()
+	if !ok || next == nil || next.ID == report.ID || next.Total != (TrafficBytes{}) {
+		t.Fatalf("new instance inherited old traffic: %+v", next)
 	}
 	if err := client.CloseConnection(""); err != nil {
 		t.Fatal(err)

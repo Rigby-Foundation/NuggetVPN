@@ -10,16 +10,36 @@ import (
 	"strings"
 )
 
-const label = "org.rigbyfoundation.nuggetvpn"
+const label = "org.rigbyfoundation.kage"
 
 // A launch agent in the user's library: loaded at login, no administrator
 // rights, and listed under System Settings' login items.
-func agentPath() (string, error) {
+func agentFile(identifier string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, "Library", "LaunchAgents", label+".plist"), nil
+	return filepath.Join(home, "Library", "LaunchAgents", identifier+".plist"), nil
+}
+
+func agentPath() (string, error) { return agentFile(label) }
+
+func MigrateLegacy() error {
+	path, err := agentFile("org.rigbyfoundation.nuggetvpn")
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if !enabled() {
+		if err := Set(true); err != nil {
+			return err
+		}
+	}
+	return os.Remove(path)
 }
 
 func enable(executable string) error {

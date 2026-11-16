@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime"
 	"slices"
 
@@ -109,33 +108,11 @@ func runGUI() {
 	// System notifications, where Wails has them. On Android its Linux
 	// notifier would look for D-Bus, fail, and stop the app from starting.
 	var notifier *notifications.NotificationService
-	services := []application.Service{}
 	if runtime.GOOS != "android" {
 		notifier = notifications.New()
-		services = append(services, application.NewService(notifier))
 	}
-	service := app.New(version, trayIcon, notifier)
-	services = append([]application.Service{application.NewService(service)}, services...)
-
-	// Started by the system at login: come up without a window, unless
-	// closing is set to quit — then there would be no tray icon to reopen it
-	// from, and an invisible app with no way in.
-	startHidden := false
-	if slices.Contains(os.Args[1:], autostart.Flag) {
-		startHidden = service.GetSettings().CloseAction != models.CloseQuit
-	}
-
-	// Set once the window exists; the second-instance callback needs it.
-	var window *application.WebviewWindow
-
-	// WebView2 otherwise derives this from the executable's name. Keep the
-	// existing profile so the Kage rename retains appearance and language.
-	webviewDataPath := ""
-	if runtime.GOOS == "windows" {
-		if configDir, err := os.UserConfigDir(); err == nil {
-			webviewDataPath = filepath.Join(configDir, "NuggetVPN.exe")
-		}
-	}
+	var service *app.App
+	serviceReady := make(chan struct{})
 
 	windowIcon := appIcon
 	if runtime.GOOS == "darwin" {
@@ -148,9 +125,8 @@ func runGUI() {
 		Name:        "Kage",
 		Description: "Modern, lightweight VPN client with an embedded Xray core",
 		Icon:        windowIcon,
-		Services:    services,
 		Windows: application.WindowsOptions{
-			WebviewUserDataPath: webviewDataPath,
+			WebviewUserDataPath: storage.WebviewDataPath(),
 		},
 		Assets: application.AssetOptions{
 			Handler: app.PluginFiles(app.UserFilesHandler(application.AssetFileServerFS(assets))),
@@ -167,22 +143,35 @@ func runGUI() {
 		// instead brings the running copy to the front — which is also how a
 		// window closed to the tray, or hidden completely, is reopened.
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: storage.Identifier,
+			UniqueID: storage.SingleInstanceID,
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-				if window != nil {
-					service.ShowWindow()
-				}
+				<-serviceReady
+				service.ShowWindow()
 				app.ReceiveLaunchArgs(service, data.Args)
 			},
 		},
 	})
+	if err := storage.MigrateLegacyDirectories(); err != nil {
+		log.Printf("could not migrate Kage data: %v", err)
+	}
+	if err := autostart.MigrateLegacy(); err != nil {
+		log.Printf("could not migrate the Kage login item: %v", err)
+	}
+	service = app.New(version, trayIcon, notifier)
+	wailsApp.RegisterService(application.NewService(service))
+	if notifier != nil {
+		wailsApp.RegisterService(application.NewService(notifier))
+	}
+
+	// A start at login can be hidden when there is a tray to reopen it from.
+	startHidden := slices.Contains(os.Args[1:], autostart.Flag) && service.GetSettings().CloseAction != models.CloseQuit
 
 	// macOS delivers import URLs as application events.
 	wailsApp.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
 		app.ReceiveLaunchArgs(service, []string{event.Context().URL()})
 	})
 
-	window = wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:            app.WindowName,
 		Title:           "Kage",
 		Width:           1100,
@@ -201,6 +190,7 @@ func runGUI() {
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
 	})
+	close(serviceReady)
 
 	if models.DevBuild {
 		configureWebViewDevtools(window)

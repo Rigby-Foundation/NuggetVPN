@@ -47,7 +47,10 @@ func pluginsStore() *plugins.Store {
 // from anything but the window itself; see plugins.GuardRuntime. A function,
 // not a method: every exported App method is callable from the window.
 func PluginFiles(next http.Handler) http.Handler {
-	return pluginsStore().Handler(next)
+	handler := sync.OnceValue(func() http.Handler { return pluginsStore().Handler(next) })
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler().ServeHTTP(w, r)
+	})
 }
 
 // PluginInfo is a plugin as the window sees it: its manifest with file names

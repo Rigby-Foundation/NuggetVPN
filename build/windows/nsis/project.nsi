@@ -159,7 +159,8 @@ Section "uninstall"
     Delete "$INSTDIR\Wintun-LICENSE.txt"
     !insertmacro wails.setShellContext
 
-    RMDir /r "$AppData\NuggetVPN.exe" # Remove the WebView2 DataPath
+    RMDir /r "$AppData\Kage.exe" # Remove the WebView2 DataPath
+    RMDir /r "$AppData\NuggetVPN.exe" # Remove a pre-migration WebView2 profile
 
     RMDir /r $INSTDIR
 

@@ -24,13 +24,11 @@ const speedProgressEventName = "speed-progress"
 
 // insights holds what the background work keeps between rounds.
 type insights struct {
-	once  sync.Once
-	store *stats.Store
+	once      sync.Once
+	store     *stats.Store
+	analytics analyticsState
 
 	mu sync.Mutex
-	// seen is each open connection's byte counts at the last look, so only
-	// what was added since is counted.
-	seen map[string][2]int64
 	// speed cancels a running speed test; nil when none is running.
 	speed context.CancelFunc
 }
@@ -75,36 +73,6 @@ func (a *App) runBackground(ctx context.Context) {
 	}
 }
 
-// countUsage adds what each program sent and received since the last look.
-func (a *App) countUsage() {
-	_, settings := a.snapshot()
-	a.mu.Lock()
-	connected := a.state.Status == StatusConnected
-	a.mu.Unlock()
-	if !connected || !models.On(settings.AppStats) {
-		a.insights.mu.Lock()
-		a.insights.seen = nil
-		a.insights.mu.Unlock()
-		return
-	}
-	open := a.GetConnections()
-	now := time.Now()
-	a.insights.mu.Lock()
-	defer a.insights.mu.Unlock()
-	next := make(map[string][2]int64, len(open))
-	for _, connection := range open {
-		previous := a.insights.seen[connection.ID]
-		up, down := connection.Upload-previous[0], connection.Download-previous[1]
-		if up < 0 || down < 0 {
-			// A new connection that reused an id: count it from zero.
-			up, down = connection.Upload, connection.Download
-		}
-		a.statsStore().AddUsage(now, connection.App, uint64(max(up, 0)), uint64(max(down, 0)))
-		next[connection.ID] = [2]int64{connection.Upload, connection.Download}
-	}
-	a.insights.seen = next
-}
-
 // AppUsage is traffic by program over the last days, and day by day.
 type AppUsage struct {
 	Programs []stats.ProgramUsage `json:"programs"`
@@ -115,13 +83,6 @@ type AppUsage struct {
 func (a *App) GetAppUsage(days int) AppUsage {
 	programs, daily := a.statsStore().Usage(min(max(days, 1), 90), time.Now())
 	return AppUsage{Programs: programs, Days: daily}
-}
-
-// ClearStatistics forgets traffic by program, server history and speed
-// tests.
-func (a *App) ClearStatistics() error {
-	a.statsStore().Clear()
-	return a.statsStore().Save()
 }
 
 // ---------------------------------------------------------------------------

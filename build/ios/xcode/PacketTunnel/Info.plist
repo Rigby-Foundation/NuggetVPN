@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>PacketTunnel</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.rigbyfoundation.nuggetvpn.PacketTunnel</string>
+	<string>org.rigbyfoundation.kage.PacketTunnel</string>
 	<key>CFBundleName</key>
 	<string>PacketTunnel</string>
 	<key>CFBundlePackageType</key>

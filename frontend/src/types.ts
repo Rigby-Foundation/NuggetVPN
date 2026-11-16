@@ -52,6 +52,7 @@ export interface SubscriptionInfo {
 }
 
 export interface AppSettings {
+    setup_completed: boolean | null;
     mtu: number;
     dns: string;
     tls_fragment: boolean;

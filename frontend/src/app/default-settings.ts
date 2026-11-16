@@ -3,6 +3,7 @@ import type { AppSettings } from "@/types";
 export const DEFAULT_USER_AGENT = "Kage/3.0.0";
 
 export const pendingSettings: AppSettings = {
+  setup_completed: null,
   mtu: 9000,
   dns: "1.1.1.1",
   tls_fragment: false,

@@ -74,10 +74,11 @@ public final class NuggetBridge {
         }
     }
 
-    /** Passes a nuggetvpn:// link the app was opened with to Go. */
+    /** Passes a Kage import link the app was opened with to Go. */
     public static void deliverLink(Intent intent) {
         if (intent == null || intent.getData() == null) return;
-        if (!"nuggetvpn".equals(intent.getData().getScheme())) return;
+        String scheme = intent.getData().getScheme();
+        if (!"kage".equalsIgnoreCase(scheme) && !"nuggetvpn".equalsIgnoreCase(scheme)) return;
         nativeOpenLink(intent.getData().toString());
     }
 

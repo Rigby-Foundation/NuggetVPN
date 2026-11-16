@@ -85,6 +85,8 @@ const (
 
 // AppSettings mirrors the settings object the frontend owns.
 type AppSettings struct {
+	// SetupCompleted is nil in installations written before first-run setup.
+	SetupCompleted   *bool  `json:"setup_completed"`
 	MTU              uint32 `json:"mtu"`
 	DNS              string `json:"dns"`
 	TLSFragment      bool   `json:"tls_fragment"`
@@ -219,8 +221,8 @@ type AppSettings struct {
 	// tries the ones that keep failing last. A pointer so older settings
 	// default to on.
 	ServerHealth *bool `json:"server_health"`
-	// AppStats counts traffic by program, day by day. A pointer so older
-	// settings default to on.
+	// AppStats records local traffic analytics. The original key preserves
+	// the user's choice about recording per-program usage.
 	AppStats *bool `json:"app_stats"`
 }
 

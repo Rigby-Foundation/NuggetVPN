@@ -8,7 +8,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.rigbyfoundation.nuggetvpn</string>
+		<string>group.org.rigbyfoundation.kage</string>
 	</array>
 </dict>
 </plist>
