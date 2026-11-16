@@ -68,24 +68,24 @@ func (a *App) RegisterUser(server, username, password string) (string, error) {
 }
 
 // PushProfilesToServer uploads local profiles.
-func (a *App) PushProfilesToServer(settings models.AppSettings) (string, error) {
+func (a *App) PushProfilesToServer(settings models.AppSettings, password string) (string, error) {
 	if err := a.checkProfileAccess(); err != nil {
 		return "", err
 	}
 	profiles, settings := a.snapshot()
-	return a.remote.PushProfiles(a.context(), settings, profiles)
+	return a.remote.PushProfiles(a.context(), settings, profiles, password)
 }
 
 // PullProfilesFromServer replaces local profiles with the server's copy.
-func (a *App) PullProfilesFromServer(settings models.AppSettings) ([]models.Profile, error) {
+func (a *App) PullProfilesFromServer(settings models.AppSettings, password string) ([]models.Profile, error) {
 	if err := a.checkProfileAccess(); err != nil {
 		return nil, err
 	}
-	profiles, err := a.remote.PullProfiles(a.context(), settings)
+	profiles, err := a.remote.PullProfiles(a.context(), settings, password)
 	if err != nil {
 		return nil, err
 	}
-	if len(profiles) == 0 {
+	if profiles == nil {
 		return a.GetProfiles(), nil
 	}
 	return a.editProfiles(func([]models.Profile) ([]models.Profile, error) {

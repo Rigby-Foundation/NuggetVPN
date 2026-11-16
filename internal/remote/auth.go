@@ -17,10 +17,10 @@ type authResponse struct {
 	Message string `json:"message"`
 }
 
-// serverProfile is the sync server's envelope; `hash` holds the serialized
-// Profile rather than a digest, matching the existing server contract.
+// serverProfile is NuggetSync's storage row. Its numeric ID increases with
+// each upload; hash is an opaque, client-encrypted snapshot, not a digest.
 type serverProfile struct {
-	ID             string `json:"id"`
+	ID             int64  `json:"id"`
 	Name           string `json:"name"`
 	Hash           string `json:"hash"`
 	EncryptionType string `json:"encryption_type"`
@@ -95,11 +95,14 @@ func (c *Client) Register(ctx context.Context, server, username, password string
 	return "Registration successful", nil
 }
 
-// PushProfiles uploads every local profile to the sync server.
+// PushProfiles uploads one encrypted snapshot. NuggetSync appends rows rather
+// than updating them, so a snapshot also represents deletions without reviving
+// old profiles on the next download.
 func (c *Client) PushProfiles(
 	ctx context.Context,
 	settings models.AppSettings,
 	profiles []models.Profile,
+	password string,
 ) (string, error) {
 	server, token, err := syncCredentials(settings)
 	if err != nil {
@@ -107,23 +110,20 @@ func (c *Client) PushProfiles(
 	}
 	endpoint := strings.TrimRight(server, "/") + "/profiles"
 
-	for _, profile := range profiles {
-		encoded, err := json.Marshal(profile)
-		if err != nil {
-			return "", err
-		}
-		data, status, err := c.postJSON(ctx, endpoint, token, map[string]string{
-			"name":            profile.Name,
-			"hash":            string(encoded),
-			"encryption_type": "json",
-		})
-		if err != nil {
-			return "", err
-		}
-		if status < 200 || status >= 300 {
-			return "", fmt.Errorf("failed to push profile %s: %s",
-				profile.Name, strings.TrimSpace(string(data)))
-		}
+	encoded, err := sealSyncProfiles(profiles, password)
+	if err != nil {
+		return "", err
+	}
+	data, status, err := c.postJSON(ctx, endpoint, token, map[string]string{
+		"name":            "Kage profiles",
+		"hash":            encoded,
+		"encryption_type": syncCipher,
+	})
+	if err != nil {
+		return "", err
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("failed to upload profiles: %s", strings.TrimSpace(string(data)))
 	}
 	return "All profiles pushed successfully", nil
 }
@@ -132,10 +132,14 @@ func (c *Client) PushProfiles(
 func (c *Client) PullProfiles(
 	ctx context.Context,
 	settings models.AppSettings,
+	password string,
 ) ([]models.Profile, error) {
 	server, token, err := syncCredentials(settings)
 	if err != nil {
 		return nil, err
+	}
+	if password == "" {
+		return nil, errSyncPasswordRequired
 	}
 	endpoint := strings.TrimRight(server, "/") + "/profiles"
 
@@ -151,9 +155,13 @@ func (c *Client) PullProfiles(
 	}
 	defer response.Body.Close()
 
-	data, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	const maxResponse = 32 << 20
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponse+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(data) > maxResponse {
+		return nil, fmt.Errorf("sync response is too large")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, fmt.Errorf("%s", strings.TrimSpace(string(data)))
@@ -164,16 +172,21 @@ func (c *Client) PullProfiles(
 		return nil, fmt.Errorf("unexpected profiles response: %w", err)
 	}
 
-	profiles := make([]models.Profile, 0, len(remoteProfiles))
-	for _, remote := range remoteProfiles {
-		var profile models.Profile
-		// A malformed entry should not discard the rest of the account.
-		if err := json.Unmarshal([]byte(remote.Hash), &profile); err != nil {
-			continue
-		}
-		profiles = append(profiles, profile)
+	if len(remoteProfiles) == 0 {
+		// nil means this account has no saved snapshot. An explicitly empty
+		// decrypted list, in contrast, is a valid snapshot of zero profiles.
+		return nil, nil
 	}
-	return profiles, nil
+	latest := remoteProfiles[0]
+	for _, row := range remoteProfiles {
+		if row.ID <= 0 {
+			return nil, fmt.Errorf("invalid sync profile ID")
+		}
+		if row.ID > latest.ID {
+			latest = row
+		}
+	}
+	return openSyncProfiles(latest.Hash, password)
 }
 
 func syncCredentials(settings models.AppSettings) (server, token string, err error) {

@@ -130,8 +130,8 @@ const COMMANDS: Record<string, { method: string; args: string[] }> = {
 
     login_user: { method: "LoginUser", args: ["server", "username", "password"] },
     register_user: { method: "RegisterUser", args: ["server", "username", "password"] },
-    push_profiles_to_server: { method: "PushProfilesToServer", args: ["settings"] },
-    pull_profiles_from_server: { method: "PullProfilesFromServer", args: ["settings"] },
+    push_profiles_to_server: { method: "PushProfilesToServer", args: ["settings", "password"] },
+    pull_profiles_from_server: { method: "PullProfilesFromServer", args: ["settings", "password"] },
 
     get_current_platform: { method: "GetCurrentPlatform", args: [] },
     open_logs_folder: { method: "OpenLogsFolder", args: [] },

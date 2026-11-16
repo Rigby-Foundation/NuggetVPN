@@ -849,7 +849,7 @@ const en = {
     "profileEncryption.strength": "Argon2id cost",
     "profileEncryption.standard": "Standard · 64 MiB, 3 passes",
     "profileEncryption.high": "High · 128 MiB, 4 passes",
-    "profileEncryption.setup": "Kage can’t recover your master password. This protects the local profile file. Backups, exports, and sync can contain readable copies.",
+    "profileEncryption.setup": "Kage can’t recover your master password. This protects the local profile file. Backups and exports can contain readable copies. Sync uses separate encryption.",
     "profileEncryption.disableDescription": "Enter your master password to store saved profiles without encryption.",
     "profileEncryption.authFailed": "The password is incorrect or the encrypted profile file has changed.",
     "privacy.ipCheck": "Check my public address",
@@ -869,6 +869,11 @@ const en = {
     "sync.description": "Keeps your profiles the same on every device signed in to the same server.",
     "sync.connectedTo": "Connected to",
     "sync.connect": "Connect a sync server",
+
+    "sync.encryptionPassword": "Sync encryption password",
+    "sync.encryptionDescription": "Choose a separate password for sync and use it on every device. It is never sent to the server or saved by Kage. Keep it safe: it cannot be recovered.",
+    "sync.snapshotDescription": "Upload saves an encrypted copy of all profiles. Download replaces your profiles with the latest saved copy after decryption.",
+    "sync.downloaded": "Profiles downloaded.",
 
     // Routing
     "routing.summaryNone": "No rules yet. Unmatched traffic: {action}.",

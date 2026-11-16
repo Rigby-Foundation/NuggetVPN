@@ -75,6 +75,14 @@ Rules can combine conditions with AND, OR, and inversion. A non-inverted domain 
 - **Logs.** View live Xray output under **Settings → Advanced → Logs** and export the latest 1,000 lines. Logging is off by default in release builds.
 - **Backups and plugins.** Export settings and profiles as a backup, or use plugins for fonts, themes, and routing setups. Desktop plugins can also add sandboxed pages and approved native backends. [Plugin documentation](docs/plugins/README.md)
 
+### Encrypted profile sync
+
+Under **Settings → Synchronisation**, sign in or create an account on your NuggetSync server. Choose a separate **sync encryption password** and use the same password on each device. Kage never saves this password or sends it to the server. Losing it means losing access to the saved sync copy.
+
+**Upload profiles** saves one encrypted snapshot of all profiles, including their names and subscription URLs. **Download profiles** decrypts the latest snapshot before replacing local profiles. A wrong password, damaged data, or an unsupported format leaves local profiles intact. This is manual profile transfer; settings and routing are not included. Local profile encryption uses its own password and remains independent.
+
+Snapshots use Argon2id (64 MiB, 3 passes, 4 threads, random 16-byte salt) and XChaCha20-Poly1305 (random 24-byte nonce). The format and derivation metadata are authenticated. The server's `hash` field holds the versioned `kage.sync` envelope; uploads declare `encryption_type: XChaCha20-Poly1305`. NuggetSync appends rows, so downloads use the greatest numeric row ID as the latest snapshot. Old rows remain on the server. The plaintext snapshot limit is 1 MiB; incompatible older sync data is rejected rather than partially imported.
+
 ## Build from source
 
 Install **Go 1.27**, **Bun**, and **Wails CLI v3.0.0**. The Go module pins the Xray revision and lists the required toolchain.

@@ -874,6 +874,8 @@ function SyncPanel() {
   const [server, setServer] = useState(vpn.settings.auth_server ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [syncPassword, setSyncPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -887,18 +889,38 @@ function SyncPanel() {
   };
   return (
     <SettingsGroup title={t("sync.title")} description={t("sync.description")}>
-      {vpn.settings.auth_server ? (
+      {vpn.settings.auth_server && vpn.settings.auth_token ? (
         <>
           <p className="text-xs text-muted-foreground">
             {vpn.settings.auth_server}
           </p>
+          <SettingsField
+            stacked
+            label={t("sync.encryptionPassword")}
+            description={t("sync.encryptionDescription")}
+            control={
+              <Input
+                type="password"
+                autoComplete="off"
+                aria-label={t("sync.encryptionPassword")}
+                placeholder={t("sync.encryptionPassword")}
+                value={syncPassword}
+                disabled={busy}
+                onChange={(event) => setSyncPassword(event.target.value)}
+              />
+            }
+          />
+          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+            {t("sync.snapshotDescription")}
+          </p>
           <div className="flex flex-wrap gap-2">
             <ActionButton
-              disabled={busy}
+              disabled={busy || !syncPassword}
               onClick={() =>
                 void run(async () => {
                   await invoke("push_profiles_to_server", {
                     settings: vpn.settings,
+                    password: syncPassword,
                   });
                   toast.success(t("ui.syncUploaded"));
                 })
@@ -907,14 +929,16 @@ function SyncPanel() {
               {t("ui.syncUpload")}
             </ActionButton>
             <ActionButton
-              disabled={busy}
+              disabled={busy || !syncPassword}
               onClick={() =>
                 void run(async () => {
                   vpn.setProfiles(
                     await invoke<Profile[]>("pull_profiles_from_server", {
                       settings: vpn.settings,
+                      password: syncPassword,
                     }),
                   );
+                  toast.success(t("sync.downloaded"));
                 })
               }
             >
@@ -924,10 +948,17 @@ function SyncPanel() {
               variant="ghost"
               disabled={busy}
               onClick={() =>
-                vpn.patchSettings({
-                  auth_server: null,
-                  auth_token: null,
-                  skip_auth: false,
+                void run(async () => {
+                  await vpn.saveSettings(
+                    {
+                      ...vpn.settings,
+                      auth_server: null,
+                      auth_token: null,
+                      skip_auth: false,
+                    },
+                    false,
+                  );
+                  setSyncPassword("");
                 })
               }
             >
@@ -941,31 +972,54 @@ function SyncPanel() {
           onSubmit={(event) => {
             event.preventDefault();
             void run(async () => {
+              if (creatingAccount) {
+                await invoke<string>("register_user", {
+                  server: server.trim(),
+                  username,
+                  password,
+                });
+                setPassword("");
+                setCreatingAccount(false);
+                toast.success(t("onboarding.registered"));
+                return;
+              }
               const token = await invoke<string>("login_user", {
-                server,
+                server: server.trim(),
                 username,
                 password,
               });
-              await vpn.saveSettings({
-                ...vpn.settings,
-                auth_server: server,
-                auth_token: token,
-                skip_auth: false,
-              });
+              await vpn.saveSettings(
+                {
+                  ...vpn.settings,
+                  auth_server: server.trim(),
+                  auth_token: token,
+                  skip_auth: false,
+                },
+                false,
+              );
               setPassword("");
             });
           }}
         >
+          <h3 className="text-sm font-medium">
+            {t(
+              creatingAccount
+                ? "onboarding.createAccountTitle"
+                : "onboarding.signInTitle",
+            )}
+          </h3>
           <Input
             type="url"
             required
-            aria-label={t("sync.title")}
+            disabled={busy}
+            aria-label={t("onboarding.server")}
             placeholder="https://your-sync-server"
             value={server}
             onChange={(event) => setServer(event.target.value)}
           />
           <Input
             required
+            disabled={busy}
             aria-label={t("ui.username")}
             autoComplete="username"
             placeholder={t("ui.username")}
@@ -974,16 +1028,39 @@ function SyncPanel() {
           />
           <Input
             required
+            disabled={busy}
             aria-label={t("ui.password")}
-            autoComplete="current-password"
+            autoComplete={creatingAccount ? "new-password" : "current-password"}
             type="password"
             placeholder={t("ui.password")}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
           <Button type="submit" disabled={busy}>
-            {t(busy ? "status.connecting" : "sync.connect")}
+            {busy && <RefreshCw className="size-4 animate-spin" />}
+            {t(creatingAccount ? "onboarding.createAccount" : "onboarding.signIn")}
           </Button>
+          <div className="flex flex-wrap items-center gap-x-2 text-sm">
+            <span className="text-muted-foreground">
+              {t(
+                creatingAccount
+                  ? "onboarding.haveAccount"
+                  : "onboarding.needAccount",
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto px-0 py-1"
+              disabled={busy}
+              onClick={() => {
+                setCreatingAccount(!creatingAccount);
+                setPassword("");
+              }}
+            >
+              {t(creatingAccount ? "onboarding.signIn" : "onboarding.createAccount")}
+            </Button>
+          </div>
         </form>
       )}
     </SettingsGroup>
