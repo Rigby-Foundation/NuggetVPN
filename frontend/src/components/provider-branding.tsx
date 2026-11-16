@@ -11,20 +11,16 @@ export function ProviderLogo({ info, className, fallback }: { info?: Subscriptio
     return <img src={logo} alt="" draggable={false} className={cn("shrink-0 object-contain", className)} />;
 }
 
-/**
- * The provider's card background (banner-image), drawn on the right of the
- * card and faded into it, under the card's content. The provider's own
- * guidance puts the artwork in the right half of a 1200×200 frame. The
- * parent isolates a stacking context, so it sits under everything there.
- */
+/** The subscription's artwork, kept in its original proportions. */
 export function ProviderBanner({ info }: { info?: SubscriptionInfo }) {
     const image = useBrandingImage(info?.banner_image);
     if (!image) return null;
     return (
-        <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 end-0 -z-10 w-2/3 bg-cover bg-right opacity-50 [mask-image:linear-gradient(to_left,black_35%,transparent)] rtl:[mask-image:linear-gradient(to_right,black_35%,transparent)]"
-            style={{ backgroundImage: `url("${image}")` }}
+        <img
+            src={image}
+            alt=""
+            draggable={false}
+            className="pointer-events-none h-auto max-h-32 w-full shrink-0 border-b border-border/60 bg-background/35 object-contain"
         />
     );
 }

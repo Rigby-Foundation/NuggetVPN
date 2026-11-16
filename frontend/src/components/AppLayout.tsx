@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useMatches, useNavigation } from "react-router";
+import { useVpn } from "@/app/vpn-context";
 import { AppHeader } from "@/components/Header";
 import { MobileNavigation } from "@/components/MobileNavigation";
 import { AppSidebar } from "@/components/Sidebar";
@@ -11,7 +12,8 @@ import { useApplyFont } from "@/lib/fonts";
 import { useT, type MessageKey } from "@/lib/i18n";
 
 export function AppLayout() {
-  useApplyTheme();
+  const { plugins } = useVpn();
+  useApplyTheme(plugins);
   useApplyFont();
   const compact = useIsMobile();
   useMobileViewport(compact);

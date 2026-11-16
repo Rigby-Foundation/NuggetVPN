@@ -370,6 +370,7 @@ function ConfigurationView({
                     (selecting ? checked : active) && "border-primary/60",
                   )}
                 >
+                  <ProviderBanner info={source.info} />
                   <button
                     type="button"
                     aria-label={source.label}
@@ -377,8 +378,7 @@ function ConfigurationView({
                     onClick={(event) => handleCard(source, event)}
                     className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   />
-                  <div className="pointer-events-none relative isolate flex min-h-30 flex-1 flex-col gap-3 overflow-hidden p-4">
-                    <ProviderBanner info={source.info} />
+                  <div className="pointer-events-none relative flex min-h-30 flex-1 flex-col gap-3 p-4">
                     <div className="flex items-start gap-2.5">
                       <ProviderLogo
                         info={source.info}

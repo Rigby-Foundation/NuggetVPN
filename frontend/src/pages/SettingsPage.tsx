@@ -31,6 +31,7 @@ import {
 import { SettingsField, SettingsGroup } from "@/components/settings/shell";
 import { BackupPanel } from "@/components/settings/backup";
 import { FontSettings } from "@/components/settings/fonts";
+import { ThemeSettings } from "@/components/settings/themes";
 import { LogsPanel } from "@/components/settings/logs";
 import { UpdatesPanel } from "@/components/settings/updates";
 import { PluginsPanel } from "@/components/settings/plugins";
@@ -49,7 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { usePageMotion, useThemeChoice, type ThemeChoice } from "@/lib/theme";
+import { usePageMotion } from "@/lib/theme";
 import {
   LANGUAGES,
   useI18n,
@@ -788,16 +789,6 @@ function SettingsInput({
   );
 }
 
-const themeModes = [
-  { id: "Light", label: "theme.light", preview: "light" },
-  { id: "Dark", label: "theme.dark", preview: "dark" },
-  { id: "System", label: "settings.appearance.systemTheme", preview: "system" },
-] as const satisfies readonly {
-  id: ThemeChoice;
-  label: MessageKey;
-  preview: string;
-}[];
-
 function ServerSelectGroups({ profiles }: { profiles: Profile[] }) {
   const t = useI18n().t;
   const { sources } = useVpn();
@@ -833,41 +824,10 @@ function ServerSelectGroups({ profiles }: { profiles: Profile[] }) {
 
 function AppearancePanel() {
   const { t } = useI18n();
-  const [theme, setTheme] = useThemeChoice();
   const [motion, setMotion] = usePageMotion();
   return (
     <>
-      <SettingsGroup
-        title={t("appearance.theme")}
-        description={t("appearance.theme.description")}
-      >
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {themeModes.map(({ id, label, preview }) => (
-            <button
-              type="button"
-              key={id}
-              aria-pressed={theme === id}
-              onClick={() => setTheme(id)}
-              className={cn(
-                "min-w-0 rounded-xl border border-border/60 p-1.5 text-start hover:bg-accent/55 focus-visible:outline-2 focus-visible:outline-ring sm:p-2",
-                theme === id && "border-primary/75 bg-primary/8",
-              )}
-            >
-              <span
-                aria-hidden="true"
-                data-preview={preview}
-                className="settings-theme-preview"
-              >
-                <span />
-                <span />
-              </span>
-              <span className="mt-2 block px-1 text-xs font-medium [overflow-wrap:anywhere]">
-                {t(label)}
-              </span>
-            </button>
-          ))}
-        </div>
-      </SettingsGroup>
+      <ThemeSettings />
       <FontSettings />
       <SettingsGroup
         title={t("appearance.motion")}

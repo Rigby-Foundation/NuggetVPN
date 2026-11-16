@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@/lib/backend";
 
 /**
- * Subscription providers' images (logo, card background), as data URLs; the
+ * Subscription providers' images (logo and banner), as data URLs; the
  * backend downloads each once and keeps it (see app.GetBrandingImages). Kept
  * for the session here too, so a card drawn again draws at once.
  */

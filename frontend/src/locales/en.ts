@@ -644,9 +644,13 @@ const en = {
     "theme.everforest.hint": "Forest greens, easy on the eyes",
 
     // Theme editor
+    "appearance.wallpaper": "From wallpaper",
+    "appearance.moreThemes": "More themes",
+    "editor.hue": "Hue",
+    "editor.delete": "Delete theme",
     "editor.newTitle": "New theme",
     "editor.editTitle": "Edit theme",
-    "editor.description": "Text stays readable whatever you pick: the accent's brightness is set by the mode.",
+    "editor.description": "Pick a background and an accent, or enter their hex codes.",
     "editor.name": "Theme name",
     "editor.startFrom": "Start from another theme…",
     "editor.startFrom.custom": "Your themes",
@@ -654,7 +658,7 @@ const en = {
     "editor.untitled": "Untitled",
     "editor.background": "Background",
     "editor.accent": "Accent",
-    "color.field": "Hue and vividness",
+    "color.field": "Saturation and brightness",
     "color.hex": "Hex colour",
     "editor.darkness": "Darkness",
     "editor.brightness": "Brightness",
