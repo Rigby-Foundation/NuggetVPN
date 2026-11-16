@@ -23,6 +23,11 @@
     background: var(--accent);
 }
 
+[data-compact] .react-flow__controls-button {
+    width: 36px;
+    height: 36px;
+}
+
 /* The node shells draw their own chrome. */
 .react-flow__node {
     border: none;

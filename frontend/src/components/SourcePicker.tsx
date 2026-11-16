@@ -29,7 +29,7 @@ export function ImportProfilesButton({
         onClick={() => setOpen(true)}
         aria-label={t("add.addProfile")}
         title={t("add.addProfile")}
-        className={compact ? "size-10 shrink-0 p-0" : undefined}
+        className={compact ? "size-10 shrink-0 p-0 compact:size-11" : undefined}
       >
         <Plus className="size-4" aria-hidden="true" />
         {!compact && t("add.addProfile")}
@@ -83,7 +83,7 @@ export function SourcePicker({
       <PopoverTrigger
         disabled={disabled}
         aria-label={t("ui.profileLabel", { name: current.label })}
-        className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-2.5 text-left transition-colors enabled:hover:bg-accent/50"
+        className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-2.5 text-start transition-colors enabled:hover:bg-accent/50 compact:h-11 compact:flex-1"
       >
         <ProviderLogo
           info={current.info}
@@ -98,7 +98,7 @@ export function SourcePicker({
             {current.detail}
           </span>
         </span>
-        <ChevronDown className="ml-2 size-3.5 shrink-0 text-muted-foreground" />
+        <ChevronDown className="ms-2 size-3.5 shrink-0 text-muted-foreground compact:ms-auto" />
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -111,7 +111,7 @@ export function SourcePicker({
           <button
             key={option.key}
             type="button"
-            className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-accent"
+            className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-start hover:bg-accent compact:min-h-11"
             onClick={() => {
               setSelection((previous) =>
                 previous.domain === option.key

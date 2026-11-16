@@ -7,6 +7,7 @@
 @import "@fontsource-variable/manrope";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant compact (&:where([data-compact] *));
 
 html,
 body,
@@ -19,31 +20,75 @@ body,
 
 html {
   color-scheme: light;
-  scrollbar-color: var(--muted-foreground) var(--background);
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 70%, transparent) transparent;
   scrollbar-width: thin;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --app-viewport-height: 100vh;
+  --app-viewport-top: 0px;
+  --app-viewport-bottom: 0px;
+  --app-tab-height: 3.5rem;
+  --app-tabs: 0px;
 }
 
-body.dark {
+html.dark {
   color-scheme: dark;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+@supports (height: 100dvh) {
+  html { --app-viewport-height: 100dvh; }
 }
 
-::-webkit-scrollbar-track {
-  background: var(--background);
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--muted-foreground); border-radius: 999px; }
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border: 2px solid var(--background);
-  border-radius: 999px;
+.app-shell {
+  position: relative;
+  top: var(--app-viewport-top);
+  height: var(--app-viewport-height);
+  min-height: 0;
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  background: var(--sidebar);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+[data-compact] { --app-tabs: var(--app-tab-height); }
+
+.mobile-navigation {
+  padding-bottom: var(--safe-bottom);
+}
+
+[data-compact] [data-slot="dialog-content"] {
+  top: calc(var(--app-viewport-top) + (var(--app-viewport-height) + var(--safe-top) - var(--safe-bottom)) / 2);
+  width: min(100%, calc(100% - 2 * max(var(--safe-left), var(--safe-right)) - 1.5rem));
+  max-height: calc(var(--app-viewport-height) - var(--safe-top) - var(--safe-bottom) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-compact] [data-slot="sheet-content"][data-side="bottom"] {
+  bottom: var(--app-viewport-bottom);
+  max-height: calc(var(--app-viewport-height) - var(--safe-top));
+  padding-bottom: calc(1rem + var(--safe-bottom));
+  padding-left: max(0.75rem, var(--safe-left));
+  padding-right: max(0.75rem, var(--safe-right));
+}
+
+/* Keep the controls finger-sized and prevent WebKit zooming a text field. */
+[data-compact] :is([data-slot="button"], [data-slot="select-trigger"], [data-slot="select-item"], [data-slot="dropdown-menu-item"]) {
+  min-height: 2.5rem;
+}
+
+[data-compact] :is(input:not([type]), input:is([type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"], [type="tel"]), textarea) {
+  font-size: 1rem;
+}
+
+[data-compact] [data-slot="input"] {
+  min-height: 2.75rem;
 }
 
 .window-drag {

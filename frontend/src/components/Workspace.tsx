@@ -26,7 +26,7 @@ export function Workspace({
   return (
     <Page title={title} hideTitle className="min-h-full p-4 sm:p-6">
       <div className="flex flex-col gap-5 py-3 sm:px-4">
-        <header data-page-part="0" className="flex items-center justify-between gap-3">
+        <header data-page-part="0" className="flex items-center justify-between gap-3 compact:flex-wrap">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <Glyph icon={Icon} />
             <div className="min-w-0 space-y-0.5">
@@ -35,7 +35,7 @@ export function Workspace({
             </div>
           </div>
           {actions && (
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>
           )}
         </header>
         {children}
@@ -106,7 +106,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "size-8 rounded-lg text-muted-foreground hover:text-foreground",
+        "size-8 rounded-lg text-muted-foreground hover:text-foreground compact:size-10",
         className,
       )}
       {...props}
@@ -194,7 +194,7 @@ export function SearchField({
   placeholder: string;
 }) {
   return (
-    <label className="flex h-9 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-3 focus-within:ring-2 focus-within:ring-ring/50 sm:basis-0">
+    <label className="flex h-9 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-3 focus-within:ring-2 focus-within:ring-ring/50 sm:basis-0 compact:h-11 compact:basis-full">
       <Search className="size-3.5 shrink-0 text-muted-foreground" />
       <input
         type="search"

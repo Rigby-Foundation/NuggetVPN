@@ -43,6 +43,8 @@ const ja: Messages = {
     "nav.connection": "ホーム",
     "nav.configuration": "プロファイル",
     "nav.proxies": "サーバー",
+    "nav.mobileConfigs": "構成",
+    "nav.mobileRouting": "ルート",
     "nav.routing": "ルーティング",
     "nav.logs": "ログ",
     "nav.connections": "ネットワーク接続",

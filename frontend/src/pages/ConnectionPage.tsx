@@ -7,6 +7,7 @@ import { Page } from "@/components/Page";
 import { ImportProfilesButton, SourcePicker } from "@/components/SourcePicker";
 import { Flag } from "@/components/ui/flag";
 import { useTraffic } from "@/hooks/use-traffic";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { LOCAL, profileDomain } from "@/hooks/use-profiles";
 import { errorMessage } from "@/lib/backend";
 import { withoutFlagEmoji } from "@/lib/flags";
@@ -55,6 +56,7 @@ export default function ConnectionPage() {
   } = vpn;
   const navigate = useNavigate();
   const reducedMotion = useReducedMotion();
+  const compact = useIsMobile();
   const [burst, setBurst] = useState(0);
   const [serverOpen, setServerOpen] = useState(false);
   const [requestError, setRequestError] = useState("");
@@ -173,9 +175,9 @@ export default function ConnectionPage() {
   };
 
   return (
-    <Page title={t("ui.connectionPage")} className="h-full" hideTitle>
+    <Page title={t("ui.connectionPage")} className="h-full compact:h-auto compact:min-h-full compact:p-3" hideTitle>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 pt-1 sm:px-4 sm:pt-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1 pt-1 sm:px-4 sm:pt-3 compact:grid compact:grid-cols-1 compact:gap-2 compact:px-0 compact:pt-0">
           <div
             data-page-part="0"
             className="flex min-w-0 flex-1 items-center gap-2"
@@ -195,7 +197,7 @@ export default function ConnectionPage() {
               data-page-part="1"
               disabled={locked || !vpn.loaded}
               aria-label={t("serverPicker.label", { name: serverName })}
-              className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-3 transition-colors enabled:hover:bg-accent/50 sm:max-w-[52%]"
+              className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-xl border border-border/60 bg-card/70 px-3 transition-colors enabled:hover:bg-accent/50 sm:max-w-[52%] compact:h-11 compact:max-w-full"
             >
               <Flag
                 name={
@@ -212,7 +214,7 @@ export default function ConnectionPage() {
               <span className="truncate text-sm font-medium">
                 {withoutFlagEmoji(serverName) || serverName}
               </span>
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground compact:ms-auto" />
             </PopoverTrigger>
             <PopoverContent
               align="end"
@@ -279,7 +281,7 @@ export default function ConnectionPage() {
                   setServerOpen(false);
                   navigate("/profiles");
                 }}
-                className="flex items-center gap-2.5 rounded-lg border-t border-border/60 px-2.5 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="flex items-center gap-2.5 rounded-lg border-t border-border/60 px-2.5 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground compact:min-h-11"
               >
                 <LayoutGrid className="size-4" aria-hidden="true" />
                 {t("serverPicker.all")}
@@ -289,7 +291,7 @@ export default function ConnectionPage() {
         </div>
 
         {/* Main connection area */}
-        <div className="relative flex-1 min-h-0 flex items-center justify-center">
+        <div className="relative flex-1 min-h-0 flex items-center justify-center compact:min-h-56 compact:flex-col compact:gap-3 compact:pt-4">
           {/* Energy burst */}
           <AnimatePresence>
             {burst > 0 && (
@@ -352,10 +354,10 @@ export default function ConnectionPage() {
           </AnimatePresence>
 
           {/* The entry transition and connection-state movement use separate elements. */}
-          <div data-page-part="2">
+          <div data-page-part="2" className="min-w-0 max-w-full">
             <motion.div
               animate={{
-                y: connected ? -60 : 0,
+                y: connected ? (compact ? -8 : -60) : 0,
               }}
               transition={{
                 duration: reducedMotion ? 0 : 0.45,
@@ -399,7 +401,7 @@ export default function ConnectionPage() {
                 />
               </button>
 
-              <p role="status" className="text-sm text-muted-foreground">
+              <p role="status" className="text-center text-sm text-muted-foreground">
                 {status}
               </p>
               {message && !connected && !connecting && (
@@ -442,10 +444,7 @@ export default function ConnectionPage() {
                   duration: reducedMotion ? 0 : 0.2,
                   ease: "easeOut",
                 }}
-                className="absolute top-[calc(50%+clamp(58px,14vmin,105px))] left-1/2 w-full max-w-2xl px-1"
-                style={{
-                  x: "-50%",
-                }}
+                className="absolute top-[calc(50%+clamp(58px,14vmin,105px))] left-1/2 w-full max-w-2xl -translate-x-1/2 px-1 compact:static compact:translate-x-0 compact:px-0"
               >
                 <div className="grid grid-cols-2 gap-y-3 rounded-xl border border-border/60 bg-background/80 px-2 py-3 sm:grid-cols-4">
                   {stats.map((stat, i) => {
@@ -503,7 +502,7 @@ function ServerOption({
       disabled={disabled}
       title={disabled ? detail : undefined}
       onClick={onSelect}
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:opacity-50 ${selected ? "bg-accent" : "enabled:hover:bg-accent/60"}`}
+      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors disabled:opacity-50 compact:min-h-11 ${selected ? "bg-accent" : "enabled:hover:bg-accent/60"}`}
     >
       <Flag name={name} auto={auto} size={25} />
       <span className="min-w-0 flex-1">

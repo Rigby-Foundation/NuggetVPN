@@ -1,5 +1,4 @@
 import { Minus, MoveDiagonal, Square, X } from "lucide-react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { getPlatform } from "@/lib/platform";
 import { windowAction } from "@/lib/window";
 import Kage from "@/public/kage.svg";
@@ -14,7 +13,7 @@ export function AppHeader() {
   return (
     <header
       data-platform={platform}
-      className={`app-header relative z-20 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center bg-sidebar text-sidebar-foreground ${desktop ? "window-drag" : ""}`}
+      className={`app-header relative z-20 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center bg-sidebar text-sidebar-foreground compact:h-11 ${desktop ? "window-drag" : ""}`}
       onDoubleClick={(event) => {
         if (desktop && !(event.target as HTMLElement).closest("button")) {
           void windowAction("ToggleMaximiseWindow");
@@ -65,7 +64,6 @@ export function AppHeader() {
             ))}
           </div>
         )}
-        <SidebarTrigger className="md:hidden" />
       </div>
       <img
         src={Kage}
@@ -73,7 +71,7 @@ export function AppHeader() {
         width={141}
         height={32}
         draggable={false}
-        className="pointer-events-none block h-7 w-auto translate-y-[12.5%] select-none invert dark:invert-0"
+        className="pointer-events-none block h-7 w-auto translate-y-[12.5%] select-none invert compact:h-5 dark:invert-0"
       />
       <div className="flex h-full items-center justify-end">
         {(platform === "windows" || platform === "linux") && (

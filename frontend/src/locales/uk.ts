@@ -41,6 +41,8 @@ const uk: Messages = {
     "nav.connection": "Головна",
     "nav.configuration": "Профілі",
     "nav.proxies": "Сервери",
+    "nav.mobileConfigs": "Конфіги",
+    "nav.mobileRouting": "Маршрути",
     "nav.routing": "Маршрутизація",
     "nav.logs": "Журнал",
     "nav.connections": "Мережеві з’єднання",

@@ -43,6 +43,8 @@ const zh: Messages = {
     "nav.connection": "首页",
     "nav.configuration": "配置",
     "nav.proxies": "服务器",
+    "nav.mobileConfigs": "配置",
+    "nav.mobileRouting": "路由",
     "nav.routing": "路由",
     "nav.logs": "日志",
     "nav.connections": "网络连接",

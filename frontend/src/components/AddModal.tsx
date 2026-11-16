@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
-import { isAndroid } from "@/lib/platform";
+import { isAndroid, isIOS } from "@/lib/platform";
 
 interface AddModalProps {
   isOpen: boolean;
@@ -109,7 +109,7 @@ function AddModal({
         className="max-h-[calc(100svh-2rem)] overflow-y-auto p-5 sm:max-w-md"
         onPaste={onPaste}
         // On a phone, focusing the field raised the keyboard over the dialog.
-        initialFocus={isAndroid ? false : undefined}
+        initialFocus={isAndroid || isIOS ? false : undefined}
       >
         <DialogHeader>
           <DialogTitle>{t("add.title")}</DialogTitle>
@@ -146,6 +146,9 @@ function AddModal({
             <Textarea
               aria-describedby="config-link-hint"
               id="config-link"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
               placeholder={t("add.linkPlaceholder")}

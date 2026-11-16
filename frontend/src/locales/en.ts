@@ -48,6 +48,8 @@ const en = {
     "nav.connection": "Home",
     "nav.configuration": "Profiles",
     "nav.proxies": "Servers",
+    "nav.mobileConfigs": "Configs",
+    "nav.mobileRouting": "Routing",
     "nav.routing": "Routing",
     "nav.logs": "Logs",
     "nav.connections": "Network connections",

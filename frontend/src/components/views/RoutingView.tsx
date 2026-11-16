@@ -681,7 +681,7 @@ function RoutingCanvas({ settings, hiddenActions, onHideAction, onChange, profil
                 color="color-mix(in srgb, var(--foreground) 10%, transparent)" />
             <Controls showInteractive={false} />
         </ReactFlow>
-        {selectedWire && <div className="nodrag absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 shadow-sm"><span className="text-xs text-muted-foreground">{selectedWire.id === "edge:default" ? t("routing.ui.default") : t("routing.ui.wire")}</span>{selectedWire.id !== "edge:default" && <Button size="sm" variant="secondary" onClick={() => { updateRule(selectedWire.source, { action: "" as RoutingAction, server: "" }); setSelectedWire(null); }}>{t("routing.ui.disconnect")}</Button>}<Button size="sm" variant="ghost" onClick={() => setSelectedWire(null)}>{t("connection.dismiss")}</Button></div>}
+        {selectedWire && <div className="nodrag absolute bottom-3 left-1/2 z-10 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 shadow-sm compact:bottom-16 compact:flex-wrap compact:gap-1"><span className="text-xs text-muted-foreground">{selectedWire.id === "edge:default" ? t("routing.ui.default") : t("routing.ui.wire")}</span>{selectedWire.id !== "edge:default" && <Button size="sm" variant="secondary" onClick={() => { updateRule(selectedWire.source, { action: "" as RoutingAction, server: "" }); setSelectedWire(null); }}>{t("routing.ui.disconnect")}</Button>}<Button size="sm" variant="ghost" onClick={() => setSelectedWire(null)}>{t("connection.dismiss")}</Button></div>}
         </div>
     );
 }
@@ -1236,7 +1236,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
 
     return (
         <div className="absolute inset-0 flex flex-col">
-            <header data-page-part="0" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-10 pt-7 sm:pt-9 pb-4 shrink-0">
+            <header data-page-part="0" className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-10 pt-7 sm:pt-9 pb-4 shrink-0 compact:gap-y-1 compact:px-3 compact:pt-3 compact:pb-2">
                 <div className="min-w-0">
                     <h1 className="sr-only">{t("nav.routing")}</h1>
                     <div className="flex flex-wrap items-center gap-3">
@@ -1248,7 +1248,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                             : t("routing.summary", { count: rules.length, action: defaultLabel })}
                     </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex max-w-full flex-wrap items-center gap-1">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -1351,7 +1351,7 @@ function RoutingView({ settings, onChange: save, onReplace, profiles, connected 
                     {isMobile ? (
                         <Button
                             size="sm"
-                            className="absolute bottom-7 end-3 z-10 h-10 gap-1.5 rounded-full px-4 shadow-lg"
+                            className="absolute bottom-3 end-3 z-10 h-11 gap-1.5 rounded-full px-4 shadow-lg"
                             onClick={() => setPaletteOpen(true)}
                         >
                             <Plus size={16} aria-hidden="true" /> {t("routing.tab.add")}

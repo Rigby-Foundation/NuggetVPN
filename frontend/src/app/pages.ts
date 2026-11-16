@@ -13,6 +13,7 @@ export interface AppPage {
     placement?: "main" | "footer";
     group?: string;
     label?: MessageKey;
+    mobileLabel?: MessageKey;
     /** Use a concrete URL for routes with parameters or wildcards. */
     to?: string;
     /** Set false to keep this item active on child pages. */
@@ -31,7 +32,7 @@ export const pages: readonly AppPage[] = [
     title: "ui.connectionPage",
     icon: EthernetPort,
     load: () => import("@/pages/ConnectionPage"),
-    sidebar: {},
+    sidebar: { mobileLabel: "nav.connection" },
   },
   {
     path: "/profiles",
@@ -45,14 +46,14 @@ export const pages: readonly AppPage[] = [
     title: "ui.configsPage",
     icon: Server,
     load: () => import("@/pages/ConfigsPage"),
-    sidebar: {},
+    sidebar: { mobileLabel: "nav.mobileConfigs" },
   },
   {
     path: "/routing",
     title: "nav.routing",
     icon: Route,
     load: () => import("@/pages/RoutingPage"),
-    sidebar: {},
+    sidebar: { mobileLabel: "nav.mobileRouting" },
   },
   {
     path: settingsPage,

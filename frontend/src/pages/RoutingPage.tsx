@@ -5,7 +5,7 @@ export default function RoutingPage() {
   const { settings, profiles, connection, patchSettings, replaceSettings } =
     useVpn();
   return (
-    <div className="relative h-full min-h-[420px]">
+    <div className="relative h-full min-h-[420px] compact:min-h-64">
       <RoutingView
         settings={settings}
         onChange={patchSettings}

@@ -45,6 +45,8 @@ const fa: Messages = {
     "nav.connection": "خانه",
     "nav.configuration": "پروفایل‌ها",
     "nav.proxies": "سرورها",
+    "nav.mobileConfigs": "پیکربندی",
+    "nav.mobileRouting": "مسیریابی",
     "nav.routing": "مسیریابی",
     "nav.logs": "گزارش‌ها",
     "nav.connections": "اتصال‌های شبکه",

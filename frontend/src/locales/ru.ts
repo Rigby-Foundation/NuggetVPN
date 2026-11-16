@@ -41,6 +41,8 @@ const ru: Messages = {
     "nav.connection": "Главная",
     "nav.configuration": "Профили",
     "nav.proxies": "Серверы",
+    "nav.mobileConfigs": "Конфиги",
+    "nav.mobileRouting": "Маршруты",
     "nav.routing": "Маршрутизация",
     "nav.logs": "Журнал",
     "nav.connections": "Сетевые соединения",

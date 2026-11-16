@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { AppHeader } from "@/components/Header";
+import { MobileNavigation } from "@/components/MobileNavigation";
 import { AppSidebar } from "@/components/Sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useMobileViewport } from "@/hooks/use-mobile-viewport";
 import { useApplyTheme, usePageMotion } from "@/lib/theme";
 import { useApplyFont } from "@/lib/fonts";
 import { useT, type MessageKey } from "@/lib/i18n";
@@ -10,6 +13,8 @@ import { useT, type MessageKey } from "@/lib/i18n";
 export function AppLayout() {
   useApplyTheme();
   useApplyFont();
+  const compact = useIsMobile();
+  useMobileViewport(compact);
   const [pageMotion] = usePageMotion();
   const t = useT();
   const { pathname } = useLocation();
@@ -29,7 +34,7 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <SidebarProvider className="h-svh min-h-0 flex-col overflow-hidden">
+    <SidebarProvider className="app-shell min-h-0 flex-col overflow-hidden">
       <a
         href="#page-content"
         onClick={(event) => {
@@ -42,13 +47,13 @@ export function AppLayout() {
       </a>
       <AppHeader />
       <div className="flex min-h-0 flex-1 bg-sidebar">
-        <AppSidebar />
+        {!compact && <AppSidebar />}
         <main
           id="page-content"
           ref={main}
           tabIndex={-1}
           aria-busy={navigation.state !== "idle"}
-          className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none rounded-ss-3xl border-t border-s bg-background outline-none"
+          className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none rounded-ss-3xl border-t border-s bg-background outline-none compact:rounded-none compact:border-s-0"
         >
           <div
             key={pathname}
@@ -59,6 +64,7 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+      {compact && <MobileNavigation />}
     </SidebarProvider>
   );
 }

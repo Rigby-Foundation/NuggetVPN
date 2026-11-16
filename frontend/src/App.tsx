@@ -18,6 +18,7 @@ export default function App() {
           <ImportLinkDialog />
           <Toaster
             position="bottom-center"
+            containerStyle={{ bottom: "calc(var(--app-viewport-bottom) + var(--safe-bottom) + var(--app-tabs) + 0.75rem)" }}
             toastOptions={{
               style: {
                 background: "var(--card)",

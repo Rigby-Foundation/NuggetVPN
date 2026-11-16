@@ -21,7 +21,7 @@ export function Page({
   return (
     <section className={cn("flex flex-col gap-6 p-6", className)}>
       {!hideTitle && (
-        <div data-page-part="0" className="flex flex-wrap items-start justify-between gap-4">
+        <div data-page-part="0" className="flex flex-wrap items-start justify-between gap-4 compact:gap-3">
           <div className="space-y-1">
             {title && (
               <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

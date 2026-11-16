@@ -1,4 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { invoke } from "@/lib/backend";
+import { hasNativeRuntime, isAndroid, isIOS } from "@/lib/platform";
 export type ThemeChoice = "Light" | "Dark" | "System";
 function storedTheme(): ThemeChoice {
   try {
@@ -64,11 +66,16 @@ export function useApplyTheme() {
   const [theme] = useThemeChoice();
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () =>
-      document.body.classList.toggle(
-        "dark",
-        theme === "Dark" || (theme === "System" && media.matches),
-      );
+    const apply = () => {
+      const dark = theme === "Dark" || (theme === "System" && media.matches);
+      document.documentElement.classList.toggle("dark", dark);
+      if ((isAndroid || isIOS) && hasNativeRuntime()) {
+        void invoke("set_system_bars", {
+          color: dark ? "#18181B" : "#FAFAFA",
+          light: !dark,
+        }).catch(() => undefined);
+      }
+    };
     apply();
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);

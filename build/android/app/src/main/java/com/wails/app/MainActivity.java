@@ -98,12 +98,15 @@ public class MainActivity extends AppCompatActivity {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View container = findViewById(R.id.main_container);
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(container, (view, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(
-                    androidx.core.view.WindowInsetsCompat.Type.systemBars()
-                            | androidx.core.view.WindowInsetsCompat.Type.displayCutout()
-                            | androidx.core.view.WindowInsetsCompat.Type.ime());
+            int paddedTypes = androidx.core.view.WindowInsetsCompat.Type.systemBars()
+                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+                    | androidx.core.view.WindowInsetsCompat.Type.ime();
+            androidx.core.graphics.Insets bars = insets.getInsets(paddedTypes);
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            return insets;
+            // The parent already applied these; don't pass them to WebView twice.
+            return new androidx.core.view.WindowInsetsCompat.Builder(insets)
+                    .setInsets(paddedTypes, androidx.core.graphics.Insets.NONE)
+                    .build();
         });
 
         // Initialize the native Go library, once per process

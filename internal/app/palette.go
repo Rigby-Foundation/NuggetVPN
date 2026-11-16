@@ -3,6 +3,9 @@ package app
 import (
 	"encoding/json"
 	"regexp"
+	"runtime"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // GetSystemPalette returns the system's own colour palette, which the
@@ -22,9 +25,19 @@ var hexColor = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
 // page, as #RRGGBB, with dark icons when light is set. Nothing happens where
 // there are no such bars.
 func (a *App) SetSystemBars(color string, light bool) {
-	if hexColor.MatchString(color) {
-		setSystemBars(color, light)
+	if !hexColor.MatchString(color) {
+		return
 	}
+	if runtime.GOOS == "ios" {
+		// The WebView paints the safe area; UIKit owns the status bar icons.
+		style := `{"style":"light"}`
+		if light {
+			style = `{"style":"dark"}`
+		}
+		application.Mobile.SetStatusBar(style)
+		return
+	}
+	setSystemBars(color, light)
 }
 
 // InstalledApp is an app on the phone, for Applications rules.
