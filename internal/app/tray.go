@@ -21,10 +21,23 @@ import (
 func (a *App) buildTray() {
 	tray := a.app.SystemTray.New()
 	tray.SetTooltip("Kage")
-	tray.SetIcon(a.icon)
+	if runtime.GOOS == "darwin" {
+		// Let macOS render the transparent glyph against the menu bar's
+		// current appearance, including light and dark wallpapers.
+		tray.SetTemplateIcon(a.icon)
+	} else {
+		tray.SetIcon(a.icon)
+	}
 
-	// A left click should reveal the window rather than only open the menu.
-	tray.OnClick(a.ShowWindow)
+	// macOS opens the menu with native tracking when no handler overrides it.
+	// Windows needs an explicit callback; Linux cannot open menus through
+	// Wails yet, so retain its window shortcut.
+	switch runtime.GOOS {
+	case "windows":
+		tray.OnClick(tray.OpenMenu)
+	case "linux":
+		tray.OnClick(a.ShowWindow)
+	}
 	a.tray = tray
 	a.trayLanguage = "en"
 	a.refreshTrayMenu()
