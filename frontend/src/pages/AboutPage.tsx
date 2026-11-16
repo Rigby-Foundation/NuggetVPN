@@ -1,14 +1,11 @@
 import { useEffect, useState, type ComponentProps } from "react";
-import { ArrowLeft, ChevronRight, ExternalLink, Heart, Info, RefreshCw, Scale } from "lucide-react";
-import { Link } from "react-router";
-import { settingsPage } from "@/app/pages";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { ChevronRight, ExternalLink, Heart, Scale } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { errorMessage, invoke, openExternal } from "@/lib/backend";
+import { invoke, openExternal } from "@/lib/backend";
 import { useT } from "@/lib/i18n";
 import { hasNativeRuntime } from "@/lib/platform";
 import wordmark from "@/public/kage.svg";
-import type { UpdateInfo } from "@/types";
 import { version as bundledVersion } from "../../package.json";
 
 const project = {
@@ -43,9 +40,6 @@ function ProjectLink({ href, ...props }: ComponentProps<"a"> & { href: string })
 export default function AboutPage() {
   const t = useT();
   const [version, setVersion] = useState(bundledVersion);
-  const [checking, setChecking] = useState(false);
-  const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -55,36 +49,11 @@ export default function AboutPage() {
     return () => { active = false; };
   }, []);
 
-  async function checkForUpdates() {
-    setChecking(true);
-    setUpdate(null);
-    setError("");
-    try {
-      setUpdate(await invoke<UpdateInfo>("check_for_update"));
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setChecking(false);
-    }
-  }
-
   return (
-    <section className="grid min-h-full grid-rows-[auto_1fr_auto]" aria-labelledby="about-title">
-      <header className="flex min-h-14 items-center gap-2.5 border-b border-border/60 px-3 sm:px-5">
-        <Link
-          to={settingsPage}
-          replace
-          aria-label={t("common.back")}
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <ArrowLeft className="size-4 rtl:rotate-180" aria-hidden="true" />
-        </Link>
-        <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <h1 id="about-title" className="text-base font-semibold">{t("settings.about")}</h1>
-      </header>
-
+    <section className="grid min-h-full grid-rows-[1fr_auto]" aria-labelledby="about-title">
       <div className="grid min-h-72 place-items-center px-5 py-10 text-center">
         <div data-page-part="0" className="flex min-w-0 max-w-full flex-col items-center">
+          <h1 id="about-title" className="sr-only">{t("settings.about")}</h1>
           <img
             src={wordmark}
             alt="Kage"
@@ -96,40 +65,11 @@ export default function AboutPage() {
           <p className="mt-4 text-base font-medium text-muted-foreground">
             {t("updates.version")} <bdi className="font-semibold tabular-nums text-primary">{version}</bdi>
           </p>
-          <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-muted-foreground">
-            {__KAGE_REVISION__ && (
-              <>
-                <span>{t("about.build")} <bdi className="font-mono">{__KAGE_REVISION__}</bdi></span>
-                <span aria-hidden="true" className="text-border">·</span>
-              </>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void checkForUpdates()}
-              disabled={checking}
-              className="px-1.5 text-xs text-muted-foreground"
-            >
-              <RefreshCw className={checking ? "size-3 motion-safe:animate-spin" : "size-3"} aria-hidden="true" />
-              {checking ? t("updates.checking") : t("about.checkUpdates")}
-            </Button>
-          </div>
-          <div aria-live="polite" className="max-w-sm text-xs text-muted-foreground">
-            {error ? (
-              <p className="break-words text-destructive">{error}</p>
-            ) : update ? (
-              update.available ? (
-                <p>
-                  {t("updates.available", { version: update.latest })}{" "}
-                  {update.page_url && (
-                    <ProjectLink href={update.page_url} className="underline underline-offset-3 hover:text-foreground">
-                      {t("updates.page")}
-                    </ProjectLink>
-                  )}
-                </p>
-              ) : t("about.upToDate")
-            ) : null}
-          </div>
+          {__KAGE_REVISION__ && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("about.build")} <bdi className="font-mono">{__KAGE_REVISION__}</bdi>
+            </p>
+          )}
 
           <Dialog>
             <DialogTrigger render={<Button variant="outline" size="sm" className="mt-4 rounded-full px-3 text-muted-foreground" />}>

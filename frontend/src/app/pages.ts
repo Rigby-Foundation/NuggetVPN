@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { EthernetPort, Route, Server, Settings, UserGroup } from "lucide-react";
+import { EthernetPort, Info, Route, Server, Settings, UserGroup } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -60,11 +60,13 @@ export const pages: readonly AppPage[] = [
     title: "nav.settings",
     icon: Settings,
     load: () => import("@/pages/SettingsPage"),
-    sidebar: { end: false },
+    sidebar: {},
   },
   {
     path: aboutPage,
     title: "settings.about",
+    icon: Info,
     load: () => import("@/pages/AboutPage"),
+    sidebar: { placement: "footer", mobileLabel: "about.mobileLabel" },
   },
 ];
