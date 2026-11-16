@@ -108,6 +108,9 @@ func ReceiveLaunchArgs(a *App, args []string) {
 func (a *App) TakePendingLink() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.profileStore.CheckAccess() != nil {
+		return ""
+	}
 	link := a.pendingLink
 	a.pendingLink = ""
 	return link

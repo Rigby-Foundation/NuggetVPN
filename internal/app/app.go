@@ -23,7 +23,6 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/cli"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
@@ -70,10 +69,11 @@ type App struct {
 	// quitting tells the window-close hook to stop swallowing the close.
 	quitting bool
 
-	mu       sync.Mutex
-	profiles []models.Profile
-	settings models.AppSettings
-	state    ConnectionState
+	mu           sync.Mutex
+	profiles     []models.Profile
+	profileStore *storage.ProfileStore
+	settings     models.AppSettings
+	state        ConnectionState
 
 	// connectMu serialises Connect and Disconnect so two clicks cannot race a
 	// half-finished failover sweep.
@@ -138,9 +138,11 @@ type App struct {
 func New(version string, icon []byte, notifier *notifications.NotificationService) *App {
 	_ = storage.EnsureDirs()
 
+	profileStore, profiles := storage.OpenProfiles(storage.ProfilesPath())
 	service := &App{
-		profiles: storage.LoadProfiles(link.DecodeProfileName),
-		settings: storage.LoadSettings(),
+		profiles:     profiles,
+		profileStore: profileStore,
+		settings:     storage.LoadSettings(),
 		core: core.NewClient(
 			storage.ControlSocketPath(),
 			storage.ControlTokenPath(),
@@ -154,14 +156,11 @@ func New(version string, icon []byte, notifier *notifications.NotificationServic
 		notifier: notifier,
 		version:  version,
 	}
-	metadataChanged := false
-	for i := range service.profiles {
-		if link.NormalizeProfileMetadata(&service.profiles[i]) {
-			metadataChanged = true
-		}
+	if profileStore.Status().Enabled {
+		_ = removeCoreConfigMirror()
 	}
-	if metadataChanged {
-		_ = storage.SaveProfiles(service.profiles)
+	if normalizeLoadedProfiles(profiles) {
+		_ = profileStore.Save(profiles)
 	}
 	service.initPluginHost()
 	service.settings.Normalize()
@@ -224,6 +223,9 @@ func (a *App) ServiceShutdown() error {
 	_ = a.statsStore().Save()
 	a.stopCommandLine()
 	a.core.Shutdown()
+	a.mu.Lock()
+	a.profileStore.Close()
+	a.mu.Unlock()
 
 	a.logMu.Lock()
 	defer a.logMu.Unlock()

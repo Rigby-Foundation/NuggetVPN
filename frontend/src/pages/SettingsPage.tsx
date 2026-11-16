@@ -30,6 +30,7 @@ import {
 } from "@/components/Workspace";
 import { SettingsField, SettingsGroup } from "@/components/settings/shell";
 import { BackupPanel } from "@/components/settings/backup";
+import { ProfileEncryptionSettings } from "@/components/settings/profile-encryption";
 import { FontSettings } from "@/components/settings/fonts";
 import { ThemeSettings } from "@/components/settings/themes";
 import { LogsPanel } from "@/components/settings/logs";
@@ -128,6 +129,7 @@ const searchTerms: Partial<Record<SectionId, MessageKey[]>> = {
   subscriptions: ["behaviour.autoUpdate", "identity.userAgent"],
   logs: ["logs.export", "privacy.logs"],
   privacy: [
+    "profileEncryption.title",
     "privacy.ipCheck",
     "privacy.logs",
     "privacy.appStats",
@@ -574,32 +576,35 @@ export default function SettingsPage() {
       break;
     case "privacy":
       detail = (
-        <SettingsGroup>
-          {toggle(
-            "ip_check_enabled",
-            t("privacy.ipCheck"),
-            t("privacy.ipCheck.description"),
-            true,
-          )}
-          {toggle(
-            "logging_enabled",
-            t("privacy.logs"),
-            t("privacy.logs.description"),
-            true,
-          )}
-          {toggle(
-            "app_stats",
-            t("privacy.appStats"),
-            t("privacy.appStats.description"),
-            true,
-          )}
-          {toggle(
-            "server_health",
-            t("privacy.serverHealth"),
-            t("privacy.serverHealth.description"),
-            true,
-          )}
-        </SettingsGroup>
+        <>
+          <ProfileEncryptionSettings />
+          <SettingsGroup>
+            {toggle(
+              "ip_check_enabled",
+              t("privacy.ipCheck"),
+              t("privacy.ipCheck.description"),
+              true,
+            )}
+            {toggle(
+              "logging_enabled",
+              t("privacy.logs"),
+              t("privacy.logs.description"),
+              true,
+            )}
+            {toggle(
+              "app_stats",
+              t("privacy.appStats"),
+              t("privacy.appStats.description"),
+              true,
+            )}
+            {toggle(
+              "server_health",
+              t("privacy.serverHealth"),
+              t("privacy.serverHealth.description"),
+              true,
+            )}
+          </SettingsGroup>
+        </>
       );
       break;
     case "backup":

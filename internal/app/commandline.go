@@ -48,6 +48,9 @@ func (a *App) handleCommand(command string, args []string) (string, any, error) 
 		return describeState(state, a.GetTraffic()), state, nil
 
 	case "connect":
+		if err := a.checkProfileAccess(); err != nil {
+			return "", nil, err
+		}
 		profiles, settings := a.snapshot()
 		var state ConnectionState
 		var err error
@@ -77,6 +80,9 @@ func (a *App) handleCommand(command string, args []string) (string, any, error) 
 		return "Disconnected", state, nil
 
 	case "servers":
+		if err := a.checkProfileAccess(); err != nil {
+			return "", nil, err
+		}
 		profiles, _ := a.snapshot()
 		current := a.GetConnectionState().ProfileID
 		search := strings.ToLower(strings.Join(args, " "))

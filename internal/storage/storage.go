@@ -171,47 +171,6 @@ func EnsureDirs() error {
 	return nil
 }
 
-// LoadProfiles reads profiles.json, returning an empty slice when absent.
-// Profile names are re-decoded on load because some providers percent-encode
-// them more than once.
-func LoadProfiles(decodeName func(string) string) []models.Profile {
-	data, err := os.ReadFile(ProfilesPath())
-	if err != nil {
-		return []models.Profile{}
-	}
-	var profiles []models.Profile
-	if err := json.Unmarshal(data, &profiles); err != nil {
-		return []models.Profile{}
-	}
-
-	changed := false
-	for i := range profiles {
-		if decodeName == nil {
-			break
-		}
-		if decoded := decodeName(profiles[i].Name); decoded != profiles[i].Name {
-			profiles[i].Name = decoded
-			changed = true
-		}
-	}
-	if changed {
-		_ = SaveProfiles(profiles)
-	}
-	return profiles
-}
-
-// SaveProfiles writes profiles.json atomically.
-func SaveProfiles(profiles []models.Profile) error {
-	if profiles == nil {
-		profiles = []models.Profile{}
-	}
-	data, err := json.MarshalIndent(profiles, "", "  ")
-	if err != nil {
-		return err
-	}
-	return writeFile(ProfilesPath(), data)
-}
-
 // LoadSettings reads settings.json, falling back to defaults.
 func LoadSettings() models.AppSettings {
 	settings := models.DefaultSettings()
@@ -238,13 +197,17 @@ func SaveSettings(settings models.AppSettings) error {
 // writeFile writes through a temporary file so a crash mid-write cannot leave a
 // truncated profiles.json behind.
 func writeFile(path string, data []byte) error {
+	return writeFileWithPattern(path, filepath.Base(path)+".*", data)
+}
+
+func writeFileWithPattern(path, pattern string, data []byte) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), pattern)
 	if err != nil {
 		return err
 	}
@@ -252,6 +215,10 @@ func writeFile(path string, data []byte) error {
 	defer os.Remove(tmpName)
 
 	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return err
 	}

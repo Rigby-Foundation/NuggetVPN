@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
 // ---------------------------------------------------------------------------
@@ -62,6 +61,9 @@ type BackupImport struct {
 // ExportBackup saves everything to a file the user picks. ui is the window's
 // own part. An empty path means the dialog was cancelled.
 func (a *App) ExportBackup(ui string) (string, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return "", err
+	}
 	if a.app == nil {
 		return "", errors.New("application is not ready")
 	}
@@ -127,6 +129,9 @@ func (a *App) encodeBackup(settings models.AppSettings, profiles []models.Profil
 // servers and the added fonts and pictures. The window puts its own part
 // back from the result.
 func (a *App) ImportBackup() (BackupImport, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return BackupImport{}, err
+	}
 	if a.app == nil {
 		return BackupImport{}, errors.New("application is not ready")
 	}
@@ -157,6 +162,9 @@ func (a *App) ImportBackup() (BackupImport, error) {
 }
 
 func (a *App) restoreBackup(data []byte) (BackupImport, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return BackupImport{}, err
+	}
 	var backup Backup
 	if err := json.Unmarshal(data, &backup); err != nil || backup.Format != backupFormat {
 		return BackupImport{}, errors.New("that is not a Kage backup")
@@ -206,7 +214,12 @@ func (a *App) restoreBackup(data []byte) (BackupImport, error) {
 	for index := range backup.Profiles {
 		backup.Profiles[index].ConfigLink = strings.TrimSpace(backup.Profiles[index].ConfigLink)
 	}
-	profiles := a.replaceProfiles(backup.Profiles)
+	profiles, err := a.editProfiles(func([]models.Profile) ([]models.Profile, error) {
+		return backup.Profiles, nil
+	})
+	if err != nil {
+		return BackupImport{}, err
+	}
 	saved, err := a.SaveSettings(settings)
 	if err != nil {
 		return BackupImport{}, err
@@ -214,6 +227,5 @@ func (a *App) restoreBackup(data []byte) (BackupImport, error) {
 	if err := a.registerHotkey(saved.GlobalShortcut); err != nil {
 		a.appendLog("WARN global shortcut: " + err.Error())
 	}
-	_ = storage.SaveProfiles(profiles)
 	return BackupImport{Imported: true, Settings: saved, Profiles: profiles, UI: backup.UI}, nil
 }

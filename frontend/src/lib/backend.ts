@@ -34,6 +34,10 @@ const SERVICE = "github.com/Rigby-Foundation/NuggetVPN/internal/app.App";
  */
 const COMMANDS: Record<string, { method: string; args: string[] }> = {
     get_profiles: { method: "GetProfiles", args: [] },
+    get_profile_encryption: { method: "GetProfileEncryption", args: [] },
+    enable_profile_encryption: { method: "EnableProfileEncryption", args: ["password", "strength"] },
+    unlock_profiles: { method: "UnlockProfiles", args: ["password"] },
+    disable_profile_encryption: { method: "DisableProfileEncryption", args: ["password"] },
     add_profile: { method: "AddProfile", args: ["name", "link"] },
     delete_profile: { method: "DeleteProfile", args: ["id"] },
     delete_profiles_by_source: { method: "DeleteProfilesBySource", args: ["sourceDomain"] },

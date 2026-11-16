@@ -16,6 +16,12 @@ export interface Profile {
     subscription_info?: SubscriptionInfo | null;
 }
 
+export interface ProfileEncryptionStatus {
+    enabled: boolean;
+    locked: boolean;
+    unavailable: boolean;
+}
+
 /** A subscription's account details; see models.SubscriptionInfo. */
 export interface SubscriptionInfo {
     upload: number;

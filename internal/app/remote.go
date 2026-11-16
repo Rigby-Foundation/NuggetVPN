@@ -3,7 +3,6 @@ package app
 import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 )
 
 // ---------------------------------------------------------------------------
@@ -12,6 +11,9 @@ import (
 
 // ImportSubscription fetches a subscription URL and adds its profiles.
 func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return nil, err
+	}
 	// A subscription body is read whole; see releaseMemory.
 	defer releaseMemory()
 	settings := a.GetSettings()
@@ -19,7 +21,7 @@ func (a *App) ImportSubscription(url string) ([]models.Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return a.applySubscriptions([]remote.Replacement{replacement}), nil
+	return a.applySubscriptions([]remote.Replacement{replacement})
 }
 
 // RefreshSubscriptionsOnStartup re-fetches every saved subscription.
@@ -33,6 +35,9 @@ func (a *App) RefreshSubscriptionByDomain(sourceDomain string) (remote.RefreshSu
 }
 
 func (a *App) refreshSubscriptions(sourceDomain string) (remote.RefreshSummary, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return remote.RefreshSummary{}, err
+	}
 	// A subscription body is read whole; see releaseMemory.
 	defer releaseMemory()
 	profiles, settings := a.snapshot()
@@ -41,17 +46,15 @@ func (a *App) refreshSubscriptions(sourceDomain string) (remote.RefreshSummary, 
 		return summary, err
 	}
 	if len(replacements) != 0 {
-		a.applySubscriptions(replacements)
+		_, err = a.applySubscriptions(replacements)
 	}
-	return summary, nil
+	return summary, err
 }
 
-func (a *App) applySubscriptions(replacements []remote.Replacement) []models.Profile {
-	a.mu.Lock()
-	profiles := a.replaceProfilesLocked(remote.Apply(a.profiles, replacements))
-	a.mu.Unlock()
-	_ = storage.SaveProfiles(profiles)
-	return profiles
+func (a *App) applySubscriptions(replacements []remote.Replacement) ([]models.Profile, error) {
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		return remote.Apply(profiles, replacements), nil
+	})
 }
 
 // LoginUser authenticates against the profile sync server.
@@ -66,12 +69,18 @@ func (a *App) RegisterUser(server, username, password string) (string, error) {
 
 // PushProfilesToServer uploads local profiles.
 func (a *App) PushProfilesToServer(settings models.AppSettings) (string, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return "", err
+	}
 	profiles, settings := a.snapshot()
 	return a.remote.PushProfiles(a.context(), settings, profiles)
 }
 
 // PullProfilesFromServer replaces local profiles with the server's copy.
 func (a *App) PullProfilesFromServer(settings models.AppSettings) ([]models.Profile, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return nil, err
+	}
 	profiles, err := a.remote.PullProfiles(a.context(), settings)
 	if err != nil {
 		return nil, err
@@ -79,5 +88,7 @@ func (a *App) PullProfilesFromServer(settings models.AppSettings) ([]models.Prof
 	if len(profiles) == 0 {
 		return a.GetProfiles(), nil
 	}
-	return a.replaceProfiles(profiles), nil
+	return a.editProfiles(func([]models.Profile) ([]models.Profile, error) {
+		return profiles, nil
+	})
 }

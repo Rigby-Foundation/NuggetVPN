@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v3 v3.0.0
 	github.com/xtls/xray-core v1.260327.1-0.20261114155821-5d17b872edde
+	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.45.0
 	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
@@ -53,7 +54,6 @@ require (
 	github.com/xtls/reality v0.0.0-20261108101329-4bb46b2afd8b // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20261020153306-9f2b28d4331a // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/sync v0.24.0 // indirect

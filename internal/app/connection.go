@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/Rigby-Foundation/NuggetVPN/internal/stats"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
-	"os"
 )
 
 type ConnectionState struct {
@@ -308,6 +308,9 @@ func (a *App) connect(sourceDomain, mode, profileID string, generation uint64) (
 	defer a.connectMu.Unlock()
 	if a.connectGen.Load() != generation {
 		return a.GetConnectionState(), fmt.Errorf("superseded")
+	}
+	if err := a.checkProfileAccess(); err != nil {
+		return a.GetConnectionState(), err
 	}
 
 	profiles, settings := a.snapshot()
@@ -697,8 +700,10 @@ func (a *App) startProfile(
 	}
 	a.mu.Lock()
 	a.ruleOwners, a.serverFor = result.RuleOwners, result.ServerFor
+	if a.profileStore.CheckAccess() == nil && !a.profileEncryptionLocked().Enabled {
+		_ = os.WriteFile(storage.CoreConfigPath(), result.JSON, 0o600)
+	}
 	a.mu.Unlock()
-	_ = os.WriteFile(storage.CoreConfigPath(), result.JSON, 0o600)
 	a.appendLog(fmt.Sprintf("Starting %s with Xray", profile.Name))
 	return a.core.StartConfigured(result.JSON, result.Script, len(result.RuleOwners))
 }

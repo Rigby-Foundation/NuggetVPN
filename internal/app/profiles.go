@@ -2,13 +2,13 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
 	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
 )
 
@@ -24,23 +24,30 @@ func (a *App) snapshot() ([]models.Profile, models.AppSettings) {
 	return profiles, a.settings
 }
 
-func (a *App) replaceProfiles(profiles []models.Profile) []models.Profile {
+// editProfiles applies a mutation to the latest list and commits it before
+// publishing it in memory. Refreshes and traffic updates share this lock.
+func (a *App) editProfiles(edit func([]models.Profile) ([]models.Profile, error)) ([]models.Profile, error) {
 	a.mu.Lock()
-	snapshot := a.replaceProfilesLocked(profiles)
-	a.mu.Unlock()
-
-	_ = storage.SaveProfiles(snapshot)
-	return snapshot
+	defer a.mu.Unlock()
+	if err := a.profileStore.CheckAccess(); err != nil {
+		return nil, err
+	}
+	profiles, err := edit(slices.Clone(a.profiles))
+	if err != nil {
+		return nil, err
+	}
+	return a.replaceProfilesLocked(profiles)
 }
 
-func (a *App) replaceProfilesLocked(profiles []models.Profile) []models.Profile {
+func (a *App) replaceProfilesLocked(profiles []models.Profile) ([]models.Profile, error) {
 	for i := range profiles {
 		link.NormalizeProfileMetadata(&profiles[i])
 	}
+	if err := a.profileStore.Save(profiles); err != nil {
+		return nil, err
+	}
 	a.profiles = profiles
-	snapshot := make([]models.Profile, len(profiles))
-	copy(snapshot, profiles)
-	return snapshot
+	return append([]models.Profile{}, profiles...), nil
 }
 
 // GetProfiles returns every saved profile.
@@ -55,8 +62,10 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 	if trimmed == "" {
 		return nil, fmt.Errorf("a config link is required")
 	}
-	profiles, settings := a.snapshot()
-	if err := checkProfile(settings, models.Profile{ConfigLink: trimmed}); err != nil {
+	if err := a.checkProfileAccess(); err != nil {
+		return nil, err
+	}
+	if err := checkProfile(a.GetSettings(), models.Profile{ConfigLink: trimmed}); err != nil {
 		return nil, fmt.Errorf("invalid Xray config: %w", err)
 	}
 
@@ -65,8 +74,7 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 		resolved = link.ExtractName(trimmed)
 	}
 	zero := uint64(0)
-
-	profiles = append(profiles, models.Profile{
+	profile := models.Profile{
 		ID:           uuid.NewString(),
 		Name:         resolved,
 		Description:  link.ExtractDescription(trimmed),
@@ -76,68 +84,58 @@ func (a *App) AddProfile(name, configLink string) ([]models.Profile, error) {
 		SourceDomain: "local",
 		TotalUp:      &zero,
 		TotalDown:    &zero,
+	}
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		return append(profiles, profile), nil
 	})
-	return a.replaceProfiles(profiles), nil
 }
 
 // DeleteProfile removes one profile by id.
 func (a *App) DeleteProfile(id string) ([]models.Profile, error) {
-	profiles, _ := a.snapshot()
-	kept := profiles[:0]
-	for _, profile := range profiles {
-		if profile.ID != id {
-			kept = append(kept, profile)
-		}
-	}
-	return a.replaceProfiles(kept), nil
+	return a.DeleteProfilesByIds([]string{id})
 }
 
 // DeleteProfilesBySource removes every profile from one subscription.
 func (a *App) DeleteProfilesBySource(sourceDomain string) ([]models.Profile, error) {
 	target := strings.TrimSpace(sourceDomain)
-	profiles, _ := a.snapshot()
-	kept := profiles[:0]
-	for _, profile := range profiles {
-		if profile.NormalizedSourceDomain() != target {
-			kept = append(kept, profile)
-		}
-	}
-	return a.replaceProfiles(kept), nil
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		return slices.DeleteFunc(profiles, func(profile models.Profile) bool {
+			return profile.NormalizedSourceDomain() == target
+		}), nil
+	})
 }
 
 // DeleteProfilesByIds removes a batch of profiles.
 func (a *App) DeleteProfilesByIds(ids []string) ([]models.Profile, error) {
-	profiles, _ := a.snapshot()
 	if len(ids) == 0 {
-		return profiles, nil
+		return a.GetProfiles(), a.checkProfileAccess()
 	}
 	remove := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		remove[id] = true
 	}
-	kept := profiles[:0]
-	for _, profile := range profiles {
-		if !remove[profile.ID] {
-			kept = append(kept, profile)
-		}
-	}
-	return a.replaceProfiles(kept), nil
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		return slices.DeleteFunc(profiles, func(profile models.Profile) bool {
+			return remove[profile.ID]
+		}), nil
+	})
 }
 
 // SetFavorites stars or unstars servers. Starred servers are listed first,
 // and a subscription refresh keeps the star on each.
 func (a *App) SetFavorites(ids []string, favorite bool) ([]models.Profile, error) {
-	profiles, _ := a.snapshot()
 	wanted := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		wanted[id] = true
 	}
-	for index := range profiles {
-		if wanted[profiles[index].ID] {
-			profiles[index].Favorite = favorite
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		for index := range profiles {
+			if wanted[profiles[index].ID] {
+				profiles[index].Favorite = favorite
+			}
 		}
-	}
-	return a.replaceProfiles(profiles), nil
+		return profiles, nil
+	})
 }
 
 // ShareLinks returns a share link for every server in the given profiles, in
@@ -145,6 +143,9 @@ func (a *App) SetFavorites(ids []string, favorite bool) ([]models.Profile, error
 // config, one link per server in it. Profiles with nothing shareable are
 // skipped; an error means none of them had anything.
 func (a *App) ShareLinks(ids []string) ([]link.SharedLink, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return nil, err
+	}
 	profiles, _ := a.snapshot()
 	byID := make(map[string]models.Profile, len(profiles))
 	for _, profile := range profiles {
@@ -177,18 +178,10 @@ func (a *App) UpdateProfile(id, name, configLink string) ([]models.Profile, erro
 		return nil, fmt.Errorf("config link cannot be empty")
 	}
 
-	profiles, settings := a.snapshot()
-	index := -1
-	for i, p := range profiles {
-		if p.ID == id {
-			index = i
-			break
-		}
+	if err := a.checkProfileAccess(); err != nil {
+		return nil, err
 	}
-	if index < 0 {
-		return nil, fmt.Errorf("profile not found: %s", id)
-	}
-
+	settings := a.GetSettings()
 	outbound, err := link.ParseOutbound(trimmedLink, settings)
 	if err != nil {
 		return nil, fmt.Errorf("invalid config link: %w", err)
@@ -201,22 +194,28 @@ func (a *App) UpdateProfile(id, name, configLink string) ([]models.Profile, erro
 	if resolvedName == "" {
 		resolvedName = link.ExtractName(trimmedLink)
 	}
-	if resolvedName == "" {
-		resolvedName = profiles[index].Name
-	}
-
 	server := outbound.Server()
 	if server == "" {
 		server = "Auto"
 	}
 
-	profiles[index].Name = resolvedName
-	profiles[index].Description = link.ExtractDescription(trimmedLink)
-	profiles[index].ConfigLink = trimmedLink
-	profiles[index].Server = server
-	profiles[index].Protocol = link.DetectProtocol(trimmedLink)
-
-	return a.replaceProfiles(profiles), nil
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		for i := range profiles {
+			profile := &profiles[i]
+			if profile.ID != id {
+				continue
+			}
+			if resolvedName != "" {
+				profile.Name = resolvedName
+			}
+			profile.Description = link.ExtractDescription(trimmedLink)
+			profile.ConfigLink = trimmedLink
+			profile.Server = server
+			profile.Protocol = link.DetectProtocol(trimmedLink)
+			return profiles, nil
+		}
+		return nil, fmt.Errorf("profile not found: %s", id)
+	})
 }
 
 // UpdateSubscriptionURL changes the subscription URL for a subscription domain.
@@ -225,22 +224,26 @@ func (a *App) UpdateSubscriptionURL(domain, newURL string) ([]models.Profile, er
 	if trimmedURL == "" {
 		return nil, fmt.Errorf("subscription URL cannot be empty")
 	}
-	profiles, _ := a.snapshot()
-	updated := false
-	for i := range profiles {
-		if profiles[i].NormalizedSourceDomain() == domain {
-			profiles[i].SubscriptionURL = trimmedURL
-			updated = true
+	return a.editProfiles(func(profiles []models.Profile) ([]models.Profile, error) {
+		updated := false
+		for i := range profiles {
+			if profiles[i].NormalizedSourceDomain() == domain {
+				profiles[i].SubscriptionURL = trimmedURL
+				updated = true
+			}
 		}
-	}
-	if !updated {
-		return nil, fmt.Errorf("subscription domain not found: %s", domain)
-	}
-	return a.replaceProfiles(profiles), nil
+		if !updated {
+			return nil, fmt.Errorf("subscription domain not found: %s", domain)
+		}
+		return profiles, nil
+	})
 }
 
 // ExportConfigs exports the given profiles into sing-box, clash, or xray configuration.
 func (a *App) ExportConfigs(ids []string, format string, full bool) (string, error) {
+	if err := a.checkProfileAccess(); err != nil {
+		return "", err
+	}
 	profiles, settings := a.snapshot()
 	byID := make(map[string]models.Profile, len(profiles))
 	for _, p := range profiles {

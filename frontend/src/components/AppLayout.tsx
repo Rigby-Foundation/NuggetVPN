@@ -3,6 +3,7 @@ import { Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useVpn } from "@/app/vpn-context";
 import { AppHeader } from "@/components/Header";
 import { MobileNavigation } from "@/components/MobileNavigation";
+import { LockedProfiles } from "@/components/settings/profile-encryption";
 import { AppSidebar } from "@/components/Sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -12,7 +13,7 @@ import { useApplyFont } from "@/lib/fonts";
 import { useT, type MessageKey } from "@/lib/i18n";
 
 export function AppLayout() {
-  const { plugins } = useVpn();
+  const { plugins, profileEncryption } = useVpn();
   useApplyTheme(plugins);
   useApplyFont();
   const compact = useIsMobile();
@@ -25,10 +26,12 @@ export function AppLayout() {
   const main = useRef<HTMLElement>(null);
   const handle = matches.at(-1)?.handle as { title?: MessageKey } | undefined;
   const title = handle?.title && t(handle.title);
+  const locked = profileEncryption?.locked;
 
   useEffect(() => {
-    document.title = title ? `${title} — Kage` : "Kage";
-  }, [title]);
+    const pageTitle = locked ? t("profileEncryption.locked") : title;
+    document.title = pageTitle ? `${pageTitle} — Kage` : "Kage";
+  }, [locked, t, title]);
 
   useEffect(() => {
     main.current?.scrollTo(0, 0);
@@ -49,7 +52,7 @@ export function AppLayout() {
       </a>
       <AppHeader />
       <div className="flex min-h-0 flex-1 bg-sidebar">
-        {!compact && <AppSidebar />}
+        {!compact && !locked && <AppSidebar />}
         <main
           id="page-content"
           ref={main}
@@ -62,11 +65,11 @@ export function AppLayout() {
             data-page-motion={pageMotion}
             className="h-full"
           >
-            <Outlet />
+            {locked ? <LockedProfiles unavailable={profileEncryption.unavailable} /> : <Outlet />}
           </div>
         </main>
       </div>
-      {compact && <MobileNavigation />}
+      {compact && !locked && <MobileNavigation />}
     </SidebarProvider>
   );
 }

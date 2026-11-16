@@ -5,11 +5,11 @@ import { EVENTS, invoke, listen } from "@/lib/backend";
 import { hasNativeRuntime } from "@/lib/platform";
 
 export function ImportLinkDialog() {
-  const { loaded, addProfile, importSubscription } = useVpn();
+  const { loaded, profileEncryption, addProfile, importSubscription } = useVpn();
   const [request, setRequest] = useState<{ link: string; id: number }>();
 
   useEffect(() => {
-    if (!loaded || !hasNativeRuntime()) return;
+    if (!loaded || profileEncryption?.locked || !hasNativeRuntime()) return;
     let active = true;
     let queue = Promise.resolve();
     let id = 0;
@@ -30,7 +30,7 @@ export function ImportLinkDialog() {
       active = false;
       stop();
     };
-  }, [loaded]);
+  }, [loaded, profileEncryption?.locked]);
 
   if (!request) return null;
   return (

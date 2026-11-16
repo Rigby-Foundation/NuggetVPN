@@ -25,6 +25,7 @@ import type {
   AppSettings,
   ConnectionState,
   PluginInfo,
+  ProfileEncryptionStatus,
   ProfilePing,
 } from "@/types";
 
@@ -39,6 +40,7 @@ function useVpnData() {
   const { load, setSelection, profiles, selection } = profileState;
   const [settings, setSettings] = useState<AppSettings>(pendingSettings);
   const [loaded, setLoaded] = useState(!hasNativeRuntime());
+  const [profileEncryption, setProfileEncryption] = useState<ProfileEncryptionStatus>();
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<ConnectionState>({
     status: "idle",
@@ -102,10 +104,11 @@ function useVpnData() {
     if (!hasNativeRuntime()) return;
     const eventVersion = connectionEvents.current;
     try {
-      const [stored, profiles, state] = await Promise.all([
+      const [stored, profiles, state, encryption] = await Promise.all([
         invoke<AppSettings>("get_settings"),
         load(),
         invoke<ConnectionState>("get_connection_state"),
+        invoke<ProfileEncryptionStatus>("get_profile_encryption"),
       ]);
       replaceSettings(stored);
       if (connectionEvents.current === eventVersion) applyConnection(state);
@@ -119,6 +122,7 @@ function useVpnData() {
           }),
         );
       }
+      setProfileEncryption(encryption);
       setError("");
       setLoaded(true);
     } catch (cause) {
@@ -334,6 +338,8 @@ function useVpnData() {
   return useMemo(
     () => ({
       ...profileState,
+      profileEncryption,
+      setProfileEncryption,
       unsupportedProfiles,
       setSelection: selectConnection,
       settings,
@@ -356,6 +362,7 @@ function useVpnData() {
     }),
     [
       profileState,
+      profileEncryption,
       unsupportedProfiles,
       selectConnection,
       settings,

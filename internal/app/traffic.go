@@ -1,11 +1,6 @@
 package app
 
-import (
-	"time"
-
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
-)
+import "time"
 
 type TrafficSample struct {
 	Up        uint64 `json:"up"`
@@ -162,13 +157,14 @@ func (a *App) addProfileUsage(id string, up, down uint64) {
 		}
 		totalDown += down
 		a.profiles[index].TotalDown = &totalDown
-		break
+		err := a.profileStore.Save(a.profiles)
+		a.mu.Unlock()
+		if err != nil {
+			a.appendLog("WARN save profile traffic totals: " + err.Error())
+		}
+		return
 	}
-	snapshot := make([]models.Profile, len(a.profiles))
-	copy(snapshot, a.profiles)
 	a.mu.Unlock()
-
-	_ = storage.SaveProfiles(snapshot)
 }
 
 func saturatingSub(current, previous uint64) uint64 {
