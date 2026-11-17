@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 func TestUnsupportedSavedRulesCannotDisappearOrBroaden(t *testing.T) {

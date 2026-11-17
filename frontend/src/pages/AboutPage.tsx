@@ -11,7 +11,7 @@ import { version as bundledVersion } from "../../package.json";
 const project = {
   name: "Kage",
   license: "MPL-2.0",
-  licenseURL: "https://github.com/Rigby-Foundation/NuggetVPN/blob/main/LICENSE",
+  licenseURL: "https://github.com/Rigby-Foundation/Kage/blob/main/LICENSE",
 };
 
 const credits = [

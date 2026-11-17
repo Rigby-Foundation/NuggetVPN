@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Outbound is a normalized server description. It stays a generic map

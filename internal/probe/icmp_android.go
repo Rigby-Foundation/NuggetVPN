@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/android"
+	"github.com/Rigby-Foundation/Kage/internal/android"
 )
 
 // Pinging from Go on Android.

@@ -5,7 +5,7 @@ package main
 import (
 	"C"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/ios"
+	"github.com/Rigby-Foundation/Kage/internal/ios"
 )
 
 // For iOS builds we export functions for WailsAppDelegate and PacketTunnelProvider.

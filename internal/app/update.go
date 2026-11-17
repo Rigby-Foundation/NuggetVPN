@@ -22,7 +22,7 @@ import (
 
 // releasesURL is the newest published release. Drafts are not listed, so a
 // release is only offered once it has been published.
-const releasesURL = "https://api.github.com/repos/Rigby-Foundation/NuggetVPN/releases/latest"
+const releasesURL = "https://api.github.com/repos/Rigby-Foundation/Kage/releases/latest"
 
 // updateProgressEventName carries download progress while an update is
 // being fetched.

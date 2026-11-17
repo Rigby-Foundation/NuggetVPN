@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 const (

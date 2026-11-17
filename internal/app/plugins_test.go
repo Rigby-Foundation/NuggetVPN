@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/plugins"
 )
 
 func pluginTestStore(t *testing.T) (*App, *plugins.Store) {

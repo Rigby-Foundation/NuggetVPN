@@ -3,8 +3,8 @@ package app
 import (
 	"fmt"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------

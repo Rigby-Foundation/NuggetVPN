@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // TestRankByLatencyIsBounded checks the worst case: fifty servers that answer

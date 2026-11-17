@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 func TestCoreSettingsSignatureIgnoresClientAndCanvasChanges(t *testing.T) {

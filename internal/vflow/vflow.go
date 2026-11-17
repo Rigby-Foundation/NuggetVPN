@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Format names the file type inside the file itself.

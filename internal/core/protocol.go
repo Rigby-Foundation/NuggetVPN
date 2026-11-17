@@ -19,7 +19,7 @@ package core
 
 import (
 	"encoding/json"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayruntime"
+	"github.com/Rigby-Foundation/Kage/internal/xrayruntime"
 	"net"
 	"strconv"
 	"strings"

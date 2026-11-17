@@ -6,7 +6,7 @@ Kage is a VPN and proxy client for **macOS, Windows, Linux, Android, and iOS**. 
 
 **Pronunciation:** *KAH-geh*, with a hard **g** and an **e** like the vowel in “get.” The name comes from the Japanese word 影 (かげ), meaning “shadow.” [Japanese dictionary entry](https://dictionary.cambridge.org/us/dictionary/japanese-english/%E5%BD%B1)
 
-[Download Kage](https://github.com/Rigby-Foundation/NuggetVPN/releases) · [CLI guide](docs/cli.md) · [Plugin documentation](docs/plugins/README.md)
+[Download Kage](https://github.com/Rigby-Foundation/Kage/releases) · [CLI guide](docs/cli.md) · [Plugin documentation](docs/plugins/README.md)
 
 Kage was previously called NuggetVPN. Its app ID is now `org.rigbyfoundation.kage`. On desktop, Kage moves the previous app data folder on first launch. On Android and iOS, export a backup from the old app and import it into the new installation to transfer your profiles and settings.
 
@@ -25,13 +25,13 @@ The desktop install scripts download the release and verify its SHA-256 checksum
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/Rigby-Foundation/Kage/main/scripts/install.ps1 | iex
 ```
 
 **macOS and Linux**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/Kage/main/scripts/install.sh | sh
 ```
 
 Linux needs systemd-resolved and `resolvectl` for TUN DNS. The first desktop connection asks for permission to set up the tunnel. On mobile, accept the operating system’s VPN prompt.
@@ -89,8 +89,8 @@ Install **Go 1.27**, **Bun**, and **Wails CLI v3.0.0**. The Go module pins the X
 
 ```sh
 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
-git clone https://github.com/Rigby-Foundation/NuggetVPN.git
-cd NuggetVPN
+git clone https://github.com/Rigby-Foundation/Kage.git
+cd Kage
 make dev
 ```
 

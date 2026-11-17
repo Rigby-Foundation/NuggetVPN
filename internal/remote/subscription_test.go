@@ -3,7 +3,7 @@ package remote
 import (
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 func usage(n uint64) *uint64 { return &n }

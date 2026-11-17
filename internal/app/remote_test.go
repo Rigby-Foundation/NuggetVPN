@@ -12,9 +12,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/remote"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 func TestSyncDownloadKeepsLocalStoreOnFailureAndUsesLocalEncryption(t *testing.T) {

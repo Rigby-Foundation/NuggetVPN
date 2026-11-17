@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
+	"github.com/Rigby-Foundation/Kage/internal/plugins"
 )
 
 func main() {

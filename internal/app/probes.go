@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
+	"github.com/Rigby-Foundation/Kage/internal/probe"
 )
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Match the real NuggetSync contract: append-only POSTs, numeric IDs, and

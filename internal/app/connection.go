@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/probe"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/stats"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/probe"
+	"github.com/Rigby-Foundation/Kage/internal/stats"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/xrayconfig"
 )
 
 type ConnectionState struct {

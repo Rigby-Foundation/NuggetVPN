@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 type IPInfo struct {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // A server written out as a link must parse back into the same server.

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 func TestParseSubscriptionInfo(t *testing.T) {

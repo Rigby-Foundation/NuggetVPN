@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayruntime"
+	"github.com/Rigby-Foundation/Kage/internal/xrayruntime"
 )
 
 var tunnelRunMu sync.Mutex

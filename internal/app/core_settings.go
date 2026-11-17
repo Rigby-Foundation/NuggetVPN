@@ -3,7 +3,7 @@ package app
 import (
 	"encoding/json"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 const coreReloadEventName = "core-reload-requested"

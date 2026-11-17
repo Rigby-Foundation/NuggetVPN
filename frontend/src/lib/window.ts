@@ -1,7 +1,7 @@
 import { Call } from "@wailsio/runtime";
 import { hasNativeRuntime } from "@/lib/platform";
 
-const SERVICE = "github.com/Rigby-Foundation/NuggetVPN/internal/app.App";
+const SERVICE = "github.com/Rigby-Foundation/Kage/internal/app.App";
 
 type WindowAction = "RequestClose" | "MinimiseWindow" | "ToggleMaximiseWindow";
 

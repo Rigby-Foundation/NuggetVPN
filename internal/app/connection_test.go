@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 func TestLocalFailureStopsTheServerHunt(t *testing.T) {

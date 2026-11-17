@@ -1,4 +1,4 @@
-module github.com/Rigby-Foundation/NuggetVPN
+module github.com/Rigby-Foundation/Kage
 
 go 1.27
 

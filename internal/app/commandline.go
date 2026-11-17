@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/cli"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/cli"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 // ---------------------------------------------------------------------------

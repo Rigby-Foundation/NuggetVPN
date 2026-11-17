@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
+	"github.com/Rigby-Foundation/Kage/internal/plugins"
 )
 
 func (a *App) initPluginHost() {

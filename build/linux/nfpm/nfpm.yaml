@@ -12,9 +12,9 @@ maintainer: "Rigby Foundation <noreply@rigbyfoundation.org>"
 description: |
   Modern, lightweight VPN client with an embedded Xray core.
   Supports VLESS (including Reality), VMess, Trojan, Shadowsocks,
-  Hysteria, Hysteria2, TUIC and WireGuard.
+  Hysteria 2, WireGuard, SOCKS5 and HTTP.
 vendor: "Rigby Foundation"
-homepage: "https://github.com/Rigby-Foundation/NuggetVPN"
+homepage: "https://github.com/Rigby-Foundation/Kage"
 license: "MPL-2.0"
 release: "1"
 

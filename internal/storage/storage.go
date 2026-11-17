@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Identifier is the bundle identifier used for per-user directories.

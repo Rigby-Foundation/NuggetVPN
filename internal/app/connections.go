@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
+	"github.com/Rigby-Foundation/Kage/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------

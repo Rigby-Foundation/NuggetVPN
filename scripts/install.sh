@@ -1,7 +1,7 @@
 #!/bin/sh
 # Kage installer for macOS and Linux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Rigby-Foundation/Kage/main/scripts/install.sh | sh
 #
 # Downloads the latest release from GitHub, checks it against the SHA-256
 # GitHub publishes for it, and installs it:
@@ -12,7 +12,7 @@
 
 set -eu
 
-REPO="Rigby-Foundation/NuggetVPN"
+REPO="Rigby-Foundation/Kage"
 API="https://api.github.com/repos/$REPO/releases/latest"
 
 say() { printf '  %s\n' "$*"; }

@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
+	"github.com/Rigby-Foundation/Kage/internal/link"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------

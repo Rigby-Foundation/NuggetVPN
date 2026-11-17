@@ -20,13 +20,13 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/cli"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/autostart"
+	"github.com/Rigby-Foundation/Kage/internal/cli"
+	"github.com/Rigby-Foundation/Kage/internal/core"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/plugins"
+	"github.com/Rigby-Foundation/Kage/internal/remote"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 const (

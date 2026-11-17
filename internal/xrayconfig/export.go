@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/link"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Export uses the same native conversion and validation as a connection.

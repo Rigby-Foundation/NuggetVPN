@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/geodat"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayconfig"
+	"github.com/Rigby-Foundation/Kage/internal/geodat"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/xrayconfig"
 )
 
 // ---------------------------------------------------------------------------

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/link"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 // GetProfileEncryption reports the local profile store's current state.

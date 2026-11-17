@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // XHTTPExtra is the "extra" a provider sends for servers that take uploads

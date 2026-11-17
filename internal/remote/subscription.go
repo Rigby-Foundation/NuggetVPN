@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/link"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 )
 
 // Requests carry the identity headers from settings: some panels gate the

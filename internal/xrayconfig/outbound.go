@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/link"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/link"
+	"github.com/Rigby-Foundation/Kage/internal/models"
 	"github.com/xtls/xray-core/infra/conf"
 )
 

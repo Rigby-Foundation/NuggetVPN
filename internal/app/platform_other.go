@@ -2,7 +2,7 @@
 
 package app
 
-import "github.com/Rigby-Foundation/NuggetVPN/internal/wallpaper"
+import "github.com/Rigby-Foundation/Kage/internal/wallpaper"
 
 // onAndroid is true in the Android build.
 const onAndroid = false

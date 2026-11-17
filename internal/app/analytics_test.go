@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/core"
+	"github.com/Rigby-Foundation/Kage/internal/core"
 )
 
 func TestTrafficAnalyticsAttributesOnlyTheCounterDelta(t *testing.T) {

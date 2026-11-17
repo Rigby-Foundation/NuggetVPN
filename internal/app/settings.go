@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/autostart"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/autostart"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 package app
 
 import (
-	"github.com/Rigby-Foundation/NuggetVPN/internal/android"
+	"github.com/Rigby-Foundation/Kage/internal/android"
 )
 
 // onAndroid is true in the Android build.

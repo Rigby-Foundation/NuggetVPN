@@ -16,9 +16,9 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/plugins"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/storage"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/plugins"
+	"github.com/Rigby-Foundation/Kage/internal/storage"
 )
 
 // ---------------------------------------------------------------------------

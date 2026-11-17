@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/Rigby-Foundation/NuggetVPN/internal/models"
-	"github.com/Rigby-Foundation/NuggetVPN/internal/remote"
+	"github.com/Rigby-Foundation/Kage/internal/models"
+	"github.com/Rigby-Foundation/Kage/internal/remote"
 )
 
 // ---------------------------------------------------------------------------

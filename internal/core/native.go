@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/Rigby-Foundation/NuggetVPN/internal/xrayruntime"
+	"github.com/Rigby-Foundation/Kage/internal/xrayruntime"
 	"sync"
 )
 

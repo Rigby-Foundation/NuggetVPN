@@ -1,6 +1,6 @@
 # Kage installer for Windows.
 #
-#   irm https://raw.githubusercontent.com/Rigby-Foundation/NuggetVPN/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Rigby-Foundation/Kage/main/scripts/install.ps1 | iex
 #
 # Downloads the latest release's installer from GitHub, checks it against the
 # SHA-256 GitHub publishes for it, installs it silently (one UAC prompt), and
@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is many times slower with the bar
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$Repo = 'Rigby-Foundation/NuggetVPN'
+$Repo = 'Rigby-Foundation/Kage'
 
 function Say($text) { Write-Host "  $text" }
 

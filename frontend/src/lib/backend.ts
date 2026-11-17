@@ -25,7 +25,7 @@ import { currentLanguage, translate } from "@/lib/i18n";
  * with every call failing on "unknown bound method name" while the suite
  * stayed green.
  */
-const SERVICE = "github.com/Rigby-Foundation/NuggetVPN/internal/app.App";
+const SERVICE = "github.com/Rigby-Foundation/Kage/internal/app.App";
 
 /**
  * Maps the command names the UI uses onto Go methods. Wails passes arguments
