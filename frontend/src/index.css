@@ -20,7 +20,7 @@ body,
 
 html {
   color-scheme: light;
-  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 70%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
   scrollbar-width: thin;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -42,9 +42,9 @@ html.dark {
 }
 
 @supports not (scrollbar-color: auto) {
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--muted-foreground); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted-foreground) 35%, transparent); border-radius: 999px; }
 }
 
 .app-shell {
@@ -219,6 +219,7 @@ html.dark {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
   }
   body {
     @apply bg-background text-foreground;

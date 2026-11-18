@@ -297,7 +297,7 @@ export default function ConnectionPage() {
             {burst > 0 && (
               <motion.div
                 key={burst}
-                className="absolute inset-[-160px] pointer-events-none z-20"
+                className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
               >
                 <motion.div
                   className="absolute left-1/2 top-1/2 size-40 rounded-full bg-primary/30 blur-3xl"
