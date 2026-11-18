@@ -11,7 +11,7 @@ info:
   description: "Modern, lightweight VPN client with an embedded Xray core" # The application description
   copyright: "(c) 2026, Rigby Foundation" # Copyright text
   comments: "MPL-2.0" # Comments
-  version: "3.0.0" # The application version
+  version: "3.0.1" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"
@@ -20,7 +20,7 @@ info:
 ios:
   bundleID: "org.rigbyfoundation.kage"
   displayName: "Kage"
-  version: "3.0.0"
+  version: "3.0.1"
   company: "Rigby Foundation"
   comments: "MPL-2.0"
   minIOSVersion: "15.0"

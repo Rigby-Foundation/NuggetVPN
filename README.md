@@ -42,7 +42,7 @@ Linux needs systemd-resolved and `resolvectl` for TUN DNS. The first desktop con
 2. Select a configuration, then pick a server or use **Automatic**.
 3. Open **Connection** and press **Connect**. You can switch servers while the tunnel is running.
 
-Kage supports VLESS (including REALITY and XTLS Vision), VMess, Trojan, Shadowsocks, Hysteria 2, WireGuard, SOCKS5, and HTTP. Supported transports include TCP, WebSocket, gRPC, HTTPUpgrade, and XHTTP. Subscriptions can include server groups, descriptions, and usage and expiry information. The default subscription User-Agent is `Kage/3.0.0` and can be changed in Settings.
+Kage supports VLESS (including REALITY and XTLS Vision), VMess, Trojan, Shadowsocks, Hysteria 2, WireGuard, SOCKS5, and HTTP. Supported transports include TCP, WebSocket, gRPC, HTTPUpgrade, and XHTTP. Subscriptions can include server groups, descriptions, and usage and expiry information. The default subscription User-Agent is `Kage/3.0.1` and can be changed in Settings.
 
 ### Import links with `kage://`
 

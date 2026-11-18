@@ -47,7 +47,7 @@ var trayIcon []byte
 
 // version is stamped into the core service handshake so the GUI can detect a
 // service left behind by an older build.
-var version = "3.0.0"
+var version = "3.0.1"
 
 func main() {
 	// Kage status, connect, ...: control the running app and exit.

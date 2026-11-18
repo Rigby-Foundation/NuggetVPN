@@ -156,11 +156,11 @@ func TestBeamUserAgentIsPreserved(t *testing.T) {
 
 func TestLegacyDefaultUserAgentMigratesToKage(t *testing.T) {
 	settings := AppSettings{SubscriptionUserAgent: "NuggetVPN/1.0"}
-	if got := settings.SubscriptionHeaders()["User-Agent"]; got != "Kage/3.0.0" {
+	if got := settings.SubscriptionHeaders()["User-Agent"]; got != "Kage/3.0.1" {
 		t.Fatalf("legacy default would send %q", got)
 	}
 	settings.Normalize()
-	if settings.SubscriptionUserAgent != "Kage/3.0.0" {
+	if settings.SubscriptionUserAgent != "Kage/3.0.1" {
 		t.Fatalf("legacy default normalized to %q", settings.SubscriptionUserAgent)
 	}
 }

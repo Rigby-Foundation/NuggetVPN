@@ -21,7 +21,7 @@ import (
 
 // DefaultUserAgent identifies this app honestly, and is what a provider that
 // does not care will see.
-const DefaultUserAgent = "Kage/3.0.0"
+const DefaultUserAgent = "Kage/3.0.1"
 
 func subscriptionUserAgent(value string) string {
 	switch agent := strings.TrimSpace(value); agent {

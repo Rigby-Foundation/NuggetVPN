@@ -1,6 +1,6 @@
 import type { AppSettings } from "@/types";
 
-export const DEFAULT_USER_AGENT = "Kage/3.0.0";
+export const DEFAULT_USER_AGENT = "Kage/3.0.1";
 
 export const pendingSettings: AppSettings = {
   setup_completed: null,
