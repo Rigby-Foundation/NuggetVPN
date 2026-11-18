@@ -7,12 +7,12 @@ export function MobileNavigation() {
 
   return (
     <nav className="mobile-navigation shrink-0 border-t border-border/60 bg-sidebar" aria-label={t("nav.menu")}>
-      <ul className="mx-auto flex max-w-md gap-1 px-1">
+      <ul className="mx-auto flex max-w-md px-1">
         {pages.map(({ path, title, icon: Icon, sidebar }) => {
           if (!Icon || !sidebar || sidebar.mobile === false || (sidebar.placement === "footer" && !sidebar.mobileLabel)) return null;
           const label = sidebar.label ?? title;
           return (
-            <li key={path} className="min-w-0 flex-1">
+            <li key={path} className="min-w-11 flex-1">
               <NavLink
                 to={sidebar.to ?? path}
                 end={sidebar.end ?? true}

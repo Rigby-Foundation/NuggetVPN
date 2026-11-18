@@ -203,7 +203,7 @@ func Build(request Request) (Result, error) {
 	if err != nil {
 		return result, err
 	}
-	config := map[string]any{"log": buildLog(settings), "inbounds": buildInbounds(settings, request.MixedPort, !request.DisableTUN), "outbounds": outbounds, "dns": dns}
+	config := map[string]any{"log": buildLog(settings), "inbounds": buildInbounds(settings, request.MixedPort, !request.DisableTUN, runtime.GOOS), "outbounds": outbounds, "dns": dns}
 	if len(selectors) > 1 {
 		config["routing"] = map[string]any{"balancers": []any{map[string]any{"tag": "fastest", "selector": selectors, "fallbackTag": ExitTag, "strategy": map[string]any{"type": "leastPing"}}}}
 		config["observatory"] = map[string]any{"subjectSelector": selectors, "probeURL": "https://www.gstatic.com/generate_204", "probeInterval": "3m", "enableConcurrency": true}
@@ -220,19 +220,23 @@ func buildLog(settings models.AppSettings) map[string]any {
 	return map[string]any{"loglevel": level}
 }
 
-func buildInbounds(settings models.AppSettings, port int, tun bool) []map[string]any {
+func buildInbounds(settings models.AppSettings, port int, tun bool, platform string) []map[string]any {
 	inbounds := []map[string]any{}
 	sniff := map[string]any{"enabled": true, "destOverride": []string{"http", "tls", "quic"}, "routeOnly": true}
 	if tun {
 		options := map[string]any{"MTU": settings.MTU, "gateway": []string{"172.19.0.1/30", "fdfe:dcba:9876::1/126"}, "dns": []string{"172.19.0.2"}}
-		if runtime.GOOS != "ios" && runtime.GOOS != "android" {
+		if platform == "ios" || platform == "android" {
+			// Mobile receives an existing VPN descriptor. A name avoids Xray's
+			// unused-name discovery, which Android's sandbox cannot perform.
+			options["name"] = "kage"
+		} else {
 			options["autoSystemRoutingTable"] = []string{"0.0.0.0/0", "::/0"}
 			options["autoOutboundsInterface"] = "auto"
-			if runtime.GOOS == "windows" {
+			if platform == "windows" {
 				options["name"] = "NuggetVPN"
 				options["autoSystemWfpBlockLeak"] = []string{"dns", "misconfigtun"}
 			}
-			if runtime.GOOS == "linux" {
+			if platform == "linux" {
 				options["autoSystemDnsToGateway"] = true
 			}
 		}
@@ -307,7 +311,7 @@ func Lockdown(settings models.AppSettings, ownPath string) (Result, error) {
 		return Result{}, err
 	}
 	config := map[string]any{
-		"log": buildLog(settings), "inbounds": buildInbounds(settings, 0, true),
+		"log": buildLog(settings), "inbounds": buildInbounds(settings, 0, true, runtime.GOOS),
 		"dns":       map[string]any{"tag": "dns-query", "servers": []any{map[string]any{"address": "1.1.1.1"}}},
 		"outbounds": []any{map[string]any{"tag": "drop", "protocol": "blackhole"}, map[string]any{"tag": DirectTag, "protocol": "freedom"}, map[string]any{"tag": "dns-out", "protocol": "dns"}},
 	}

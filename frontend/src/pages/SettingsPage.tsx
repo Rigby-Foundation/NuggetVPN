@@ -19,8 +19,6 @@ import {
   Waypoints,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { Link } from "react-router";
-import { analyticsPage } from "@/app/pages";
 import { useVpn } from "@/app/vpn-context";
 import { Page } from "@/components/Page";
 import { cn } from "@/lib/utils";
@@ -600,10 +598,6 @@ export default function SettingsPage() {
               t("privacy.appStats.description"),
               true,
             )}
-            <SettingsField
-              label={t("stats.analytics")}
-              control={<Button variant="outline" render={<Link to={analyticsPage} />}>{t("stats.open")}</Button>}
-            />
             {toggle(
               "server_health",
               t("privacy.serverHealth"),
@@ -638,7 +632,6 @@ export default function SettingsPage() {
     <Page
       title={t("nav.settings")}
       description={t("settings.description")}
-      actions={<Button variant="outline" className="hidden compact:inline-flex" render={<Link to={analyticsPage} />}>{t("stats.analytics")}</Button>}
       className="@container min-h-full gap-5 px-4 pt-4 pb-0 sm:px-8 sm:pt-8"
     >
       {vpn.error && (

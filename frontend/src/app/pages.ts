@@ -63,7 +63,7 @@ export const pages: readonly AppPage[] = [
     title: "stats.analytics",
     icon: ChartNoAxesColumn,
     load: () => import("@/pages/AnalyticsPage"),
-    sidebar: { mobile: false },
+    sidebar: {},
   },
   {
     path: settingsPage,

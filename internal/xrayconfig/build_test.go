@@ -14,8 +14,10 @@ import (
 	xcore "github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/routing"
 	rsession "github.com/xtls/xray-core/features/routing/session"
+	"github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/infra/conf/serial"
 	_ "github.com/xtls/xray-core/main/distro/all"
+	"github.com/xtls/xray-core/proxy/tun"
 )
 
 func testRequest() Request {
@@ -103,6 +105,41 @@ func TestConfigurationUsesOnlyNativeXray(t *testing.T) {
 		if _, old := outbound["type"]; old {
 			t.Fatal("non-Xray outbound survived")
 		}
+	}
+}
+
+func TestMobileTUNHasExplicitNameForProvidedDescriptor(t *testing.T) {
+	for _, platform := range []string{"android", "ios"} {
+		t.Run(platform, func(t *testing.T) {
+			inbounds := buildInbounds(models.DefaultSettings(), 10808, true, platform)
+			options := inbounds[0]["settings"].(map[string]any)
+			if options["name"] != "kage" {
+				t.Fatal("mobile TUN must skip Xray's sandbox-restricted interface discovery")
+			}
+			for _, key := range []string{"autoSystemRoutingTable", "autoOutboundsInterface", "autoSystemDnsToGateway", "autoSystemWfpBlockLeak"} {
+				if _, exists := options[key]; exists {
+					t.Fatalf("mobile TUN cannot manage desktop interface options: %s", key)
+				}
+			}
+			data, err := json.Marshal(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var config conf.TunConfig
+			if err := json.Unmarshal(data, &config); err != nil {
+				t.Fatal(err)
+			}
+			built, err := config.Build()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if built.(*tun.Config).Name != "kage" {
+				t.Fatal("native Xray replaced the provided mobile TUN name")
+			}
+			if len(inbounds) != 2 || inbounds[1]["protocol"] != "socks" {
+				t.Fatal("mobile proxy listener was lost")
+			}
+		})
 	}
 }
 
