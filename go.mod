@@ -7,7 +7,7 @@ toolchain go1.27.4
 require (
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v3 v3.0.0
-	github.com/xtls/xray-core v1.260327.1-0.20261114155821-5d17b872edde
+	github.com/xtls/xray-core v1.260327.1-0.20261117164350-82b5b76bc510
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.45.0
 	golang.org/x/net v0.62.0
