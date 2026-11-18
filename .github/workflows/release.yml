@@ -176,6 +176,8 @@ jobs:
       matrix:
         arch: [amd64, arm64]
     runs-on: windows-2025
+    env:
+      NSIS_VERSION: "3.13"
     steps:
       - uses: actions/checkout@v4
 
@@ -205,28 +207,35 @@ jobs:
         if: steps.wails-cache.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
+      - name: Cache NSIS
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/nsis-${{ env.NSIS_VERSION }}
+          key: nsis-${{ runner.os }}-${{ runner.arch }}-${{ env.NSIS_VERSION }}
+
       - name: Install NSIS
-        # The installer is built with makensis, which the windows-2025 image
-        # does not ship (GitHub's older Windows images did). Chocolatey when
-        # the image has it, otherwise the official zip.
+        # Use the official portable compiler directly: Chocolatey's package
+        # feed can time out even when the NSIS download itself is available.
         shell: pwsh
         run: |
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            Write-Host "makensis already installed"
-            exit 0
-          }
-          $nsisDir = "${env:ProgramFiles(x86)}\NSIS"
-          if (Get-Command choco -ErrorAction SilentlyContinue) {
-            choco install nsis -y --no-progress
-          } else {
-            $version = "3.11"
-            $zip = Join-Path $env:RUNNER_TEMP "nsis.zip"
-            Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/NSIS%203/$version/nsis-$version.zip" -OutFile $zip -UserAgent "curl/8" -MaximumRedirection 10
+          $version = $env:NSIS_VERSION
+          $nsisDir = Join-Path $env:RUNNER_TEMP "nsis-$version"
+          $compiler = Join-Path $nsisDir "makensis.exe"
+          if (-not (Test-Path $compiler)) {
+            $zip = Join-Path $env:RUNNER_TEMP "nsis-$version.zip"
+            $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/$version/nsis-$version.zip"
+            curl.exe --fail --location --retry 4 --retry-all-errors --retry-delay 5 --connect-timeout 30 --max-time 120 --output $zip $url
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not download NSIS $version after retries."
+            }
             Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP -Force
-            $nsisDir = Join-Path $env:RUNNER_TEMP "nsis-$version"
           }
-          if (-not (Test-Path (Join-Path $nsisDir "makensis.exe"))) {
-            throw "makensis.exe not found in $nsisDir after installing NSIS"
+          if (-not (Test-Path $compiler)) {
+            throw "makensis.exe not found in $nsisDir after extracting NSIS $version."
+          }
+          & $compiler /VERSION
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS $version could not run."
           }
           Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
 
