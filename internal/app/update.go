@@ -73,7 +73,7 @@ func (a *App) CheckForUpdate() (UpdateInfo, error) {
 	info.Notes = latest.Body
 	info.PageURL = latest.HTMLURL
 	info.Available = newerVersion(info.Latest, a.version)
-	if name, size, _, ok := pickAsset(latest); ok {
+	if name, size, _, ok := pickAsset(latest, runtime.GOOS, runtime.GOARCH); ok {
 		info.Asset, info.AssetSize = name, size
 		info.Installable = runtime.GOOS == "windows" || runtime.GOOS == "darwin"
 	}
@@ -110,14 +110,14 @@ func (a *App) latestRelease() (release, error) {
 	return latest, nil
 }
 
-// pickAsset chooses the download for this platform, by the names the
+// pickAsset chooses the download for the platform and architecture, by the names the
 // release workflow gives them.
-func pickAsset(latest release) (name string, size int64, link string, ok bool) {
+func pickAsset(latest release, platform, arch string) (name string, size int64, link string, ok bool) {
 	suffix := map[string]string{
-		"windows": "-windows-amd64-installer.exe",
+		"windows": "-windows-" + arch + "-installer.exe",
 		"darwin":  "-macos-universal.dmg",
 		"linux":   "-linux-amd64.AppImage",
-	}[runtime.GOOS]
+	}[platform]
 	if suffix == "" {
 		return "", 0, "", false
 	}
@@ -143,7 +143,7 @@ func (a *App) InstallUpdate() error {
 		}
 		latest = &fresh
 	}
-	name, size, link, ok := pickAsset(*latest)
+	name, size, link, ok := pickAsset(*latest, runtime.GOOS, runtime.GOARCH)
 	if !ok || (runtime.GOOS != "windows" && runtime.GOOS != "darwin") {
 		return errors.New("no installer for this system; download it from the release page")
 	}

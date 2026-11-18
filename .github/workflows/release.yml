@@ -170,7 +170,11 @@ jobs:
           if-no-files-found: error
 
   windows:
-    name: Windows (installer)
+    name: Windows (${{ matrix.arch }} installer)
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
@@ -227,31 +231,31 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
 
       - name: Package
-        # Produces bin/Kage.exe plus bin/Kage-amd64-installer.exe.
-        run: wails3 task windows:package
+        # Each target packages its matching executable and Wintun driver.
+        run: wails3 task windows:package ARCH=${{ matrix.arch }}
 
       - name: Package the silent installer
-        # bin/Kage-amd64-silent-installer.exe: no pages, starts the app.
-        run: wails3 task windows:create:nsis:silent
+        # No pages; starts the app when installation finishes.
+        run: wails3 task windows:create:nsis:silent ARCH=${{ matrix.arch }}
 
       - name: Archive
         shell: bash
         run: |
           cd bin
-          7z a "Kage-${{ github.ref_name }}-windows-amd64.zip" Kage.exe wintun.dll Wintun-LICENSE.txt
+          7z a "Kage-${{ github.ref_name }}-windows-${{ matrix.arch }}.zip" Kage.exe wintun.dll Wintun-LICENSE.txt
           for installer in *-installer.exe; do
             [ -e "$installer" ] || continue
             # The silent one keeps "silent" in its name: both match the glob.
             case "$installer" in
-              *-silent-installer.exe) mv "$installer" "Kage-${{ github.ref_name }}-windows-amd64-silent-installer.exe" ;;
-              *) mv "$installer" "Kage-${{ github.ref_name }}-windows-amd64-installer.exe" ;;
+              *-silent-installer.exe) mv "$installer" "Kage-${{ github.ref_name }}-windows-${{ matrix.arch }}-silent-installer.exe" ;;
+              *) mv "$installer" "Kage-${{ github.ref_name }}-windows-${{ matrix.arch }}-installer.exe" ;;
             esac
           done
           ls -la
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-package
+          name: windows-${{ matrix.arch }}-package
           path: |
             bin/*.zip
             bin/*-installer.exe

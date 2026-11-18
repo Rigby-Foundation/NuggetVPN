@@ -17,16 +17,19 @@ function Say($text) { Write-Host "  $text" }
 if (-not [Environment]::Is64BitOperatingSystem) {
     throw 'Kage needs 64-bit Windows.'
 }
-if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-    Say 'ARM64 Windows: installing the x64 build, which runs under emulation.'
+# ARCHITEW6432 reports the native architecture when PowerShell runs under emulation.
+$architecture = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') {
+    'arm64'
+} else {
+    'amd64'
 }
 
 Say 'Looking up the latest release...'
 $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" `
     -Headers @{ 'User-Agent' = 'Kage-install'; 'Accept' = 'application/vnd.github+json' }
-$asset = $release.assets | Where-Object { $_.name -like '*-windows-amd64-installer.exe' } | Select-Object -First 1
+$asset = $release.assets | Where-Object { $_.name -like "*-windows-$architecture-installer.exe" } | Select-Object -First 1
 if (-not $asset) {
-    throw "Release $($release.tag_name) has no Windows installer."
+    throw "Release $($release.tag_name) has no Windows $architecture installer."
 }
 
 $target = Join-Path $env:TEMP $asset.name

@@ -145,10 +145,16 @@ jobs:
         include:
           - name: macos-arm64
             runner: macos-15
+            arch: arm64
           - name: linux-amd64
             runner: ubuntu-24.04
+            arch: amd64
           - name: windows-amd64
             runner: windows-2025
+            arch: amd64
+          - name: windows-arm64
+            runner: windows-2025
+            arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -191,14 +197,14 @@ jobs:
 
       - name: Build
         if: runner.os != 'macOS'
-        run: wails3 task build
+        run: wails3 task build ARCH=${{ matrix.arch }}
 
       # A bare Mach-O is not something anyone can run: macOS needs the bundle
       # for its Info.plist, its icon and its signature. `package` depends on
       # `build`, so this still fails on a compile error.
       - name: Package .app
         if: runner.os == 'macOS'
-        run: wails3 task package
+        run: wails3 task package ARCH=${{ matrix.arch }}
 
       # upload-artifact zips without preserving the executable bit, and that
       # also breaks the ad-hoc signature `package` applies — leaving a bundle

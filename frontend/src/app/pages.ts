@@ -14,8 +14,8 @@ export interface AppPage {
     group?: string;
     label?: MessageKey;
     mobileLabel?: MessageKey;
-    /** Set false for pages reached through another screen on phones. */
-    mobile?: boolean;
+    /** Set false to hide on phones, or "more" to place in the More menu. */
+    mobile?: boolean | "more";
     /** Use a concrete URL for routes with parameters or wildcards. */
     to?: string;
     /** Set false to keep this item active on child pages. */
@@ -63,7 +63,7 @@ export const pages: readonly AppPage[] = [
     title: "stats.analytics",
     icon: ChartNoAxesColumn,
     load: () => import("@/pages/AnalyticsPage"),
-    sidebar: {},
+    sidebar: { mobile: "more" },
   },
   {
     path: settingsPage,
@@ -77,6 +77,6 @@ export const pages: readonly AppPage[] = [
     title: "settings.about",
     icon: Info,
     load: () => import("@/pages/AboutPage"),
-    sidebar: { placement: "footer", mobileLabel: "about.mobileLabel" },
+    sidebar: { placement: "footer", mobileLabel: "about.mobileLabel", mobile: "more" },
   },
 ];
